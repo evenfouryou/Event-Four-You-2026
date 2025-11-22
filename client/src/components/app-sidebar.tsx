@@ -9,6 +9,7 @@ import {
   Settings,
   LogOut,
   ShoppingCart,
+  DollarSign,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import {
@@ -93,6 +94,17 @@ export function AppSidebar() {
         title: "Magazzino",
         icon: Warehouse,
         url: "/warehouse",
+        group: "Inventario",
+      }
+    );
+  }
+
+  if (isCompanyAdmin) {
+    menuItems.push(
+      {
+        title: "Listini Prezzi",
+        icon: DollarSign,
+        url: "/price-lists",
         group: "Inventario",
       }
     );

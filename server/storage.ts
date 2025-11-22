@@ -79,6 +79,20 @@ export interface IStorage {
   createStockMovement(movement: InsertStockMovement): Promise<StockMovement>;
   getMovementsByCompany(companyId: string): Promise<StockMovement[]>;
   getMovementsByEvent(eventId: string): Promise<StockMovement[]>;
+  
+  // Price list operations
+  getPriceListsByCompany(companyId: string): Promise<PriceList[]>;
+  getPriceListByIdAndCompany(id: string, companyId: string): Promise<PriceList | undefined>;
+  createPriceList(priceList: InsertPriceList): Promise<PriceList>;
+  updatePriceList(id: string, companyId: string, priceList: Partial<PriceList>): Promise<PriceList | undefined>;
+  deletePriceList(id: string, companyId: string): Promise<boolean>;
+  
+  // Price list item operations
+  getPriceListItems(priceListId: string): Promise<PriceListItem[]>;
+  getPriceListItemWithCompanyCheck(id: string, companyId: string): Promise<PriceListItem | undefined>;
+  createPriceListItem(item: InsertPriceListItem, companyId: string): Promise<PriceListItem>;
+  updatePriceListItem(id: string, companyId: string, item: Partial<PriceListItem>): Promise<PriceListItem | undefined>;
+  deletePriceListItem(id: string, companyId: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -297,6 +311,138 @@ export class DatabaseStorage implements IStorage {
       .from(stockMovements)
       .where(eq(stockMovements.toEventId, eventId))
       .orderBy(stockMovements.createdAt);
+  }
+  
+  // Price list operations
+  async getPriceListsByCompany(companyId: string): Promise<PriceList[]> {
+    return await db
+      .select()
+      .from(priceLists)
+      .where(eq(priceLists.companyId, companyId))
+      .orderBy(priceLists.createdAt);
+  }
+
+  async getPriceList(id: string): Promise<PriceList | undefined> {
+    const [priceList] = await db.select().from(priceLists).where(eq(priceLists.id, id));
+    return priceList;
+  }
+
+  async getPriceListByIdAndCompany(id: string, companyId: string): Promise<PriceList | undefined> {
+    const [priceList] = await db
+      .select()
+      .from(priceLists)
+      .where(and(eq(priceLists.id, id), eq(priceLists.companyId, companyId)));
+    return priceList;
+  }
+
+  async createPriceList(priceListData: InsertPriceList): Promise<PriceList> {
+    const [priceList] = await db.insert(priceLists).values(priceListData).returning();
+    return priceList;
+  }
+
+  async updatePriceList(id: string, companyId: string, priceListData: Partial<PriceList>): Promise<PriceList | undefined> {
+    const [priceList] = await db
+      .update(priceLists)
+      .set({ ...priceListData, updatedAt: new Date() })
+      .where(and(eq(priceLists.id, id), eq(priceLists.companyId, companyId)))
+      .returning();
+    return priceList;
+  }
+
+  async deletePriceList(id: string, companyId: string): Promise<boolean> {
+    return await db.transaction(async (tx) => {
+      const [existing] = await tx
+        .select()
+        .from(priceLists)
+        .where(and(eq(priceLists.id, id), eq(priceLists.companyId, companyId)))
+        .for('update');
+      
+      if (!existing) {
+        return false;
+      }
+
+      await tx.delete(priceListItems).where(eq(priceListItems.priceListId, id));
+      await tx.delete(priceLists).where(eq(priceLists.id, id));
+      return true;
+    });
+  }
+  
+  // Price list item operations
+  async getPriceListItems(priceListId: string): Promise<PriceListItem[]> {
+    return await db
+      .select()
+      .from(priceListItems)
+      .where(eq(priceListItems.priceListId, priceListId))
+      .orderBy(priceListItems.createdAt);
+  }
+
+  async getPriceListItem(id: string): Promise<PriceListItem | undefined> {
+    const [item] = await db.select().from(priceListItems).where(eq(priceListItems.id, id));
+    return item;
+  }
+
+  async createPriceListItem(itemData: InsertPriceListItem, companyId: string): Promise<PriceListItem> {
+    const priceList = await this.getPriceListByIdAndCompany(itemData.priceListId, companyId);
+    if (!priceList) {
+      throw new Error("Price list not found or access denied");
+    }
+
+    const [product] = await db
+      .select()
+      .from(products)
+      .where(and(eq(products.id, itemData.productId), eq(products.companyId, companyId)));
+    if (!product) {
+      throw new Error("Product not found or access denied");
+    }
+
+    const [item] = await db.insert(priceListItems).values(itemData).returning();
+    return item;
+  }
+
+  async updatePriceListItem(id: string, companyId: string, itemData: Partial<PriceListItem>): Promise<PriceListItem | undefined> {
+    const { priceListId, productId, ...safeData } = itemData;
+    
+    const [item] = await db
+      .update(priceListItems)
+      .set({ ...safeData, updatedAt: new Date() })
+      .where(
+        and(
+          eq(priceListItems.id, id),
+          inArray(
+            priceListItems.priceListId,
+            db.select({ id: priceLists.id }).from(priceLists).where(eq(priceLists.companyId, companyId))
+          )
+        )
+      )
+      .returning();
+    return item;
+  }
+
+  async deletePriceListItem(id: string, companyId: string): Promise<boolean> {
+    return await db.transaction(async (tx) => {
+      const [existing] = await tx
+        .select({ item: priceListItems })
+        .from(priceListItems)
+        .innerJoin(priceLists, eq(priceListItems.priceListId, priceLists.id))
+        .where(and(eq(priceListItems.id, id), eq(priceLists.companyId, companyId)))
+        .for('update');
+      
+      if (!existing) {
+        return false;
+      }
+
+      await tx.delete(priceListItems).where(eq(priceListItems.id, id));
+      return true;
+    });
+  }
+
+  async getPriceListItemWithCompanyCheck(itemId: string, companyId: string): Promise<PriceListItem | undefined> {
+    const [item] = await db
+      .select()
+      .from(priceListItems)
+      .innerJoin(priceLists, eq(priceListItems.priceListId, priceLists.id))
+      .where(and(eq(priceListItems.id, itemId), eq(priceLists.companyId, companyId)));
+    return item ? item.price_list_items : undefined;
   }
 }
 

@@ -328,11 +328,17 @@ export const insertPriceListSchema = createInsertSchema(priceLists).omit({
   updatedAt: true,
 });
 
+export const updatePriceListSchema = insertPriceListSchema.partial().omit({ companyId: true });
+
 export const insertPriceListItemSchema = createInsertSchema(priceListItems).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
+}).extend({
+  salePrice: z.coerce.number().positive("Il prezzo di vendita deve essere positivo"),
 });
+
+export const updatePriceListItemSchema = insertPriceListItemSchema.partial().omit({ priceListId: true, productId: true });
 
 export const insertStockMovementSchema = createInsertSchema(stockMovements).omit({
   id: true,
@@ -361,9 +367,11 @@ export type InsertProduct = z.infer<typeof insertProductSchema>;
 
 export type PriceList = typeof priceLists.$inferSelect;
 export type InsertPriceList = z.infer<typeof insertPriceListSchema>;
+export type UpdatePriceList = z.infer<typeof updatePriceListSchema>;
 
 export type PriceListItem = typeof priceListItems.$inferSelect;
 export type InsertPriceListItem = z.infer<typeof insertPriceListItemSchema>;
+export type UpdatePriceListItem = z.infer<typeof updatePriceListItemSchema>;
 
 export type Stock = typeof stocks.$inferSelect;
 

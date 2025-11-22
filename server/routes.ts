@@ -569,6 +569,196 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Price Lists routes
+  app.get('/api/price-lists', isAuthenticated, async (req: any, res) => {
+    try {
+      const companyId = await getUserCompanyId(req);
+      if (!companyId) {
+        return res.status(403).json({ message: "No company associated" });
+      }
+      const priceLists = await storage.getPriceListsByCompany(companyId);
+      res.json(priceLists);
+    } catch (error) {
+      console.error("Error fetching price lists:", error);
+      res.status(500).json({ message: "Failed to fetch price lists" });
+    }
+  });
+
+  app.get('/api/price-lists/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const companyId = await getUserCompanyId(req);
+      if (!companyId) {
+        return res.status(403).json({ message: "No company associated" });
+      }
+
+      const { id } = req.params;
+      const priceList = await storage.getPriceListByIdAndCompany(id, companyId);
+      
+      if (!priceList) {
+        return res.status(404).json({ message: "Price list not found" });
+      }
+      res.json(priceList);
+    } catch (error) {
+      console.error("Error fetching price list:", error);
+      res.status(500).json({ message: "Failed to fetch price list" });
+    }
+  });
+
+  app.post('/api/price-lists', isAuthenticated, async (req: any, res) => {
+    try {
+      const companyId = await getUserCompanyId(req);
+      if (!companyId) {
+        return res.status(403).json({ message: "No company associated" });
+      }
+
+      const { insertPriceListSchema } = await import('@shared/schema');
+      const validated = insertPriceListSchema.parse(req.body);
+
+      const priceList = await storage.createPriceList({
+        ...validated,
+        companyId,
+      });
+      res.json(priceList);
+    } catch (error) {
+      console.error("Error creating price list:", error);
+      res.status(500).json({ message: "Failed to create price list" });
+    }
+  });
+
+  app.patch('/api/price-lists/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const companyId = await getUserCompanyId(req);
+      if (!companyId) {
+        return res.status(403).json({ message: "No company associated" });
+      }
+
+      const { id } = req.params;
+      const { updatePriceListSchema } = await import('@shared/schema');
+      const validated = updatePriceListSchema.parse(req.body);
+
+      const priceList = await storage.updatePriceList(id, companyId, validated);
+      if (!priceList) {
+        return res.status(404).json({ message: "Price list not found" });
+      }
+      res.json(priceList);
+    } catch (error) {
+      console.error("Error updating price list:", error);
+      res.status(500).json({ message: "Failed to update price list" });
+    }
+  });
+
+  app.delete('/api/price-lists/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const companyId = await getUserCompanyId(req);
+      if (!companyId) {
+        return res.status(403).json({ message: "No company associated" });
+      }
+
+      const { id } = req.params;
+      const success = await storage.deletePriceList(id, companyId);
+      
+      if (!success) {
+        return res.status(404).json({ message: "Price list not found" });
+      }
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting price list:", error);
+      res.status(500).json({ message: "Failed to delete price list" });
+    }
+  });
+
+  // Price List Items routes
+  app.get('/api/price-lists/:priceListId/items', isAuthenticated, async (req: any, res) => {
+    try {
+      const companyId = await getUserCompanyId(req);
+      if (!companyId) {
+        return res.status(403).json({ message: "No company associated" });
+      }
+
+      const { priceListId } = req.params;
+      const priceList = await storage.getPriceListByIdAndCompany(priceListId, companyId);
+      
+      if (!priceList) {
+        return res.status(404).json({ message: "Price list not found" });
+      }
+
+      const items = await storage.getPriceListItems(priceListId);
+      res.json(items);
+    } catch (error) {
+      console.error("Error fetching price list items:", error);
+      res.status(500).json({ message: "Failed to fetch price list items" });
+    }
+  });
+
+  app.post('/api/price-lists/:priceListId/items', isAuthenticated, async (req: any, res) => {
+    try {
+      const companyId = await getUserCompanyId(req);
+      if (!companyId) {
+        return res.status(403).json({ message: "No company associated" });
+      }
+
+      const { priceListId } = req.params;
+      const { insertPriceListItemSchema } = await import('@shared/schema');
+      const validated = insertPriceListItemSchema.parse({
+        ...req.body,
+        priceListId,
+      });
+
+      const item = await storage.createPriceListItem(validated, companyId);
+      res.json(item);
+    } catch (error) {
+      console.error("Error creating price list item:", error);
+      if (error instanceof Error && error.message.includes("not found or access denied")) {
+        return res.status(404).json({ message: error.message });
+      }
+      res.status(500).json({ message: "Failed to create price list item" });
+    }
+  });
+
+  app.patch('/api/price-list-items/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const companyId = await getUserCompanyId(req);
+      if (!companyId) {
+        return res.status(403).json({ message: "No company associated" });
+      }
+
+      const { id } = req.params;
+      const { updatePriceListItemSchema } = await import('@shared/schema');
+      const validated = updatePriceListItemSchema.parse(req.body);
+
+      const item = await storage.updatePriceListItem(id, companyId, validated);
+      if (!item) {
+        return res.status(404).json({ message: "Price list item not found" });
+      }
+      res.json(item);
+    } catch (error) {
+      console.error("Error updating price list item:", error);
+      res.status(500).json({ message: "Failed to update price list item" });
+    }
+  });
+
+  app.delete('/api/price-list-items/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const companyId = await getUserCompanyId(req);
+      if (!companyId) {
+        return res.status(403).json({ message: "No company associated" });
+      }
+
+      const { id } = req.params;
+      const success = await storage.deletePriceListItem(id, companyId);
+      
+      if (!success) {
+        return res.status(404).json({ message: "Price list item not found" });
+      }
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting price list item:", error);
+      res.status(500).json({ message: "Failed to delete price list item" });
+    }
+  });
+
   // End of night report
   app.get('/api/reports/end-of-night/:eventId', isAuthenticated, async (req: any, res) => {
     try {
