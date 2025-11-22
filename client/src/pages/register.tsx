@@ -82,10 +82,12 @@ export default function Register() {
               Ti abbiamo inviato un'email di benvenuto all'indirizzo fornito.
               Ora puoi accedere alla piattaforma.
             </p>
-            <Button asChild className="w-full" data-testid="button-go-to-login">
-              <Link href="/api/login">
-                Vai al Login
-              </Link>
+            <Button 
+              className="w-full" 
+              onClick={() => window.location.href = '/api/login'}
+              data-testid="button-go-to-login"
+            >
+              Vai al Login
             </Button>
           </CardContent>
         </Card>
@@ -236,9 +238,14 @@ export default function Register() {
 
                 <p className="text-sm text-center text-muted-foreground">
                   Hai già un account?{" "}
-                  <Link href="/api/login" className="text-primary hover:underline">
+                  <button 
+                    type="button"
+                    onClick={() => window.location.href = '/api/login'} 
+                    className="text-primary hover:underline"
+                    data-testid="link-login"
+                  >
                     Accedi
-                  </Link>
+                  </button>
                 </p>
               </div>
             </form>
