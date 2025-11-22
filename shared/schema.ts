@@ -95,6 +95,8 @@ export const events = pgTable("events", {
   endDatetime: timestamp("end_datetime").notNull(),
   capacity: integer("capacity"),
   status: varchar("status", { length: 50 }).notNull().default('draft'), // draft, scheduled, ongoing, closed
+  priceListId: varchar("price_list_id").references(() => priceLists.id), // for revenue calculation
+  actualRevenue: decimal("actual_revenue", { precision: 10, scale: 2 }), // actual cash/card collected
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -108,6 +110,10 @@ export const eventsRelations = relations(events, ({ one, many }) => ({
   location: one(locations, {
     fields: [events.locationId],
     references: [locations.id],
+  }),
+  priceList: one(priceLists, {
+    fields: [events.priceListId],
+    references: [priceLists.id],
   }),
   stations: many(stations),
   stockMovements: many(stockMovements),
@@ -308,6 +314,12 @@ export const insertEventSchema = createInsertSchema(events).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
+}).extend({
+  actualRevenue: z.coerce.number().nonnegative().optional().or(z.literal(null)),
+});
+
+export const updateEventSchema = insertEventSchema.partial().omit({ companyId: true }).extend({
+  actualRevenue: z.coerce.number().nonnegative().optional().or(z.literal(null)),
 });
 
 export const insertStationSchema = createInsertSchema(stations).omit({

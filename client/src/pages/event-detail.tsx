@@ -37,7 +37,7 @@ import { ArrowLeft, Plus, Users, Package, Warehouse } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { insertStationSchema, type Event, type Station, type InsertStation, type User, type Product } from "@shared/schema";
+import { insertStationSchema, updateEventSchema, type Event, type Station, type InsertStation, type User, type Product, type PriceList } from "@shared/schema";
 
 const transferSchema = z.object({
   productId: z.string().min(1, "Seleziona un prodotto"),
@@ -51,6 +51,7 @@ export default function EventDetail() {
   const { id } = useParams();
   const [stationDialogOpen, setStationDialogOpen] = useState(false);
   const [transferDialogOpen, setTransferDialogOpen] = useState(false);
+  const [revenueFormData, setRevenueFormData] = useState<{ priceListId?: string; actualRevenue?: string }>({});
   const { toast } = useToast();
 
   const { data: event, isLoading: eventLoading } = useQuery<Event>({
@@ -68,6 +69,10 @@ export default function EventDetail() {
 
   const { data: products } = useQuery<Product[]>({
     queryKey: ['/api/products'],
+  });
+
+  const { data: priceLists } = useQuery<PriceList[]>({
+    queryKey: ['/api/price-lists'],
   });
 
   const { data: generalStocks } = useQuery<Array<{
@@ -106,6 +111,27 @@ export default function EventDetail() {
       productId: '',
       stationId: '',
       quantity: '',
+    },
+  });
+
+  const updateEventMutation = useMutation({
+    mutationFn: async (data: { priceListId?: string; actualRevenue?: number | null }) => {
+      await apiRequest('PATCH', `/api/events/${id}`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/events', id] });
+      queryClient.invalidateQueries({ queryKey: ['/api/events', id, 'revenue-analysis'] });
+      toast({
+        title: "Successo",
+        description: "Evento aggiornato con successo",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Errore",
+        description: "Impossibile aggiornare l'evento",
+        variant: "destructive",
+      });
     },
   });
 
@@ -434,6 +460,66 @@ export default function EventDetail() {
           </div>
         )}
       </div>
+
+      <Card className="mb-8">
+        <CardHeader>
+          <CardTitle>Gestione Ricavi</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <label htmlFor="priceListId" className="text-sm font-medium">
+                Listino Prezzi
+              </label>
+              <Select
+                value={revenueFormData.priceListId || event?.priceListId || ""}
+                onValueChange={(value) => setRevenueFormData(prev => ({ ...prev, priceListId: value }))}
+              >
+                <SelectTrigger data-testid="select-price-list">
+                  <SelectValue placeholder="Seleziona listino" />
+                </SelectTrigger>
+                <SelectContent>
+                  {priceLists?.map((priceList) => (
+                    <SelectItem key={priceList.id} value={priceList.id}>
+                      {priceList.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <label htmlFor="actualRevenue" className="text-sm font-medium">
+                Ricavo Effettivo (€)
+              </label>
+              <Input
+                id="actualRevenue"
+                type="number"
+                step="0.01"
+                placeholder="0.00"
+                value={revenueFormData.actualRevenue || event?.actualRevenue || ""}
+                onChange={(e) => setRevenueFormData(prev => ({ ...prev, actualRevenue: e.target.value }))}
+                data-testid="input-actual-revenue"
+              />
+            </div>
+          </div>
+
+          <Button
+            onClick={() => {
+              const data: { priceListId?: string; actualRevenue?: number | null } = {};
+              if (revenueFormData.priceListId !== undefined) data.priceListId = revenueFormData.priceListId;
+              if (revenueFormData.actualRevenue !== undefined) {
+                data.actualRevenue = revenueFormData.actualRevenue === '' ? null : parseFloat(revenueFormData.actualRevenue);
+              }
+              updateEventMutation.mutate(data);
+            }}
+            disabled={updateEventMutation.isPending || (revenueFormData.priceListId === undefined && revenueFormData.actualRevenue === undefined)}
+            data-testid="button-update-revenue"
+          >
+            Salva Ricavi
+          </Button>
+        </CardContent>
+      </Card>
 
       <div className="mb-8">
         <div className="flex items-center justify-between mb-4">

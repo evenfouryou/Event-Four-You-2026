@@ -262,6 +262,85 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.patch('/api/events/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const companyId = await getUserCompanyId(req);
+      if (!companyId) {
+        return res.status(403).json({ message: "No company associated" });
+      }
+
+      const { id } = req.params;
+      const event = await storage.getEvent(id);
+      if (!event || event.companyId !== companyId) {
+        return res.status(404).json({ message: "Event not found" });
+      }
+
+      const validated = updateEventSchema.parse(req.body);
+      const updatedEvent = await storage.updateEvent(id, validated);
+      res.json(updatedEvent);
+    } catch (error: any) {
+      console.error("Error updating event:", error);
+      res.status(400).json({ message: error.message || "Failed to update event" });
+    }
+  });
+
+  app.get('/api/events/:id/revenue-analysis', isAuthenticated, async (req: any, res) => {
+    try {
+      const companyId = await getUserCompanyId(req);
+      if (!companyId) {
+        return res.status(403).json({ message: "No company associated" });
+      }
+
+      const { id } = req.params;
+      const event = await storage.getEvent(id);
+      if (!event || event.companyId !== companyId) {
+        return res.status(404).json({ message: "Event not found" });
+      }
+
+      // Get all consumptions for this event
+      const movements = await db
+        .select()
+        .from(stockMovements)
+        .where(and(eq(stockMovements.toEventId, id), eq(stockMovements.type, 'CONSUME')));
+
+      let theoreticalRevenue = 0;
+
+      // Calculate theoretical revenue
+      if (event.priceListId) {
+        for (const movement of movements) {
+          const priceItem = await db
+            .select()
+            .from(priceListItems)
+            .where(and(
+              eq(priceListItems.priceListId, event.priceListId),
+              eq(priceListItems.productId, movement.productId)
+            ))
+            .limit(1);
+
+          if (priceItem[0]) {
+            const quantity = parseFloat(movement.quantity);
+            const price = parseFloat(priceItem[0].salePrice);
+            theoreticalRevenue += quantity * price;
+          }
+        }
+      }
+
+      const actualRevenue = event.actualRevenue ? parseFloat(event.actualRevenue) : 0;
+      const variance = actualRevenue - theoreticalRevenue;
+      const variancePercent = theoreticalRevenue > 0 ? (variance / theoreticalRevenue) * 100 : 0;
+
+      res.json({
+        theoreticalRevenue,
+        actualRevenue,
+        variance,
+        variancePercent,
+      });
+    } catch (error) {
+      console.error("Error calculating revenue analysis:", error);
+      res.status(500).json({ message: "Failed to calculate revenue analysis" });
+    }
+  });
+
   // ===== STATIONS =====
   app.get('/api/events/:id/stations', isAuthenticated, async (req: any, res) => {
     try {

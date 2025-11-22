@@ -3,9 +3,10 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { FileText, Download, FileSpreadsheet } from "lucide-react";
+import { FileText, Download, FileSpreadsheet, TrendingUp, TrendingDown, DollarSign } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import jsPDF from "jspdf";
 import * as XLSX from "xlsx";
 
@@ -34,6 +35,13 @@ type ReportData = {
   totalCost: number;
 };
 
+type RevenueAnalysis = {
+  theoreticalRevenue: number;
+  actualRevenue: number;
+  variance: number;
+  variancePercent: number;
+};
+
 export default function Reports() {
   const [selectedEventId, setSelectedEventId] = useState<string>("");
 
@@ -43,6 +51,11 @@ export default function Reports() {
 
   const { data: reportData, isLoading: reportLoading } = useQuery<ReportData>({
     queryKey: ['/api/reports/end-of-night', selectedEventId],
+    enabled: !!selectedEventId,
+  });
+
+  const { data: revenueAnalysis } = useQuery<RevenueAnalysis>({
+    queryKey: ['/api/events', selectedEventId, 'revenue-analysis'],
     enabled: !!selectedEventId,
   });
 
@@ -201,6 +214,117 @@ export default function Reports() {
 
       {reportData && !reportLoading && (
         <div className="space-y-6">
+          {revenueAnalysis && revenueAnalysis.theoreticalRevenue > 0 ? (
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Ricavo Teorico</CardTitle>
+                    <DollarSign className="w-4 h-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-semibold" data-testid="text-theoretical-revenue">
+                      €{revenueAnalysis.theoreticalRevenue.toFixed(2)}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Basato sui consumi e listino
+                    </p>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Ricavo Effettivo</CardTitle>
+                    <DollarSign className="w-4 h-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-semibold" data-testid="text-actual-revenue">
+                      €{revenueAnalysis.actualRevenue.toFixed(2)}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Incasso reale dell'evento
+                    </p>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Varianza</CardTitle>
+                    {revenueAnalysis.variance >= 0 ? (
+                      <TrendingUp className="w-4 h-4 text-green-600" />
+                    ) : (
+                      <TrendingDown className="w-4 h-4 text-red-600" />
+                    )}
+                  </CardHeader>
+                  <CardContent>
+                    <div className={`text-2xl font-semibold ${revenueAnalysis.variance >= 0 ? 'text-green-600' : 'text-red-600'}`} data-testid="text-variance">
+                      €{revenueAnalysis.variance.toFixed(2)}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Differenza tra effettivo e teorico
+                    </p>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Varianza %</CardTitle>
+                    {revenueAnalysis.variancePercent >= 0 ? (
+                      <TrendingUp className="w-4 h-4 text-green-600" />
+                    ) : (
+                      <TrendingDown className="w-4 h-4 text-red-600" />
+                    )}
+                  </CardHeader>
+                  <CardContent>
+                    <div className={`text-2xl font-semibold ${revenueAnalysis.variancePercent >= 0 ? 'text-green-600' : 'text-red-600'}`} data-testid="text-variance-percent">
+                      {revenueAnalysis.variancePercent.toFixed(1)}%
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Percentuale di variazione
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Analisi Ricavi</CardTitle>
+                  <CardDescription>Confronto tra ricavo teorico e effettivo</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <BarChart
+                      data={[
+                        {
+                          name: 'Ricavi',
+                          Teorico: revenueAnalysis.theoreticalRevenue,
+                          Effettivo: revenueAnalysis.actualRevenue,
+                        },
+                      ]}
+                      margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="name" />
+                      <YAxis />
+                      <Tooltip />
+                      <Legend />
+                      <Bar dataKey="Teorico" fill="hsl(var(--primary))" />
+                      <Bar dataKey="Effettivo" fill="hsl(var(--accent))" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+            </>
+          ) : revenueAnalysis && revenueAnalysis.theoreticalRevenue === 0 ? (
+            <Card>
+              <CardContent className="p-6 text-center">
+                <p className="text-muted-foreground">
+                  Nessun dato ricavi disponibile. Assicurati di aver assegnato un listino prezzi all'evento e di aver registrato dei consumi.
+                </p>
+              </CardContent>
+            </Card>
+          ) : null}
+
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
