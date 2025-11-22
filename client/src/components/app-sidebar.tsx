@@ -11,6 +11,7 @@ import {
   ShoppingCart,
   DollarSign,
   Upload,
+  FileText,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import {
@@ -78,6 +79,12 @@ export function AppSidebar() {
         title: "Location",
         icon: MapPin,
         url: "/locations",
+        group: "Generale",
+      },
+      {
+        title: "Report",
+        icon: FileText,
+        url: "/reports",
         group: "Generale",
       }
     );
