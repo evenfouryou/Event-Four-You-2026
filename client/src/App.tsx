@@ -20,6 +20,7 @@ import Register from "@/pages/register";
 import PriceLists from "@/pages/price-lists";
 import ImportPage from "@/pages/import";
 import Reports from "@/pages/reports";
+import ReturnToWarehouse from "@/pages/return-to-warehouse";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -71,6 +72,7 @@ function Router() {
               <Route path="/price-lists" component={PriceLists} />
               <Route path="/import" component={ImportPage} />
               <Route path="/reports" component={Reports} />
+              <Route path="/return-to-warehouse" component={ReturnToWarehouse} />
               <Route component={NotFound} />
             </Switch>
           </main>

@@ -522,6 +522,77 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Return stock from event to warehouse
+  app.post('/api/stock/return-to-warehouse', isAuthenticated, async (req: any, res) => {
+    try {
+      const companyId = await getUserCompanyId(req);
+      const userId = req.user.claims.sub;
+      if (!companyId) {
+        return res.status(403).json({ message: "No company associated" });
+      }
+
+      // Validate request body
+      const returnSchema = z.object({
+        eventId: z.string().uuid(),
+        stationId: z.string().uuid().nullable().optional(),
+        productId: z.string().uuid(),
+        quantity: z.coerce.number().positive(),
+      });
+
+      const { eventId, stationId, productId, quantity } = returnSchema.parse(req.body);
+
+      // Execute in transaction for atomicity
+      await db.transaction(async (tx) => {
+        // Decrease from event/station stock
+        const stocks = stationId 
+          ? await storage.getStationStocks(stationId)
+          : await storage.getEventStocks(eventId);
+        const stock = stocks.find(s => String(s.productId) === String(productId));
+        if (!stock || parseFloat(stock.quantity) < parseFloat(quantity)) {
+          throw new Error("Insufficient stock to return");
+        }
+
+        const newEventQty = Math.max(0, parseFloat(stock.quantity) - quantity);
+        await storage.upsertStock({
+          companyId,
+          productId,
+          eventId,
+          stationId: stationId || null,
+          quantity: newEventQty.toString(),
+        });
+
+        // Increase in general warehouse
+        const generalStocks = await storage.getGeneralStocks(companyId);
+        const generalStock = generalStocks.find(s => String(s.productId) === String(productId));
+        const currentGeneralQty = generalStock ? parseFloat(generalStock.quantity) : 0;
+        const newGeneralQty = currentGeneralQty + quantity;
+
+        await storage.upsertStock({
+          companyId,
+          productId,
+          quantity: newGeneralQty.toString(),
+        });
+
+        // Log movement
+        await storage.createStockMovement({
+          companyId,
+          productId,
+          fromEventId: eventId,
+          fromStationId: stationId || null,
+          quantity: quantity.toString(),
+          type: 'RETURN',
+          reason: `Returned to warehouse from ${stationId ? 'station' : 'event'}`,
+          performedBy: userId,
+        });
+      });
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error returning stock:", error);
+      res.status(500).json({ message: "Failed to return stock" });
+    }
+  });
+
   // Stock consumption
   app.post('/api/stock/consume', isAuthenticated, async (req: any, res) => {
     try {

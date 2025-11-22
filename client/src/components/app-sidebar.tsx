@@ -12,6 +12,7 @@ import {
   DollarSign,
   Upload,
   FileText,
+  PackageOpen,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import {
@@ -108,6 +109,12 @@ export function AppSidebar() {
         title: "Import CSV",
         icon: Upload,
         url: "/import",
+        group: "Inventario",
+      },
+      {
+        title: "Rientro Magazzino",
+        icon: PackageOpen,
+        url: "/return-to-warehouse",
         group: "Inventario",
       }
     );

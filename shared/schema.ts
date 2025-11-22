@@ -343,6 +343,8 @@ export const updatePriceListItemSchema = insertPriceListItemSchema.partial().omi
 export const insertStockMovementSchema = createInsertSchema(stockMovements).omit({
   id: true,
   createdAt: true,
+}).extend({
+  type: z.enum(['LOAD', 'UNLOAD', 'TRANSFER', 'CONSUME', 'RETURN']),
 });
 
 // TypeScript types
