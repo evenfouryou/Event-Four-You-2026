@@ -683,7 +683,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Price list not found" });
       }
 
-      const items = await storage.getPriceListItems(priceListId);
+      const items = await storage.getPriceListItems(priceListId, companyId);
       res.json(items);
     } catch (error) {
       console.error("Error fetching price list items:", error);

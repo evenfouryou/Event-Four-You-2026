@@ -29,7 +29,7 @@ type PriceListFormValues = z.infer<typeof priceListSchema>;
 
 const priceListItemSchema = z.object({
   productId: z.string().min(1, "Prodotto richiesto"),
-  salePrice: z.string().min(1, "Prezzo richiesto"),
+  salePrice: z.coerce.number().positive("Il prezzo deve essere maggiore di zero"),
 });
 
 type PriceListItemFormValues = z.infer<typeof priceListItemSchema>;
@@ -80,7 +80,7 @@ export default function PriceLists() {
     resolver: zodResolver(priceListItemSchema),
     defaultValues: {
       productId: "",
-      salePrice: "",
+      salePrice: 0,
     },
   });
 
