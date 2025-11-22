@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Calendar, Package, BarChart3, Users } from "lucide-react";
+import { Link } from "wouter";
 
 export default function Landing() {
   return (
@@ -11,12 +12,21 @@ export default function Landing() {
             <Calendar className="h-6 w-6 text-primary" />
             <h1 className="text-xl font-semibold">Event4U</h1>
           </div>
-          <Button
-            onClick={() => window.location.href = '/api/login'}
-            data-testid="button-login"
-          >
-            Accedi
-          </Button>
+          <div className="flex gap-3">
+            <Button
+              variant="outline"
+              onClick={() => window.location.href = '/api/login'}
+              data-testid="button-login"
+            >
+              Accedi
+            </Button>
+            <Button
+              asChild
+              data-testid="button-register-header"
+            >
+              <Link href="/register">Registrati</Link>
+            </Button>
+          </div>
         </div>
       </header>
 
@@ -31,13 +41,23 @@ export default function Landing() {
               Sistema completo per organizzare eventi, gestire magazzino, 
               tracciare consumi e generare report dettagliati in tempo reale.
             </p>
-            <Button
-              size="lg"
-              onClick={() => window.location.href = '/api/login'}
-              data-testid="button-login-hero"
-            >
-              Inizia Ora
-            </Button>
+            <div className="flex gap-4 justify-center">
+              <Button
+                size="lg"
+                asChild
+                data-testid="button-register-hero"
+              >
+                <Link href="/register">Registrati Ora</Link>
+              </Button>
+              <Button
+                size="lg"
+                variant="outline"
+                onClick={() => window.location.href = '/api/login'}
+                data-testid="button-login-hero"
+              >
+                Accedi
+              </Button>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -100,13 +120,23 @@ export default function Landing() {
               <p className="text-muted-foreground mb-6">
                 Registrati ora e inizia a gestire i tuoi eventi in modo professionale
               </p>
-              <Button
-                size="lg"
-                onClick={() => window.location.href = '/api/login'}
-                data-testid="button-login-footer"
-              >
-                Accedi alla Piattaforma
-              </Button>
+              <div className="flex gap-4 justify-center">
+                <Button
+                  size="lg"
+                  asChild
+                  data-testid="button-register-footer"
+                >
+                  <Link href="/register">Crea Account</Link>
+                </Button>
+                <Button
+                  size="lg"
+                  variant="outline"
+                  onClick={() => window.location.href = '/api/login'}
+                  data-testid="button-login-footer"
+                >
+                  Accedi
+                </Button>
+              </div>
             </div>
           </div>
         </section>

@@ -16,6 +16,7 @@ import Events from "@/pages/events";
 import EventDetail from "@/pages/event-detail";
 import Warehouse from "@/pages/warehouse";
 import ConsumptionTracking from "@/pages/consumption-tracking";
+import Register from "@/pages/register";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -40,6 +41,7 @@ function Router() {
     return (
       <Switch>
         <Route path="/" component={Landing} />
+        <Route path="/register" component={Register} />
         <Route component={NotFound} />
       </Switch>
     );

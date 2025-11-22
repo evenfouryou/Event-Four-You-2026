@@ -81,7 +81,7 @@ export function AppSidebar() {
     );
   }
 
-  if (isCompanyAdmin || isOrganizer || isWarehouse) {
+  if (isCompanyAdmin || isWarehouse) {
     menuItems.push(
       {
         title: "Prodotti",
@@ -105,17 +105,11 @@ export function AppSidebar() {
         icon: Calendar,
         url: "/",
         group: "Operazioni",
-      },
-      {
-        title: "Registra Consumi",
-        icon: ShoppingCart,
-        url: "/consumption",
-        group: "Operazioni",
       }
     );
   }
 
-  if (isOrganizer || isWarehouse) {
+  if (isWarehouse || isBartender) {
     menuItems.push(
       {
         title: "Registra Consumi",

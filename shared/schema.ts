@@ -29,11 +29,13 @@ export const sessions = pgTable(
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   email: varchar("email").unique(),
+  passwordHash: varchar("password_hash"), // For classic email/password registration (optional - null for Replit Auth users)
   firstName: varchar("first_name"),
   lastName: varchar("last_name"),
   profileImageUrl: varchar("profile_image_url"),
   role: varchar("role").notNull().default('organizer'), // super_admin, company_admin, organizer, warehouse, bartender
   companyId: varchar("company_id").references(() => companies.id),
+  emailVerified: boolean("email_verified").default(false), // Email verification status for classic registration
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
