@@ -57,8 +57,7 @@ export default function Home() {
   const { user } = useAuth();
 
   const isSuperAdmin = user?.role === 'super_admin';
-  const isCompanyAdmin = user?.role === 'company_admin';
-  const isOrganizer = user?.role === 'organizer';
+  const isAdmin = user?.role === 'admin';
   const isBartender = user?.role === 'bartender';
 
   const { data: events, isLoading: eventsLoading } = useQuery<Event[]>({
@@ -257,7 +256,7 @@ export default function Home() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
         <div>
           <h1 className="text-2xl font-semibold mb-1">
-            {isOrganizer ? 'Dashboard Organizzatore' : 'Dashboard Admin'}
+            Dashboard Admin
           </h1>
           <p className="text-muted-foreground">
             Panoramica eventi e inventario

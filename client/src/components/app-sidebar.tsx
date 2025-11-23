@@ -38,8 +38,7 @@ export function AppSidebar() {
   if (!user) return null;
 
   const isSuperAdmin = user.role === 'super_admin';
-  const isCompanyAdmin = user.role === 'company_admin';
-  const isOrganizer = user.role === 'organizer';
+  const isAdmin = user.role === 'admin';
   const isWarehouse = user.role === 'warehouse';
   const isBartender = user.role === 'bartender';
 
@@ -68,7 +67,7 @@ export function AppSidebar() {
     );
   }
 
-  if (isCompanyAdmin || isOrganizer) {
+  if (isAdmin) {
     menuItems.push(
       {
         title: "Dashboard",
@@ -97,7 +96,7 @@ export function AppSidebar() {
     );
   }
 
-  if (isCompanyAdmin || isWarehouse) {
+  if (isAdmin || isWarehouse) {
     menuItems.push(
       {
         title: "Prodotti",
@@ -126,7 +125,7 @@ export function AppSidebar() {
     );
   }
 
-  if (isCompanyAdmin) {
+  if (isAdmin) {
     menuItems.push(
       {
         title: "Listini Prezzi",
@@ -159,7 +158,7 @@ export function AppSidebar() {
     );
   }
 
-  if (isCompanyAdmin) {
+  if (isAdmin) {
     menuItems.push(
       {
         title: "Impostazioni",
@@ -188,8 +187,7 @@ export function AppSidebar() {
 
   const roleLabels: Record<string, string> = {
     super_admin: 'Super Admin',
-    company_admin: 'Admin Azienda',
-    organizer: 'Organizzatore',
+    admin: 'Admin',
     warehouse: 'Magazziniere',
     bartender: 'Barista',
   };

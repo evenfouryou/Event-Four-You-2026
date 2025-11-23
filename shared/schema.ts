@@ -33,7 +33,7 @@ export const users = pgTable("users", {
   firstName: varchar("first_name"),
   lastName: varchar("last_name"),
   profileImageUrl: varchar("profile_image_url"),
-  role: varchar("role").notNull().default('organizer'), // super_admin, company_admin, organizer, warehouse, bartender
+  role: varchar("role").notNull().default('admin'), // super_admin, admin, warehouse, bartender
   companyId: varchar("company_id").references(() => companies.id),
   emailVerified: boolean("email_verified").default(false), // Email verification status for classic registration
   createdAt: timestamp("created_at").defaultNow(),
@@ -315,12 +315,12 @@ export const insertEventSchema = createInsertSchema(events).omit({
   createdAt: true,
   updatedAt: true,
 }).extend({
-  actualRevenue: z.coerce.number().nonnegative().optional().or(z.literal(null)),
+  actualRevenue: z.union([z.string(), z.coerce.number(), z.null()]).transform(val => 
+    val === null || val === undefined ? null : typeof val === 'number' ? val.toString() : val
+  ).optional(),
 });
 
-export const updateEventSchema = insertEventSchema.partial().omit({ companyId: true }).extend({
-  actualRevenue: z.coerce.number().nonnegative().optional().or(z.literal(null)),
-});
+export const updateEventSchema = insertEventSchema.partial().omit({ companyId: true });
 
 export const insertStationSchema = createInsertSchema(stations).omit({
   id: true,
@@ -347,7 +347,7 @@ export const insertPriceListItemSchema = createInsertSchema(priceListItems).omit
   createdAt: true,
   updatedAt: true,
 }).extend({
-  salePrice: z.coerce.number().positive("Il prezzo di vendita deve essere positivo"),
+  salePrice: z.union([z.string(), z.coerce.number()]).transform(val => typeof val === 'number' ? val.toString() : val),
 });
 
 export const updatePriceListItemSchema = insertPriceListItemSchema.partial().omit({ priceListId: true, productId: true });

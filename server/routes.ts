@@ -52,7 +52,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     password: z.string().min(8, "Password must be at least 8 characters"),
     firstName: z.string().min(1, "First name is required"),
     lastName: z.string().min(1, "Last name is required"),
-    role: z.enum(['organizer', 'warehouse', 'bartender']).default('organizer'),
+    role: z.enum(['admin', 'warehouse', 'bartender']).default('admin'),
     companyId: z.string().optional(),
   });
 
@@ -84,7 +84,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Send welcome email
       try {
         await emailTransporter.sendMail({
-          from: (process.env.SMTP_FROM || 'Event4U <noreply@event4u.com>') as string,
+          from: process.env.SMTP_FROM ?? 'Event4U <noreply@event4u.com>',
           to: user.email,
           subject: 'Benvenuto su Event4U',
           html: `
