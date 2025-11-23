@@ -43,7 +43,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Users as UsersIcon, Edit, Trash2 } from "lucide-react";
+import { Plus, Users as UsersIcon, Edit, Trash2, Ban, CheckCircle, LogIn } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -201,6 +201,65 @@ export default function UsersPage() {
       toast({
         title: "Errore",
         description: error.message || "Impossibile eliminare l'utente",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const toggleActiveMutation = useMutation({
+    mutationFn: async ({ id, isActive }: { id: string; isActive: boolean }) => {
+      await apiRequest('PATCH', `/api/users/${id}`, { isActive });
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/users'] });
+      toast({
+        title: "Successo",
+        description: variables.isActive ? "Utente riattivato con successo" : "Utente disattivato con successo",
+      });
+    },
+    onError: (error: any) => {
+      if (isUnauthorizedError(error)) {
+        toast({
+          title: "Non autorizzato",
+          description: "Effettua nuovamente il login...",
+          variant: "destructive",
+        });
+        setTimeout(() => window.location.href = '/api/login', 500);
+        return;
+      }
+      toast({
+        title: "Errore",
+        description: error.message || "Impossibile modificare lo stato dell'utente",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const impersonateMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      await apiRequest('POST', `/api/users/${userId}/impersonate`, {});
+    },
+    onSuccess: () => {
+      toast({
+        title: "Impersonificazione attivata",
+        description: "Accesso come utente effettuato",
+      });
+      // Reload per applicare la nuova sessione
+      setTimeout(() => window.location.reload(), 500);
+    },
+    onError: (error: any) => {
+      if (isUnauthorizedError(error)) {
+        toast({
+          title: "Non autorizzato",
+          description: "Effettua nuovamente il login...",
+          variant: "destructive",
+        });
+        setTimeout(() => window.location.href = '/api/login', 500);
+        return;
+      }
+      toast({
+        title: "Errore",
+        description: error.message || "Impossibile impersonificare l'utente",
         variant: "destructive",
       });
     },
@@ -481,41 +540,80 @@ export default function UsersPage() {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex-1 min-w-0">
-                    {isSuperAdmin && (
-                      <p className="text-xs text-muted-foreground truncate">
-                        {getCompanyName(user.companyId)}
-                      </p>
-                    )}
-                    {user.emailVerified ? (
-                      <Badge variant="secondary" className="text-xs mt-1">
-                        Verificato
-                      </Badge>
-                    ) : (
-                      <Badge variant="outline" className="text-xs mt-1">
-                        Non verificato
-                      </Badge>
-                    )}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      {isSuperAdmin && (
+                        <p className="text-xs text-muted-foreground truncate">
+                          {getCompanyName(user.companyId)}
+                        </p>
+                      )}
+                      <div className="flex gap-2 mt-1 flex-wrap">
+                        {user.emailVerified ? (
+                          <Badge variant="secondary" className="text-xs">
+                            Verificato
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-xs">
+                            Non verificato
+                          </Badge>
+                        )}
+                        {user.isActive ? (
+                          <Badge variant="outline" className="text-xs">
+                            <CheckCircle className="h-3 w-3 mr-1" />
+                            Attivo
+                          </Badge>
+                        ) : (
+                          <Badge variant="destructive" className="text-xs">
+                            <Ban className="h-3 w-3 mr-1" />
+                            Disattivato
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex gap-2 shrink-0">
+                  <div className="flex gap-1 shrink-0 flex-wrap">
                     <Button
                       size="icon"
                       variant="ghost"
                       onClick={() => handleEdit(user)}
                       data-testid={`button-edit-user-${user.id}`}
+                      title="Modifica utente"
                     >
                       <Edit className="h-4 w-4" />
                     </Button>
                     {user.id !== currentUser?.id && (
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        onClick={() => handleDeleteClick(user.id)}
-                        data-testid={`button-delete-user-${user.id}`}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      <>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => toggleActiveMutation.mutate({ id: user.id, isActive: !user.isActive })}
+                          data-testid={`button-toggle-active-user-${user.id}`}
+                          title={user.isActive ? "Disattiva utente" : "Riattiva utente"}
+                        >
+                          {user.isActive ? <Ban className="h-4 w-4" /> : <CheckCircle className="h-4 w-4" />}
+                        </Button>
+                        {isSuperAdmin && (
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => impersonateMutation.mutate(user.id)}
+                            data-testid={`button-impersonate-user-${user.id}`}
+                            title="Impersonifica utente"
+                          >
+                            <LogIn className="h-4 w-4" />
+                          </Button>
+                        )}
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => handleDeleteClick(user.id)}
+                          data-testid={`button-delete-user-${user.id}`}
+                          title="Elimina utente"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </>
                     )}
                   </div>
                 </div>

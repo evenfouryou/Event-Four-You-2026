@@ -18,10 +18,23 @@ Preferred communication style: Simple, everyday language.
 ## Recent Changes
 
 ### November 23, 2025
-- **Fixed Event Stock Display**: Added missing `/api/events/:id/stocks` endpoint to properly display transferred stock on event detail pages
-- **Added Settings Page**: Created `/settings` page for company admins to manage company information (name, tax ID, address)
-- **Enhanced Station Creation**: Added station type selection in creation form - users can now choose between general (fixed) stations and event-specific stations
+- **Removed Revenue Management**: Removed revenue management section from event detail page
+- **Station Soft Delete**: Implemented soft delete for stations using `deletedAt` field - preserves historical event data
+- **Station Deletion UI**: Added delete button for stations with confirmation dialog
+- **Event Stations Display**: Added station count display in event cards on events list page
+- **User Account Management**: 
+  - Added `isActive` field for user account activation/deactivation
+  - Added UI buttons to activate/deactivate user accounts
+  - Added impersonation feature for super_admin users
+  - Added security protections: super_admin cannot self-deactivate, admins cannot modify super_admin accounts
+- **Security Enhancements**:
+  - Impersonation uses separate `impersonatorId` session field to prevent privilege escalation
+  - Role-based protections in user PATCH endpoint
+  - Soft delete filters on all station queries to preserve data integrity
 - **New API Endpoints**:
+  - `POST /api/users/:id/impersonate` - Super admin can impersonate any user
+  - `POST /api/users/stop-impersonation` - Return to original super admin session
+  - `DELETE /api/stations/:id` - Soft delete a station
   - `GET /api/events/:id/stocks` - Returns all stock items transferred to a specific event
   - `GET /api/companies/current` - Returns the company associated with the logged-in user
 

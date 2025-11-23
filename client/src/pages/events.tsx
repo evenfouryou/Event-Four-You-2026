@@ -34,10 +34,10 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Plus, Calendar as CalendarIcon, MapPin, Users, Eye, Search } from "lucide-react";
+import { Plus, Calendar as CalendarIcon, MapPin, Users, Eye, Search, Warehouse } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { insertEventSchema, type Event, type InsertEvent, type Location } from "@shared/schema";
+import { insertEventSchema, type Event, type InsertEvent, type Location, type Station } from "@shared/schema";
 
 const statusLabels: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
   draft: { label: 'Bozza', variant: 'outline' },
@@ -61,6 +61,10 @@ export default function Events() {
 
   const { data: locations, isLoading: locationsLoading } = useQuery<Location[]>({
     queryKey: ['/api/locations'],
+  });
+
+  const { data: stations } = useQuery<Station[]>({
+    queryKey: ['/api/stations'],
   });
 
   const form = useForm<InsertEvent>({
@@ -338,6 +342,7 @@ export default function Events() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredEvents.map((event) => {
             const statusInfo = statusLabels[event.status] || statusLabels.draft;
+            const eventStations = stations?.filter(s => s.eventId === event.id) || [];
             return (
               <Card key={event.id} className="hover-elevate" data-testid={`event-card-${event.id}`}>
                 <CardHeader className="pb-3">
@@ -376,6 +381,15 @@ export default function Events() {
                       <Users className="h-4 w-4 text-muted-foreground" />
                       <span className="text-muted-foreground">
                         Capienza: <span className="font-medium text-foreground">{event.capacity}</span>
+                      </span>
+                    </div>
+                  )}
+
+                  {eventStations.length > 0 && (
+                    <div className="flex items-center gap-2 text-sm">
+                      <Warehouse className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-muted-foreground">
+                        Postazioni: <span className="font-medium text-foreground">{eventStations.length}</span>
                       </span>
                     </div>
                   )}

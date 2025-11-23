@@ -581,6 +581,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Delete station (preserves event historical data)
+  app.delete('/api/stations/:id', isAdminOrSuperAdmin, async (req: any, res) => {
+    try {
+      const deleted = await storage.deleteStation(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ message: "Station not found" });
+      }
+      res.json({ message: "Station deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting station:", error);
+      res.status(500).json({ message: "Failed to delete station" });
+    }
+  });
+
   // Get stations for specific event
   app.get('/api/events/:id/stations', isAuthenticated, async (req: any, res) => {
     try {
@@ -862,6 +876,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (req.body.email !== undefined) updates.email = req.body.email;
       if (req.body.role !== undefined) updates.role = req.body.role;
       
+      // Validate and set isActive (boolean)
+      if (req.body.isActive !== undefined) {
+        if (typeof req.body.isActive !== 'boolean') {
+          return res.status(400).json({ message: "isActive must be a boolean" });
+        }
+        // Prevent deactivating super_admin or editing higher roles
+        if (targetUser.role === 'super_admin' && currentUser.role !== 'super_admin') {
+          return res.status(403).json({ message: "Forbidden: Cannot modify super admin accounts" });
+        }
+        // Prevent self-deactivation for super_admin
+        if (targetUserId === userId && currentUser.role === 'super_admin' && req.body.isActive === false) {
+          return res.status(400).json({ message: "Super admin cannot deactivate themselves" });
+        }
+        updates.isActive = req.body.isActive;
+      }
+      
+      // Prevent role changes to higher privileges
+      if (req.body.role !== undefined) {
+        if (targetUser.role === 'super_admin' && currentUser.role !== 'super_admin') {
+          return res.status(403).json({ message: "Forbidden: Cannot modify super admin role" });
+        }
+      }
+      
       // Solo super admin può cambiare companyId
       if (req.body.companyId !== undefined && currentUser.role === 'super_admin') {
         updates.companyId = req.body.companyId;
@@ -919,6 +956,99 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting user:", error);
       res.status(500).json({ message: "Failed to delete user" });
+    }
+  });
+
+  // Impersonate user (super_admin only)
+  app.post('/api/users/:id/impersonate', isAuthenticated, async (req: any, res) => {
+    try {
+      const sessionUserId = req.user?.claims?.sub || req.user?.id;
+      
+      // Check against the impersonator (original user), not the current session user
+      const actualUserId = req.session.impersonatorId || sessionUserId;
+      const actualUser = await storage.getUser(actualUserId);
+      
+      // Only super_admin can impersonate (check the ACTUAL user, not impersonated one)
+      if (!actualUser || actualUser.role !== 'super_admin') {
+        return res.status(403).json({ message: "Forbidden: Super admin access required" });
+      }
+
+      const targetUserId = req.params.id;
+      const targetUser = await storage.getUser(targetUserId);
+      
+      if (!targetUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Cannot impersonate yourself
+      if (targetUserId === actualUserId) {
+        return res.status(400).json({ message: "Cannot impersonate yourself" });
+      }
+
+      // Store the impersonator ID (only once, not on re-impersonation)
+      if (!req.session.impersonatorId) {
+        req.session.impersonatorId = actualUserId;
+      }
+
+      // Update session to impersonate target user
+      req.session.userId = targetUserId;
+      req.session.user = targetUser;
+      
+      await new Promise<void>((resolve, reject) => {
+        req.session.save((err: any) => {
+          if (err) reject(err);
+          else resolve();
+        });
+      });
+
+      res.json({ 
+        message: "Impersonation activated", 
+        user: targetUser 
+      });
+    } catch (error) {
+      console.error("Error impersonating user:", error);
+      res.status(500).json({ message: "Failed to impersonate user" });
+    }
+  });
+
+  // Stop impersonation (return to original user)
+  app.post('/api/users/stop-impersonation', isAuthenticated, async (req: any, res) => {
+    try {
+      if (!req.session.impersonatorId) {
+        return res.status(400).json({ message: "Not currently impersonating" });
+      }
+
+      const impersonatorId = req.session.impersonatorId;
+      const impersonator = await storage.getUser(impersonatorId);
+      
+      if (!impersonator) {
+        return res.status(404).json({ message: "Original user not found" });
+      }
+
+      // Only the actual impersonator (super_admin) can stop impersonation
+      if (impersonator.role !== 'super_admin') {
+        return res.status(403).json({ message: "Forbidden: Only super admin can stop impersonation" });
+      }
+
+      // Restore original user session
+      req.session.userId = impersonatorId;
+      req.session.user = impersonator;
+      delete req.session.impersonatorId;
+      
+      await new Promise<void>((resolve, reject) => {
+        req.session.save((err: any) => {
+          if (err) reject(err);
+          else resolve();
+        });
+      });
+
+      res.json({ 
+        message: "Impersonation stopped", 
+        user: impersonator 
+      });
+    } catch (error) {
+      console.error("Error stopping impersonation:", error);
+      res.status(500).json({ message: "Failed to stop impersonation" });
     }
   });
 

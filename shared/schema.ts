@@ -36,6 +36,7 @@ export const users = pgTable("users", {
   role: varchar("role").notNull().default('gestore'), // super_admin, gestore, warehouse, bartender
   companyId: varchar("company_id").references(() => companies.id),
   emailVerified: boolean("email_verified").default(false), // Email verification status for classic registration
+  isActive: boolean("is_active").notNull().default(true), // User account active status
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -126,6 +127,7 @@ export const stations = pgTable("stations", {
   eventId: varchar("event_id").references(() => events.id), // optional - null means general station
   name: varchar("name", { length: 255 }).notNull(),
   assignedUserId: varchar("assigned_user_id").references(() => users.id),
+  deletedAt: timestamp("deleted_at"), // Soft delete - preserves historical data
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

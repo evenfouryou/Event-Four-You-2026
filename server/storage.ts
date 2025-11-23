@@ -71,6 +71,7 @@ export interface IStorage {
   getGeneralStationsByCompany(companyId: string): Promise<Station[]>;
   createStation(station: InsertStation): Promise<Station>;
   updateStation(id: string, station: Partial<Station>): Promise<Station | undefined>;
+  deleteStation(id: string): Promise<boolean>;
   
   // Product operations
   getProductsByCompany(companyId: string): Promise<Product[]>;
@@ -249,16 +250,22 @@ export class DatabaseStorage implements IStorage {
   
   // Station operations
   async getStationsByEvent(eventId: string): Promise<Station[]> {
-    return await db.select().from(stations).where(eq(stations.eventId, eventId));
+    return await db.select().from(stations)
+      .where(and(eq(stations.eventId, eventId), isNull(stations.deletedAt)));
   }
 
   async getStationsByCompany(companyId: string): Promise<Station[]> {
-    return await db.select().from(stations).where(eq(stations.companyId, companyId));
+    return await db.select().from(stations)
+      .where(and(eq(stations.companyId, companyId), isNull(stations.deletedAt)));
   }
 
   async getGeneralStationsByCompany(companyId: string): Promise<Station[]> {
     return await db.select().from(stations)
-      .where(and(eq(stations.companyId, companyId), isNull(stations.eventId)));
+      .where(and(
+        eq(stations.companyId, companyId), 
+        isNull(stations.eventId),
+        isNull(stations.deletedAt)
+      ));
   }
 
   async createStation(stationData: InsertStation): Promise<Station> {
@@ -273,6 +280,16 @@ export class DatabaseStorage implements IStorage {
       .where(eq(stations.id, id))
       .returning();
     return station;
+  }
+
+  async deleteStation(id: string): Promise<boolean> {
+    // Soft delete - preserves historical data for events
+    const [station] = await db
+      .update(stations)
+      .set({ deletedAt: new Date() })
+      .where(eq(stations.id, id))
+      .returning();
+    return !!station;
   }
   
   // Product operations
