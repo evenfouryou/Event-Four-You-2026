@@ -179,11 +179,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   };
 
   // Auth routes
+  // Helper: Remove sensitive fields from user object
+  const sanitizeUser = (user: any) => {
+    const { passwordHash, ...sanitized } = user;
+    return sanitized;
+  };
+
   app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const user = await storage.getUser(userId);
-      res.json(user);
+      res.json(user ? sanitizeUser(user) : null);
     } catch (error) {
       console.error("Error fetching user:", error);
       res.status(500).json({ message: "Failed to fetch user" });
@@ -511,15 +517,173 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ===== USERS =====
   app.get('/api/users', isAuthenticated, async (req: any, res) => {
     try {
+      const userId = req.user?.claims?.sub || req.user?.id;
+      const currentUser = await storage.getUser(userId);
+      
+      if (!currentUser) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      // Super admin vede tutti gli utenti di tutte le company
+      if (currentUser.role === 'super_admin') {
+        const allUsers = await storage.getAllUsers();
+        res.json(allUsers.map(sanitizeUser));
+        return;
+      }
+
+      // Admin vede solo gli utenti della sua company
       const companyId = await getUserCompanyId(req);
       if (!companyId) {
         return res.status(403).json({ message: "No company associated" });
       }
       const users = await storage.getUsersByCompany(companyId);
-      res.json(users);
+      res.json(users.map(sanitizeUser));
     } catch (error) {
       console.error("Error fetching users:", error);
       res.status(500).json({ message: "Failed to fetch users" });
+    }
+  });
+
+  app.post('/api/users', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub || req.user?.id;
+      const currentUser = await storage.getUser(userId);
+      
+      if (!currentUser || (currentUser.role !== 'super_admin' && currentUser.role !== 'admin')) {
+        return res.status(403).json({ message: "Forbidden: Admin access required" });
+      }
+
+      const { email, password, firstName, lastName, role, companyId } = req.body;
+
+      // Validation
+      if (!email || !password || !firstName || !lastName || !role) {
+        return res.status(400).json({ message: "Missing required fields" });
+      }
+
+      // Admin può creare utenti solo nella sua company
+      let targetCompanyId = companyId;
+      if (currentUser.role === 'admin') {
+        targetCompanyId = currentUser.companyId;
+        if (!targetCompanyId) {
+          return res.status(403).json({ message: "No company associated" });
+        }
+      }
+
+      // Check email già esistente
+      const existingUser = await storage.getUserByEmail(email);
+      if (existingUser) {
+        return res.status(400).json({ message: "Email already in use" });
+      }
+
+      // Hash password
+      const hashedPassword = await bcrypt.hash(password, 10);
+
+      // Create user
+      const newUser = await storage.createUser({
+        email,
+        passwordHash: hashedPassword,
+        firstName,
+        lastName,
+        role,
+        companyId: targetCompanyId,
+        emailVerified: true, // Admin-created users are auto-verified
+      });
+
+      // Remove password from response
+      const { passwordHash: _, ...userWithoutPassword } = newUser;
+      res.json(userWithoutPassword);
+    } catch (error: any) {
+      console.error("Error creating user:", error);
+      res.status(500).json({ message: error.message || "Failed to create user" });
+    }
+  });
+
+  app.patch('/api/users/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub || req.user?.id;
+      const currentUser = await storage.getUser(userId);
+      
+      if (!currentUser || (currentUser.role !== 'super_admin' && currentUser.role !== 'admin')) {
+        return res.status(403).json({ message: "Forbidden: Admin access required" });
+      }
+
+      const targetUserId = req.params.id;
+      const targetUser = await storage.getUser(targetUserId);
+      
+      if (!targetUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Admin può modificare solo utenti della sua company
+      if (currentUser.role === 'admin') {
+        if (targetUser.companyId !== currentUser.companyId) {
+          return res.status(403).json({ message: "Forbidden: Cannot modify users from other companies" });
+        }
+      }
+
+      const updates: any = {};
+      if (req.body.firstName !== undefined) updates.firstName = req.body.firstName;
+      if (req.body.lastName !== undefined) updates.lastName = req.body.lastName;
+      if (req.body.email !== undefined) updates.email = req.body.email;
+      if (req.body.role !== undefined) updates.role = req.body.role;
+      
+      // Solo super admin può cambiare companyId
+      if (req.body.companyId !== undefined && currentUser.role === 'super_admin') {
+        updates.companyId = req.body.companyId;
+      }
+
+      // Hash password se fornita
+      if (req.body.password) {
+        updates.passwordHash = await bcrypt.hash(req.body.password, 10);
+      }
+
+      const updatedUser = await storage.updateUser(targetUserId, updates);
+      if (!updatedUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Remove password from response
+      const { passwordHash: _, ...userWithoutPassword } = updatedUser;
+      res.json(userWithoutPassword);
+    } catch (error) {
+      console.error("Error updating user:", error);
+      res.status(500).json({ message: "Failed to update user" });
+    }
+  });
+
+  app.delete('/api/users/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub || req.user?.id;
+      const currentUser = await storage.getUser(userId);
+      
+      if (!currentUser || (currentUser.role !== 'super_admin' && currentUser.role !== 'admin')) {
+        return res.status(403).json({ message: "Forbidden: Admin access required" });
+      }
+
+      const targetUserId = req.params.id;
+      
+      // Non puoi cancellare te stesso
+      if (targetUserId === userId) {
+        return res.status(400).json({ message: "Cannot delete your own account" });
+      }
+
+      const targetUser = await storage.getUser(targetUserId);
+      if (!targetUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Admin può cancellare solo utenti della sua company
+      if (currentUser.role === 'admin') {
+        if (targetUser.companyId !== currentUser.companyId) {
+          return res.status(403).json({ message: "Forbidden: Cannot delete users from other companies" });
+        }
+      }
+
+      await storage.deleteUser(targetUserId);
+      res.json({ message: "User deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting user:", error);
+      res.status(500).json({ message: "Failed to delete user" });
     }
   });
 

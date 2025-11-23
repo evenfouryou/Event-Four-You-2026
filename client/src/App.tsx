@@ -10,6 +10,7 @@ import NotFound from "@/pages/not-found";
 import Landing from "@/pages/landing";
 import Home from "@/pages/home";
 import Companies from "@/pages/companies";
+import Users from "@/pages/users";
 import Locations from "@/pages/locations";
 import Products from "@/pages/products";
 import Events from "@/pages/events";
@@ -66,6 +67,7 @@ function Router() {
             <Switch>
               <Route path="/" component={Home} />
               <Route path="/companies" component={Companies} />
+              <Route path="/users" component={Users} />
               <Route path="/locations" component={Locations} />
               <Route path="/products" component={Products} />
               <Route path="/events" component={Events} />
