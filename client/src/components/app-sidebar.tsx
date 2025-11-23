@@ -14,6 +14,7 @@ import {
   Upload,
   FileText,
   PackageOpen,
+  Home,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import {
@@ -98,6 +99,23 @@ export function AppSidebar() {
         title: "Utenti",
         icon: Users,
         url: "/users",
+        group: "Generale",
+      }
+    );
+  }
+
+  if (isWarehouse) {
+    menuItems.push(
+      {
+        title: "Home",
+        icon: Home,
+        url: "/",
+        group: "Generale",
+      },
+      {
+        title: "Eventi",
+        icon: Calendar,
+        url: "/events",
         group: "Generale",
       }
     );

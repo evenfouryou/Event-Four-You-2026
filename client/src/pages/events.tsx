@@ -3,6 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
+import { useAuth } from "@/hooks/useAuth";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -50,6 +51,9 @@ export default function Events() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const { toast } = useToast();
+  const { user } = useAuth();
+  
+  const canCreateEvents = user?.role === 'super_admin' || user?.role === 'admin';
 
   const { data: events, isLoading: eventsLoading } = useQuery<Event[]>({
     queryKey: ['/api/events'],
@@ -125,16 +129,17 @@ export default function Events() {
         <div>
           <h1 className="text-2xl font-semibold mb-1">Gestione Eventi</h1>
           <p className="text-muted-foreground">
-            Crea e organizza i tuoi eventi
+            {canCreateEvents ? 'Crea e organizza i tuoi eventi' : 'Visualizza gli eventi'}
           </p>
         </div>
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger asChild>
-            <Button data-testid="button-create-event">
-              <Plus className="h-4 w-4 mr-2" />
-              Nuovo Evento
-            </Button>
-          </DialogTrigger>
+        {canCreateEvents && (
+          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <DialogTrigger asChild>
+              <Button data-testid="button-create-event">
+                <Plus className="h-4 w-4 mr-2" />
+                Nuovo Evento
+              </Button>
+            </DialogTrigger>
           <DialogContent className="max-w-2xl">
             <DialogHeader>
               <DialogTitle>Nuovo Evento</DialogTitle>
@@ -282,7 +287,8 @@ export default function Events() {
               </form>
             </Form>
           </DialogContent>
-        </Dialog>
+          </Dialog>
+        )}
       </div>
 
       <div className="flex flex-col sm:flex-row gap-4 mb-6">
