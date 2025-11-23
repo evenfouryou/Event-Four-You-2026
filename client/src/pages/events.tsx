@@ -132,14 +132,27 @@ export default function Events() {
             {canCreateEvents ? 'Crea e organizza i tuoi eventi' : 'Visualizza gli eventi'}
           </p>
         </div>
-        {canCreateEvents && (
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-            <DialogTrigger asChild>
-              <Button data-testid="button-create-event">
-                <Plus className="h-4 w-4 mr-2" />
-                Nuovo Evento
-              </Button>
-            </DialogTrigger>
+        <Dialog open={dialogOpen} onOpenChange={(open) => {
+          if (!canCreateEvents && open) {
+            toast({
+              title: "Accesso limitato",
+              description: "Solo gli admin possono creare eventi",
+              variant: "destructive",
+            });
+            return;
+          }
+          setDialogOpen(open);
+        }}>
+          <DialogTrigger asChild>
+            <Button 
+              data-testid="button-create-event"
+              disabled={!canCreateEvents}
+              title={!canCreateEvents ? "Solo gli admin possono creare eventi" : ""}
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Nuovo Evento
+            </Button>
+          </DialogTrigger>
           <DialogContent className="max-w-2xl">
             <DialogHeader>
               <DialogTitle>Nuovo Evento</DialogTitle>
@@ -287,8 +300,7 @@ export default function Events() {
               </form>
             </Form>
           </DialogContent>
-          </Dialog>
-        )}
+        </Dialog>
       </div>
 
       <div className="flex flex-col sm:flex-row gap-4 mb-6">

@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -37,12 +38,15 @@ type PriceListItemFormValues = z.infer<typeof priceListItemSchema>;
 
 export default function PriceLists() {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [selectedPriceList, setSelectedPriceList] = useState<PriceList | null>(null);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isItemDialogOpen, setIsItemDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [priceListToDelete, setPriceListToDelete] = useState<string | null>(null);
+  
+  const canCreatePriceLists = user?.role === 'super_admin' || user?.role === 'admin';
 
   const { data: priceLists = [], isLoading: priceListsLoading } = useQuery<PriceList[]>({
     queryKey: ['/api/price-lists'],
@@ -241,12 +245,26 @@ export default function PriceLists() {
         <div>
           <h1 className="text-3xl font-semibold tracking-tight">Listini Prezzi</h1>
           <p className="text-muted-foreground mt-1">
-            Gestisci i listini prezzi per i tuoi prodotti
+            {canCreatePriceLists ? 'Gestisci i listini prezzi per i tuoi prodotti' : 'Visualizza i listini prezzi'}
           </p>
         </div>
-        <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+        <Dialog open={isCreateDialogOpen} onOpenChange={(open) => {
+          if (!canCreatePriceLists && open) {
+            toast({
+              title: "Accesso limitato",
+              description: "Solo gli admin possono creare listini prezzi",
+              variant: "destructive",
+            });
+            return;
+          }
+          setIsCreateDialogOpen(open);
+        }}>
           <DialogTrigger asChild>
-            <Button data-testid="button-create-price-list">
+            <Button 
+              data-testid="button-create-price-list"
+              disabled={!canCreatePriceLists}
+              title={!canCreatePriceLists ? "Solo gli admin possono creare listini prezzi" : ""}
+            >
               <Plus className="h-4 w-4 mr-2" />
               Nuovo Listino
             </Button>

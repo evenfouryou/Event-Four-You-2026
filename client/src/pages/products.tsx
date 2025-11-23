@@ -3,6 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
+import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -53,6 +54,9 @@ export default function Products() {
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const { toast } = useToast();
+  const { user } = useAuth();
+  
+  const canCreateProducts = user?.role === 'super_admin' || user?.role === 'admin';
 
   const { data: products, isLoading } = useQuery<Product[]>({
     queryKey: ['/api/products'],
@@ -182,12 +186,26 @@ export default function Products() {
         <div>
           <h1 className="text-2xl font-semibold mb-1">Catalogo Prodotti</h1>
           <p className="text-muted-foreground">
-            Gestisci i prodotti e le scorte minime
+            {canCreateProducts ? 'Gestisci i prodotti e le scorte minime' : 'Visualizza i prodotti'}
           </p>
         </div>
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <Dialog open={dialogOpen} onOpenChange={(open) => {
+          if (!canCreateProducts && open) {
+            toast({
+              title: "Accesso limitato",
+              description: "Solo gli admin possono creare prodotti",
+              variant: "destructive",
+            });
+            return;
+          }
+          setDialogOpen(open);
+        }}>
           <DialogTrigger asChild>
-            <Button data-testid="button-create-product">
+            <Button 
+              data-testid="button-create-product"
+              disabled={!canCreateProducts}
+              title={!canCreateProducts ? "Solo gli admin possono creare prodotti" : ""}
+            >
               <Plus className="h-4 w-4 mr-2" />
               Nuovo Prodotto
             </Button>
