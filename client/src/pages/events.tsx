@@ -255,7 +255,7 @@ export default function Events() {
                     <FormItem>
                       <FormLabel>Note</FormLabel>
                       <FormControl>
-                        <Textarea {...field} placeholder="Tipo evento, DJ, ecc." data-testid="input-event-notes" />
+                        <Textarea {...field} value={field.value ?? ''} placeholder="Tipo evento, DJ, ecc." data-testid="input-event-notes" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>

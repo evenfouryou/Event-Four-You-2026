@@ -93,6 +93,12 @@ export function AppSidebar() {
         icon: FileText,
         url: "/reports",
         group: "Generale",
+      },
+      {
+        title: "Utenti",
+        icon: Users,
+        url: "/users",
+        group: "Generale",
       }
     );
   }

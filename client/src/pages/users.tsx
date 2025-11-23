@@ -98,6 +98,7 @@ export default function UsersPage() {
   });
 
   const isSuperAdmin = currentUser?.role === 'super_admin';
+  const isAdmin = currentUser?.role === 'admin';
 
   const form = useForm<UserFormData>({
     resolver: zodResolver(userFormSchema),
@@ -106,7 +107,7 @@ export default function UsersPage() {
       password: '',
       firstName: '',
       lastName: '',
-      role: 'admin',
+      role: isAdmin ? 'warehouse' : 'admin',
       companyId: null,
       isEditing: false,
     },
@@ -254,7 +255,7 @@ export default function UsersPage() {
         password: '',
         firstName: '',
         lastName: '',
-        role: 'admin',
+        role: isAdmin ? 'warehouse' : 'admin',
         companyId: null,
         isEditing: false,
       });
@@ -379,9 +380,11 @@ export default function UsersPage() {
                         </FormControl>
                         <SelectContent>
                           {isSuperAdmin && (
-                            <SelectItem value="super_admin">Super Admin</SelectItem>
+                            <>
+                              <SelectItem value="super_admin">Super Admin</SelectItem>
+                              <SelectItem value="admin">Admin</SelectItem>
+                            </>
                           )}
-                          <SelectItem value="admin">Admin</SelectItem>
                           <SelectItem value="warehouse">Magazzino</SelectItem>
                           <SelectItem value="bartender">Bartender</SelectItem>
                         </SelectContent>
