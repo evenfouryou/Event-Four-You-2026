@@ -412,20 +412,22 @@ export default function ImportPage() {
                           <TableCell data-testid={`status-row-${idx}`}>
                             {row._valid ? (
                               row._warnings && row._warnings.length > 0 ? (
-                                <AlertCircle 
-                                  className="h-4 w-4 text-yellow-600" 
-                                  title={row._warnings.join(", ")}
-                                  data-testid={`icon-warning-${idx}`}
-                                />
+                                <div title={row._warnings.join(", ")}>
+                                  <AlertCircle 
+                                    className="h-4 w-4 text-yellow-600" 
+                                    data-testid={`icon-warning-${idx}`}
+                                  />
+                                </div>
                               ) : (
                                 <CheckCircle2 className="h-4 w-4 text-green-600" data-testid={`icon-valid-${idx}`} />
                               )
                             ) : (
-                              <AlertCircle 
-                                className="h-4 w-4 text-destructive" 
-                                title={row._errors?.join(", ")}
-                                data-testid={`icon-invalid-${idx}`}
-                              />
+                              <div title={row._errors?.join(", ")}>
+                                <AlertCircle 
+                                  className="h-4 w-4 text-destructive" 
+                                  data-testid={`icon-invalid-${idx}`}
+                                />
+                              </div>
                             )}
                           </TableCell>
                           {importType === "products" ? (
