@@ -89,7 +89,7 @@ export default function Home() {
       <div className="p-6 md:p-8 max-w-7xl mx-auto">
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-2xl font-semibold mb-1">Dashboard Super Admin</h1>
+            <h1 className="text-2xl font-semibold mb-1">Benvenuto, {user?.firstName}</h1>
             <p className="text-muted-foreground">
               Panoramica sistema Event Four You
             </p>
@@ -186,7 +186,7 @@ export default function Home() {
     return (
       <div className="p-6 md:p-8 max-w-7xl mx-auto">
         <div className="mb-8">
-          <h1 className="text-2xl font-semibold mb-1">I Miei Eventi</h1>
+          <h1 className="text-2xl font-semibold mb-1">Benvenuto, {user?.firstName}</h1>
           <p className="text-muted-foreground">
             Eventi assegnati per oggi
           </p>
@@ -256,7 +256,7 @@ export default function Home() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
         <div>
           <h1 className="text-2xl font-semibold mb-1">
-            Dashboard Admin
+            Benvenuto, {user?.firstName}
           </h1>
           <p className="text-muted-foreground">
             Panoramica eventi e inventario
