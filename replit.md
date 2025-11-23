@@ -15,6 +15,16 @@ The system follows a company-centric hierarchy where:
 
 Preferred communication style: Simple, everyday language.
 
+## Recent Changes
+
+### November 23, 2025
+- **Fixed Event Stock Display**: Added missing `/api/events/:id/stocks` endpoint to properly display transferred stock on event detail pages
+- **Added Settings Page**: Created `/settings` page for company admins to manage company information (name, tax ID, address)
+- **Enhanced Station Creation**: Added station type selection in creation form - users can now choose between general (fixed) stations and event-specific stations
+- **New API Endpoints**:
+  - `GET /api/events/:id/stocks` - Returns all stock items transferred to a specific event
+  - `GET /api/companies/current` - Returns the company associated with the logged-in user
+
 ## System Architecture
 
 ### Frontend Architecture

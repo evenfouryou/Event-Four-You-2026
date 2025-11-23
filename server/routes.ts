@@ -258,6 +258,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get('/api/companies/current', isAuthenticated, async (req: any, res) => {
+    try {
+      const companyId = await getUserCompanyId(req);
+      if (!companyId) {
+        return res.status(404).json({ message: "No company associated" });
+      }
+      const company = await storage.getCompany(companyId);
+      if (!company) {
+        return res.status(404).json({ message: "Company not found" });
+      }
+      res.json(company);
+    } catch (error) {
+      console.error("Error fetching current company:", error);
+      res.status(500).json({ message: "Failed to fetch company" });
+    }
+  });
+
   app.post('/api/companies', isAuthenticated, async (req: any, res) => {
     try {
       if (!(await isSuperAdmin(req))) {

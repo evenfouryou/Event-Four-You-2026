@@ -50,6 +50,8 @@ import type { Station, User, Event } from "@shared/schema";
 const stationFormSchema = z.object({
   name: z.string().min(1, "Nome postazione richiesto"),
   assignedUserId: z.string().optional().nullable(),
+  stationType: z.enum(['general', 'event']).default('general'),
+  eventId: z.string().optional().nullable(),
 });
 
 type StationFormData = z.infer<typeof stationFormSchema>;
@@ -57,6 +59,7 @@ type StationFormData = z.infer<typeof stationFormSchema>;
 export default function StationsPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingStation, setEditingStation] = useState<Station | null>(null);
+  const [stationType, setStationType] = useState<'general' | 'event'>('general');
   const { toast } = useToast();
   const { user } = useAuth();
 
@@ -81,12 +84,19 @@ export default function StationsPage() {
     defaultValues: {
       name: '',
       assignedUserId: null,
+      stationType: 'general',
+      eventId: null,
     },
   });
 
   const createMutation = useMutation({
     mutationFn: async (data: StationFormData) => {
-      await apiRequest('POST', '/api/stations', data);
+      const payload = {
+        name: data.name,
+        assignedUserId: data.assignedUserId,
+        eventId: data.stationType === 'event' ? data.eventId : null,
+      };
+      await apiRequest('POST', '/api/stations', payload);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/stations'] });
@@ -157,9 +167,13 @@ export default function StationsPage() {
 
   const handleEdit = (station: Station) => {
     setEditingStation(station);
+    const isEventStation = !!station.eventId;
+    setStationType(isEventStation ? 'event' : 'general');
     form.reset({
       name: station.name,
       assignedUserId: station.assignedUserId,
+      stationType: isEventStation ? 'event' : 'general',
+      eventId: station.eventId,
     });
     setDialogOpen(true);
   };
@@ -168,9 +182,12 @@ export default function StationsPage() {
     setDialogOpen(open);
     if (!open) {
       setEditingStation(null);
+      setStationType('general');
       form.reset({
         name: '',
         assignedUserId: null,
+        stationType: 'general',
+        eventId: null,
       });
     }
   };
@@ -238,12 +255,74 @@ export default function StationsPage() {
                     <FormItem>
                       <FormLabel>Nome Postazione</FormLabel>
                       <FormControl>
-                        <Input {...field} data-testid="input-station-name" />
+                        <Input {...field} placeholder="Es. Bar Centrale, Privé 1" data-testid="input-station-name" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
+
+                <FormField
+                  control={form.control}
+                  name="stationType"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Tipo Postazione</FormLabel>
+                      <Select
+                        onValueChange={(value) => {
+                          field.onChange(value);
+                          setStationType(value as 'general' | 'event');
+                          if (value === 'general') {
+                            form.setValue('eventId', null);
+                          }
+                        }}
+                        value={field.value}
+                      >
+                        <FormControl>
+                          <SelectTrigger data-testid="select-station-type">
+                            <SelectValue placeholder="Seleziona tipo" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="general">📍 Postazione Generale (Fissa)</SelectItem>
+                          <SelectItem value="event">🎪 Postazione per Evento</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {stationType === 'event' && (
+                  <FormField
+                    control={form.control}
+                    name="eventId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Evento</FormLabel>
+                        <Select
+                          onValueChange={field.onChange}
+                          value={field.value || undefined}
+                        >
+                          <FormControl>
+                            <SelectTrigger data-testid="select-station-event">
+                              <SelectValue placeholder="Seleziona evento" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {events?.map((event) => (
+                              <SelectItem key={event.id} value={event.id}>
+                                {event.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
+
                 <FormField
                   control={form.control}
                   name="assignedUserId"
