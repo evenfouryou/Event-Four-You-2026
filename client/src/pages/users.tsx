@@ -593,7 +593,7 @@ export default function UsersPage() {
                         >
                           {user.isActive ? <Ban className="h-4 w-4" /> : <CheckCircle className="h-4 w-4" />}
                         </Button>
-                        {isSuperAdmin && (
+                        {(isSuperAdmin || (isAdmin && user.role !== 'super_admin' && user.role !== 'gestore' && user.companyId === currentUser.companyId)) && (
                           <Button
                             size="icon"
                             variant="ghost"
