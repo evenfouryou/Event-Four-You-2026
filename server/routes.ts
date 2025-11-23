@@ -1133,12 +1133,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const { insertPriceListSchema } = await import('@shared/schema');
-      const validated = insertPriceListSchema.parse(req.body);
+      const validated = insertPriceListSchema.parse({ ...req.body, companyId });
 
-      const priceList = await storage.createPriceList({
-        ...validated,
-        companyId,
-      });
+      const priceList = await storage.createPriceList(validated);
       res.json(priceList);
     } catch (error) {
       console.error("Error creating price list:", error);
