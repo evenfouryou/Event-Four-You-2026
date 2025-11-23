@@ -343,6 +343,14 @@ export const insertEventSchema = createInsertSchema(events).omit({
   createdAt: true,
   updatedAt: true,
 }).extend({
+  startDatetime: z.preprocess((val) => {
+    if (typeof val === 'string') return new Date(val);
+    return val;
+  }, z.date()),
+  endDatetime: z.preprocess((val) => {
+    if (typeof val === 'string') return new Date(val);
+    return val;
+  }, z.date()),
   actualRevenue: z.union([z.string(), z.coerce.number(), z.null()]).transform(val => 
     val === null || val === undefined ? null : typeof val === 'number' ? val.toString() : val
   ).optional(),
