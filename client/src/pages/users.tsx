@@ -76,7 +76,7 @@ type UserFormData = z.infer<typeof userFormSchema>;
 
 const roleLabels: Record<string, string> = {
   super_admin: 'Super Admin',
-  admin: 'Admin',
+  admin: 'Gestore',
   warehouse: 'Magazzino',
   bartender: 'Bartender',
 };
@@ -382,7 +382,7 @@ export default function UsersPage() {
                           {isSuperAdmin && (
                             <>
                               <SelectItem value="super_admin">Super Admin</SelectItem>
-                              <SelectItem value="admin">Admin</SelectItem>
+                              <SelectItem value="admin">Gestore</SelectItem>
                             </>
                           )}
                           <SelectItem value="warehouse">Magazzino</SelectItem>
