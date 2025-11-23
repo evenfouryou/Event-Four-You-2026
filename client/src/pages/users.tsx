@@ -51,11 +51,25 @@ import type { User, Company } from "@shared/schema";
 
 const userFormSchema = z.object({
   email: z.string().email("Email non valida"),
-  password: z.string().min(8, "Password minimo 8 caratteri").optional().or(z.literal('')),
+  password: z.string().optional(),
   firstName: z.string().min(1, "Nome richiesto"),
   lastName: z.string().min(1, "Cognome richiesto"),
   role: z.enum(['super_admin', 'admin', 'warehouse', 'bartender']),
   companyId: z.string().optional().nullable(),
+  isEditing: z.boolean().optional(),
+}).refine((data) => {
+  // Password required when creating new user
+  if (!data.isEditing && (!data.password || data.password.length < 8)) {
+    return false;
+  }
+  // Password optional when editing, but if provided must be >= 8 chars
+  if (data.isEditing && data.password && data.password.length < 8) {
+    return false;
+  }
+  return true;
+}, {
+  message: "Password minimo 8 caratteri",
+  path: ["password"],
 });
 
 type UserFormData = z.infer<typeof userFormSchema>;
@@ -94,6 +108,7 @@ export default function UsersPage() {
       lastName: '',
       role: 'admin',
       companyId: null,
+      isEditing: false,
     },
   });
 
@@ -218,6 +233,7 @@ export default function UsersPage() {
       lastName: user.lastName || '',
       role: user.role as any,
       companyId: user.companyId,
+      isEditing: true,
     });
     setDialogOpen(true);
   };
@@ -225,7 +241,15 @@ export default function UsersPage() {
   const handleDialogClose = () => {
     setDialogOpen(false);
     setEditingUser(null);
-    form.reset();
+    form.reset({
+      email: '',
+      password: '',
+      firstName: '',
+      lastName: '',
+      role: 'admin',
+      companyId: null,
+      isEditing: false,
+    });
   };
 
   const handleDeleteClick = (userId: string) => {
