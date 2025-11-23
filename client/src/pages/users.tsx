@@ -220,7 +220,13 @@ export default function UsersPage() {
       }
       updateMutation.mutate({ id: editingUser.id, data: updateData });
     } else {
-      createMutation.mutate(data);
+      // Rimuovi campi non necessari e pulisci i dati
+      const { isEditing, ...createData } = data;
+      const cleanData = {
+        ...createData,
+        companyId: createData.companyId === 'null' ? null : createData.companyId,
+      };
+      createMutation.mutate(cleanData);
     }
   };
 
