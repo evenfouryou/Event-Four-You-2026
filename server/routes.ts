@@ -10,14 +10,19 @@ import {
   insertCompanySchema,
   insertLocationSchema,
   insertEventSchema,
+  updateEventSchema,
   insertStationSchema,
   insertProductSchema,
   insertStockMovementSchema,
   insertPriceListItemSchema,
+  stockMovements,
+  priceListItems,
 } from "@shared/schema";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
 import nodemailer from "nodemailer";
+import { db } from "./db";
+import { eq, and } from "drizzle-orm";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Setup passport for classic email/password authentication (no Replit OAuth)
@@ -79,7 +84,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Send welcome email
       try {
         await emailTransporter.sendMail({
-          from: process.env.SMTP_FROM || 'Event4U <noreply@event4u.com>',
+          from: (process.env.SMTP_FROM || 'Event4U <noreply@event4u.com>') as string,
           to: user.email,
           subject: 'Benvenuto su Event4U',
           html: `
@@ -343,7 +348,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const validated = updateEventSchema.parse(req.body);
-      const updatedEvent = await storage.updateEvent(id, validated);
+      // Convert actualRevenue to string for database storage
+      const updateData: any = { ...validated };
+      if (validated.actualRevenue !== undefined && validated.actualRevenue !== null) {
+        updateData.actualRevenue = validated.actualRevenue.toString();
+      }
+      const updatedEvent = await storage.updateEvent(id, updateData);
       res.json(updatedEvent);
     } catch (error: any) {
       console.error("Error updating event:", error);
@@ -364,11 +374,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Event not found" });
       }
 
-      // Get all consumptions for this event
+      // Get all consumptions for this event with company scoping for security
       const movements = await db
         .select()
         .from(stockMovements)
-        .where(and(eq(stockMovements.toEventId, id), eq(stockMovements.type, 'CONSUME')));
+        .where(and(
+          eq(stockMovements.companyId, companyId),
+          eq(stockMovements.toEventId, id),
+          eq(stockMovements.type, 'CONSUME')
+        ));
 
       let theoreticalRevenue = 0;
 
@@ -715,7 +729,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ? await storage.getStationStocks(stationId)
           : await storage.getEventStocks(eventId);
         const stock = stocks.find(s => String(s.productId) === String(productId));
-        if (!stock || parseFloat(stock.quantity) < parseFloat(quantity)) {
+        if (!stock || parseFloat(stock.quantity) < quantity) {
           throw new Error("Insufficient stock to return");
         }
 
@@ -966,7 +980,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { updatePriceListItemSchema } = await import('@shared/schema');
       const validated = updatePriceListItemSchema.parse(req.body);
 
-      const item = await storage.updatePriceListItem(id, companyId, validated);
+      // Convert salePrice to string for database storage
+      const updateData: any = { ...validated };
+      if (validated.salePrice !== undefined) {
+        updateData.salePrice = validated.salePrice.toString();
+      }
+
+      const item = await storage.updatePriceListItem(id, companyId, updateData);
       if (!item) {
         return res.status(404).json({ message: "Price list item not found" });
       }
