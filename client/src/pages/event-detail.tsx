@@ -70,7 +70,7 @@ export default function EventDetail() {
   const [destinationStationId, setDestinationStationId] = useState<string>('general');
   const [selectedBartenderIds, setSelectedBartenderIds] = useState<string[]>([]);
   const [editingBartenderIds, setEditingBartenderIds] = useState<Map<string, string[]>>(new Map());
-  const [editingStationId, setEditingStationId] = useState<string | null>(null);
+  const [editingStationIds, setEditingStationIds] = useState<Set<string>>(new Set());
   const { toast } = useToast();
   const { user } = useAuth();
 
@@ -165,10 +165,16 @@ export default function EventDetail() {
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['/api/events', id, 'stations'] });
-      setEditingStationId(null);
-      const newMap = new Map(editingBartenderIds);
-      newMap.delete(variables.stationId);
-      setEditingBartenderIds(newMap);
+      setEditingStationIds(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(variables.stationId);
+        return newSet;
+      });
+      setEditingBartenderIds(prev => {
+        const newMap = new Map(prev);
+        newMap.delete(variables.stationId);
+        return newMap;
+      });
       toast({
         title: "Successo",
         description: "Baristi aggiornati con successo",
@@ -896,7 +902,7 @@ export default function EventDetail() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {eventStations.map((station) => {
               const assignedBartenders = users?.filter(u => station.bartenderIds?.includes(u.id)) || [];
-              const isEditing = editingStationId === station.id;
+              const isEditing = editingStationIds.has(station.id);
               return (
                 <Card key={station.id} data-testid={`station-card-${station.id}`}>
                   <CardHeader className="pb-3">
@@ -907,10 +913,14 @@ export default function EventDetail() {
                           size="sm"
                           variant="ghost"
                           onClick={() => {
-                            setEditingStationId(station.id);
-                            const newMap = new Map(editingBartenderIds);
-                            newMap.set(station.id, station.bartenderIds || []);
-                            setEditingBartenderIds(newMap);
+                            setEditingStationIds(prev => new Set(prev).add(station.id));
+                            setEditingBartenderIds(prev => {
+                              const newMap = new Map(prev);
+                              if (!newMap.has(station.id)) {
+                                newMap.set(station.id, station.bartenderIds || []);
+                              }
+                              return newMap;
+                            });
                           }}
                           data-testid={`button-edit-bartenders-${station.id}`}
                         >
@@ -951,13 +961,16 @@ export default function EventDetail() {
                                   id={`edit-bartender-${station.id}-${bartender.id}`}
                                   checked={currentIds.includes(bartender.id)}
                                   onCheckedChange={(checked) => {
-                                    const newMap = new Map(editingBartenderIds);
-                                    if (checked) {
-                                      newMap.set(station.id, [...currentIds, bartender.id]);
-                                    } else {
-                                      newMap.set(station.id, currentIds.filter(id => id !== bartender.id));
-                                    }
-                                    setEditingBartenderIds(newMap);
+                                    setEditingBartenderIds(prev => {
+                                      const newMap = new Map(prev);
+                                      const currentIds = newMap.get(station.id) || [];
+                                      if (checked) {
+                                        newMap.set(station.id, [...currentIds, bartender.id]);
+                                      } else {
+                                        newMap.set(station.id, currentIds.filter(id => id !== bartender.id));
+                                      }
+                                      return newMap;
+                                    });
                                   }}
                                   data-testid={`checkbox-edit-bartender-${bartender.id}`}
                                 />
@@ -992,10 +1005,16 @@ export default function EventDetail() {
                             size="sm"
                             variant="outline"
                             onClick={() => {
-                              setEditingStationId(null);
-                              const newMap = new Map(editingBartenderIds);
-                              newMap.delete(station.id);
-                              setEditingBartenderIds(newMap);
+                              setEditingStationIds(prev => {
+                                const newSet = new Set(prev);
+                                newSet.delete(station.id);
+                                return newSet;
+                              });
+                              setEditingBartenderIds(prev => {
+                                const newMap = new Map(prev);
+                                newMap.delete(station.id);
+                                return newMap;
+                              });
                             }}
                             data-testid={`button-cancel-bartenders-${station.id}`}
                           >
