@@ -52,7 +52,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     password: z.string().min(8, "Password must be at least 8 characters"),
     firstName: z.string().min(1, "First name is required"),
     lastName: z.string().min(1, "Last name is required"),
-    role: z.enum(['admin', 'warehouse', 'bartender']).default('admin'),
+    role: z.enum(['gestore', 'warehouse', 'bartender']).default('gestore'),
     companyId: z.string().optional(),
   });
 
@@ -184,7 +184,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(401).json({ message: "Unauthorized" });
     }
     const userRole = req.user?.role;
-    if (userRole === 'super_admin' || userRole === 'admin') {
+    if (userRole === 'super_admin' || userRole === 'gestore') {
       return next();
     }
     res.status(403).json({ message: "Accesso negato: privilegi amministrativi richiesti" });
@@ -665,7 +665,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user?.claims?.sub || req.user?.id;
       const currentUser = await storage.getUser(userId);
       
-      if (!currentUser || (currentUser.role !== 'super_admin' && currentUser.role !== 'admin')) {
+      if (!currentUser || (currentUser.role !== 'super_admin' && currentUser.role !== 'gestore')) {
         return res.status(403).json({ message: "Forbidden: Admin access required" });
       }
 
@@ -678,7 +678,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Admin può creare utenti solo nella sua company
       let targetCompanyId = companyId;
-      if (currentUser.role === 'admin') {
+      if (currentUser.role === 'gestore') {
         targetCompanyId = currentUser.companyId;
         if (!targetCompanyId) {
           return res.status(403).json({ message: "No company associated" });
@@ -719,7 +719,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user?.claims?.sub || req.user?.id;
       const currentUser = await storage.getUser(userId);
       
-      if (!currentUser || (currentUser.role !== 'super_admin' && currentUser.role !== 'admin')) {
+      if (!currentUser || (currentUser.role !== 'super_admin' && currentUser.role !== 'gestore')) {
         return res.status(403).json({ message: "Forbidden: Admin access required" });
       }
 
@@ -731,7 +731,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Admin può modificare solo utenti della sua company
-      if (currentUser.role === 'admin') {
+      if (currentUser.role === 'gestore') {
         if (targetUser.companyId !== currentUser.companyId) {
           return res.status(403).json({ message: "Forbidden: Cannot modify users from other companies" });
         }
@@ -772,7 +772,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user?.claims?.sub || req.user?.id;
       const currentUser = await storage.getUser(userId);
       
-      if (!currentUser || (currentUser.role !== 'super_admin' && currentUser.role !== 'admin')) {
+      if (!currentUser || (currentUser.role !== 'super_admin' && currentUser.role !== 'gestore')) {
         return res.status(403).json({ message: "Forbidden: Admin access required" });
       }
 
@@ -789,7 +789,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Admin può cancellare solo utenti della sua company
-      if (currentUser.role === 'admin') {
+      if (currentUser.role === 'gestore') {
         if (targetUser.companyId !== currentUser.companyId) {
           return res.status(403).json({ message: "Forbidden: Cannot delete users from other companies" });
         }

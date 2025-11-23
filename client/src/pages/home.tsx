@@ -57,7 +57,7 @@ export default function Home() {
   const { user } = useAuth();
 
   const isSuperAdmin = user?.role === 'super_admin';
-  const isAdmin = user?.role === 'admin';
+  const isAdmin = user?.role === 'gestore';
   const isBartender = user?.role === 'bartender';
 
   const { data: events, isLoading: eventsLoading } = useQuery<Event[]>({

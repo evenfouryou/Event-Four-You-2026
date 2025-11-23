@@ -53,7 +53,7 @@ export default function Events() {
   const { toast } = useToast();
   const { user } = useAuth();
   
-  const canCreateEvents = user?.role === 'super_admin' || user?.role === 'admin';
+  const canCreateEvents = user?.role === 'super_admin' || user?.role === 'gestore';
 
   const { data: events, isLoading: eventsLoading } = useQuery<Event[]>({
     queryKey: ['/api/events'],

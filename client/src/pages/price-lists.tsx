@@ -46,7 +46,7 @@ export default function PriceLists() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [priceListToDelete, setPriceListToDelete] = useState<string | null>(null);
   
-  const canCreatePriceLists = user?.role === 'super_admin' || user?.role === 'admin';
+  const canCreatePriceLists = user?.role === 'super_admin' || user?.role === 'gestore';
 
   const { data: priceLists = [], isLoading: priceListsLoading } = useQuery<PriceList[]>({
     queryKey: ['/api/price-lists'],

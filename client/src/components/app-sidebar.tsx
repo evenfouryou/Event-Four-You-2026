@@ -40,7 +40,7 @@ export function AppSidebar() {
   if (!user) return null;
 
   const isSuperAdmin = user.role === 'super_admin';
-  const isAdmin = user.role === 'admin';
+  const isAdmin = user.role === 'gestore';
   const isWarehouse = user.role === 'warehouse';
   const isBartender = user.role === 'bartender';
 
@@ -218,7 +218,7 @@ export function AppSidebar() {
 
   const roleLabels: Record<string, string> = {
     super_admin: 'Super Admin',
-    admin: 'Gestore',
+    gestore: 'Gestore',
     warehouse: 'Magazziniere',
     bartender: 'Barista',
   };

@@ -54,7 +54,7 @@ const userFormSchema = z.object({
   password: z.string().optional(),
   firstName: z.string().min(1, "Nome richiesto"),
   lastName: z.string().min(1, "Cognome richiesto"),
-  role: z.enum(['super_admin', 'admin', 'warehouse', 'bartender']),
+  role: z.enum(['super_admin', 'gestore', 'warehouse', 'bartender']),
   companyId: z.string().optional().nullable(),
   isEditing: z.boolean().optional(),
 }).refine((data) => {
@@ -76,7 +76,7 @@ type UserFormData = z.infer<typeof userFormSchema>;
 
 const roleLabels: Record<string, string> = {
   super_admin: 'Super Admin',
-  admin: 'Gestore',
+  gestore: 'Gestore',
   warehouse: 'Magazzino',
   bartender: 'Bartender',
 };
@@ -98,7 +98,7 @@ export default function UsersPage() {
   });
 
   const isSuperAdmin = currentUser?.role === 'super_admin';
-  const isAdmin = currentUser?.role === 'admin';
+  const isAdmin = currentUser?.role === 'gestore';
 
   const form = useForm<UserFormData>({
     resolver: zodResolver(userFormSchema),
@@ -107,7 +107,7 @@ export default function UsersPage() {
       password: '',
       firstName: '',
       lastName: '',
-      role: isAdmin ? 'warehouse' : 'admin',
+      role: isAdmin ? 'warehouse' : 'gestore',
       companyId: null,
       isEditing: false,
     },
@@ -255,7 +255,7 @@ export default function UsersPage() {
         password: '',
         firstName: '',
         lastName: '',
-        role: isAdmin ? 'warehouse' : 'admin',
+        role: isAdmin ? 'warehouse' : 'gestore',
         companyId: null,
         isEditing: false,
       });
@@ -382,7 +382,7 @@ export default function UsersPage() {
                           {isSuperAdmin && (
                             <>
                               <SelectItem value="super_admin">Super Admin</SelectItem>
-                              <SelectItem value="admin">Gestore</SelectItem>
+                              <SelectItem value="gestore">Gestore</SelectItem>
                             </>
                           )}
                           <SelectItem value="warehouse">Magazzino</SelectItem>

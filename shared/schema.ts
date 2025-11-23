@@ -33,7 +33,7 @@ export const users = pgTable("users", {
   firstName: varchar("first_name"),
   lastName: varchar("last_name"),
   profileImageUrl: varchar("profile_image_url"),
-  role: varchar("role").notNull().default('admin'), // super_admin, admin, warehouse, bartender
+  role: varchar("role").notNull().default('gestore'), // super_admin, gestore, warehouse, bartender
   companyId: varchar("company_id").references(() => companies.id),
   emailVerified: boolean("email_verified").default(false), // Email verification status for classic registration
   createdAt: timestamp("created_at").defaultNow(),

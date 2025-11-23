@@ -56,7 +56,7 @@ export default function Products() {
   const { toast } = useToast();
   const { user } = useAuth();
   
-  const canCreateProducts = user?.role === 'super_admin' || user?.role === 'admin';
+  const canCreateProducts = user?.role === 'super_admin' || user?.role === 'gestore';
 
   const { data: products, isLoading } = useQuery<Product[]>({
     queryKey: ['/api/products'],
