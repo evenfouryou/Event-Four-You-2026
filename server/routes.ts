@@ -83,8 +83,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Send welcome email
       try {
+        const fromEmail = process.env.SMTP_FROM || 'Event4U <noreply@event4u.com>';
         await emailTransporter.sendMail({
-          from: process.env.SMTP_FROM ?? 'Event4U <noreply@event4u.com>',
+          from: fromEmail,
           to: user.email,
           subject: 'Benvenuto su Event4U',
           html: `
