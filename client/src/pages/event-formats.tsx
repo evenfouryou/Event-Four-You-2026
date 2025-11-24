@@ -72,7 +72,7 @@ export default function EventFormats() {
   });
 
   const createMutation = useMutation({
-    mutationFn: async (data: InsertEventFormat) => apiRequest('/api/event-formats', 'POST', data),
+    mutationFn: async (data: InsertEventFormat) => apiRequest('POST', '/api/event-formats', data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/event-formats'] });
       setDialogOpen(false);
@@ -93,7 +93,7 @@ export default function EventFormats() {
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: Partial<InsertEventFormat> }) =>
-      apiRequest(`/api/event-formats/${id}`, 'PATCH', data),
+      apiRequest('PATCH', `/api/event-formats/${id}`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/event-formats'] });
       setDialogOpen(false);
@@ -114,7 +114,7 @@ export default function EventFormats() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: async (id: string) => apiRequest(`/api/event-formats/${id}`, 'DELETE'),
+    mutationFn: async (id: string) => apiRequest('DELETE', `/api/event-formats/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/event-formats'] });
       setDeletingFormat(null);
