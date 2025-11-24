@@ -70,6 +70,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Hash password
       const passwordHash = await bcrypt.hash(validated.password, 10);
 
+      // Generate verification token
+      const crypto = await import('crypto');
+      const verificationToken = crypto.randomBytes(32).toString('hex');
+
       // Create user
       const user = await storage.createUser({
         email: validated.email,
@@ -79,33 +83,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
         role: validated.role,
         companyId: validated.companyId,
         emailVerified: false,
+        verificationToken,
       });
 
-      // Send welcome email
+      // Send welcome email with verification link
       try {
+        const baseUrl = process.env.REPL_SLUG 
+          ? `https://${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co`
+          : 'http://localhost:5000';
+        const verificationLink = `${baseUrl}/verify-email?token=${verificationToken}`;
         const fromEmail = process.env.SMTP_FROM || 'Event4U <noreply@event4u.com>';
+        
         await emailTransporter.sendMail({
           from: fromEmail,
           to: user.email,
-          subject: 'Benvenuto su Event4U',
+          subject: 'Conferma il tuo account Event4U',
           html: `
-            <h2>Benvenuto su Event Four You, ${user.firstName}!</h2>
-            <p>Il tuo account è stato creato con successo.</p>
-            <p><strong>Email:</strong> ${user.email}</p>
-            <p><strong>Ruolo:</strong> ${user.role}</p>
-            <p>Puoi accedere alla piattaforma con le credenziali fornite.</p>
-            <p>Grazie per esserti registrato!</p>
-            <br/>
-            <p>Il Team Event Four You</p>
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+              <h2 style="color: #2563eb;">Benvenuto su Event Four You, ${user.firstName}!</h2>
+              <p>Il tuo account è stato creato con successo.</p>
+              <p><strong>Email:</strong> ${user.email}</p>
+              <p><strong>Ruolo:</strong> ${user.role}</p>
+              
+              <div style="background-color: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                <p style="margin-top: 0;"><strong>Per completare la registrazione, clicca sul pulsante qui sotto:</strong></p>
+                <a href="${verificationLink}" 
+                   style="display: inline-block; background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin: 10px 0;">
+                  Conferma Email
+                </a>
+                <p style="margin-bottom: 0; font-size: 12px; color: #6b7280;">
+                  Oppure copia e incolla questo link nel browser:<br/>
+                  <span style="word-break: break-all;">${verificationLink}</span>
+                </p>
+              </div>
+              
+              <p style="color: #6b7280; font-size: 14px;">
+                Se non hai richiesto questa registrazione, puoi ignorare questa email.
+              </p>
+              
+              <p style="margin-top: 30px;">
+                Grazie per esserti registrato!<br/>
+                <strong>Il Team Event Four You</strong>
+              </p>
+            </div>
           `,
         });
       } catch (emailError) {
-        console.error("Failed to send welcome email:", emailError);
+        console.error("Failed to send verification email:", emailError);
         // Continue even if email fails
       }
 
       res.json({ 
-        message: "Registration successful", 
+        message: "Registration successful. Please check your email to verify your account.", 
         user: { 
           id: user.id, 
           email: user.email, 
@@ -120,6 +149,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: error.errors[0].message });
       }
       res.status(500).json({ message: "Registration failed" });
+    }
+  });
+
+  // Email verification endpoint
+  app.get('/api/verify-email/:token', async (req, res) => {
+    try {
+      const { token } = req.params;
+
+      if (!token) {
+        return res.status(400).json({ message: "Token mancante" });
+      }
+
+      // Find user by verification token
+      const user = await storage.getUserByVerificationToken(token);
+      if (!user) {
+        return res.status(404).json({ message: "Token non valido o scaduto" });
+      }
+
+      // Check if already verified
+      if (user.emailVerified) {
+        return res.json({ message: "Email già verificata", alreadyVerified: true });
+      }
+
+      // Update user to mark email as verified and remove token
+      await storage.updateUser(user.id, {
+        emailVerified: true,
+        verificationToken: null,
+      });
+
+      res.json({ 
+        message: "Email verificata con successo! Ora puoi accedere alla piattaforma.",
+        success: true,
+      });
+    } catch (error: any) {
+      console.error("Email verification error:", error);
+      res.status(500).json({ message: "Verifica fallita. Riprova più tardi." });
     }
   });
 
