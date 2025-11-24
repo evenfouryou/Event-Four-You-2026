@@ -193,12 +193,12 @@ export function AppSidebar() {
   return (
     <Sidebar>
       <SidebarContent className="p-4">
-        <div className="mb-6 px-2">
+        <div className="mb-6 flex justify-center">
           <Link href="/">
             <img 
               src="/logo.png" 
               alt="EventFourYou" 
-              className="h-12 w-auto cursor-pointer"
+              className="h-10 max-w-[160px] object-contain cursor-pointer"
             />
           </Link>
         </div>
