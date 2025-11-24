@@ -16,6 +16,7 @@ import {
   PackageOpen,
   Home,
   Sparkles,
+  Tag,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import {
@@ -82,6 +83,12 @@ export function AppSidebar() {
         title: "Eventi",
         icon: Calendar,
         url: "/events",
+        group: "Generale",
+      },
+      {
+        title: "Format Eventi",
+        icon: Tag,
+        url: "/event-formats",
         group: "Generale",
       },
       {

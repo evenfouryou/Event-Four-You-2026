@@ -17,6 +17,7 @@ import Suppliers from "@/pages/suppliers";
 import PurchaseOrders from "@/pages/purchase-orders";
 import Events from "@/pages/events";
 import EventDetail from "@/pages/event-detail";
+import EventFormats from "@/pages/event-formats";
 import Warehouse from "@/pages/warehouse";
 import ConsumptionTracking from "@/pages/consumption-tracking";
 import Register from "@/pages/register";
@@ -81,6 +82,7 @@ function Router() {
               <Route path="/purchase-orders" component={PurchaseOrders} />
               <Route path="/events" component={Events} />
               <Route path="/events/:id" component={EventDetail} />
+              <Route path="/event-formats" component={EventFormats} />
               <Route path="/warehouse" component={Warehouse} />
               <Route path="/consumption" component={ConsumptionTracking} />
               <Route path="/price-lists" component={PriceLists} />
