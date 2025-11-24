@@ -142,6 +142,12 @@ export function AppSidebar() {
         group: "Inventario",
       },
       {
+        title: "Ordini",
+        icon: ShoppingCart,
+        url: "/purchase-orders",
+        group: "Inventario",
+      },
+      {
         title: "Magazzino",
         icon: Warehouse,
         url: "/warehouse",

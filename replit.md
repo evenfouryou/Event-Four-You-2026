@@ -18,6 +18,15 @@ Preferred communication style: Simple, everyday language.
 ## Recent Changes
 
 ### November 23, 2025
+- **Purchase Order Management System**: Comprehensive system for managing supplier orders with intelligent suggestions
+  - Added `purchaseOrders` and `purchaseOrderItems` tables to database schema
+  - New suppliers management page with full CRUD operations (already existed)
+  - New purchase orders page with list, filter, create, edit, delete operations
+  - Intelligent order generation algorithm: analyzes stock levels vs minimum thresholds and consumption patterns
+  - Automated suggestions calculate required quantities: (minThreshold * 2 - currentStock) + (avgConsumption * 7 days)
+  - Export functionality: PDF and Excel generation for sending orders to suppliers
+  - Company-scoped security: all endpoints validate user's company access
+  - Sidebar menu integration: "Ordini" link in Inventario section for Admin and Warehouse roles
 - **Multi-Bartender Assignment**: Stations now support multiple bartenders assignment instead of single bartender
   - Changed `assignedUserId` field to `bartenderIds` array in stations schema
   - Added multi-select checkbox UI for bartender assignment in station creation
@@ -49,6 +58,16 @@ Preferred communication style: Simple, everyday language.
   - Role-based protections in user PATCH endpoint
   - Soft delete filters on all station queries to preserve data integrity
 - **New API Endpoints**:
+  - `GET /api/purchase-orders` - List all purchase orders for user's company
+  - `GET /api/purchase-orders/:id` - Get specific purchase order with company validation
+  - `POST /api/purchase-orders` - Create new purchase order (auto-assigns companyId and createdBy)
+  - `PATCH /api/purchase-orders/:id` - Update purchase order with company scope validation
+  - `DELETE /api/purchase-orders/:id` - Delete purchase order and associated items
+  - `GET /api/purchase-orders/:orderId/items` - List items for a purchase order
+  - `POST /api/purchase-orders/:orderId/items` - Add item to purchase order
+  - `PATCH /api/purchase-orders/:orderId/items/:itemId` - Update purchase order item
+  - `DELETE /api/purchase-orders/:orderId/items/:itemId` - Delete purchase order item
+  - `POST /api/purchase-orders/suggested` - Generate intelligent order suggestions based on stock alerts and consumption
   - `PATCH /api/stations/:id/bartenders` - Update bartenders assigned to a station (validates bartender role and company)
   - `POST /api/users/:id/impersonate` - Super admin can impersonate any user; gestore can impersonate users from their company (excluding admins)
   - `POST /api/users/stop-impersonation` - Return to original admin session
