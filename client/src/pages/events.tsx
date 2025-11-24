@@ -41,9 +41,15 @@ export default function Events() {
     queryKey: ['/api/event-formats'],
   });
 
-  const { data: stations } = useQuery<Station[]>({
+  const { data: allStations } = useQuery<Station[]>({
     queryKey: ['/api/stations'],
   });
+
+  // Separate fixed (general) stations from event-specific stations
+  const fixedStations = useMemo(() => {
+    if (!allStations) return [];
+    return allStations.filter(s => !s.eventId && !s.deletedAt);
+  }, [allStations]);
 
   const formatsMap = useMemo(() => {
     if (!formats) return new Map<string, EventFormat>();
@@ -70,7 +76,9 @@ export default function Events() {
 
   const renderEventCard = (event: Event, isDraft: boolean = false) => {
     const statusInfo = statusLabels[event.status] || statusLabels.draft;
-    const eventStations = stations?.filter(s => s.eventId === event.id) || [];
+    // Get both fixed stations and event-specific stations
+    const eventSpecificStations = allStations?.filter(s => s.eventId === event.id) || [];
+    const totalStations = fixedStations.length + eventSpecificStations.length;
     const eventFormat = event.formatId ? formatsMap.get(event.formatId) : undefined;
 
     return (
@@ -133,11 +141,19 @@ export default function Events() {
             </div>
           )}
 
-          {eventStations.length > 0 && (
+          {totalStations > 0 && (
             <div className="flex items-center gap-2 text-sm">
               <Warehouse className="h-4 w-4 text-muted-foreground" />
               <span className="text-muted-foreground">
-                Postazioni: <span className="font-medium text-foreground">{eventStations.length}</span>
+                Postazioni: <span className="font-medium text-foreground">{totalStations}</span>
+                {fixedStations.length > 0 && eventSpecificStations.length > 0 && (
+                  <span className="text-xs ml-1">
+                    ({fixedStations.length} fisse + {eventSpecificStations.length} evento)
+                  </span>
+                )}
+                {fixedStations.length > 0 && eventSpecificStations.length === 0 && (
+                  <span className="text-xs ml-1">(fisse)</span>
+                )}
               </span>
             </div>
           )}
