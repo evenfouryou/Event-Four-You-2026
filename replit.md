@@ -17,6 +17,21 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
+### November 24, 2025
+- **AI-Powered Analytics**: Integrated OpenAI API for intelligent data analysis and insights
+  - Added `analyzeWithAI()` storage method using OpenAI gpt-4o-mini model to analyze company data
+  - Added `generateInsights()` storage method providing automated insights: low stock alerts, top consumed products, upcoming events, inventory health
+  - New AI Analysis page (`/ai-analysis`) with insights dashboard and interactive chat interface
+  - Chat interface allows natural language queries about consumption patterns, product usage, and inventory optimization
+  - Insights cards display real-time warnings, trends, and recommendations based on company data
+  - API key stored securely in Replit Secrets (OPENAI_API_KEY)
+  - Company-scoped analysis: AI only accesses data from user's company
+  - Sidebar integration: "Analisi AI" menu item for Admin and Warehouse roles
+  - Bug fix: Corrected mutation callback to use userQuery parameter instead of state to prevent conversation history misalignment
+- **New API Endpoints**:
+  - `POST /api/ai/analyze` - Accepts natural language query, returns AI-generated analysis with context
+  - `GET /api/ai/insights` - Returns array of automated insights (warnings, info, success) based on current company data
+
 ### November 23, 2025
 - **Purchase Order Management System**: Comprehensive system for managing supplier orders with intelligent suggestions
   - Added `purchaseOrders` and `purchaseOrderItems` tables to database schema
