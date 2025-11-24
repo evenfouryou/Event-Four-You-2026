@@ -12,8 +12,11 @@ Preferred communication style: Simple, everyday language.
 
 ### November 24, 2025
 - **Event Formats/Categories System**: Added event_formats table and CRUD API with admin-only permissions. Created management UI with color picker and badge preview. Events can now be classified with custom formats (e.g., "Wedding", "Concert") displayed as colored badges throughout the UI.
-- **Manual Recurring Event Date Selection**: Enhanced recurring events UI with real-time date preview and checkbox selection. Users can now review generated dates and manually select which occurrences to create. Backend validates selected dates and preserves all event fields correctly.
-- **Recurring Events Bug Fixes**: Fixed critical bugs where future-dated recurring events were excluded and `parentEventId` hierarchy wasn't established after bulk insert
+- **Manual Recurring Event Date Selection**: Enhanced recurring events UI with real-time date preview and checkbox selection. Users can now review generated dates and manually select which occurrences to create. Backend validates selected dates and preserves all event fields correctly with meaningful metadata (interval=1, count=selected_count, endDate=last_date).
+- **Recurring Events Validation**: Implemented strict backend validation - automatic recurring requires interval>=1 and either count or endDate; manual selection validates ISO strings and requires at least one date selected. Removed default value from recurrenceInterval to enable proper validation distinction.
+- **OIDC User Role Preservation**: Fixed upsertUser to filter undefined values preventing existing user fields (especially role) from being overwritten with undefined during OIDC authentication updates.
+- **Event Format CompanyId Fix**: Fixed event format creation by removing empty companyId from frontend submission and stripping it from backend request body before validation, ensuring authenticated user's companyId is always used.
+- **Date Input Validation**: Fixed "Invalid time value" error in event form by adding isNaN check before calling toISOString() on Date objects, preventing crashes with invalid Date instances.
 - **Warehouse Multi-Product Operations**: Added bulk-load and bulk-unload endpoints with table interface for managing multiple products simultaneously with quantity validation
 - **Search & Filtering**: Implemented product search by name/code in stock list, and movement filters by type/supplier/product with defensive enrichment
 - **Email Verification URLs**: Replaced deprecated `REPL_SLUG`/`REPL_OWNER` with `REPLIT_DEV_DOMAIN` and `PUBLIC_URL` fallback for production deployments

@@ -203,13 +203,18 @@ export class DatabaseStorage implements IStorage {
   }
 
   async upsertUser(userData: UpsertUser): Promise<User> {
+    // Filter out undefined values to prevent overwriting existing fields with undefined
+    const cleanedData = Object.fromEntries(
+      Object.entries(userData).filter(([_, value]) => value !== undefined)
+    );
+    
     const [user] = await db
       .insert(users)
       .values(userData)
       .onConflictDoUpdate({
         target: users.id,
         set: {
-          ...userData,
+          ...cleanedData, // Only update fields that were actually provided
           updatedAt: new Date(),
         },
       })

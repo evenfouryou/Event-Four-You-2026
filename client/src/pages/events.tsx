@@ -380,7 +380,7 @@ export default function Events() {
                           <Input
                             {...field}
                             type="datetime-local"
-                            value={field.value instanceof Date ? field.value.toISOString().slice(0, 16) : ''}
+                            value={field.value instanceof Date && !isNaN(field.value.getTime()) ? field.value.toISOString().slice(0, 16) : ''}
                             onChange={(e) => field.onChange(new Date(e.target.value))}
                             data-testid="input-event-start"
                           />
@@ -400,7 +400,7 @@ export default function Events() {
                           <Input
                             {...field}
                             type="datetime-local"
-                            value={field.value instanceof Date ? field.value.toISOString().slice(0, 16) : ''}
+                            value={field.value instanceof Date && !isNaN(field.value.getTime()) ? field.value.toISOString().slice(0, 16) : ''}
                             onChange={(e) => field.onChange(new Date(e.target.value))}
                             data-testid="input-event-end"
                           />

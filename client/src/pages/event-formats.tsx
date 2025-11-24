@@ -154,10 +154,13 @@ export default function EventFormats() {
   };
 
   const onSubmit = (data: InsertEventFormat) => {
+    // Remove companyId from data - backend will add it automatically from authenticated user
+    const { companyId, ...dataWithoutCompanyId } = data;
+    
     if (editingFormat) {
-      updateMutation.mutate({ id: editingFormat.id, data });
+      updateMutation.mutate({ id: editingFormat.id, data: dataWithoutCompanyId });
     } else {
-      createMutation.mutate(data);
+      createMutation.mutate(dataWithoutCompanyId as InsertEventFormat);
     }
   };
 

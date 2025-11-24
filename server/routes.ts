@@ -548,7 +548,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "No company associated" });
       }
       const { insertEventFormatSchema } = await import('@shared/schema');
-      const validated = insertEventFormatSchema.parse({ ...req.body, companyId });
+      // Remove companyId from body if present, use only the one from authenticated user
+      const { companyId: _ignored, ...bodyWithoutCompanyId } = req.body;
+      const validated = insertEventFormatSchema.parse({ ...bodyWithoutCompanyId, companyId });
       const format = await storage.createEventFormat(validated);
       res.json(format);
     } catch (error: any) {
