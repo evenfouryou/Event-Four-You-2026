@@ -964,7 +964,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/suppliers', isAuthenticated, async (req: any, res) => {
+  app.post('/api/suppliers', isAdminOrSuperAdmin, async (req: any, res) => {
     try {
       const companyId = await getUserCompanyId(req);
       if (!companyId) {
@@ -980,7 +980,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch('/api/suppliers/:id', isAuthenticated, async (req: any, res) => {
+  app.patch('/api/suppliers/:id', isAdminOrSuperAdmin, async (req: any, res) => {
     try {
       const companyId = await getUserCompanyId(req);
       if (!companyId) {
@@ -1000,7 +1000,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete('/api/suppliers/:id', isAuthenticated, async (req: any, res) => {
+  app.delete('/api/suppliers/:id', isAdminOrSuperAdmin, async (req: any, res) => {
     try {
       const companyId = await getUserCompanyId(req);
       if (!companyId) {

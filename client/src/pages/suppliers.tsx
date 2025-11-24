@@ -48,6 +48,7 @@ import { Plus, Truck, Edit, Trash2, Search } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { insertSupplierSchema, type Supplier, type InsertSupplier } from "@shared/schema";
+import { useAuth } from "@/hooks/useAuth";
 
 export default function Suppliers() {
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -55,6 +56,9 @@ export default function Suppliers() {
   const [deletingSupplier, setDeletingSupplier] = useState<Supplier | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const { toast } = useToast();
+  const { user } = useAuth();
+  
+  const canManageSuppliers = user?.role === 'super_admin' || user?.role === 'gestore';
 
   const { data: suppliers, isLoading } = useQuery<Supplier[]>({
     queryKey: ['/api/suppliers'],
@@ -226,7 +230,12 @@ export default function Suppliers() {
           <Truck className="h-6 w-6 text-primary" />
           <h1 className="text-2xl font-semibold">Fornitori</h1>
         </div>
-        <Button onClick={() => handleOpenDialog()} data-testid="button-create-supplier">
+        <Button 
+          onClick={() => handleOpenDialog()} 
+          data-testid="button-create-supplier"
+          disabled={!canManageSuppliers}
+          title={!canManageSuppliers ? "Solo gli admin possono gestire fornitori" : ""}
+        >
           <Plus className="h-4 w-4" />
           Nuovo Fornitore
         </Button>
@@ -301,6 +310,8 @@ export default function Suppliers() {
                                 size="icon"
                                 onClick={() => handleOpenDialog(supplier)}
                                 data-testid={`button-edit-supplier-${supplier.id}`}
+                                disabled={!canManageSuppliers}
+                                title={!canManageSuppliers ? "Solo gli admin possono modificare fornitori" : ""}
                               >
                                 <Edit className="h-4 w-4" />
                               </Button>
@@ -309,6 +320,8 @@ export default function Suppliers() {
                                 size="icon"
                                 onClick={() => setDeletingSupplier(supplier)}
                                 data-testid={`button-delete-supplier-${supplier.id}`}
+                                disabled={!canManageSuppliers}
+                                title={!canManageSuppliers ? "Solo gli admin possono eliminare fornitori" : ""}
                               >
                                 <Trash2 className="h-4 w-4" />
                               </Button>
@@ -362,6 +375,8 @@ export default function Suppliers() {
                                 size="icon"
                                 onClick={() => handleOpenDialog(supplier)}
                                 data-testid={`button-edit-supplier-${supplier.id}`}
+                                disabled={!canManageSuppliers}
+                                title={!canManageSuppliers ? "Solo gli admin possono modificare fornitori" : ""}
                               >
                                 <Edit className="h-4 w-4" />
                               </Button>
@@ -370,6 +385,8 @@ export default function Suppliers() {
                                 size="icon"
                                 onClick={() => setDeletingSupplier(supplier)}
                                 data-testid={`button-delete-supplier-${supplier.id}`}
+                                disabled={!canManageSuppliers}
+                                title={!canManageSuppliers ? "Solo gli admin possono eliminare fornitori" : ""}
                               >
                                 <Trash2 className="h-4 w-4" />
                               </Button>
