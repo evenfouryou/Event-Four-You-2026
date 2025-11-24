@@ -100,6 +100,14 @@ export const events = pgTable("events", {
   priceListId: varchar("price_list_id").references(() => priceLists.id), // for revenue calculation
   actualRevenue: decimal("actual_revenue", { precision: 10, scale: 2 }), // actual cash/card collected
   notes: text("notes"),
+  // Recurring events fields
+  seriesId: varchar("series_id"), // UUID shared by all events in a recurring series
+  isRecurring: boolean("is_recurring").notNull().default(false),
+  recurrencePattern: varchar("recurrence_pattern", { length: 20 }).default('none'), // none, daily, weekly, monthly
+  recurrenceInterval: integer("recurrence_interval").default(1), // every N days/weeks/months
+  recurrenceCount: integer("recurrence_count"), // total occurrences (null = infinite with end date)
+  recurrenceEndDate: timestamp("recurrence_end_date"), // when recurrence ends
+  parentEventId: varchar("parent_event_id").references((): any => events.id), // null for parent, points to parent for exceptions
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

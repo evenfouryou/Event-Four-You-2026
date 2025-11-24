@@ -244,8 +244,8 @@ export default function UsersPage() {
         title: "Impersonificazione attivata",
         description: "Accesso come utente effettuato",
       });
-      // Reload per applicare la nuova sessione
-      setTimeout(() => window.location.reload(), 500);
+      // Redirect alla homepage per applicare la nuova sessione
+      setTimeout(() => window.location.href = '/', 500);
     },
     onError: (error: any) => {
       if (isUnauthorizedError(error)) {
