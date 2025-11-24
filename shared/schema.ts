@@ -63,6 +63,7 @@ export const companies = pgTable("companies", {
 export const companiesRelations = relations(companies, ({ many }) => ({
   users: many(users),
   locations: many(locations),
+  eventFormats: many(eventFormats),
   events: many(events),
   products: many(products),
 }));
@@ -87,11 +88,31 @@ export const locationsRelations = relations(locations, ({ one, many }) => ({
   events: many(events),
 }));
 
+// Event Formats table
+export const eventFormats = pgTable("event_formats", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").notNull().references(() => companies.id),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  color: varchar("color", { length: 7 }).default('#3b82f6'), // hex color for badge
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const eventFormatsRelations = relations(eventFormats, ({ one, many }) => ({
+  company: one(companies, {
+    fields: [eventFormats.companyId],
+    references: [companies.id],
+  }),
+  events: many(events),
+}));
+
 // Events table
 export const events = pgTable("events", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   companyId: varchar("company_id").notNull().references(() => companies.id),
   locationId: varchar("location_id").notNull().references(() => locations.id),
+  formatId: varchar("format_id").references(() => eventFormats.id), // optional event format/category
   name: varchar("name", { length: 255 }).notNull(),
   startDatetime: timestamp("start_datetime").notNull(),
   endDatetime: timestamp("end_datetime").notNull(),
@@ -120,6 +141,10 @@ export const eventsRelations = relations(events, ({ one, many }) => ({
   location: one(locations, {
     fields: [events.locationId],
     references: [locations.id],
+  }),
+  format: one(eventFormats, {
+    fields: [events.formatId],
+    references: [eventFormats.id],
   }),
   priceList: one(priceLists, {
     fields: [events.priceListId],
@@ -408,6 +433,12 @@ export const insertLocationSchema = createInsertSchema(locations).omit({
   updatedAt: true,
 });
 
+export const insertEventFormatSchema = createInsertSchema(eventFormats).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 const baseEventSchema = createInsertSchema(events).omit({
   id: true,
   createdAt: true,
@@ -544,6 +575,9 @@ export type InsertCompany = z.infer<typeof insertCompanySchema>;
 
 export type Location = typeof locations.$inferSelect;
 export type InsertLocation = z.infer<typeof insertLocationSchema>;
+
+export type EventFormat = typeof eventFormats.$inferSelect;
+export type InsertEventFormat = z.infer<typeof insertEventFormatSchema>;
 
 export type Event = typeof events.$inferSelect;
 export type InsertEvent = z.infer<typeof insertEventSchema>;
