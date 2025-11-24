@@ -11,14 +11,17 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Search, Minus, Plus, AlertTriangle, Package, ArrowLeft, Upload, Download, Warehouse } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Search, Plus, AlertTriangle, Package, ArrowLeft, Upload, Download, Warehouse, History, Check } from "lucide-react";
 import { useLocation } from "wouter";
-import type { Event, Station, Product, Stock } from "@shared/schema";
+import type { Event, Station, Product, Stock, StockMovement } from "@shared/schema";
 
 export default function ConsumptionTracking() {
   const [, setLocation] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
   const [loadQuantities, setLoadQuantities] = useState<Record<string, string>>({});
+  const [consumeQuantities, setConsumeQuantities] = useState<Record<string, string>>({});
+  const [noRemainingFlags, setNoRemainingFlags] = useState<Record<string, boolean>>({});
   const { toast } = useToast();
 
   const urlParams = new URLSearchParams(window.location.search);
@@ -38,6 +41,10 @@ export default function ConsumptionTracking() {
 
   const { data: generalStocks } = useQuery<Stock[]>({
     queryKey: ['/api/stock/general'],
+  });
+
+  const { data: stockMovements } = useQuery<StockMovement[]>({
+    queryKey: ['/api/stock/movements'],
   });
 
   const activeEvents = events?.filter(e => e.status === 'ongoing') || [];
@@ -103,14 +110,26 @@ export default function ConsumptionTracking() {
     return isNaN(quantity) ? 0 : quantity;
   };
 
+  const eventConsumptions = stockMovements?.filter(m => 
+    m.type === 'CONSUME' && 
+    (m.fromEventId === selectedEventId || m.toEventId === selectedEventId) &&
+    (!selectedStationId || m.fromStationId === selectedStationId)
+  ).sort((a, b) => {
+    const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+    const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+    return dateB - dateA;
+  }) || [];
+
   const consumeMutation = useMutation({
     mutationFn: async (data: { eventId: string; stationId: string | null; productId: string; quantity: number }) => {
       await apiRequest('POST', '/api/stock/consume', data);
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['/api/events', selectedEventId, 'stocks'] });
       queryClient.invalidateQueries({ queryKey: ['/api/stock/general'] });
       queryClient.invalidateQueries({ queryKey: ['/api/stock/movements'] });
+      setConsumeQuantities(prev => ({ ...prev, [variables.productId]: "" }));
+      setNoRemainingFlags(prev => ({ ...prev, [variables.productId]: false }));
       toast({
         title: "Consumo registrato",
         description: "Stock aggiornato",
@@ -138,11 +157,11 @@ export default function ConsumptionTracking() {
     mutationFn: async (data: { eventId: string; stationId: string; productId: string; quantity: number }) => {
       await apiRequest('POST', '/api/stock/event-transfer', data);
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['/api/events', selectedEventId, 'stocks'] });
       queryClient.invalidateQueries({ queryKey: ['/api/stock/general'] });
       queryClient.invalidateQueries({ queryKey: ['/api/stock/movements'] });
-      setLoadQuantities({});
+      setLoadQuantities(prev => ({ ...prev, [variables.productId]: "" }));
       toast({
         title: "Prodotto caricato",
         description: "Trasferimento completato",
@@ -166,14 +185,38 @@ export default function ConsumptionTracking() {
     },
   });
 
-  const handleConsume = (productId: string, quantity: number) => {
+  const handleConsume = (productId: string) => {
     if (!selectedEventId) return;
+    
+    const stockValue = getProductStock(productId);
+    const isNoRemaining = noRemainingFlags[productId];
+    const inputQty = parseFloat(consumeQuantities[productId] || "0");
+    
+    const qty = isNoRemaining ? stockValue : inputQty;
+    
+    if (qty <= 0) {
+      toast({
+        title: "Errore",
+        description: "Inserisci una quantità valida",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    if (qty > stockValue) {
+      toast({
+        title: "Errore",
+        description: "Quantità superiore alla giacenza",
+        variant: "destructive",
+      });
+      return;
+    }
     
     consumeMutation.mutate({
       eventId: selectedEventId,
       stationId: selectedStationId || null,
       productId,
-      quantity,
+      quantity: qty,
     });
   };
 
@@ -206,6 +249,10 @@ export default function ConsumptionTracking() {
 
   const productsWithStock = filteredProducts.filter(p => getProductStock(p.id) > 0);
   const productsInGeneral = filteredProducts.filter(p => getGeneralStock(p.id) > 0);
+
+  const getProductName = (productId: string) => {
+    return products?.find(p => p.id === productId)?.name || productId;
+  };
 
   if (eventsLoading) {
     return (
@@ -316,7 +363,7 @@ export default function ConsumptionTracking() {
           </Card>
         ) : (
           <Tabs defaultValue="scarico" className="w-full">
-            <TabsList className="grid w-full grid-cols-2 mb-4">
+            <TabsList className="grid w-full grid-cols-3 mb-4">
               <TabsTrigger value="carico" className="flex items-center gap-2" data-testid="tab-carico">
                 <Upload className="h-4 w-4" />
                 Carico
@@ -324,6 +371,10 @@ export default function ConsumptionTracking() {
               <TabsTrigger value="scarico" className="flex items-center gap-2" data-testid="tab-scarico">
                 <Download className="h-4 w-4" />
                 Scarico
+              </TabsTrigger>
+              <TabsTrigger value="storico" className="flex items-center gap-2" data-testid="tab-storico">
+                <History className="h-4 w-4" />
+                Storico
               </TabsTrigger>
             </TabsList>
 
@@ -408,7 +459,7 @@ export default function ConsumptionTracking() {
                     Registra Consumi
                   </CardTitle>
                   <p className="text-sm text-muted-foreground">
-                    Tocca i pulsanti per scaricare le quantità vendute
+                    Inserisci la quantità consumata o seleziona "Nessuna rimanenza"
                   </p>
                 </CardHeader>
                 <CardContent className="p-0">
@@ -425,62 +476,136 @@ export default function ConsumptionTracking() {
                       {productsWithStock.map((product) => {
                         const stockValue = getProductStock(product.id);
                         const isLowStock = stockValue <= 5;
+                        const isNoRemaining = noRemainingFlags[product.id] || false;
                         return (
                           <div 
                             key={product.id} 
-                            className="flex items-center gap-3 p-4 hover:bg-muted/50"
+                            className="flex flex-col sm:flex-row sm:items-center gap-3 p-4 hover:bg-muted/50"
                             data-testid={`consume-row-${product.id}`}
                           >
-                            <div className="flex-1 min-w-0">
-                              <div className="font-medium truncate">{product.name}</div>
-                              <div className="text-xs text-muted-foreground">{product.code}</div>
-                            </div>
-                            
-                            <div className="text-center shrink-0 min-w-16">
-                              <div className="text-xs text-muted-foreground">Giacenza</div>
-                              <div className={`text-lg font-bold ${isLowStock ? 'text-red-500' : ''}`}>
-                                {stockValue.toFixed(1)}
+                            <div className="flex items-center gap-3 flex-1 min-w-0">
+                              <div className="flex-1 min-w-0">
+                                <div className="font-medium truncate">{product.name}</div>
+                                <div className="text-xs text-muted-foreground">{product.code}</div>
                               </div>
-                              {isLowStock && (
-                                <Badge variant="destructive" className="text-xs px-1">Basso</Badge>
-                              )}
+                              
+                              <div className="text-center shrink-0 min-w-16">
+                                <div className="text-xs text-muted-foreground">Giacenza</div>
+                                <div className={`text-lg font-bold ${isLowStock ? 'text-red-500' : ''}`}>
+                                  {stockValue.toFixed(1)}
+                                </div>
+                                {isLowStock && (
+                                  <Badge variant="destructive" className="text-xs px-1">Basso</Badge>
+                                )}
+                              </div>
                             </div>
                             
-                            <div className="flex items-center gap-1 shrink-0">
+                            <div className="flex items-center gap-3 shrink-0">
+                              <div className="flex items-center gap-2">
+                                <Input
+                                  type="number"
+                                  min="0"
+                                  max={stockValue}
+                                  step="1"
+                                  placeholder="Qtà"
+                                  value={isNoRemaining ? stockValue.toString() : (consumeQuantities[product.id] || "")}
+                                  onChange={(e) => {
+                                    setConsumeQuantities(prev => ({ ...prev, [product.id]: e.target.value }));
+                                    setNoRemainingFlags(prev => ({ ...prev, [product.id]: false }));
+                                  }}
+                                  disabled={isNoRemaining}
+                                  className="w-20 h-9 text-center"
+                                  data-testid={`input-consume-${product.id}`}
+                                />
+                              </div>
+                              
+                              <div className="flex items-center gap-2">
+                                <Checkbox
+                                  id={`no-remaining-${product.id}`}
+                                  checked={isNoRemaining}
+                                  onCheckedChange={(checked) => {
+                                    setNoRemainingFlags(prev => ({ ...prev, [product.id]: !!checked }));
+                                    if (checked) {
+                                      setConsumeQuantities(prev => ({ ...prev, [product.id]: "" }));
+                                    }
+                                  }}
+                                  data-testid={`checkbox-no-remaining-${product.id}`}
+                                />
+                                <label 
+                                  htmlFor={`no-remaining-${product.id}`}
+                                  className="text-xs cursor-pointer whitespace-nowrap"
+                                >
+                                  Finito
+                                </label>
+                              </div>
+                              
                               <Button
-                                variant="outline"
                                 size="sm"
-                                onClick={() => handleConsume(product.id, 1)}
-                                disabled={consumeMutation.isPending || stockValue < 1}
-                                className="h-10 w-12 text-base font-bold"
-                                data-testid={`button-minus-1-${product.id}`}
+                                onClick={() => handleConsume(product.id)}
+                                disabled={consumeMutation.isPending || (!isNoRemaining && !consumeQuantities[product.id])}
+                                className="bg-orange-500 hover:bg-orange-600 h-9"
+                                data-testid={`button-consume-${product.id}`}
                               >
-                                -1
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleConsume(product.id, 2)}
-                                disabled={consumeMutation.isPending || stockValue < 2}
-                                className="h-10 w-12 text-base font-bold"
-                                data-testid={`button-minus-2-${product.id}`}
-                              >
-                                -2
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleConsume(product.id, 5)}
-                                disabled={consumeMutation.isPending || stockValue < 5}
-                                className="h-10 w-12 text-base font-bold"
-                                data-testid={`button-minus-5-${product.id}`}
-                              >
-                                -5
+                                <Check className="h-4 w-4" />
                               </Button>
                             </div>
                           </div>
                         );
                       })}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="storico">
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <History className="h-5 w-5 text-blue-500" />
+                    Storico Consumi
+                  </CardTitle>
+                  <p className="text-sm text-muted-foreground">
+                    Elenco dei consumi registrati per questo evento
+                  </p>
+                </CardHeader>
+                <CardContent className="p-0">
+                  {eventConsumptions.length === 0 ? (
+                    <div className="p-8 text-center">
+                      <History className="h-10 w-10 text-muted-foreground mx-auto mb-2" />
+                      <p className="text-muted-foreground">Nessun consumo registrato</p>
+                    </div>
+                  ) : (
+                    <div className="divide-y">
+                      {eventConsumptions.map((movement) => (
+                        <div 
+                          key={movement.id} 
+                          className="flex items-center gap-3 p-4"
+                          data-testid={`history-row-${movement.id}`}
+                        >
+                          <div className="w-10 h-10 rounded-full bg-orange-500/10 flex items-center justify-center shrink-0">
+                            <Download className="h-5 w-5 text-orange-500" />
+                          </div>
+                          
+                          <div className="flex-1 min-w-0">
+                            <div className="font-medium truncate">{getProductName(movement.productId)}</div>
+                            <div className="text-xs text-muted-foreground">
+                              {movement.createdAt ? new Date(movement.createdAt).toLocaleString('it-IT', {
+                                day: '2-digit',
+                                month: '2-digit',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              }) : '-'}
+                            </div>
+                          </div>
+                          
+                          <div className="text-right shrink-0">
+                            <Badge variant="secondary" className="text-sm font-bold">
+                              -{parseFloat(movement.quantity).toFixed(1)}
+                            </Badge>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   )}
                 </CardContent>
