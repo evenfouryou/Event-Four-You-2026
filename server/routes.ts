@@ -86,14 +86,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
         verificationToken,
       });
 
+      // Create company for new user if role is gestore and no companyId provided
+      let finalCompanyId = validated.companyId;
+      if (validated.role === 'gestore' && !finalCompanyId) {
+        const newCompany = await storage.createCompany({
+          name: `${user.firstName} ${user.lastName} - Organizzazione`,
+          active: true,
+        });
+        finalCompanyId = newCompany.id;
+        // Update user with company
+        await storage.updateUser(user.id, { companyId: finalCompanyId });
+      }
+
       // Send welcome email with verification link
+      const baseUrl = process.env.REPL_SLUG 
+        ? `https://${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co`
+        : 'http://localhost:5000';
+      const verificationLink = `${baseUrl}/verify-email?token=${verificationToken}`;
+      const fromEmail = process.env.SMTP_FROM || 'Event4U <noreply@event4u.com>';
+      
+      if (!user.email) {
+        // Rollback user creation if email is missing
+        await storage.deleteUser(user.id);
+        if (finalCompanyId && validated.role === 'gestore' && !validated.companyId) {
+          // Delete auto-created company since registration failed
+          await storage.deleteCompany(finalCompanyId);
+        }
+        return res.status(400).json({ message: "Email is required for registration" });
+      }
+
       try {
-        const baseUrl = process.env.REPL_SLUG 
-          ? `https://${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co`
-          : 'http://localhost:5000';
-        const verificationLink = `${baseUrl}/verify-email?token=${verificationToken}`;
-        const fromEmail = process.env.SMTP_FROM || 'Event4U <noreply@event4u.com>';
-        
         await emailTransporter.sendMail({
           from: fromEmail,
           to: user.email,
@@ -130,7 +152,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       } catch (emailError) {
         console.error("Failed to send verification email:", emailError);
-        // Continue even if email fails
+        // Rollback user creation if email fails
+        await storage.deleteUser(user.id);
+        if (finalCompanyId && validated.role === 'gestore' && !validated.companyId) {
+          // Delete auto-created company since registration failed
+          await storage.deleteCompany(finalCompanyId);
+        }
+        return res.status(500).json({ 
+          message: "Impossibile inviare l'email di verifica. Verifica la tua email e riprova, o contatta il supporto." 
+        });
       }
 
       res.json({ 
@@ -185,6 +215,87 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("Email verification error:", error);
       res.status(500).json({ message: "Verifica fallita. Riprova più tardi." });
+    }
+  });
+
+  // Resend verification email endpoint
+  app.post('/api/resend-verification', async (req, res) => {
+    try {
+      const { email } = req.body;
+
+      if (!email) {
+        return res.status(400).json({ message: "Email richiesta" });
+      }
+
+      const user = await storage.getUserByEmail(email);
+      if (!user) {
+        // Don't reveal if email exists for security
+        return res.json({ message: "Se l'email è registrata, riceverai un link di verifica." });
+      }
+
+      // Check if already verified
+      if (user.emailVerified) {
+        return res.json({ message: "Email già verificata. Puoi effettuare il login." });
+      }
+
+      // Generate new verification token
+      const crypto = await import('crypto');
+      const verificationToken = crypto.randomBytes(32).toString('hex');
+
+      // Update user with new token
+      await storage.updateUser(user.id, { verificationToken });
+
+      // Send verification email
+      const baseUrl = process.env.REPL_SLUG 
+        ? `https://${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co`
+        : 'http://localhost:5000';
+      const verificationLink = `${baseUrl}/verify-email?token=${verificationToken}`;
+      const fromEmail = process.env.SMTP_FROM || 'Event4U <noreply@event4u.com>';
+
+      try {
+        await emailTransporter.sendMail({
+          from: fromEmail,
+          to: user.email!,
+          subject: 'Conferma il tuo account Event4U',
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+              <h2 style="color: #2563eb;">Conferma il tuo account Event Four You</h2>
+              <p>Ciao ${user.firstName},</p>
+              <p>Hai richiesto un nuovo link di verifica per il tuo account.</p>
+              
+              <div style="background-color: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                <p style="margin-top: 0;"><strong>Per completare la registrazione, clicca sul pulsante qui sotto:</strong></p>
+                <a href="${verificationLink}" 
+                   style="display: inline-block; background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin: 10px 0;">
+                  Conferma Email
+                </a>
+                <p style="margin-bottom: 0; font-size: 12px; color: #6b7280;">
+                  Oppure copia e incolla questo link nel browser:<br/>
+                  <span style="word-break: break-all;">${verificationLink}</span>
+                </p>
+              </div>
+              
+              <p style="color: #6b7280; font-size: 14px;">
+                Se non hai richiesto questo link, puoi ignorare questa email.
+              </p>
+              
+              <p style="margin-top: 30px;">
+                <strong>Il Team Event Four You</strong>
+              </p>
+            </div>
+          `,
+        });
+
+        res.json({ message: "Email di verifica inviata. Controlla la tua casella di posta." });
+      } catch (emailError) {
+        console.error("Failed to resend verification email:", emailError);
+        return res.status(500).json({ 
+          message: "Impossibile inviare l'email. Riprova più tardi o contatta il supporto." 
+        });
+      }
+    } catch (error: any) {
+      console.error("Resend verification error:", error);
+      res.status(500).json({ message: "Errore durante l'invio. Riprova più tardi." });
     }
   });
 

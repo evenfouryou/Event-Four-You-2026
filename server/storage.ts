@@ -59,6 +59,7 @@ export interface IStorage {
   getCompany(id: string): Promise<Company | undefined>;
   createCompany(company: InsertCompany): Promise<Company>;
   updateCompany(id: string, company: Partial<Company>): Promise<Company | undefined>;
+  deleteCompany(id: string): Promise<boolean>;
   
   // Location operations
   getLocationsByCompany(companyId: string): Promise<Location[]>;
@@ -247,6 +248,11 @@ export class DatabaseStorage implements IStorage {
       .where(eq(companies.id, id))
       .returning();
     return company;
+  }
+
+  async deleteCompany(id: string): Promise<boolean> {
+    const result = await db.delete(companies).where(eq(companies.id, id));
+    return result.rowCount ? result.rowCount > 0 : false;
   }
   
   // Location operations

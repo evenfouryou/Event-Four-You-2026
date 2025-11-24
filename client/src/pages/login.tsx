@@ -4,9 +4,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Calendar, AlertCircle } from "lucide-react";
+import { Calendar, AlertCircle, Mail } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 export default function Login() {
   const [, setLocation] = useLocation();
@@ -14,10 +15,14 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [showResendVerification, setShowResendVerification] = useState(false);
+  const [isResending, setIsResending] = useState(false);
+  const { toast } = useToast();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    setShowResendVerification(false);
     setIsLoading(true);
 
     try {
@@ -25,8 +30,32 @@ export default function Login() {
       window.location.href = '/';
     } catch (err: any) {
       setError(err.message || "Credenziali non valide");
+      // Show resend verification option if email not verified
+      if (err.message && err.message.includes("non verificata")) {
+        setShowResendVerification(true);
+      }
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleResendVerification = async () => {
+    setIsResending(true);
+    try {
+      const response: any = await apiRequest('POST', '/api/resend-verification', { email });
+      toast({
+        title: "Email inviata",
+        description: response.message || "Controlla la tua casella di posta per il link di verifica.",
+      });
+      setShowResendVerification(false);
+    } catch (err: any) {
+      toast({
+        title: "Errore",
+        description: err.message || "Impossibile inviare l'email. Riprova più tardi.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsResending(false);
     }
   };
 
@@ -65,6 +94,27 @@ export default function Login() {
                 <Alert variant="destructive" data-testid="alert-error">
                   <AlertCircle className="h-4 w-4" />
                   <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
+
+              {showResendVerification && (
+                <Alert data-testid="alert-resend-verification">
+                  <Mail className="h-4 w-4" />
+                  <AlertDescription>
+                    <div className="space-y-2">
+                      <p>La tua email non è stata ancora verificata.</p>
+                      <Button 
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={handleResendVerification}
+                        disabled={isResending}
+                        data-testid="button-resend-verification"
+                      >
+                        {isResending ? "Invio in corso..." : "Rinvia Email di Verifica"}
+                      </Button>
+                    </div>
+                  </AlertDescription>
                 </Alert>
               )}
 
