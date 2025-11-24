@@ -11,6 +11,13 @@ Preferred communication style: Simple, everyday language.
 ## Recent Changes
 
 ### November 24, 2025
+- **Step-by-Step Event Creation Wizard**: Replaced dialog-based event creation with comprehensive multi-step wizard (/events/wizard) featuring:
+  - **4-Step Process**: (1) Basic info (name, location, format), (2) Dates/times/capacity, (3) Recurrence configuration with manual date selection, (4) Summary and notes
+  - **Draft Auto-Save**: Automatic draft saving every 30 seconds + on step navigation, enabling users to pause and resume event creation
+  - **State Preservation**: Intelligent state management using previewVersion hash and userEditedSelection flag to preserve manual recurring date selections across draft loads and parameter changes
+  - **Date Serialization**: Proper ISO string conversion for all Date objects before API submission
+  - **Visual Progress**: Progress bar, step icons, and last-saved timestamp for clear workflow status
+  - **Draft Management**: Dedicated "Bozze in Sospeso" section in events.tsx for viewing and resuming incomplete events
 - **Event Formats/Categories System**: Added event_formats table and CRUD API with admin-only permissions. Created management UI with color picker and badge preview. Events can now be classified with custom formats (e.g., "Wedding", "Concert") displayed as colored badges throughout the UI.
 - **Manual Recurring Event Date Selection**: Enhanced recurring events UI with real-time date preview and checkbox selection. Users can now review generated dates and manually select which occurrences to create. Backend validates selected dates and preserves all event fields correctly with meaningful metadata (interval=1, count=selected_count, endDate=last_date).
 - **Recurring Events Validation**: Implemented strict backend validation - automatic recurring requires interval>=1 and either count or endDate; manual selection validates ISO strings and requires at least one date selected. Removed default value from recurrenceInterval to enable proper validation distinction.
