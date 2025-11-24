@@ -2,14 +2,7 @@
 
 ## Overview
 
-Event4U is a comprehensive event management and inventory tracking system designed for event organizers. The application enables multi-role management of events, inventory, stations (e.g., bars, storage points), and real-time consumption tracking. Built with a React frontend and Express backend, it supports role-based access control for Super Admins, Company Admins, Organizers, Warehouse Managers, and Bartenders.
-
-The system follows a company-centric hierarchy where:
-- Super Admins manage the entire platform
-- Company Admins manage their organization's settings and users
-- Organizers create and manage events, locations, and inventory
-- Warehouse staff handle stock movements
-- Bartenders track consumption at specific stations during events
+Event4U is a comprehensive event management and inventory tracking system designed for event organizers. It supports multi-role management of events, inventory, stations, and real-time consumption tracking. The system features a company-centric hierarchy with role-based access control for Super Admins, Company Admins, Organizers, Warehouse Managers, and Bartenders, enabling efficient operations from platform-level oversight to event-specific inventory management and consumption tracking. Key capabilities include email verification, AI-powered analytics for insights, intelligent purchase order management, and multi-bartender station assignments.
 
 ## User Preferences
 
@@ -18,6 +11,16 @@ Preferred communication style: Simple, everyday language.
 ## Recent Changes
 
 ### November 24, 2025
+- **Email Verification System**: Implemented complete email verification flow with transactional rollback
+  - Added `verificationToken` and `emailVerified` fields to users schema
+  - Registration automatically sends verification email with confirmation link
+  - Auto-company creation for gestore users: creates company during registration and assigns to user
+  - Full transactional rollback: if email sending fails, deletes both user AND auto-created company (no orphan records)
+  - Users cannot login until email is verified (except super_admin who bypasses verification)
+  - Login page displays resend verification button with user's email for unverified accounts
+  - Resend endpoint generates new token and sends new verification email
+  - Verification page (`/verify-email`) handles token validation with success/error states
+  - SMTP configuration via environment variables: SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM
 - **AI-Powered Analytics**: Integrated OpenAI API for intelligent data analysis and insights
   - Added `analyzeWithAI()` storage method using OpenAI gpt-4o-mini model to analyze company data
   - Added `generateInsights()` storage method providing automated insights: low stock alerts, top consumed products, upcoming events, inventory health
@@ -27,8 +30,10 @@ Preferred communication style: Simple, everyday language.
   - API key stored securely in Replit Secrets (OPENAI_API_KEY)
   - Company-scoped analysis: AI only accesses data from user's company
   - Sidebar integration: "Analisi AI" menu item for Admin and Warehouse roles
-  - Bug fix: Corrected mutation callback to use userQuery parameter instead of state to prevent conversation history misalignment
+  - Bug fix: Corrected mutation callback to use userQuery parameter instead to prevent conversation history misalignment
 - **New API Endpoints**:
+  - `POST /api/verify-email/:token` - Verifies user email using verification token, marks account as verified
+  - `POST /api/resend-verification` - Generates new verification token and sends new verification email
   - `POST /api/ai/analyze` - Accepts natural language query, returns AI-generated analysis with context
   - `GET /api/ai/insights` - Returns array of automated insights (warnings, info, success) based on current company data
 
@@ -94,139 +99,39 @@ Preferred communication style: Simple, everyday language.
 
 ### Frontend Architecture
 
-**Framework & Build System**
-- React 18 with TypeScript for type-safe component development
-- Vite as the build tool and development server for fast HMR (Hot Module Replacement)
-- Wouter for lightweight client-side routing instead of React Router
-
-**UI Component System**
-- Shadcn UI component library with Radix UI primitives for accessible, headless components
-- Tailwind CSS for utility-first styling with custom design tokens
-- Material Design 3 / Linear-inspired design system focused on information density and clarity
-- Inter font family via Google Fonts CDN for consistent typography
-
-**State Management & Data Fetching**
-- TanStack Query (React Query) v5 for server state management, caching, and synchronization
-- Custom query client configuration with refetch disabled and infinite stale time for controlled data updates
-- Form state managed with React Hook Form + Zod for schema validation
-
-**Key Design Decisions**
-- Card-based layout system optimized for management dashboards
-- Role-based UI rendering - different navigation and features based on user role
-- Responsive grid systems: 1/2/4 column layouts adapting to screen size
-- Fixed sidebar navigation (16rem width, collapsible on mobile)
-- Path aliases (@/, @shared/, @assets/) for clean imports
+The frontend is built with React 18 and TypeScript, using Vite for development and bundling. It utilizes Wouter for routing and Shadcn UI with Radix UI primitives, styled with Tailwind CSS, for an accessible and responsive user interface based on Material Design 3 principles. State management and data fetching are handled by TanStack Query v5, while form management uses React Hook Form with Zod for validation. The design emphasizes a card-based layout, role-based UI rendering, responsive grid systems, and fixed sidebar navigation, with path aliases for clean imports.
 
 ### Backend Architecture
 
-**Runtime & Framework**
-- Node.js with Express.js for RESTful API endpoints
-- TypeScript with ESM (ES Modules) for modern JavaScript syntax
-- Development mode uses tsx for hot reloading, production uses esbuild for bundled deployment
-
-**API Design Pattern**
-- RESTful architecture with resource-based endpoints (/api/companies, /api/events, etc.)
-- JSON request/response format with express.json() middleware
-- Centralized error handling and request logging
-- Session-based authentication with cookies
-
-**Database Layer**
-- Drizzle ORM for type-safe database operations
-- PostgreSQL via Neon serverless driver with WebSocket support
-- Schema-first approach with shared TypeScript types between client and server
-- Database schema defined in `shared/schema.ts` for full-stack type safety
-
-**Storage Pattern**
-- Repository pattern implementation in `server/storage.ts`
-- Abstraction layer (IStorage interface) separating business logic from data access
-- CRUD operations for all entities: Users, Companies, Locations, Events, Stations, Products, Price Lists, Stock Movements
-
-**Key Design Decisions**
-- Monorepo structure with shared schema between frontend and backend prevents type drift
-- Separate index files for dev (index-dev.ts) and production (index-prod.ts) environments
-- Dev mode serves Vite middleware for HMR; prod mode serves pre-built static files
-- Stock tracking uses event/station hierarchy for granular inventory management
+The backend is developed with Node.js and Express.js, using TypeScript with ESM for RESTful APIs. It features a centralized error handling system and session-based authentication. The database layer employs Drizzle ORM for type-safe PostgreSQL operations via Neon's serverless driver, following a schema-first approach defined in `shared/schema.ts` for full-stack type safety. A repository pattern in `server/storage.ts` provides an abstraction layer for CRUD operations across all entities. The system maintains a monorepo structure with separate development and production environments, serving static files in production and using Vite middleware in development.
 
 ### Authentication & Authorization
 
-**Authentication Strategy**
-- Dual authentication: Replit OAuth (openid-client + passport) for platform users and classic email/password for independent registrations
-- Session management via express-session with PostgreSQL store (connect-pg-simple)
-- BCrypt for password hashing when using email/password registration
-- Email verification flag for classic registrations
-
-**Authorization Model**
-- Role-based access control (RBAC) with 5 roles:
-  - `super_admin`: Full platform access, manages all companies
-  - `company_admin`: Manages single company settings, users, and permissions
-  - `organizer`: Creates events, locations, manages inventory
-  - `warehouse`: Stock loading/unloading operations
-  - `bartender`: Consumption tracking at assigned stations
-
-**Security Considerations**
-- HTTP-only secure cookies with 7-day TTL
-- Session data encrypted and stored in database
-- Role checks enforced in API middleware (isAuthenticated)
-- Company-scoped data access for multi-tenant isolation
+Authentication supports both Replit OAuth and classic email/password registration with BCrypt hashing and email verification. Session management is handled by `express-session` with a PostgreSQL store. Authorization is based on a Role-Based Access Control (RBAC) model with five roles: `super_admin`, `company_admin`, `organizer`, `warehouse`, and `bartender`. Security considerations include HTTP-only secure cookies, encrypted session data, role checks in API middleware, and company-scoped data access for multi-tenant isolation. Impersonation features for `super_admin` and `company_admin` roles are also implemented.
 
 ### Data Model & Business Logic
 
-**Entity Relationships**
-- Companies have many Users, Locations, Events, Products, Price Lists
-- Events belong to Locations and have many Stations
-- Stations track inventory via Stocks (quantity per product)
-- Stock Movements log all inventory changes (in/out) with timestamps and reasons
-- Price Lists contain Price List Items (product pricing per list)
-
-**Stock Movement Workflow**
-1. General warehouse stock loaded by warehouse staff
-2. Organizer transfers stock to event (creates event-level stock)
-3. Organizer allocates stock to stations within event
-4. Bartenders consume stock from their assigned station during event
-5. End of event: Remaining stock can be returned to general warehouse
-
-**Event Lifecycle States**
-- `draft`: Initial creation, not yet scheduled
-- `scheduled`: Date set, not yet started
-- `ongoing`: Event currently active, consumption tracking enabled
-- `closed`: Event completed, generates reports
+The system's data model links Companies to Users, Locations, Events, Products, and Price Lists. Events contain Stations, which track inventory via Stocks. Stock Movements log all inventory changes. The stock movement workflow involves loading general warehouse stock, transferring to events, allocating to stations, consumption by bartenders, and returning remaining stock. Events progress through `draft`, `scheduled`, `ongoing`, and `closed` lifecycle states. Key features include an email verification system, AI-powered analytics for insights like low stock alerts and consumption patterns, and a purchase order management system with intelligent order generation based on stock levels and consumption. Multi-bartender assignment to stations and user account activation/deactivation are also supported.
 
 ### Import/Export Features
 
-**CSV Import System**
-- PapaParse library for CSV parsing with validation preview
-- Bulk product import with category/unit normalization
-- Bulk price list item import with product lookup
-- Client-side validation before server submission
-- Error reporting per row with warnings for non-critical issues
-
-**Reporting & Analytics**
-- PDF generation via jsPDF for event reports
-- Excel export via XLSX (SheetJS) for data analysis
-- Revenue analysis: Theoretical (price list based) vs actual tracking
-- Consumption reports by station and product
-- Super Admin analytics dashboard for cross-company metrics
+The system supports CSV import for bulk product and price list item uploads with client-side validation and error reporting. Reporting capabilities include PDF generation for event reports (via jsPDF) and Excel export (via XLSX) for data analysis, covering revenue and consumption reports.
 
 ## External Dependencies
 
 ### Third-Party Services
-- **Neon Database**: Serverless PostgreSQL hosting with WebSocket support for edge deployments
-- **Google Fonts CDN**: Inter font family delivery
-- **SMTP Email**: Nodemailer integration for verification emails (configurable SMTP host/credentials)
-- **Replit OAuth**: Optional authentication provider for Replit platform integration
+- **Neon Database**: Serverless PostgreSQL hosting.
+- **Google Fonts CDN**: For consistent typography.
+- **SMTP Email**: Nodemailer for sending verification emails.
+- **Replit OAuth**: Optional authentication provider.
+- **OpenAI API**: For AI-powered analytics and insights (`gpt-4o-mini`).
 
 ### Key NPM Packages
-- **UI Components**: @radix-ui/* primitives, shadcn/ui components
-- **Forms & Validation**: react-hook-form, zod, @hookform/resolvers
-- **Data Fetching**: @tanstack/react-query
-- **Database**: drizzle-orm, drizzle-kit, @neondatabase/serverless
-- **Authentication**: passport, openid-client, express-session, bcryptjs
-- **Charts**: recharts for analytics visualizations
-- **File Processing**: papaparse (CSV), jspdf (PDF), xlsx (Excel)
-- **Build Tools**: vite, esbuild, typescript, tsx (dev runtime)
-
-### Development Tools
-- TypeScript compiler with strict mode and path aliases
-- Tailwind CSS with PostCSS for processing
-- Drizzle Kit for database migrations and schema management
-- Replit-specific plugins: runtime error overlay, cartographer, dev banner (dev only)
+- **UI Components**: `@radix-ui/*`, `shadcn/ui`.
+- **Forms & Validation**: `react-hook-form`, `zod`, `@hookform/resolvers`.
+- **Data Fetching**: `@tanstack/react-query`.
+- **Database**: `drizzle-orm`, `drizzle-kit`, `@neondatabase/serverless`.
+- **Authentication**: `passport`, `openid-client`, `express-session`, `bcryptjs`.
+- **Charts**: `recharts`.
+- **File Processing**: `papaparse` (CSV), `jspdf` (PDF), `xlsx` (Excel).
+- **Build Tools**: `vite`, `esbuild`, `typescript`, `tsx`.
