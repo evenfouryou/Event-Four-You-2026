@@ -15,6 +15,7 @@ import {
   insertProductSchema,
   insertStockMovementSchema,
   insertPriceListItemSchema,
+  insertEventFormatSchema,
   stockMovements,
   priceListItems,
 } from "@shared/schema";
@@ -547,7 +548,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!companyId) {
         return res.status(403).json({ message: "No company associated" });
       }
-      const { insertEventFormatSchema } = await import('@shared/schema');
       // Remove companyId from body if present, use only the one from authenticated user
       const { companyId: _ignored, ...bodyWithoutCompanyId } = req.body;
       const validated = insertEventFormatSchema.parse({ ...bodyWithoutCompanyId, companyId });
