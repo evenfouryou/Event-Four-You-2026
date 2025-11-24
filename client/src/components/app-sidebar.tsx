@@ -196,7 +196,7 @@ export function AppSidebar() {
         <div className="mb-6 px-2">
           <Link href="/">
             <img 
-              src="/attached_assets/new_logo (1)_1764019811144.png" 
+              src="/logo.png" 
               alt="EventFourYou" 
               className="h-12 w-auto cursor-pointer"
             />

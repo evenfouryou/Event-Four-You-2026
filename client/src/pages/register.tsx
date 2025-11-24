@@ -108,7 +108,7 @@ export default function Register() {
           <div className="flex flex-col items-center gap-4 mb-4">
             <Link href="/">
               <img 
-                src="/attached_assets/new_logo (1)_1764019811144.png" 
+                src="/logo.png" 
                 alt="EventFourYou" 
                 className="h-12 w-auto cursor-pointer"
               />

@@ -66,7 +66,7 @@ export default function Login() {
         <div className="container mx-auto px-6 py-4 flex items-center justify-between">
           <Link href="/">
             <img 
-              src="/attached_assets/new_logo (1)_1764019811144.png" 
+              src="/logo.png" 
               alt="EventFourYou" 
               className="h-10 w-auto cursor-pointer"
             />
