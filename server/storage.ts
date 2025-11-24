@@ -3,6 +3,7 @@ import {
   users,
   companies,
   locations,
+  eventFormats,
   events,
   stations,
   products,
@@ -19,6 +20,8 @@ import {
   type InsertCompany,
   type Location,
   type InsertLocation,
+  type EventFormat,
+  type InsertEventFormat,
   type Event,
   type InsertEvent,
   type Station,
@@ -66,6 +69,13 @@ export interface IStorage {
   getLocation(id: string): Promise<Location | undefined>;
   createLocation(location: InsertLocation): Promise<Location>;
   updateLocation(id: string, location: Partial<Location>): Promise<Location | undefined>;
+  
+  // Event Format operations
+  getEventFormatsByCompany(companyId: string): Promise<EventFormat[]>;
+  getEventFormat(id: string): Promise<EventFormat | undefined>;
+  createEventFormat(format: InsertEventFormat): Promise<EventFormat>;
+  updateEventFormat(id: string, format: Partial<EventFormat>): Promise<EventFormat | undefined>;
+  deleteEventFormat(id: string): Promise<boolean>;
   
   // Event operations
   getEventsByCompany(companyId: string): Promise<Event[]>;
@@ -280,6 +290,35 @@ export class DatabaseStorage implements IStorage {
       .where(eq(locations.id, id))
       .returning();
     return location;
+  }
+  
+  // Event Format operations
+  async getEventFormatsByCompany(companyId: string): Promise<EventFormat[]> {
+    return await db.select().from(eventFormats).where(eq(eventFormats.companyId, companyId));
+  }
+
+  async getEventFormat(id: string): Promise<EventFormat | undefined> {
+    const [format] = await db.select().from(eventFormats).where(eq(eventFormats.id, id));
+    return format;
+  }
+
+  async createEventFormat(formatData: InsertEventFormat): Promise<EventFormat> {
+    const [format] = await db.insert(eventFormats).values(formatData).returning();
+    return format;
+  }
+
+  async updateEventFormat(id: string, formatData: Partial<EventFormat>): Promise<EventFormat | undefined> {
+    const [format] = await db
+      .update(eventFormats)
+      .set({ ...formatData, updatedAt: new Date() })
+      .where(eq(eventFormats.id, id))
+      .returning();
+    return format;
+  }
+
+  async deleteEventFormat(id: string): Promise<boolean> {
+    const result = await db.delete(eventFormats).where(eq(eventFormats.id, id));
+    return result.rowCount !== null && result.rowCount > 0;
   }
   
   // Event operations

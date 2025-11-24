@@ -526,6 +526,63 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ===== EVENT FORMATS =====
+  app.get('/api/event-formats', isAuthenticated, async (req: any, res) => {
+    try {
+      const companyId = await getUserCompanyId(req);
+      if (!companyId) {
+        return res.status(403).json({ message: "No company associated" });
+      }
+      const formats = await storage.getEventFormatsByCompany(companyId);
+      res.json(formats);
+    } catch (error) {
+      console.error("Error fetching event formats:", error);
+      res.status(500).json({ message: "Impossibile recuperare i format eventi" });
+    }
+  });
+
+  app.post('/api/event-formats', isAdminOrSuperAdmin, async (req: any, res) => {
+    try {
+      const companyId = await getUserCompanyId(req);
+      if (!companyId) {
+        return res.status(403).json({ message: "No company associated" });
+      }
+      const { insertEventFormatSchema } = await import('@shared/schema');
+      const validated = insertEventFormatSchema.parse({ ...req.body, companyId });
+      const format = await storage.createEventFormat(validated);
+      res.json(format);
+    } catch (error: any) {
+      console.error("Error creating event format:", error);
+      res.status(400).json({ message: error.message || "Impossibile creare il format evento" });
+    }
+  });
+
+  app.patch('/api/event-formats/:id', isAdminOrSuperAdmin, async (req: any, res) => {
+    try {
+      const format = await storage.updateEventFormat(req.params.id, req.body);
+      if (!format) {
+        return res.status(404).json({ message: "Format evento non trovato" });
+      }
+      res.json(format);
+    } catch (error) {
+      console.error("Error updating event format:", error);
+      res.status(500).json({ message: "Impossibile aggiornare il format evento" });
+    }
+  });
+
+  app.delete('/api/event-formats/:id', isAdminOrSuperAdmin, async (req: any, res) => {
+    try {
+      const deleted = await storage.deleteEventFormat(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ message: "Format evento non trovato" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting event format:", error);
+      res.status(500).json({ message: "Impossibile eliminare il format evento" });
+    }
+  });
+
   // ===== EVENTS =====
   app.get('/api/events', isAuthenticated, async (req: any, res) => {
     try {
