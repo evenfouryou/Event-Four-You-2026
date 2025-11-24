@@ -126,7 +126,8 @@ export default function PurchaseOrders() {
     setSuggestionsLoading(true);
     try {
       const response = await apiRequest('POST', '/api/purchase-orders/suggested', {});
-      setSuggestions(response as SuggestedOrder[]);
+      const data = await response.json();
+      setSuggestions(data as SuggestedOrder[]);
       setSuggestionsDialogOpen(true);
     } catch (error: any) {
       if (isUnauthorizedError(error)) {
@@ -381,7 +382,7 @@ export default function PurchaseOrders() {
     
     // Total
     doc.setFontSize(14);
-    doc.text(`Totale: € ${parseFloat(order.totalAmount).toFixed(2)}`, 20, 160);
+    doc.text(`Totale: € ${parseFloat(order.totalAmount || '0').toFixed(2)}`, 20, 160);
     
     if (order.notes) {
       doc.setFontSize(10);
@@ -537,7 +538,7 @@ export default function PurchaseOrders() {
                         : '-'
                       }
                     </TableCell>
-                    <TableCell>€ {parseFloat(order.totalAmount).toFixed(2)}</TableCell>
+                    <TableCell>€ {parseFloat(order.totalAmount || '0').toFixed(2)}</TableCell>
                     <TableCell>
                       <Badge variant={statusVariants[order.status]}>
                         {statusLabels[order.status]}
