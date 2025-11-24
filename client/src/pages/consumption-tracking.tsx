@@ -610,10 +610,10 @@ export default function ConsumptionTracking() {
                 <CardHeader className="pb-3">
                   <CardTitle className="text-lg flex items-center gap-2">
                     <History className="h-5 w-5 text-blue-500" />
-                    Storico Consumi
+                    Riepilogo Consumi
                   </CardTitle>
                   <p className="text-sm text-muted-foreground">
-                    Elenco dei consumi registrati per questo evento
+                    Totale consumato per ogni prodotto in questo evento
                   </p>
                 </CardHeader>
                 <CardContent className="p-0">
@@ -624,35 +624,42 @@ export default function ConsumptionTracking() {
                     </div>
                   ) : (
                     <div className="divide-y">
-                      {eventConsumptions.map((movement) => (
-                        <div 
-                          key={movement.id} 
-                          className="flex items-center gap-3 p-4"
-                          data-testid={`history-row-${movement.id}`}
-                        >
-                          <div className="w-10 h-10 rounded-full bg-orange-500/10 flex items-center justify-center shrink-0">
-                            <Download className="h-5 w-5 text-orange-500" />
-                          </div>
-                          
-                          <div className="flex-1 min-w-0">
-                            <div className="font-medium truncate">{getProductName(movement.productId)}</div>
-                            <div className="text-xs text-muted-foreground">
-                              {movement.createdAt ? new Date(movement.createdAt).toLocaleString('it-IT', {
-                                day: '2-digit',
-                                month: '2-digit',
-                                hour: '2-digit',
-                                minute: '2-digit'
-                              }) : '-'}
+                      {(() => {
+                        const productTotals = new Map<string, number>();
+                        eventConsumptions.forEach(m => {
+                          const current = productTotals.get(m.productId) || 0;
+                          productTotals.set(m.productId, current + parseFloat(m.quantity));
+                        });
+                        
+                        return Array.from(productTotals.entries()).map(([productId, total]) => {
+                          const product = products?.find(p => p.id === productId);
+                          return (
+                            <div 
+                              key={productId} 
+                              className="flex items-center gap-3 p-4"
+                              data-testid={`summary-row-${productId}`}
+                            >
+                              <div className="w-12 h-12 rounded-lg bg-orange-500/10 flex items-center justify-center shrink-0">
+                                <Package className="h-6 w-6 text-orange-500" />
+                              </div>
+                              
+                              <div className="flex-1 min-w-0">
+                                <div className="font-medium truncate">{product?.name || productId}</div>
+                                <div className="text-xs text-muted-foreground">{product?.code}</div>
+                              </div>
+                              
+                              <div className="text-right shrink-0">
+                                <div className="text-2xl font-bold text-orange-500">
+                                  {total.toFixed(1)}
+                                </div>
+                                <div className="text-xs text-muted-foreground">
+                                  {product?.unitOfMeasure || 'pz'}
+                                </div>
+                              </div>
                             </div>
-                          </div>
-                          
-                          <div className="text-right shrink-0">
-                            <Badge variant="secondary" className="text-sm font-bold">
-                              -{parseFloat(movement.quantity).toFixed(1)}
-                            </Badge>
-                          </div>
-                        </div>
-                      ))}
+                          );
+                        });
+                      })()}
                     </div>
                   )}
                 </CardContent>
