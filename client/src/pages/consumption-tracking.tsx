@@ -11,8 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Search, Plus, AlertTriangle, Package, ArrowLeft, Upload, Download, Warehouse, History, Check } from "lucide-react";
+import { Search, Plus, AlertTriangle, Package, ArrowLeft, Upload, Download, Warehouse, History, Check, RotateCcw } from "lucide-react";
 import { useLocation } from "wouter";
 import type { Event, Station, Product, Stock, StockMovement } from "@shared/schema";
 
@@ -20,8 +19,7 @@ export default function ConsumptionTracking() {
   const [, setLocation] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
   const [loadQuantities, setLoadQuantities] = useState<Record<string, string>>({});
-  const [consumeQuantities, setConsumeQuantities] = useState<Record<string, string>>({});
-  const [noRemainingFlags, setNoRemainingFlags] = useState<Record<string, boolean>>({});
+  const [remainingQuantities, setRemainingQuantities] = useState<Record<string, string>>({});
   const { toast } = useToast();
 
   const urlParams = new URLSearchParams(window.location.search);
@@ -128,8 +126,7 @@ export default function ConsumptionTracking() {
       queryClient.invalidateQueries({ queryKey: ['/api/events', selectedEventId, 'stocks'] });
       queryClient.invalidateQueries({ queryKey: ['/api/stock/general'] });
       queryClient.invalidateQueries({ queryKey: ['/api/stock/movements'] });
-      setConsumeQuantities(prev => ({ ...prev, [variables.productId]: "" }));
-      setNoRemainingFlags(prev => ({ ...prev, [variables.productId]: false }));
+      setRemainingQuantities(prev => ({ ...prev, [variables.productId]: "" }));
       toast({
         title: "Consumo registrato",
         description: "Stock aggiornato",
@@ -148,6 +145,29 @@ export default function ConsumptionTracking() {
       toast({
         title: "Errore",
         description: error.message || "Impossibile registrare il consumo",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const returnMutation = useMutation({
+    mutationFn: async (data: { eventId: string; stationId: string; productId: string; quantity: number }) => {
+      await apiRequest('POST', '/api/stock/return-to-warehouse', data);
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/events', selectedEventId, 'stocks'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/stock/general'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/stock/movements'] });
+      setRemainingQuantities(prev => ({ ...prev, [variables.productId]: "" }));
+      toast({
+        title: "Reso al magazzino",
+        description: "Prodotto restituito",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Errore",
+        description: error.message || "Impossibile restituire al magazzino",
         variant: "destructive",
       });
     },
@@ -185,28 +205,57 @@ export default function ConsumptionTracking() {
     },
   });
 
-  const handleConsume = (productId: string) => {
-    if (!selectedEventId) return;
+  const handleCloseProduct = (productId: string) => {
+    if (!selectedEventId || !selectedStationId) return;
     
     const stockValue = getProductStock(productId);
-    const isNoRemaining = noRemainingFlags[productId];
-    const inputQty = parseFloat(consumeQuantities[productId] || "0");
+    const remaining = parseFloat(remainingQuantities[productId] || "0");
     
-    const qty = isNoRemaining ? stockValue : inputQty;
-    
-    if (qty <= 0) {
+    if (remaining < 0 || remaining > stockValue) {
       toast({
         title: "Errore",
-        description: "Inserisci una quantità valida",
+        description: "Quantità rimasta non valida",
         variant: "destructive",
       });
       return;
     }
     
-    if (qty > stockValue) {
+    const consumed = stockValue - remaining;
+    
+    if (consumed > 0) {
+      consumeMutation.mutate({
+        eventId: selectedEventId,
+        stationId: selectedStationId,
+        productId,
+        quantity: consumed,
+      });
+    }
+    
+    if (remaining > 0) {
+      returnMutation.mutate({
+        eventId: selectedEventId,
+        stationId: selectedStationId,
+        productId,
+        quantity: remaining,
+      });
+    }
+    
+    if (consumed === 0 && remaining === 0) {
+      toast({
+        title: "Nessuna modifica",
+        description: "La giacenza è già zero",
+      });
+    }
+  };
+
+  const handleConsumeAll = (productId: string) => {
+    if (!selectedEventId) return;
+    const stockValue = getProductStock(productId);
+    
+    if (stockValue <= 0) {
       toast({
         title: "Errore",
-        description: "Quantità superiore alla giacenza",
+        description: "Nessuna giacenza da scaricare",
         variant: "destructive",
       });
       return;
@@ -216,7 +265,7 @@ export default function ConsumptionTracking() {
       eventId: selectedEventId,
       stationId: selectedStationId || null,
       productId,
-      quantity: qty,
+      quantity: stockValue,
     });
   };
 
@@ -456,10 +505,10 @@ export default function ConsumptionTracking() {
                 <CardHeader className="pb-3">
                   <CardTitle className="text-lg flex items-center gap-2">
                     <Package className="h-5 w-5 text-orange-500" />
-                    Registra Consumi
+                    Chiudi Prodotti
                   </CardTitle>
                   <p className="text-sm text-muted-foreground">
-                    Inserisci la quantità consumata o seleziona "Nessuna rimanenza"
+                    Inserisci la quantità <strong>rimasta</strong>: il consumato viene calcolato e il resto torna al magazzino
                   </p>
                 </CardHeader>
                 <CardContent className="p-0">
@@ -475,79 +524,77 @@ export default function ConsumptionTracking() {
                     <div className="divide-y">
                       {productsWithStock.map((product) => {
                         const stockValue = getProductStock(product.id);
+                        const remaining = parseFloat(remainingQuantities[product.id] || "");
+                        const consumed = !isNaN(remaining) ? stockValue - remaining : 0;
                         const isLowStock = stockValue <= 5;
-                        const isNoRemaining = noRemainingFlags[product.id] || false;
+                        
                         return (
                           <div 
                             key={product.id} 
-                            className="flex flex-col sm:flex-row sm:items-center gap-3 p-4 hover:bg-muted/50"
+                            className="p-4 hover:bg-muted/50"
                             data-testid={`consume-row-${product.id}`}
                           >
-                            <div className="flex items-center gap-3 flex-1 min-w-0">
+                            <div className="flex items-center gap-3 mb-3">
                               <div className="flex-1 min-w-0">
                                 <div className="font-medium truncate">{product.name}</div>
                                 <div className="text-xs text-muted-foreground">{product.code}</div>
                               </div>
                               
-                              <div className="text-center shrink-0 min-w-16">
-                                <div className="text-xs text-muted-foreground">Giacenza</div>
-                                <div className={`text-lg font-bold ${isLowStock ? 'text-red-500' : ''}`}>
+                              <div className="text-center shrink-0">
+                                <div className="text-xs text-muted-foreground">Caricato</div>
+                                <div className={`text-xl font-bold ${isLowStock ? 'text-orange-500' : ''}`}>
                                   {stockValue.toFixed(1)}
                                 </div>
-                                {isLowStock && (
-                                  <Badge variant="destructive" className="text-xs px-1">Basso</Badge>
-                                )}
                               </div>
                             </div>
                             
-                            <div className="flex items-center gap-3 shrink-0">
-                              <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2">
+                              <div className="flex-1">
+                                <Label className="text-xs text-muted-foreground mb-1 block">Rimasto</Label>
                                 <Input
                                   type="number"
                                   min="0"
                                   max={stockValue}
                                   step="1"
-                                  placeholder="Qtà"
-                                  value={isNoRemaining ? stockValue.toString() : (consumeQuantities[product.id] || "")}
-                                  onChange={(e) => {
-                                    setConsumeQuantities(prev => ({ ...prev, [product.id]: e.target.value }));
-                                    setNoRemainingFlags(prev => ({ ...prev, [product.id]: false }));
-                                  }}
-                                  disabled={isNoRemaining}
-                                  className="w-20 h-9 text-center"
-                                  data-testid={`input-consume-${product.id}`}
+                                  placeholder="0"
+                                  value={remainingQuantities[product.id] || ""}
+                                  onChange={(e) => setRemainingQuantities(prev => ({ ...prev, [product.id]: e.target.value }))}
+                                  className="h-10 text-center text-lg"
+                                  data-testid={`input-remaining-${product.id}`}
                                 />
                               </div>
                               
-                              <div className="flex items-center gap-2">
-                                <Checkbox
-                                  id={`no-remaining-${product.id}`}
-                                  checked={isNoRemaining}
-                                  onCheckedChange={(checked) => {
-                                    setNoRemainingFlags(prev => ({ ...prev, [product.id]: !!checked }));
-                                    if (checked) {
-                                      setConsumeQuantities(prev => ({ ...prev, [product.id]: "" }));
-                                    }
-                                  }}
-                                  data-testid={`checkbox-no-remaining-${product.id}`}
-                                />
-                                <label 
-                                  htmlFor={`no-remaining-${product.id}`}
-                                  className="text-xs cursor-pointer whitespace-nowrap"
+                              {!isNaN(remaining) && remaining >= 0 && (
+                                <div className="text-center shrink-0 min-w-16">
+                                  <div className="text-xs text-muted-foreground">Consumato</div>
+                                  <div className="text-lg font-bold text-orange-500">
+                                    {consumed.toFixed(1)}
+                                  </div>
+                                </div>
+                              )}
+                              
+                              <div className="flex flex-col gap-1 shrink-0">
+                                <Button
+                                  size="sm"
+                                  onClick={() => handleCloseProduct(product.id)}
+                                  disabled={consumeMutation.isPending || returnMutation.isPending || remainingQuantities[product.id] === "" || remainingQuantities[product.id] === undefined}
+                                  className="bg-blue-600 hover:bg-blue-700 h-9"
+                                  data-testid={`button-close-${product.id}`}
                                 >
-                                  Finito
-                                </label>
+                                  <Check className="h-4 w-4 mr-1" />
+                                  Chiudi
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleConsumeAll(product.id)}
+                                  disabled={consumeMutation.isPending}
+                                  className="h-9 text-xs"
+                                  data-testid={`button-finish-${product.id}`}
+                                >
+                                  Finito tutto
+                                </Button>
                               </div>
-                              
-                              <Button
-                                size="sm"
-                                onClick={() => handleConsume(product.id)}
-                                disabled={consumeMutation.isPending || (!isNoRemaining && !consumeQuantities[product.id])}
-                                className="bg-orange-500 hover:bg-orange-600 h-9"
-                                data-testid={`button-consume-${product.id}`}
-                              >
-                                <Check className="h-4 w-4" />
-                              </Button>
                             </div>
                           </div>
                         );
