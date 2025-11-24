@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -76,8 +77,13 @@ export default function Home() {
   });
 
   // Redirect baristi e magazzinieri direttamente a Beverage
+  useEffect(() => {
+    if (isBartender || isWarehouse) {
+      setLocation('/beverage');
+    }
+  }, [isBartender, isWarehouse, setLocation]);
+
   if (isBartender || isWarehouse) {
-    setLocation('/beverage');
     return null;
   }
 

@@ -85,9 +85,9 @@ export default function Beverage() {
     enabled: !isBartender,
   });
 
-  // Fetch stations for selected event (for bartender)
-  const { data: eventStations, isLoading: stationsLoading } = useQuery<Station[]>({
-    queryKey: ['/api/events', selectedEventId, 'stations'],
+  // Fetch all stations for bartender (both event-specific and general)
+  const { data: allStations, isLoading: stationsLoading } = useQuery<Station[]>({
+    queryKey: ['/api/stations'],
     enabled: isBartender && !!selectedEventId,
   });
 
@@ -95,9 +95,10 @@ export default function Beverage() {
   const scheduledEvents = events?.filter(e => e.status === 'scheduled') || [];
   const lowStockProducts = generalStocks?.filter(s => Number(s.quantity) < 10) || [];
 
-  // Filter stations where the bartender is assigned
-  const myStations = eventStations?.filter(s => 
-    s.bartenderIds?.includes(user?.id || '')
+  // Filter stations where the bartender is assigned (both event-specific and general stations)
+  const myStations = allStations?.filter(s => 
+    s.bartenderIds?.includes(user?.id || '') && 
+    (s.eventId === selectedEventId || !s.eventId) // Event stations or general stations
   ) || [];
 
   const selectedEvent = events?.find(e => e.id === selectedEventId);
@@ -135,7 +136,7 @@ export default function Beverage() {
                 <Card 
                   key={station.id} 
                   className="hover-elevate cursor-pointer"
-                  onClick={() => setLocation(`/consumption?eventId=${selectedEventId}&stationId=${station.id}`)}
+                  onClick={() => setLocation(`/consumption-tracking?eventId=${selectedEventId}&stationId=${station.id}`)}
                   data-testid={`station-card-${station.id}`}
                 >
                   <CardContent className="p-6">
@@ -154,11 +155,11 @@ export default function Beverage() {
                 </Card>
               ))}
             </div>
-          ) : eventStations && eventStations.length > 0 ? (
+          ) : allStations && allStations.length > 0 ? (
             <Card>
               <CardContent className="p-12 text-center">
                 <Users className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
-                <p className="text-muted-foreground mb-2">Non sei assegnato a nessuna postazione per questo evento</p>
+                <p className="text-muted-foreground mb-2">Non sei assegnato a nessuna postazione</p>
                 <p className="text-sm text-muted-foreground">Contatta il gestore per essere assegnato</p>
               </CardContent>
             </Card>
