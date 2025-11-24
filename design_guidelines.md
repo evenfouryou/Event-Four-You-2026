@@ -2,179 +2,204 @@
 
 ## Design Approach
 
-**Selected Approach:** Design System - Material Design 3 / Linear-inspired
-**Justification:** Information-dense management application requiring clarity, efficient workflows, and role-based dashboards. Draws from Linear's clean data presentation and Material Design's structured component hierarchy.
+**Selected System:** Material Design 3 with Linear-inspired data presentation  
+**Justification:** Enterprise-grade management platform requiring information density, role-based workflows, and real-time data visualization. Material Design 3 provides robust dark mode theming and Italian language support.
+
+## Language & Localization
+
+**Primary Language:** Italian (it-IT)
+- Use Italian labels throughout: "Dashboard" → "Bacheca", "Events" → "Eventi", "Inventory" → "Inventario"
+- Date formats: DD/MM/YYYY, 24-hour time
+- Number formatting: European decimals (1.234,56)
+- Maintain English as optional secondary language toggle in user settings
 
 ## Typography System
 
-**Font Family:** Inter (via Google Fonts CDN)
-- Headings: 600 weight
-- Body: 400 weight
-- Data/Numbers: 500 weight (tabular figures)
+**Font Family:** Inter (Google Fonts CDN)  
+**Weights:** 400 (regular), 500 (medium), 600 (semibold)
 
-**Scale:**
-- Page Title: text-2xl (24px)
-- Section Header: text-xl (20px)
-- Card Title: text-lg (18px)
-- Body/Forms: text-base (16px)
-- Labels/Meta: text-sm (14px)
-- Table Data: text-sm (14px)
+**Hierarchy:**
+- Page Titles: text-2xl, font-semibold
+- Section Headers: text-xl, font-semibold  
+- Card Titles: text-lg, font-medium
+- Body Text: text-base, font-normal
+- Labels/Metadata: text-sm, font-normal
+- Table Data: text-sm, font-medium (tabular-nums)
 
 ## Layout System
 
-**Spacing Units:** Tailwind units of 2, 4, 6, and 8 (p-2, m-4, gap-6, py-8)
+**Spacing Primitives:** Tailwind units 2, 4, 6, 8 (gap-4, p-6, py-8, etc.)
 
 **Application Structure:**
-- Fixed sidebar navigation (w-64) - collapsible on mobile
-- Top header bar (h-16) with user profile, notifications, company selector
-- Main content area with max-w-7xl container, px-6 py-8
-- Card-based layout with rounded-lg, shadow-sm
+- Fixed sidebar: w-64 on desktop, collapsible drawer on mobile
+- Top header: h-16 with breadcrumbs, search, notifications, profile
+- Content container: max-w-7xl, px-6, py-8
+- Cards: rounded-lg, shadow-sm, p-6
 
-**Grid Systems:**
-- Dashboard metrics: grid-cols-1 md:grid-cols-2 lg:grid-cols-4
-- Data tables: Full width with horizontal scroll on mobile
-- Forms: grid-cols-1 lg:grid-cols-2 for multi-column inputs
+**Responsive Grid Patterns:**
+- Dashboard metrics: grid-cols-1 md:grid-cols-2 lg:grid-cols-4, gap-6
+- Event cards: grid-cols-1 md:grid-cols-2 lg:grid-cols-3, gap-4
+- Forms: grid-cols-1 lg:grid-cols-2, gap-6
+- Tables: full-width with horizontal scroll below lg breakpoint
 
-## Component Library
+## Dark Mode Implementation
 
-### Navigation
+**Mode Toggle:** 
+- Icon switch in top header (sun/moon using Heroicons)
+- Persists preference in localStorage
+- System preference detection as default
+
+**Semantic Contrast Levels:**
+- Surface elevation through subtle backdrop variations
+- Text hierarchy: primary/secondary/tertiary opacity levels
+- Borders: reduced opacity in dark mode for softer appearance
+- Shadows: deeper and more pronounced in dark mode
+- Interactive states: more visible in dark backgrounds
+
+**Component Adaptations:**
+- Cards: elevated surface treatment in dark mode
+- Tables: alternating row treatment with subtle backdrop shift
+- Inputs: darker backgrounds with lighter borders
+- Buttons: higher contrast states for visibility
+- Charts/graphs: adjusted line weights and opacity for dark backgrounds
+
+## Navigation Components
+
 **Sidebar:**
-- Role-based menu items with icons (Heroicons)
-- Active state: subtle left border indicator
-- Grouped sections: "Events," "Inventory," "Reports," "Settings"
-- Bottom section: Company switcher (for users with multiple companies)
+- Logo at top (h-16)
+- Role-filtered menu sections with Heroicons (outline style)
+- Active state: subtle accent border-l-3 indicator
+- Sections: "Bacheca", "Eventi", "Inventario", "Rapporti", "Impostazioni"
+- Bottom area: Company selector dropdown, user mini-profile
+- Mobile: Full-screen drawer overlay with backdrop blur
 
 **Top Bar:**
-- Left: Breadcrumb navigation (Home > Events > Summer Festival 2024)
-- Right: Search, notifications bell, user avatar dropdown
+- Left: Breadcrumb with slash separators  
+- Center: Global search (⌘K shortcut hint)
+- Right: Dark mode toggle, notification bell with badge, user avatar dropdown
 
-### Data Display
+## Data Display Components
+
+**Dashboard Stats Cards:**
+- Large metric: text-3xl, font-semibold, tabular-nums
+- Label: text-sm below metric
+- Trend indicator: icon + percentage with directional arrow (Heroicons)
+- Corner icon: large decorative icon (opacity-20 in light, opacity-10 in dark)
+- Min height: h-32
 
 **Tables:**
-- Sticky header row
-- Hover state on rows
-- Inline actions (edit, delete icons) on row hover
-- Pagination at bottom
-- Filter/sort controls above table
-- Empty states with illustrations and CTAs
+- Sticky header with filter/sort controls
+- Hover state on rows (subtle backdrop change)
+- Inline actions: appear on row hover (edit, delete icons)
+- Pagination: bottom-aligned with items-per-page selector
+- Empty states: centered icon, heading, description, CTA button
+- Loading state: skeleton rows with shimmer animation
 
-**Cards:**
-- Consistent padding: p-6
-- Header with title and action button
-- Divider between header and content
-- Footer for metadata or actions
+**Event Cards:**
+- Header: Event name + status badge (Draft/Attivo/Concluso)
+- Body: Date/time row with calendar icon, location row with pin icon, participant count
+- Footer: Assigned staff avatars (max 3 + overflow count), quick actions menu
+- Hover: subtle lift with shadow elevation change
 
-**Stats Cards (Dashboard):**
-- Large number display (text-3xl, font-semibold)
-- Label below (text-sm)
-- Trend indicator (↑/↓ with percentage)
-- Icon in top-right corner
+**Inventory Cards:**
+- Product name + thumbnail image (64x64, rounded)
+- Stock level progress bar (current/capacity) 
+- Critical/warning thresholds indicated by progress fill treatment
+- Last updated timestamp
+- Quick action: consumption adjustment buttons
 
-### Forms
+## Form Components
 
 **Input Fields:**
-- Floating labels or top-aligned labels with required asterisk
-- Helper text below (text-sm)
-- Error states with red border and error message
-- Consistent height: h-10 for inputs
-- Full width within container
-
-**Form Layout:**
-- Group related fields with subtle section headers
-- Action buttons right-aligned at bottom
-- "Save" primary button, "Cancel" secondary button with gap-3
+- Height: h-11 for text inputs
+- Labels: top-aligned, text-sm, font-medium, required asterisk
+- Helper text: text-xs below input
+- Error states: red accent border, error icon right-aligned, error message below
+- Success states: green accent border, checkmark icon
+- Disabled states: reduced opacity, no-pointer cursor
 
 **Special Inputs:**
-- Date/time pickers for events
-- Quantity adjusters (+/- buttons) for inventory
-- Dropdown selects for locations, products, stations
-- Multi-select for permissions/roles
+- Date/Time: Material Design 3 picker modals
+- Quantity: Large +/- buttons flanking display (mobile: min-h-14 touch targets)
+- Selects: Dropdown with search for 10+ options
+- Multi-select: Chip-based selection with overflow scroll
 
-### Inventory-Specific Components
+**Form Layout:**
+- Section headers with divider below (text-lg, font-semibold, pb-4, border-b)
+- Field groups with gap-6 vertical spacing
+- Submit actions: right-aligned, primary + secondary buttons, gap-3
+- Validation: real-time on blur, full validation on submit
 
-**Stock Level Indicator:**
-- Progress bar showing current vs. capacity
-- Color coding threshold (critical/warning/healthy) - described semantically
-- Quantity badge overlay
-
-**Quick Consumption Panel (Mobile):**
-- Large touch targets (min-h-14)
-- Product name with current quantity
-- - and + buttons flanking quantity display
-- Swipe-to-consume pattern option
-
-**Movement Log:**
-- Timeline-style list with icons
-- User avatar, action description, timestamp
-- Expandable details for each entry
-
-### Event Management
-
-**Event Card:**
-- Event name (text-lg, font-semibold)
-- Date/time with calendar icon
-- Location with map pin icon
-- Status badge (Draft/Active/Closed)
-- Participant count
-- Quick action menu (•••)
-
-**Station Assignment:**
-- Drag-and-drop interface for assigning staff
-- Station cards showing assigned bartender avatar
-- Stock status indicator per station
-
-### Reports
-
-**End-of-Night Report:**
-- Summary cards at top (total consumption, cost, variance)
-- Expandable sections per station
-- Product breakdown table with columns: Product | Initial | Consumed | Remaining | Cost
-- Export buttons (PDF, Excel) in header
-- Date range selector for historical reports
-
-## Role-Based Dashboards
+## Role-Specific Dashboards
 
 **Super Admin:**
-- Company list with creation CTA
-- System-wide metrics
-- Activity feed
+- Company management grid with quick stats per company
+- System health monitor (API status, storage usage)
+- Activity feed with filterable user actions
 
-**Company Admin:**
-- Quick stats (upcoming events, stock alerts)
-- Recent activity timeline
-- Team management shortcuts
+**Company Admin:**  
+- Quick metrics: upcoming events count, low stock alerts, active staff
+- Calendar month-view of events
+- Team overview with role distribution
+- Inventory alerts prominently displayed
 
 **Organizer:**
-- Calendar view of events
-- Active events with real-time consumption
-- Inventory alerts prominently displayed
-- Quick create event button (floating action button)
+- Active events carousel (horizontally scrollable cards)
+- Today's timeline view with real-time consumption tracking
+- Quick create event floating action button (bottom-right, mobile)
+- Stock status dashboard with critical items highlighted
 
 **Warehouse Manager:**
-- Stock levels overview
-- Pending transfers list
-- Load/unload forms immediately accessible
+- Stock levels table sortable by quantity/last update
+- Transfer requests queue with approve/reject actions  
+- Load/unload quick forms accessible from header
+- Movement log with timeline visualization
 
-**Bartender (Mobile-First):**
-- Today's assigned events (card list)
-- Tap event → see station → product list
-- Large touch-friendly consumption controls
-- Offline sync indicator
+**Bartender (Mobile-Optimized):**
+- Today's events: large card list with station assignments
+- Product list: searchable with large touch-friendly quantity controls
+- Offline mode indicator with sync status
+- Bottom navigation: Events, Scan Product, Profile
 
 ## Mobile Considerations
 
-- Bottom navigation for primary actions
-- Swipe gestures for common tasks
-- Simplified header (logo + notifications)
-- Sticky action buttons at screen bottom
-- Pull-to-refresh for inventory updates
-- Haptic feedback on quantity adjustments
+- Bottom tab navigation (4-5 primary actions)
+- Simplified header: logo + notifications only
+- Touch targets: min 44x44px (iOS) / 48x48px (Android)
+- Swipe gestures: right-to-left for delete, pull-to-refresh
+- Sticky CTAs at bottom with backdrop blur
+- Haptic feedback on increment/decrement actions
+- Reduced motion option respects system preferences
+
+## Analytics & Reports
+
+**Report Header:**
+- Date range selector with presets (Oggi, Questa Settimana, Questo Mese, Personalizzato)
+- Export buttons (PDF, Excel) with download icons
+- Filter controls (by location, product category, event)
+
+**Visualization Components:**
+- Summary cards grid at top (total consumption, revenue, variance)
+- Charts: Use Chart.js or similar library - bar charts for consumption, line charts for trends, donut charts for distribution
+- Data tables: expandable rows for detailed breakdowns
+- Comparison mode: side-by-side event analysis
+
+**Station Reports:**
+- Accordion-style expandable sections per station
+- Per-station summary with bartender info, duration, total sales
+- Product breakdown table: columns (Prodotto, Iniziale, Consumato, Rimanente, Costo)
+
+## Images
+
+**No hero images** - This is a utility-focused management application. All visual elements are component-based (icons, charts, data visualization).
+
+**Product thumbnails:** Use throughout inventory cards and consumption logs (64x64 rounded squares).
 
 ## Accessibility
 
-- Consistent focus indicators (2px outline)
-- ARIA labels for icon-only buttons
-- Keyboard navigation throughout
-- Screen reader announcements for stock updates
-- High contrast ratios for all text
-- Touch targets minimum 44x44px on mobile
+- Consistent focus indicators: 2px outline with offset
+- ARIA labels on all icon-only buttons (Italian labels)
+- Keyboard shortcuts documented in help modal (⌘K search, N new event, etc.)
+- Screen reader announcements for real-time updates (stock changes, notifications)
+- High contrast mode support in both light/dark themes
+- Reduced motion: disable all transitions when prefers-reduced-motion is active

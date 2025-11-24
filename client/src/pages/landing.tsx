@@ -3,6 +3,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Calendar, Package, BarChart3, Users, Sparkles } from "lucide-react";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 export default function Landing() {
   return (
@@ -19,7 +20,8 @@ export default function Landing() {
             alt="EventFourYou" 
             className="h-10 w-auto"
           />
-          <div className="flex gap-3">
+          <div className="flex items-center gap-3">
+            <ThemeToggle />
             <Button
               variant="outline"
               asChild

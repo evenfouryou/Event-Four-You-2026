@@ -4,10 +4,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Calendar, AlertCircle, Mail } from "lucide-react";
+import { AlertCircle, Mail } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 export default function Login() {
   const [, setLocation] = useLocation();
@@ -70,7 +71,8 @@ export default function Login() {
               className="h-10 w-auto cursor-pointer"
             />
           </Link>
-          <div className="flex gap-3">
+          <div className="flex items-center gap-3">
+            <ThemeToggle />
             <Button variant="outline" asChild data-testid="button-back-home">
               <Link href="/">Home</Link>
             </Button>
