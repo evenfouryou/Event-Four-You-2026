@@ -1,10 +1,11 @@
+import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import {
   Calendar,
   Package,
@@ -17,8 +18,9 @@ import {
   MapPin,
   Clock,
   Wine,
+  Users,
 } from "lucide-react";
-import type { Event, Product } from "@shared/schema";
+import type { Event, Product, Station } from "@shared/schema";
 
 function StatsCard({
   title,
@@ -60,8 +62,10 @@ function StatsCard({
 
 export default function Beverage() {
   const { user } = useAuth();
+  const [, setLocation] = useLocation();
   const isBartender = user?.role === 'bartender';
   const isWarehouse = user?.role === 'warehouse';
+  const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
 
   const { data: events, isLoading: eventsLoading } = useQuery<Event[]>({
     queryKey: ['/api/events'],
@@ -81,25 +85,103 @@ export default function Beverage() {
     enabled: !isBartender,
   });
 
+  // Fetch stations for selected event (for bartender)
+  const { data: eventStations, isLoading: stationsLoading } = useQuery<Station[]>({
+    queryKey: ['/api/events', selectedEventId, 'stations'],
+    enabled: isBartender && !!selectedEventId,
+  });
+
   const ongoingEvents = events?.filter(e => e.status === 'ongoing') || [];
   const scheduledEvents = events?.filter(e => e.status === 'scheduled') || [];
   const lowStockProducts = generalStocks?.filter(s => Number(s.quantity) < 10) || [];
 
+  // Filter stations where the bartender is assigned
+  const myStations = eventStations?.filter(s => 
+    s.bartenderIds?.includes(user?.id || '')
+  ) || [];
+
+  const selectedEvent = events?.find(e => e.id === selectedEventId);
+
   if (isBartender) {
+    // Step 2: Show stations for selected event
+    if (selectedEventId && selectedEvent) {
+      return (
+        <div className="p-6 md:p-8 max-w-7xl mx-auto">
+          <div className="flex items-center gap-4 mb-8">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={() => setSelectedEventId(null)}
+              data-testid="button-back-events"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <div>
+              <h1 className="text-2xl font-semibold mb-1">{selectedEvent.name}</h1>
+              <p className="text-muted-foreground">
+                Seleziona la tua postazione
+              </p>
+            </div>
+          </div>
+
+          {stationsLoading ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <Skeleton className="h-32" />
+              <Skeleton className="h-32" />
+            </div>
+          ) : myStations.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {myStations.map((station) => (
+                <Card 
+                  key={station.id} 
+                  className="hover-elevate cursor-pointer"
+                  onClick={() => setLocation(`/consumption?eventId=${selectedEventId}&stationId=${station.id}`)}
+                  data-testid={`station-card-${station.id}`}
+                >
+                  <CardContent className="p-6">
+                    <div className="flex items-center gap-4">
+                      <div className="rounded-xl bg-green-500/10 p-4">
+                        <MapPin className="h-8 w-8 text-green-500" />
+                      </div>
+                      <div>
+                        <h3 className="text-xl font-semibold">{station.name}</h3>
+                        <p className="text-sm text-muted-foreground">
+                          Postazione assegnata
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : eventStations && eventStations.length > 0 ? (
+            <Card>
+              <CardContent className="p-12 text-center">
+                <Users className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+                <p className="text-muted-foreground mb-2">Non sei assegnato a nessuna postazione per questo evento</p>
+                <p className="text-sm text-muted-foreground">Contatta il gestore per essere assegnato</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card>
+              <CardContent className="p-12 text-center">
+                <MapPin className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+                <p className="text-muted-foreground">Nessuna postazione configurata per questo evento</p>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      );
+    }
+
+    // Step 1: Show events to select
     return (
       <div className="p-6 md:p-8 max-w-7xl mx-auto">
-        <div className="flex items-center gap-4 mb-8">
-          <Button variant="ghost" size="icon" asChild>
-            <Link href="/">
-              <ArrowLeft className="h-5 w-5" />
-            </Link>
-          </Button>
-          <div>
-            <h1 className="text-2xl font-semibold mb-1">Ciao, {user?.firstName || 'Barista'}</h1>
-            <p className="text-muted-foreground">
-              Seleziona un evento per registrare i consumi
-            </p>
-          </div>
+        <div className="mb-8">
+          <h1 className="text-2xl font-semibold mb-1">Ciao, {user?.firstName || 'Barista'}</h1>
+          <p className="text-muted-foreground">
+            Seleziona un evento per registrare i consumi
+          </p>
         </div>
 
         {eventsLoading ? (
@@ -110,23 +192,26 @@ export default function Beverage() {
         ) : ongoingEvents.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {ongoingEvents.map((event) => (
-              <Link key={event.id} href="/consumption">
-                <Card className="hover-elevate cursor-pointer">
-                  <CardContent className="p-6">
-                    <div className="flex items-center gap-4">
-                      <div className="rounded-xl bg-primary/10 p-4">
-                        <Wine className="h-8 w-8 text-primary" />
-                      </div>
-                      <div>
-                        <h3 className="text-xl font-semibold">{event.name}</h3>
-                        <p className="text-sm text-muted-foreground">
-                          {new Date(event.startDatetime).toLocaleDateString('it-IT')}
-                        </p>
-                      </div>
+              <Card 
+                key={event.id} 
+                className="hover-elevate cursor-pointer"
+                onClick={() => setSelectedEventId(event.id)}
+                data-testid={`event-card-${event.id}`}
+              >
+                <CardContent className="p-6">
+                  <div className="flex items-center gap-4">
+                    <div className="rounded-xl bg-primary/10 p-4">
+                      <Wine className="h-8 w-8 text-primary" />
                     </div>
-                  </CardContent>
-                </Card>
-              </Link>
+                    <div>
+                      <h3 className="text-xl font-semibold">{event.name}</h3>
+                      <p className="text-sm text-muted-foreground">
+                        {new Date(event.startDatetime).toLocaleDateString('it-IT')}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
             ))}
           </div>
         ) : (

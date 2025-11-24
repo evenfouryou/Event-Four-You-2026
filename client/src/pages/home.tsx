@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import {
   Wine,
   Calculator,
@@ -64,13 +64,22 @@ function SectionCard({
 
 export default function Home() {
   const { user } = useAuth();
+  const [, setLocation] = useLocation();
 
   const isSuperAdmin = user?.role === 'super_admin';
+  const isBartender = user?.role === 'bartender';
+  const isWarehouse = user?.role === 'warehouse';
 
   const { data: companies, isLoading: companiesLoading } = useQuery<Company[]>({
     queryKey: ['/api/companies'],
     enabled: isSuperAdmin,
   });
+
+  // Redirect baristi e magazzinieri direttamente a Beverage
+  if (isBartender || isWarehouse) {
+    setLocation('/beverage');
+    return null;
+  }
 
   if (isSuperAdmin) {
     return (
