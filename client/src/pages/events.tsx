@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Plus, Calendar as CalendarIcon, Users, Eye, Search, Warehouse, Repeat, FileEdit, Clock, CalendarCheck, FilePenLine, CheckCircle2 } from "lucide-react";
+import { Plus, Calendar as CalendarIcon, Users, Eye, Search, Warehouse, Repeat, FileEdit, Clock, CalendarCheck, FilePenLine, CheckCircle2, ArrowLeft } from "lucide-react";
 import type { Event, Station, EventFormat } from "@shared/schema";
 
 const statusLabels: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
@@ -240,8 +240,13 @@ export default function Events() {
   return (
     <div className="p-6 md:p-8 max-w-7xl mx-auto">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
+      <div className="flex items-center gap-4 mb-6">
+        <Button variant="ghost" size="icon" asChild>
+          <Link href="/beverage">
+            <ArrowLeft className="h-5 w-5" />
+          </Link>
+        </Button>
+        <div className="flex-1">
           <h1 className="text-2xl font-semibold mb-1">Gestione Eventi</h1>
           <p className="text-muted-foreground">
             {canCreateEvents ? 'Organizza e monitora i tuoi eventi' : 'Visualizza gli eventi'}

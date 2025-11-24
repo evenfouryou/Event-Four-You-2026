@@ -11,7 +11,8 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { DollarSign, Plus, Edit, Trash2, Check, X, Package } from "lucide-react";
+import { DollarSign, Plus, Edit, Trash2, Check, X, Package, ArrowLeft } from "lucide-react";
+import { Link } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -241,8 +242,13 @@ export default function PriceLists() {
 
   return (
     <div className="container mx-auto p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
+      <div className="flex items-center gap-4">
+        <Button variant="ghost" size="icon" asChild>
+          <Link href="/beverage">
+            <ArrowLeft className="h-5 w-5" />
+          </Link>
+        </Button>
+        <div className="flex-1">
           <h1 className="text-3xl font-semibold tracking-tight">Listini Prezzi</h1>
           <p className="text-muted-foreground mt-1">
             {canCreatePriceLists ? 'Gestisci i listini prezzi per i tuoi prodotti' : 'Visualizza i listini prezzi'}

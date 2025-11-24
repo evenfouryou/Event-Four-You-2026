@@ -44,7 +44,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Plus, Truck, Edit, Trash2, Search } from "lucide-react";
+import { Plus, Truck, Edit, Trash2, Search, ArrowLeft } from "lucide-react";
+import { Link } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { insertSupplierSchema, type Supplier, type InsertSupplier } from "@shared/schema";
@@ -225,8 +226,13 @@ export default function Suppliers() {
 
   return (
     <div className="flex flex-col gap-6 p-6">
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
+      <div className="flex items-center gap-4">
+        <Button variant="ghost" size="icon" asChild>
+          <Link href="/beverage">
+            <ArrowLeft className="h-5 w-5" />
+          </Link>
+        </Button>
+        <div className="flex items-center gap-3 flex-1">
           <Truck className="h-6 w-6 text-primary" />
           <h1 className="text-2xl font-semibold">Fornitori</h1>
         </div>

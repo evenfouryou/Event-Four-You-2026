@@ -51,7 +51,8 @@ import {
 } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Boxes, Edit, Trash2 } from "lucide-react";
+import { Plus, Boxes, Edit, Trash2, ArrowLeft } from "lucide-react";
+import { Link } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -248,8 +249,13 @@ export default function StationsPage() {
 
   return (
     <div className="p-6 md:p-8 max-w-7xl mx-auto">
-      <div className="flex items-center justify-between mb-8">
-        <div>
+      <div className="flex items-center gap-4 mb-8">
+        <Button variant="ghost" size="icon" asChild>
+          <Link href="/beverage">
+            <ArrowLeft className="h-5 w-5" />
+          </Link>
+        </Button>
+        <div className="flex-1">
           <h1 className="text-2xl font-semibold mb-1">Gestione Postazioni</h1>
           <p className="text-muted-foreground">
             Crea e gestisci le postazioni generali dell'azienda
