@@ -14,10 +14,11 @@ export default function Landing() {
         className="border-b bg-background sticky top-0 z-50"
       >
         <div className="container mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Calendar className="h-6 w-6 text-primary" />
-            <h1 className="text-xl font-semibold">Event Four You</h1>
-          </div>
+          <img 
+            src="/attached_assets/new_logo (1)_1764019811144.png" 
+            alt="EventFourYou" 
+            className="h-10 w-auto"
+          />
           <div className="flex gap-3">
             <Button
               variant="outline"

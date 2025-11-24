@@ -101,12 +101,16 @@ export default function Register() {
     <div className="min-h-screen flex items-center justify-center p-6 bg-gradient-to-br from-primary/5 to-background">
       <Card className="max-w-2xl w-full">
         <CardHeader>
-          <div className="flex items-center gap-3 mb-2">
-            <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center">
-              <UserPlus className="h-6 w-6 text-primary" />
-            </div>
-            <div>
-              <CardTitle className="text-2xl">Registrazione Event Four You</CardTitle>
+          <div className="flex flex-col items-center gap-4 mb-4">
+            <Link href="/">
+              <img 
+                src="/attached_assets/new_logo (1)_1764019811144.png" 
+                alt="EventFourYou" 
+                className="h-12 w-auto cursor-pointer"
+              />
+            </Link>
+            <div className="text-center">
+              <CardTitle className="text-2xl">Registrazione</CardTitle>
               <CardDescription>
                 Crea il tuo account organizzatore eventi
               </CardDescription>

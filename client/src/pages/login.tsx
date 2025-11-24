@@ -64,10 +64,11 @@ export default function Login() {
       <header className="border-b">
         <div className="container mx-auto px-6 py-4 flex items-center justify-between">
           <Link href="/">
-            <div className="flex items-center gap-2 cursor-pointer">
-              <Calendar className="h-6 w-6 text-primary" />
-              <h1 className="text-xl font-semibold">Event Four You</h1>
-            </div>
+            <img 
+              src="/attached_assets/new_logo (1)_1764019811144.png" 
+              alt="EventFourYou" 
+              className="h-10 w-auto cursor-pointer"
+            />
           </Link>
           <div className="flex gap-3">
             <Button variant="outline" asChild data-testid="button-back-home">

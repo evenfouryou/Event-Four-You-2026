@@ -253,10 +253,13 @@ export function AppSidebar() {
     <Sidebar>
       <SidebarContent className="p-4">
         <div className="mb-6 px-2">
-          <h2 className="text-xl font-semibold tracking-tight">Event Four You</h2>
-          <p className="text-sm text-muted-foreground mt-1">
-            Gestione Eventi
-          </p>
+          <Link href="/">
+            <img 
+              src="/attached_assets/new_logo (1)_1764019811144.png" 
+              alt="EventFourYou" 
+              className="h-12 w-auto cursor-pointer"
+            />
+          </Link>
         </div>
 
         {Object.entries(groupedItems).map(([group, items]) => (

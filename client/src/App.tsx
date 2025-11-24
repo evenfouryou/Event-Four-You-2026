@@ -9,6 +9,7 @@ import { useAuth } from "@/hooks/useAuth";
 import NotFound from "@/pages/not-found";
 import Landing from "@/pages/landing";
 import Home from "@/pages/home";
+import Beverage from "@/pages/beverage";
 import Companies from "@/pages/companies";
 import Users from "@/pages/users";
 import Locations from "@/pages/locations";
@@ -75,6 +76,7 @@ function Router() {
           <main className="flex-1 overflow-auto">
             <Switch>
               <Route path="/" component={Home} />
+              <Route path="/beverage" component={Beverage} />
               <Route path="/companies" component={Companies} />
               <Route path="/users" component={Users} />
               <Route path="/locations" component={Locations} />

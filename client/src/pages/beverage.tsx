@@ -1,0 +1,449 @@
+import { useAuth } from "@/hooks/useAuth";
+import { useQuery } from "@tanstack/react-query";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
+import { Link } from "wouter";
+import {
+  Calendar,
+  Package,
+  AlertTriangle,
+  TrendingUp,
+  Plus,
+  Warehouse,
+  BarChart3,
+  ArrowLeft,
+  MapPin,
+  Clock,
+  Wine,
+} from "lucide-react";
+import type { Event, Product } from "@shared/schema";
+
+function StatsCard({
+  title,
+  value,
+  icon: Icon,
+  trend,
+  testId,
+}: {
+  title: string;
+  value: string | number;
+  icon: React.ElementType;
+  trend?: string;
+  testId: string;
+}) {
+  return (
+    <Card>
+      <CardContent className="p-6">
+        <div className="flex items-start justify-between">
+          <div className="flex-1">
+            <p className="text-sm text-muted-foreground mb-1">{title}</p>
+            <p className="text-3xl font-semibold" data-testid={testId}>
+              {value}
+            </p>
+            {trend && (
+              <p className="text-sm text-muted-foreground mt-2 flex items-center gap-1">
+                <TrendingUp className="h-3 w-3" />
+                {trend}
+              </p>
+            )}
+          </div>
+          <div className="rounded-lg bg-primary/10 p-3">
+            <Icon className="h-5 w-5 text-primary" />
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+export default function Beverage() {
+  const { user } = useAuth();
+  const isBartender = user?.role === 'bartender';
+  const isWarehouse = user?.role === 'warehouse';
+
+  const { data: events, isLoading: eventsLoading } = useQuery<Event[]>({
+    queryKey: ['/api/events'],
+  });
+
+  const { data: products, isLoading: productsLoading } = useQuery<Product[]>({
+    queryKey: ['/api/products'],
+    enabled: !isBartender,
+  });
+
+  const { data: generalStocks } = useQuery<Array<{
+    productId: string;
+    quantity: string;
+    productName: string;
+  }>>({
+    queryKey: ['/api/stock/general'],
+    enabled: !isBartender,
+  });
+
+  const ongoingEvents = events?.filter(e => e.status === 'ongoing') || [];
+  const scheduledEvents = events?.filter(e => e.status === 'scheduled') || [];
+  const lowStockProducts = generalStocks?.filter(s => Number(s.quantity) < 10) || [];
+
+  if (isBartender) {
+    return (
+      <div className="p-6 md:p-8 max-w-7xl mx-auto">
+        <div className="flex items-center gap-4 mb-8">
+          <Button variant="ghost" size="icon" asChild>
+            <Link href="/">
+              <ArrowLeft className="h-5 w-5" />
+            </Link>
+          </Button>
+          <div>
+            <h1 className="text-2xl font-semibold mb-1">Ciao, {user?.firstName || 'Barista'}</h1>
+            <p className="text-muted-foreground">
+              Seleziona un evento per registrare i consumi
+            </p>
+          </div>
+        </div>
+
+        {eventsLoading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <Skeleton className="h-32" />
+            <Skeleton className="h-32" />
+          </div>
+        ) : ongoingEvents.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {ongoingEvents.map((event) => (
+              <Link key={event.id} href="/consumption">
+                <Card className="hover-elevate cursor-pointer">
+                  <CardContent className="p-6">
+                    <div className="flex items-center gap-4">
+                      <div className="rounded-xl bg-primary/10 p-4">
+                        <Wine className="h-8 w-8 text-primary" />
+                      </div>
+                      <div>
+                        <h3 className="text-xl font-semibold">{event.name}</h3>
+                        <p className="text-sm text-muted-foreground">
+                          {new Date(event.startDatetime).toLocaleDateString('it-IT')}
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </Link>
+            ))}
+          </div>
+        ) : (
+          <Card>
+            <CardContent className="p-12 text-center">
+              <Calendar className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+              <p className="text-muted-foreground">Nessun evento attivo al momento</p>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+    );
+  }
+
+  if (isWarehouse) {
+    return (
+      <div className="p-6 md:p-8 max-w-7xl mx-auto">
+        <div className="flex items-center gap-4 mb-8">
+          <Button variant="ghost" size="icon" asChild>
+            <Link href="/">
+              <ArrowLeft className="h-5 w-5" />
+            </Link>
+          </Button>
+          <div>
+            <h1 className="text-2xl font-semibold mb-1">Ciao, {user?.firstName || 'Magazziniere'}</h1>
+            <p className="text-muted-foreground">
+              Gestisci il magazzino e le scorte
+            </p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+          <StatsCard
+            title="Prodotti in Magazzino"
+            value={products?.length || 0}
+            icon={Package}
+            testId="stat-products"
+          />
+          <StatsCard
+            title="Scorte Basse"
+            value={lowStockProducts.length}
+            icon={AlertTriangle}
+            testId="stat-low-stock"
+          />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <Link href="/warehouse">
+            <Card className="hover-elevate cursor-pointer h-full">
+              <CardContent className="p-6">
+                <div className="flex items-center gap-4">
+                  <div className="rounded-xl bg-blue-500 p-4">
+                    <Package className="h-8 w-8 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-semibold">Magazzino</h3>
+                    <p className="text-muted-foreground text-sm">Gestisci le scorte</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
+          <Link href="/products">
+            <Card className="hover-elevate cursor-pointer h-full">
+              <CardContent className="p-6">
+                <div className="flex items-center gap-4">
+                  <div className="rounded-xl bg-green-500 p-4">
+                    <Wine className="h-8 w-8 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-semibold">Prodotti</h3>
+                    <p className="text-muted-foreground text-sm">Catalogo prodotti</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-6 md:p-8 max-w-7xl mx-auto">
+      <div className="flex items-center gap-4 mb-8">
+        <Button variant="ghost" size="icon" asChild>
+          <Link href="/">
+            <ArrowLeft className="h-5 w-5" />
+          </Link>
+        </Button>
+        <div className="flex-1">
+          <h1 className="text-2xl font-semibold mb-1 flex items-center gap-2">
+            <Wine className="h-6 w-6 text-purple-500" />
+            Beverage
+          </h1>
+          <p className="text-muted-foreground">
+            Gestione eventi, magazzino e consumi
+          </p>
+        </div>
+        <Button asChild data-testid="button-create-event">
+          <Link href="/events/wizard">
+            <Plus className="h-4 w-4 mr-2" />
+            Nuovo Evento
+          </Link>
+        </Button>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        {eventsLoading || productsLoading ? (
+          <>
+            <Skeleton className="h-32" />
+            <Skeleton className="h-32" />
+            <Skeleton className="h-32" />
+            <Skeleton className="h-32" />
+          </>
+        ) : (
+          <>
+            <StatsCard
+              title="Eventi in Corso"
+              value={ongoingEvents.length}
+              icon={Calendar}
+              testId="stat-ongoing-events"
+            />
+            <StatsCard
+              title="Eventi Programmati"
+              value={scheduledEvents.length}
+              icon={Calendar}
+              testId="stat-scheduled-events"
+            />
+            <StatsCard
+              title="Prodotti"
+              value={products?.length || 0}
+              icon={Package}
+              testId="stat-products"
+            />
+            <StatsCard
+              title="Scorte Basse"
+              value={lowStockProducts.length}
+              icon={AlertTriangle}
+              testId="stat-low-stock"
+            />
+          </>
+        )}
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        <Link href="/events">
+          <Card className="hover-elevate cursor-pointer">
+            <CardContent className="p-4 flex items-center gap-3">
+              <Calendar className="h-5 w-5 text-primary" />
+              <span className="font-medium">Eventi</span>
+            </CardContent>
+          </Card>
+        </Link>
+        <Link href="/warehouse">
+          <Card className="hover-elevate cursor-pointer">
+            <CardContent className="p-4 flex items-center gap-3">
+              <Warehouse className="h-5 w-5 text-primary" />
+              <span className="font-medium">Magazzino</span>
+            </CardContent>
+          </Card>
+        </Link>
+        <Link href="/products">
+          <Card className="hover-elevate cursor-pointer">
+            <CardContent className="p-4 flex items-center gap-3">
+              <Package className="h-5 w-5 text-primary" />
+              <span className="font-medium">Prodotti</span>
+            </CardContent>
+          </Card>
+        </Link>
+        <Link href="/stations">
+          <Card className="hover-elevate cursor-pointer">
+            <CardContent className="p-4 flex items-center gap-3">
+              <MapPin className="h-5 w-5 text-primary" />
+              <span className="font-medium">Postazioni</span>
+            </CardContent>
+          </Card>
+        </Link>
+        <Link href="/suppliers">
+          <Card className="hover-elevate cursor-pointer">
+            <CardContent className="p-4 flex items-center gap-3">
+              <Package className="h-5 w-5 text-primary" />
+              <span className="font-medium">Fornitori</span>
+            </CardContent>
+          </Card>
+        </Link>
+        <Link href="/purchase-orders">
+          <Card className="hover-elevate cursor-pointer">
+            <CardContent className="p-4 flex items-center gap-3">
+              <Package className="h-5 w-5 text-primary" />
+              <span className="font-medium">Ordini</span>
+            </CardContent>
+          </Card>
+        </Link>
+        <Link href="/price-lists">
+          <Card className="hover-elevate cursor-pointer">
+            <CardContent className="p-4 flex items-center gap-3">
+              <Package className="h-5 w-5 text-primary" />
+              <span className="font-medium">Listini</span>
+            </CardContent>
+          </Card>
+        </Link>
+        <Link href="/reports">
+          <Card className="hover-elevate cursor-pointer">
+            <CardContent className="p-4 flex items-center gap-3">
+              <BarChart3 className="h-5 w-5 text-primary" />
+              <span className="font-medium">Report</span>
+            </CardContent>
+          </Card>
+        </Link>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between gap-2">
+            <CardTitle>Prossimi Eventi</CardTitle>
+            <Button variant="outline" size="sm" asChild>
+              <Link href="/events">Vedi tutti</Link>
+            </Button>
+          </CardHeader>
+          <CardContent>
+            {eventsLoading ? (
+              <div className="space-y-3">
+                <Skeleton className="h-16" />
+                <Skeleton className="h-16" />
+                <Skeleton className="h-16" />
+              </div>
+            ) : [...ongoingEvents, ...scheduledEvents].length > 0 ? (
+              <div className="space-y-3">
+                {[...ongoingEvents, ...scheduledEvents].slice(0, 5).map((event) => (
+                  <Link key={event.id} href={`/events/${event.id}`}>
+                    <div
+                      className="flex items-center justify-between p-3 rounded-lg hover-elevate cursor-pointer"
+                      data-testid={`event-item-${event.id}`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className={`rounded-lg p-2 ${event.status === 'ongoing' ? 'bg-green-100 dark:bg-green-900/30' : 'bg-blue-100 dark:bg-blue-900/30'}`}>
+                          <Calendar className={`h-4 w-4 ${event.status === 'ongoing' ? 'text-green-600' : 'text-blue-600'}`} />
+                        </div>
+                        <div>
+                          <p className="font-medium">{event.name}</p>
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <Clock className="h-3 w-3" />
+                            {new Date(event.startDatetime).toLocaleDateString('it-IT', {
+                              day: 'numeric',
+                              month: 'short',
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })}
+                          </div>
+                        </div>
+                      </div>
+                      <Badge variant={event.status === 'ongoing' ? 'default' : 'secondary'}>
+                        {event.status === 'ongoing' ? 'In corso' : 'Programmato'}
+                      </Badge>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <Calendar className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+                <p className="text-muted-foreground mb-4">Nessun evento programmato</p>
+                <Button asChild data-testid="button-create-first-event">
+                  <Link href="/events/wizard">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Crea Evento
+                  </Link>
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between gap-2">
+            <CardTitle>Scorte Basse</CardTitle>
+            <Button variant="outline" size="sm" asChild>
+              <Link href="/warehouse">Magazzino</Link>
+            </Button>
+          </CardHeader>
+          <CardContent>
+            {productsLoading ? (
+              <div className="space-y-3">
+                <Skeleton className="h-12" />
+                <Skeleton className="h-12" />
+                <Skeleton className="h-12" />
+              </div>
+            ) : lowStockProducts.length > 0 ? (
+              <div className="space-y-3">
+                {lowStockProducts.slice(0, 5).map((stock) => (
+                  <div
+                    key={stock.productId}
+                    className="flex items-center justify-between p-3 rounded-lg bg-orange-50 dark:bg-orange-950/20"
+                    data-testid={`low-stock-${stock.productId}`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="rounded-lg bg-orange-100 dark:bg-orange-900/50 p-2">
+                        <AlertTriangle className="h-4 w-4 text-orange-600" />
+                      </div>
+                      <p className="font-medium">{stock.productName}</p>
+                    </div>
+                    <Badge variant="outline" className="text-orange-600 border-orange-300">
+                      {Number(stock.quantity).toFixed(0)} unità
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <Package className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+                <p className="text-muted-foreground">Tutte le scorte sono ok</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
