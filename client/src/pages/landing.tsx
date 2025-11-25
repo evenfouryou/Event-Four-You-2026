@@ -14,22 +14,25 @@ export default function Landing() {
         transition={{ duration: 0.5 }}
         className="border-b bg-background sticky top-0 z-50"
       >
-        <div className="container mx-auto px-6 py-4 flex items-center justify-between">
+        <div className="container mx-auto px-4 md:px-6 py-3 md:py-4 flex items-center justify-between gap-2">
           <img 
             src="/logo.png" 
             alt="EventFourYou" 
-            className="h-10 w-auto"
+            className="h-8 md:h-10 w-auto"
           />
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 md:gap-3">
             <ThemeToggle />
             <Button
               variant="outline"
+              size="sm"
               asChild
+              className="hidden sm:inline-flex"
               data-testid="button-login"
             >
               <Link href="/login">Accedi</Link>
             </Button>
             <Button
+              size="sm"
               asChild
               data-testid="button-register-header"
             >
@@ -40,7 +43,7 @@ export default function Landing() {
       </motion.header>
 
       <main className="flex-1">
-        <section className="relative container mx-auto px-6 py-16 md:py-24 overflow-hidden">
+        <section className="relative container mx-auto px-4 md:px-6 py-12 md:py-24 overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-primary/10 pointer-events-none" />
           <motion.div 
             className="absolute top-10 right-10 w-72 h-72 bg-primary/5 rounded-full pointer-events-none"

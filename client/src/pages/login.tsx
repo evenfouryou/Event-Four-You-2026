@@ -63,27 +63,27 @@ export default function Login() {
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <header className="border-b">
-        <div className="container mx-auto px-6 py-4 flex items-center justify-between">
+        <div className="container mx-auto px-4 md:px-6 py-3 md:py-4 flex items-center justify-between gap-2">
           <Link href="/">
             <img 
               src="/logo.png" 
               alt="EventFourYou" 
-              className="h-10 w-auto cursor-pointer"
+              className="h-8 md:h-10 w-auto cursor-pointer"
             />
           </Link>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 md:gap-3">
             <ThemeToggle />
-            <Button variant="outline" asChild data-testid="button-back-home">
+            <Button variant="outline" size="sm" asChild className="hidden md:inline-flex" data-testid="button-back-home">
               <Link href="/">Home</Link>
             </Button>
-            <Button asChild data-testid="button-register">
+            <Button size="sm" asChild data-testid="button-register">
               <Link href="/register">Registrati</Link>
             </Button>
           </div>
         </div>
       </header>
 
-      <main className="flex-1 flex items-center justify-center p-6">
+      <main className="flex-1 flex items-center justify-center p-4 md:p-6">
         <Card className="w-full max-w-md">
           <CardHeader>
             <CardTitle>Accedi</CardTitle>

@@ -64,13 +64,13 @@ export default function Register() {
 
   if (registrationSuccess) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-6 bg-gradient-to-br from-primary/5 to-background">
+      <div className="min-h-screen flex items-center justify-center p-4 md:p-6 bg-gradient-to-br from-primary/5 to-background">
         <Card className="max-w-md w-full">
           <CardHeader className="text-center">
-            <div className="mx-auto mb-4 h-16 w-16 rounded-full bg-green-100 flex items-center justify-center">
-              <CheckCircle2 className="h-8 w-8 text-green-600" />
+            <div className="mx-auto mb-4 h-14 md:h-16 w-14 md:w-16 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
+              <CheckCircle2 className="h-7 md:h-8 w-7 md:w-8 text-green-600 dark:text-green-400" />
             </div>
-            <CardTitle className="text-2xl">Registrazione Completata!</CardTitle>
+            <CardTitle className="text-xl md:text-2xl">Registrazione Completata!</CardTitle>
             <CardDescription>
               Il tuo account è stato creato con successo
             </CardDescription>
@@ -99,22 +99,22 @@ export default function Register() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-6 bg-gradient-to-br from-primary/5 to-background relative">
-      <div className="absolute top-4 right-4">
+    <div className="min-h-screen flex items-center justify-center p-4 md:p-6 bg-gradient-to-br from-primary/5 to-background relative">
+      <div className="absolute top-3 md:top-4 right-3 md:right-4">
         <ThemeToggle />
       </div>
       <Card className="max-w-2xl w-full">
-        <CardHeader>
-          <div className="flex flex-col items-center gap-4 mb-4">
+        <CardHeader className="pb-4 md:pb-6">
+          <div className="flex flex-col items-center gap-3 md:gap-4 mb-2 md:mb-4">
             <Link href="/">
               <img 
                 src="/logo.png" 
                 alt="EventFourYou" 
-                className="h-12 w-auto cursor-pointer"
+                className="h-10 md:h-12 w-auto cursor-pointer"
               />
             </Link>
             <div className="text-center">
-              <CardTitle className="text-2xl">Registrazione</CardTitle>
+              <CardTitle className="text-xl md:text-2xl">Registrazione</CardTitle>
               <CardDescription>
                 Crea il tuo account organizzatore eventi
               </CardDescription>
