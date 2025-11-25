@@ -10,6 +10,16 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
+### November 25, 2025
+- **Comprehensive Mobile Optimization**: Full mobile-first responsive design implementation
+  - **Touch-Friendly Targets**: All interactive elements (buttons, inputs, selects) have 44px minimum touch height on mobile (iOS standard)
+  - **iOS Auto-Zoom Prevention**: Input fields use 16px font-size on mobile to prevent Safari auto-zoom on focus
+  - **Safe Area Support**: CSS env(safe-area-inset-*) handling for iPhone notch and home indicator
+  - **Mobile Bottom Navigation**: Fixed bottom navigation bar with Home, Events, Warehouse, Reports shortcuts (visible only on screens < 768px)
+  - **Responsive Headers**: Login, Register, and Landing pages have compact mobile headers with smaller logos and optimized button layouts
+  - **Dialog/Sheet Mobile Optimization**: Full-screen dialogs on mobile with proper keyboard handling and safe-area padding
+  - **Viewport Configuration**: Disabled user scaling for app-like experience on mobile devices
+
 ### November 24, 2025
 - **Module-Based Home Page Structure**: Restructured navigation with a new home page featuring four main sections (Beverage, Contabilità, Personale, Dati). Each section is displayed as a large card with icon, description and navigation. Only Beverage is currently active, other sections show "Prossimamente" (Coming Soon).
 - **Dedicated Beverage Dashboard**: Created /beverage route containing the full operational dashboard with stats (ongoing events, scheduled events, products, low stock), quick access links, events list, and low stock alerts. This replaces the old home page content for gestore/organizer users.
