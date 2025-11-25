@@ -238,9 +238,13 @@ export default function EventWizard() {
 
   const publishMutation = useMutation({
     mutationFn: async (data: InsertEvent) => {
-      if (draftId) {
-        return apiRequest('PATCH', `/api/events/${draftId}`, { ...data, status: 'scheduled' });
+      // Use ref to get the most current draftId (same as saveDraftMutation)
+      const currentDraftId = draftIdRef.current;
+      if (currentDraftId) {
+        // Update the existing draft to scheduled status
+        return apiRequest('PATCH', `/api/events/${currentDraftId}`, { ...data, status: 'scheduled' });
       } else {
+        // Create new event directly as scheduled
         return apiRequest('POST', '/api/events', { ...data, status: 'scheduled' });
       }
     },
