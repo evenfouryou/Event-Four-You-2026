@@ -109,3 +109,6 @@ SMTP_PASS = "zxcrdyutzijqmmdf"
 SMTP_HOST = "smtp.gmail.com"
 SMTP_PORT = "587"
 SMTP_FROM = "Event Four You <info@eventfouryou.com>"
+
+[userenv.production]
+PUBLIC_URL = "https://eventmanage.replit.app"
