@@ -34,6 +34,8 @@ import Stations from "@/pages/stations";
 import Settings from "@/pages/settings";
 import AIAnalysis from "@/pages/ai-analysis";
 import VerifyEmail from "@/pages/verify-email";
+import ForgotPassword from "@/pages/forgot-password";
+import ResetPassword from "@/pages/reset-password";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -61,6 +63,8 @@ function Router() {
         <Route path="/login" component={Login} />
         <Route path="/register" component={Register} />
         <Route path="/verify-email" component={VerifyEmail} />
+        <Route path="/forgot-password" component={ForgotPassword} />
+        <Route path="/reset-password" component={ResetPassword} />
         <Route component={NotFound} />
       </Switch>
     );

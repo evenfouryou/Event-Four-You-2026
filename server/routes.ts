@@ -306,6 +306,164 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Forgot password - Request password reset
+  app.post('/api/forgot-password', async (req, res) => {
+    try {
+      const { email } = req.body;
+
+      if (!email) {
+        return res.status(400).json({ message: "Email richiesta" });
+      }
+
+      const user = await storage.getUserByEmail(email);
+      
+      // Always return success message for security (don't reveal if email exists)
+      const successMessage = "Se l'email è registrata, riceverai un link per reimpostare la password.";
+      
+      if (!user) {
+        return res.json({ message: successMessage });
+      }
+
+      // Generate reset token
+      const crypto = await import('crypto');
+      const resetToken = crypto.randomBytes(32).toString('hex');
+      const resetExpires = new Date(Date.now() + 3600000); // 1 hour from now
+
+      // Save token to user
+      await storage.updateUser(user.id, { 
+        resetPasswordToken: resetToken,
+        resetPasswordExpires: resetExpires 
+      });
+
+      // Build reset link
+      const baseUrl = process.env.PUBLIC_URL 
+        ? process.env.PUBLIC_URL.replace(/\/$/, '')
+        : process.env.REPLIT_DEV_DOMAIN 
+          ? `https://${process.env.REPLIT_DEV_DOMAIN}`
+          : 'http://localhost:5000';
+      const resetLink = `${baseUrl}/reset-password?token=${resetToken}`;
+      const fromEmail = process.env.SMTP_FROM || 'Event4U <noreply@event4u.com>';
+
+      try {
+        await emailTransporter.sendMail({
+          from: fromEmail,
+          to: user.email!,
+          subject: 'Reimposta la tua password - Event4U',
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+              <h2 style="color: #2563eb;">Reimposta la tua password</h2>
+              <p>Ciao ${user.firstName},</p>
+              <p>Hai richiesto di reimpostare la password del tuo account Event Four You.</p>
+              
+              <div style="background-color: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                <p style="margin-top: 0;"><strong>Clicca sul pulsante qui sotto per impostare una nuova password:</strong></p>
+                <a href="${resetLink}" 
+                   style="display: inline-block; background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin: 10px 0;">
+                  Reimposta Password
+                </a>
+                <p style="margin-bottom: 0; font-size: 12px; color: #6b7280;">
+                  Oppure copia e incolla questo link nel browser:<br/>
+                  <span style="word-break: break-all;">${resetLink}</span>
+                </p>
+              </div>
+              
+              <p style="color: #dc2626; font-size: 14px;">
+                <strong>Attenzione:</strong> Questo link scadrà tra 1 ora.
+              </p>
+              
+              <p style="color: #6b7280; font-size: 14px;">
+                Se non hai richiesto il reset della password, puoi ignorare questa email. La tua password non verrà modificata.
+              </p>
+              
+              <p style="margin-top: 30px;">
+                <strong>Il Team Event Four You</strong>
+              </p>
+            </div>
+          `,
+        });
+
+        res.json({ message: successMessage });
+      } catch (emailError) {
+        console.error("Failed to send password reset email:", emailError);
+        return res.status(500).json({ 
+          message: "Impossibile inviare l'email. Riprova più tardi." 
+        });
+      }
+    } catch (error: any) {
+      console.error("Forgot password error:", error);
+      res.status(500).json({ message: "Errore durante l'invio. Riprova più tardi." });
+    }
+  });
+
+  // Reset password with token
+  app.post('/api/reset-password', async (req, res) => {
+    try {
+      const { token, password } = req.body;
+
+      if (!token || !password) {
+        return res.status(400).json({ message: "Token e password richiesti" });
+      }
+
+      if (password.length < 8) {
+        return res.status(400).json({ message: "La password deve essere di almeno 8 caratteri" });
+      }
+
+      // Find user by reset token
+      const user = await storage.getUserByResetToken(token);
+      
+      if (!user) {
+        return res.status(400).json({ message: "Link non valido o scaduto" });
+      }
+
+      // Check if token is expired
+      if (user.resetPasswordExpires && new Date() > new Date(user.resetPasswordExpires)) {
+        return res.status(400).json({ message: "Link scaduto. Richiedi un nuovo reset password." });
+      }
+
+      // Hash new password
+      const passwordHash = await bcrypt.hash(password, 10);
+
+      // Update user with new password and clear reset token
+      await storage.updateUser(user.id, { 
+        passwordHash,
+        resetPasswordToken: null,
+        resetPasswordExpires: null,
+        emailVerified: true // Also verify email since they received the email
+      });
+
+      res.json({ message: "Password reimpostata con successo! Ora puoi accedere." });
+    } catch (error: any) {
+      console.error("Reset password error:", error);
+      res.status(500).json({ message: "Errore durante il reset. Riprova più tardi." });
+    }
+  });
+
+  // Verify reset token is valid (for frontend validation)
+  app.get('/api/verify-reset-token/:token', async (req, res) => {
+    try {
+      const { token } = req.params;
+
+      if (!token) {
+        return res.status(400).json({ valid: false, message: "Token mancante" });
+      }
+
+      const user = await storage.getUserByResetToken(token);
+      
+      if (!user) {
+        return res.status(400).json({ valid: false, message: "Link non valido" });
+      }
+
+      if (user.resetPasswordExpires && new Date() > new Date(user.resetPasswordExpires)) {
+        return res.status(400).json({ valid: false, message: "Link scaduto" });
+      }
+
+      res.json({ valid: true, email: user.email });
+    } catch (error: any) {
+      console.error("Verify reset token error:", error);
+      res.status(500).json({ valid: false, message: "Errore di verifica" });
+    }
+  });
+
   // Classic email/password login
   app.post('/api/auth/login', async (req, res) => {
     try {
