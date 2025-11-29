@@ -129,12 +129,14 @@ export default function Reports() {
       await apiRequest('POST', '/api/reports/correct-consumption', data);
     },
     onSuccess: (_, variables) => {
-      // Use variables.eventId instead of selectedEventId to avoid stale closure
+      // Invalidate cache first, then refetch to force fresh data
+      queryClient.setQueryData(['/api/reports/end-of-night', variables.eventId], undefined);
+      queryClient.setQueryData(['/api/events', variables.eventId, 'revenue-analysis'], undefined);
+      
       setTimeout(() => {
         queryClient.refetchQueries({ queryKey: ['/api/reports/end-of-night', variables.eventId] });
         queryClient.refetchQueries({ queryKey: ['/api/events', variables.eventId, 'revenue-analysis'] });
-        queryClient.refetchQueries({ queryKey: ['/api/stock'] });
-      }, 100);
+      }, 50);
       
       setCorrectionDialogOpen(false);
       setCorrectingProduct(null);
