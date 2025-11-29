@@ -409,6 +409,375 @@ export const purchaseOrderItemsRelations = relations(purchaseOrderItems, ({ one 
   }),
 }));
 
+// ==================== MODULO CONTABILITÀ ====================
+
+// Fixed Costs (Costi fissi location)
+export const fixedCosts = pgTable("fixed_costs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").notNull().references(() => companies.id),
+  locationId: varchar("location_id").references(() => locations.id),
+  category: varchar("category", { length: 100 }).notNull(), // affitto, service, permessi, sicurezza, amministrativi
+  name: varchar("name", { length: 255 }).notNull(),
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  frequency: varchar("frequency", { length: 50 }).notNull().default('monthly'), // monthly, yearly, per_event
+  validFrom: timestamp("valid_from"),
+  validTo: timestamp("valid_to"),
+  notes: text("notes"),
+  active: boolean("active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const fixedCostsRelations = relations(fixedCosts, ({ one }) => ({
+  company: one(companies, {
+    fields: [fixedCosts.companyId],
+    references: [companies.id],
+  }),
+  location: one(locations, {
+    fields: [fixedCosts.locationId],
+    references: [locations.id],
+  }),
+}));
+
+// Extra Costs (Costi extra per evento)
+export const extraCosts = pgTable("extra_costs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").notNull().references(() => companies.id),
+  eventId: varchar("event_id").references(() => events.id),
+  category: varchar("category", { length: 100 }).notNull(), // personale, service, noleggi, acquisti
+  name: varchar("name", { length: 255 }).notNull(),
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  supplierId: varchar("supplier_id").references(() => suppliers.id),
+  invoiceNumber: varchar("invoice_number", { length: 100 }),
+  invoiceDate: timestamp("invoice_date"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const extraCostsRelations = relations(extraCosts, ({ one }) => ({
+  company: one(companies, {
+    fields: [extraCosts.companyId],
+    references: [companies.id],
+  }),
+  event: one(events, {
+    fields: [extraCosts.eventId],
+    references: [events.id],
+  }),
+  supplier: one(suppliers, {
+    fields: [extraCosts.supplierId],
+    references: [suppliers.id],
+  }),
+}));
+
+// Maintenances (Manutenzioni)
+export const maintenances = pgTable("maintenances", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").notNull().references(() => companies.id),
+  locationId: varchar("location_id").references(() => locations.id),
+  eventId: varchar("event_id").references(() => events.id),
+  type: varchar("type", { length: 50 }).notNull(), // ordinaria, straordinaria
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  amount: decimal("amount", { precision: 10, scale: 2 }),
+  status: varchar("status", { length: 50 }).notNull().default('pending'), // pending, scheduled, completed
+  scheduledDate: timestamp("scheduled_date"),
+  completedDate: timestamp("completed_date"),
+  supplierId: varchar("supplier_id").references(() => suppliers.id),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const maintenancesRelations = relations(maintenances, ({ one }) => ({
+  company: one(companies, {
+    fields: [maintenances.companyId],
+    references: [companies.id],
+  }),
+  location: one(locations, {
+    fields: [maintenances.locationId],
+    references: [locations.id],
+  }),
+  event: one(events, {
+    fields: [maintenances.eventId],
+    references: [events.id],
+  }),
+  supplier: one(suppliers, {
+    fields: [maintenances.supplierId],
+    references: [suppliers.id],
+  }),
+}));
+
+// Accounting Documents (Documenti contabili)
+export const accountingDocuments = pgTable("accounting_documents", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").notNull().references(() => companies.id),
+  eventId: varchar("event_id").references(() => events.id),
+  type: varchar("type", { length: 50 }).notNull(), // fattura, preventivo, ricevuta, contratto
+  documentNumber: varchar("document_number", { length: 100 }),
+  issueDate: timestamp("issue_date"),
+  dueDate: timestamp("due_date"),
+  amount: decimal("amount", { precision: 10, scale: 2 }),
+  supplierId: varchar("supplier_id").references(() => suppliers.id),
+  status: varchar("status", { length: 50 }).notNull().default('pending'), // pending, paid, cancelled
+  fileUrl: varchar("file_url", { length: 500 }),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const accountingDocumentsRelations = relations(accountingDocuments, ({ one }) => ({
+  company: one(companies, {
+    fields: [accountingDocuments.companyId],
+    references: [companies.id],
+  }),
+  event: one(events, {
+    fields: [accountingDocuments.eventId],
+    references: [events.id],
+  }),
+  supplier: one(suppliers, {
+    fields: [accountingDocuments.supplierId],
+    references: [suppliers.id],
+  }),
+}));
+
+// ==================== MODULO PERSONALE ====================
+
+// Staff (Anagrafica personale)
+export const staff = pgTable("staff", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").notNull().references(() => companies.id),
+  userId: varchar("user_id").references(() => users.id), // Optional link to user account
+  firstName: varchar("first_name", { length: 100 }).notNull(),
+  lastName: varchar("last_name", { length: 100 }).notNull(),
+  fiscalCode: varchar("fiscal_code", { length: 16 }),
+  email: varchar("email", { length: 255 }),
+  phone: varchar("phone", { length: 50 }),
+  role: varchar("role", { length: 100 }).notNull(), // pr, barista, sicurezza, fotografo, dj, tecnico
+  hourlyRate: decimal("hourly_rate", { precision: 10, scale: 2 }),
+  fixedRate: decimal("fixed_rate", { precision: 10, scale: 2 }), // Compenso fisso per serata
+  bankIban: varchar("bank_iban", { length: 34 }),
+  address: text("address"),
+  notes: text("notes"),
+  active: boolean("active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const staffRelations = relations(staff, ({ one, many }) => ({
+  company: one(companies, {
+    fields: [staff.companyId],
+    references: [companies.id],
+  }),
+  user: one(users, {
+    fields: [staff.userId],
+    references: [users.id],
+  }),
+  assignments: many(staffAssignments),
+  payments: many(staffPayments),
+}));
+
+// Staff Assignments (Assegnazione personale agli eventi)
+export const staffAssignments = pgTable("staff_assignments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").notNull().references(() => companies.id),
+  eventId: varchar("event_id").notNull().references(() => events.id),
+  staffId: varchar("staff_id").notNull().references(() => staff.id),
+  role: varchar("role", { length: 100 }), // Role for this specific event
+  scheduledStart: timestamp("scheduled_start"),
+  scheduledEnd: timestamp("scheduled_end"),
+  actualStart: timestamp("actual_start"),
+  actualEnd: timestamp("actual_end"),
+  status: varchar("status", { length: 50 }).notNull().default('scheduled'), // scheduled, confirmed, present, absent, replaced
+  compensationType: varchar("compensation_type", { length: 50 }).default('fixed'), // fixed, hourly
+  compensationAmount: decimal("compensation_amount", { precision: 10, scale: 2 }),
+  bonus: decimal("bonus", { precision: 10, scale: 2 }),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const staffAssignmentsRelations = relations(staffAssignments, ({ one }) => ({
+  company: one(companies, {
+    fields: [staffAssignments.companyId],
+    references: [companies.id],
+  }),
+  event: one(events, {
+    fields: [staffAssignments.eventId],
+    references: [events.id],
+  }),
+  staff: one(staff, {
+    fields: [staffAssignments.staffId],
+    references: [staff.id],
+  }),
+}));
+
+// Staff Payments (Pagamenti personale)
+export const staffPayments = pgTable("staff_payments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").notNull().references(() => companies.id),
+  staffId: varchar("staff_id").notNull().references(() => staff.id),
+  eventId: varchar("event_id").references(() => events.id),
+  assignmentId: varchar("assignment_id").references(() => staffAssignments.id),
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  paymentDate: timestamp("payment_date"),
+  paymentMethod: varchar("payment_method", { length: 50 }), // cash, bank_transfer, other
+  status: varchar("status", { length: 50 }).notNull().default('pending'), // pending, paid, cancelled
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const staffPaymentsRelations = relations(staffPayments, ({ one }) => ({
+  company: one(companies, {
+    fields: [staffPayments.companyId],
+    references: [companies.id],
+  }),
+  staff: one(staff, {
+    fields: [staffPayments.staffId],
+    references: [staff.id],
+  }),
+  event: one(events, {
+    fields: [staffPayments.eventId],
+    references: [events.id],
+  }),
+  assignment: one(staffAssignments, {
+    fields: [staffPayments.assignmentId],
+    references: [staffAssignments.id],
+  }),
+}));
+
+// ==================== MODULO CASSA ====================
+
+// Cash Sectors (Settori cassa)
+export const cashSectors = pgTable("cash_sectors", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").notNull().references(() => companies.id),
+  name: varchar("name", { length: 100 }).notNull(), // Ingressi, Beverage, Guardaroba, Extra
+  description: text("description"),
+  sortOrder: integer("sort_order").default(0),
+  active: boolean("active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const cashSectorsRelations = relations(cashSectors, ({ one, many }) => ({
+  company: one(companies, {
+    fields: [cashSectors.companyId],
+    references: [companies.id],
+  }),
+  positions: many(cashPositions),
+}));
+
+// Cash Positions (Postazioni cassa)
+export const cashPositions = pgTable("cash_positions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").notNull().references(() => companies.id),
+  eventId: varchar("event_id").notNull().references(() => events.id),
+  sectorId: varchar("sector_id").notNull().references(() => cashSectors.id),
+  name: varchar("name", { length: 100 }).notNull(), // Bar 1, Biglietteria, VIP Bar
+  operatorId: varchar("operator_id").references(() => staff.id),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const cashPositionsRelations = relations(cashPositions, ({ one, many }) => ({
+  company: one(companies, {
+    fields: [cashPositions.companyId],
+    references: [companies.id],
+  }),
+  event: one(events, {
+    fields: [cashPositions.eventId],
+    references: [events.id],
+  }),
+  sector: one(cashSectors, {
+    fields: [cashPositions.sectorId],
+    references: [cashSectors.id],
+  }),
+  operator: one(staff, {
+    fields: [cashPositions.operatorId],
+    references: [staff.id],
+  }),
+  entries: many(cashEntries),
+  funds: many(cashFunds),
+}));
+
+// Cash Entries (Registrazioni incassi)
+export const cashEntries = pgTable("cash_entries", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").notNull().references(() => companies.id),
+  eventId: varchar("event_id").notNull().references(() => events.id),
+  positionId: varchar("position_id").notNull().references(() => cashPositions.id),
+  entryType: varchar("entry_type", { length: 50 }).notNull(), // quantity, monetary
+  productId: varchar("product_id").references(() => products.id), // For quantity-based entries
+  description: varchar("description", { length: 255 }), // For custom entries
+  quantity: decimal("quantity", { precision: 10, scale: 2 }),
+  unitPrice: decimal("unit_price", { precision: 10, scale: 2 }),
+  totalAmount: decimal("total_amount", { precision: 10, scale: 2 }).notNull(),
+  paymentMethod: varchar("payment_method", { length: 50 }).notNull(), // cash, card, online, credits
+  notes: text("notes"),
+  entryTime: timestamp("entry_time").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const cashEntriesRelations = relations(cashEntries, ({ one }) => ({
+  company: one(companies, {
+    fields: [cashEntries.companyId],
+    references: [companies.id],
+  }),
+  event: one(events, {
+    fields: [cashEntries.eventId],
+    references: [events.id],
+  }),
+  position: one(cashPositions, {
+    fields: [cashEntries.positionId],
+    references: [cashPositions.id],
+  }),
+  product: one(products, {
+    fields: [cashEntries.productId],
+    references: [products.id],
+  }),
+}));
+
+// Cash Funds (Fondi cassa - apertura/chiusura)
+export const cashFunds = pgTable("cash_funds", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").notNull().references(() => companies.id),
+  eventId: varchar("event_id").notNull().references(() => events.id),
+  positionId: varchar("position_id").notNull().references(() => cashPositions.id),
+  type: varchar("type", { length: 50 }).notNull(), // opening, closing
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  expectedAmount: decimal("expected_amount", { precision: 10, scale: 2 }), // For closing - calculated
+  difference: decimal("difference", { precision: 10, scale: 2 }), // Closing: actual - expected
+  denominations: jsonb("denominations"), // Optional breakdown by coin/bill
+  operatorId: varchar("operator_id").references(() => staff.id),
+  notes: text("notes"),
+  recordedAt: timestamp("recorded_at").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const cashFundsRelations = relations(cashFunds, ({ one }) => ({
+  company: one(companies, {
+    fields: [cashFunds.companyId],
+    references: [companies.id],
+  }),
+  event: one(events, {
+    fields: [cashFunds.eventId],
+    references: [events.id],
+  }),
+  position: one(cashPositions, {
+    fields: [cashFunds.positionId],
+    references: [cashPositions.id],
+  }),
+  operator: one(staff, {
+    fields: [cashFunds.operatorId],
+    references: [staff.id],
+  }),
+}));
+
 // Zod schemas for validation
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
@@ -608,3 +977,233 @@ export type UpdatePurchaseOrder = z.infer<typeof updatePurchaseOrderSchema>;
 export type PurchaseOrderItem = typeof purchaseOrderItems.$inferSelect;
 export type InsertPurchaseOrderItem = z.infer<typeof insertPurchaseOrderItemSchema>;
 export type UpdatePurchaseOrderItem = z.infer<typeof updatePurchaseOrderItemSchema>;
+
+// ==================== MODULO CONTABILITÀ - Schemas ====================
+
+export const insertFixedCostSchema = createInsertSchema(fixedCosts).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  amount: z.union([z.string(), z.coerce.number()]).transform(val => typeof val === 'number' ? val.toString() : val),
+  validFrom: z.union([z.string(), z.date(), z.null(), z.undefined()]).transform(val => 
+    val ? (typeof val === 'string' ? new Date(val) : val) : null
+  ).optional(),
+  validTo: z.union([z.string(), z.date(), z.null(), z.undefined()]).transform(val => 
+    val ? (typeof val === 'string' ? new Date(val) : val) : null
+  ).optional(),
+});
+
+export const updateFixedCostSchema = insertFixedCostSchema.partial().omit({ companyId: true });
+
+export const insertExtraCostSchema = createInsertSchema(extraCosts).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  amount: z.union([z.string(), z.coerce.number()]).transform(val => typeof val === 'number' ? val.toString() : val),
+  invoiceDate: z.union([z.string(), z.date(), z.null(), z.undefined()]).transform(val => 
+    val ? (typeof val === 'string' ? new Date(val) : val) : null
+  ).optional(),
+});
+
+export const updateExtraCostSchema = insertExtraCostSchema.partial().omit({ companyId: true });
+
+export const insertMaintenanceSchema = createInsertSchema(maintenances).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  amount: z.union([z.string(), z.coerce.number(), z.null(), z.undefined()]).transform(val => 
+    val === null || val === undefined ? null : typeof val === 'number' ? val.toString() : val
+  ).optional(),
+  scheduledDate: z.union([z.string(), z.date(), z.null(), z.undefined()]).transform(val => 
+    val ? (typeof val === 'string' ? new Date(val) : val) : null
+  ).optional(),
+  completedDate: z.union([z.string(), z.date(), z.null(), z.undefined()]).transform(val => 
+    val ? (typeof val === 'string' ? new Date(val) : val) : null
+  ).optional(),
+});
+
+export const updateMaintenanceSchema = insertMaintenanceSchema.partial().omit({ companyId: true });
+
+export const insertAccountingDocumentSchema = createInsertSchema(accountingDocuments).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  amount: z.union([z.string(), z.coerce.number(), z.null(), z.undefined()]).transform(val => 
+    val === null || val === undefined ? null : typeof val === 'number' ? val.toString() : val
+  ).optional(),
+  issueDate: z.union([z.string(), z.date(), z.null(), z.undefined()]).transform(val => 
+    val ? (typeof val === 'string' ? new Date(val) : val) : null
+  ).optional(),
+  dueDate: z.union([z.string(), z.date(), z.null(), z.undefined()]).transform(val => 
+    val ? (typeof val === 'string' ? new Date(val) : val) : null
+  ).optional(),
+});
+
+export const updateAccountingDocumentSchema = insertAccountingDocumentSchema.partial().omit({ companyId: true });
+
+// ==================== MODULO PERSONALE - Schemas ====================
+
+export const insertStaffSchema = createInsertSchema(staff).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  hourlyRate: z.union([z.string(), z.coerce.number(), z.null(), z.undefined()]).transform(val => 
+    val === null || val === undefined ? null : typeof val === 'number' ? val.toString() : val
+  ).optional(),
+  fixedRate: z.union([z.string(), z.coerce.number(), z.null(), z.undefined()]).transform(val => 
+    val === null || val === undefined ? null : typeof val === 'number' ? val.toString() : val
+  ).optional(),
+});
+
+export const updateStaffSchema = insertStaffSchema.partial().omit({ companyId: true });
+
+export const insertStaffAssignmentSchema = createInsertSchema(staffAssignments).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  scheduledStart: z.union([z.string(), z.date(), z.null(), z.undefined()]).transform(val => 
+    val ? (typeof val === 'string' ? new Date(val) : val) : null
+  ).optional(),
+  scheduledEnd: z.union([z.string(), z.date(), z.null(), z.undefined()]).transform(val => 
+    val ? (typeof val === 'string' ? new Date(val) : val) : null
+  ).optional(),
+  actualStart: z.union([z.string(), z.date(), z.null(), z.undefined()]).transform(val => 
+    val ? (typeof val === 'string' ? new Date(val) : val) : null
+  ).optional(),
+  actualEnd: z.union([z.string(), z.date(), z.null(), z.undefined()]).transform(val => 
+    val ? (typeof val === 'string' ? new Date(val) : val) : null
+  ).optional(),
+  compensationAmount: z.union([z.string(), z.coerce.number(), z.null(), z.undefined()]).transform(val => 
+    val === null || val === undefined ? null : typeof val === 'number' ? val.toString() : val
+  ).optional(),
+  bonus: z.union([z.string(), z.coerce.number(), z.null(), z.undefined()]).transform(val => 
+    val === null || val === undefined ? null : typeof val === 'number' ? val.toString() : val
+  ).optional(),
+});
+
+export const updateStaffAssignmentSchema = insertStaffAssignmentSchema.partial().omit({ companyId: true, eventId: true, staffId: true });
+
+export const insertStaffPaymentSchema = createInsertSchema(staffPayments).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  amount: z.union([z.string(), z.coerce.number()]).transform(val => typeof val === 'number' ? val.toString() : val),
+  paymentDate: z.union([z.string(), z.date(), z.null(), z.undefined()]).transform(val => 
+    val ? (typeof val === 'string' ? new Date(val) : val) : null
+  ).optional(),
+});
+
+export const updateStaffPaymentSchema = insertStaffPaymentSchema.partial().omit({ companyId: true, staffId: true });
+
+// ==================== MODULO CASSA - Schemas ====================
+
+export const insertCashSectorSchema = createInsertSchema(cashSectors).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const updateCashSectorSchema = insertCashSectorSchema.partial().omit({ companyId: true });
+
+export const insertCashPositionSchema = createInsertSchema(cashPositions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const updateCashPositionSchema = insertCashPositionSchema.partial().omit({ companyId: true, eventId: true });
+
+export const insertCashEntrySchema = createInsertSchema(cashEntries).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  quantity: z.union([z.string(), z.coerce.number(), z.null(), z.undefined()]).transform(val => 
+    val === null || val === undefined ? null : typeof val === 'number' ? val.toString() : val
+  ).optional(),
+  unitPrice: z.union([z.string(), z.coerce.number(), z.null(), z.undefined()]).transform(val => 
+    val === null || val === undefined ? null : typeof val === 'number' ? val.toString() : val
+  ).optional(),
+  totalAmount: z.union([z.string(), z.coerce.number()]).transform(val => typeof val === 'number' ? val.toString() : val),
+  entryTime: z.union([z.string(), z.date(), z.null(), z.undefined()]).transform(val => 
+    val ? (typeof val === 'string' ? new Date(val) : val) : new Date()
+  ).optional(),
+});
+
+export const updateCashEntrySchema = insertCashEntrySchema.partial().omit({ companyId: true, eventId: true, positionId: true });
+
+export const insertCashFundSchema = createInsertSchema(cashFunds).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  amount: z.union([z.string(), z.coerce.number()]).transform(val => typeof val === 'number' ? val.toString() : val),
+  expectedAmount: z.union([z.string(), z.coerce.number(), z.null(), z.undefined()]).transform(val => 
+    val === null || val === undefined ? null : typeof val === 'number' ? val.toString() : val
+  ).optional(),
+  difference: z.union([z.string(), z.coerce.number(), z.null(), z.undefined()]).transform(val => 
+    val === null || val === undefined ? null : typeof val === 'number' ? val.toString() : val
+  ).optional(),
+  recordedAt: z.union([z.string(), z.date(), z.null(), z.undefined()]).transform(val => 
+    val ? (typeof val === 'string' ? new Date(val) : val) : new Date()
+  ).optional(),
+});
+
+export const updateCashFundSchema = insertCashFundSchema.partial().omit({ companyId: true, eventId: true, positionId: true });
+
+// ==================== MODULO CONTABILITÀ - Types ====================
+
+export type FixedCost = typeof fixedCosts.$inferSelect;
+export type InsertFixedCost = z.infer<typeof insertFixedCostSchema>;
+export type UpdateFixedCost = z.infer<typeof updateFixedCostSchema>;
+
+export type ExtraCost = typeof extraCosts.$inferSelect;
+export type InsertExtraCost = z.infer<typeof insertExtraCostSchema>;
+export type UpdateExtraCost = z.infer<typeof updateExtraCostSchema>;
+
+export type Maintenance = typeof maintenances.$inferSelect;
+export type InsertMaintenance = z.infer<typeof insertMaintenanceSchema>;
+export type UpdateMaintenance = z.infer<typeof updateMaintenanceSchema>;
+
+export type AccountingDocument = typeof accountingDocuments.$inferSelect;
+export type InsertAccountingDocument = z.infer<typeof insertAccountingDocumentSchema>;
+export type UpdateAccountingDocument = z.infer<typeof updateAccountingDocumentSchema>;
+
+// ==================== MODULO PERSONALE - Types ====================
+
+export type Staff = typeof staff.$inferSelect;
+export type InsertStaff = z.infer<typeof insertStaffSchema>;
+export type UpdateStaff = z.infer<typeof updateStaffSchema>;
+
+export type StaffAssignment = typeof staffAssignments.$inferSelect;
+export type InsertStaffAssignment = z.infer<typeof insertStaffAssignmentSchema>;
+export type UpdateStaffAssignment = z.infer<typeof updateStaffAssignmentSchema>;
+
+export type StaffPayment = typeof staffPayments.$inferSelect;
+export type InsertStaffPayment = z.infer<typeof insertStaffPaymentSchema>;
+export type UpdateStaffPayment = z.infer<typeof updateStaffPaymentSchema>;
+
+// ==================== MODULO CASSA - Types ====================
+
+export type CashSector = typeof cashSectors.$inferSelect;
+export type InsertCashSector = z.infer<typeof insertCashSectorSchema>;
+export type UpdateCashSector = z.infer<typeof updateCashSectorSchema>;
+
+export type CashPosition = typeof cashPositions.$inferSelect;
+export type InsertCashPosition = z.infer<typeof insertCashPositionSchema>;
+export type UpdateCashPosition = z.infer<typeof updateCashPositionSchema>;
+
+export type CashEntry = typeof cashEntries.$inferSelect;
+export type InsertCashEntry = z.infer<typeof insertCashEntrySchema>;
+export type UpdateCashEntry = z.infer<typeof updateCashEntrySchema>;
+
+export type CashFund = typeof cashFunds.$inferSelect;
+export type InsertCashFund = z.infer<typeof insertCashFundSchema>;
+export type UpdateCashFund = z.infer<typeof updateCashFundSchema>;
