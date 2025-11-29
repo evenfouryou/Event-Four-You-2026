@@ -2603,75 +2603,130 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const movements = await storage.getMovementsByEvent(eventId);
       const products = await storage.getProductsByCompany(companyId);
 
-      // Get all relevant movements (CONSUME adds, RETURN subtracts)
-      const relevantMovements = movements.filter(m => m.type === 'CONSUME' || m.type === 'RETURN');
+      // Get CONSUME and RETURN movements separately
+      const consumeMovements = movements.filter(m => m.type === 'CONSUME');
+      const returnMovements = movements.filter(m => m.type === 'RETURN');
 
-      // Calculate total consumption aggregated by product (considering both CONSUME and RETURN)
+      // Calculate NET consumption by aggregating CONSUME and RETURN separately, then subtracting
       const consumptionByProduct = new Map<string, {
         productId: string;
         productName: string;
-        totalQuantity: number;
+        sumConsume: number;
+        sumReturn: number;
         costPrice: string;
-        totalCost: number;
       }>();
 
-      let totalCost = 0;
-
-      // Aggregate all consumptions regardless of station (CONSUME adds, RETURN subtracts)
-      relevantMovements.forEach(m => {
+      // First, aggregate all CONSUME movements
+      consumeMovements.forEach(m => {
         const product = products.find(p => p.id === m.productId);
         if (!product) return;
 
-        const qty = m.type === 'RETURN' ? -parseFloat(m.quantity) : parseFloat(m.quantity);
-        const cost = parseFloat(product.costPrice) * qty;
-        totalCost += cost;
-
+        const qty = parseFloat(m.quantity) || 0;
         const existing = consumptionByProduct.get(m.productId);
         if (existing) {
-          existing.totalQuantity += qty;
-          existing.totalCost += cost;
+          existing.sumConsume += qty;
         } else {
           consumptionByProduct.set(m.productId, {
             productId: m.productId,
             productName: product.name,
-            totalQuantity: qty,
+            sumConsume: qty,
+            sumReturn: 0,
             costPrice: product.costPrice,
-            totalCost: cost,
           });
         }
       });
 
-      // Get unique station IDs from relevant movements (excluding null stations)
-      const stationIds = [...new Set(relevantMovements.map(m => m.fromStationId).filter(Boolean))] as string[];
+      // Then, aggregate all RETURN movements
+      returnMovements.forEach(m => {
+        const product = products.find(p => p.id === m.productId);
+        if (!product) return;
+
+        const qty = parseFloat(m.quantity) || 0;
+        const existing = consumptionByProduct.get(m.productId);
+        if (existing) {
+          existing.sumReturn += qty;
+        } else {
+          consumptionByProduct.set(m.productId, {
+            productId: m.productId,
+            productName: product.name,
+            sumConsume: 0,
+            sumReturn: qty,
+            costPrice: product.costPrice,
+          });
+        }
+      });
+
+      // Calculate final NET values (never negative)
+      let totalCost = 0;
+      const consumedProducts = Array.from(consumptionByProduct.values()).map(p => {
+        const netQuantity = Math.max(p.sumConsume - p.sumReturn, 0);
+        const netCost = netQuantity * parseFloat(p.costPrice);
+        totalCost += netCost;
+        return {
+          productId: p.productId,
+          productName: p.productName,
+          totalQuantity: netQuantity,
+          costPrice: p.costPrice,
+          totalCost: netCost,
+        };
+      }).filter(p => p.totalQuantity > 0); // Only include products with positive consumption
+
+      // Get unique station IDs from consume movements (excluding null stations)
+      const stationIds = [...new Set(consumeMovements.map(m => m.fromStationId).filter(Boolean))] as string[];
       
       // Fetch station details for all referenced stations
       const allStations = await storage.getStationsByCompany(companyId);
       const stationMap = new Map(allStations.map(s => [s.id, s]));
 
-      // Calculate consumption per station (for detailed breakdown, considering CONSUME and RETURN)
+      // Calculate consumption per station with NET values
       const stationReports = stationIds.map(stationId => {
         const station = stationMap.get(stationId);
         const stationName = station?.name || `Postazione ${stationId.slice(0, 8)}`;
         
-        const stationMovements = relevantMovements.filter(m => 
-          m.fromStationId === stationId
-        );
+        // Get movements for this station
+        const stationConsumes = consumeMovements.filter(m => m.fromStationId === stationId);
+        const stationReturns = returnMovements.filter(m => m.fromStationId === stationId);
+
+        // Aggregate by product for this station
+        const stationProductMap = new Map<string, { consume: number; return: number }>();
+        
+        stationConsumes.forEach(m => {
+          const qty = parseFloat(m.quantity) || 0;
+          const existing = stationProductMap.get(m.productId);
+          if (existing) {
+            existing.consume += qty;
+          } else {
+            stationProductMap.set(m.productId, { consume: qty, return: 0 });
+          }
+        });
+
+        stationReturns.forEach(m => {
+          const qty = parseFloat(m.quantity) || 0;
+          const existing = stationProductMap.get(m.productId);
+          if (existing) {
+            existing.return += qty;
+          } else {
+            stationProductMap.set(m.productId, { consume: 0, return: qty });
+          }
+        });
 
         const items: any[] = [];
         let stationTotalCost = 0;
 
-        stationMovements.forEach(m => {
-          const product = products.find(p => p.id === m.productId);
+        stationProductMap.forEach((data, productId) => {
+          const product = products.find(p => p.id === productId);
           if (!product) return;
           
-          const qty = m.type === 'RETURN' ? -parseFloat(m.quantity) : parseFloat(m.quantity);
-          const cost = parseFloat(product.costPrice) * qty;
+          const netQty = Math.max(data.consume - data.return, 0);
+          if (netQty <= 0) return; // Skip products with zero or negative net
+          
+          const cost = netQty * parseFloat(product.costPrice);
           stationTotalCost += cost;
 
           items.push({
-            productId: m.productId,
+            productId,
             productName: product.name,
-            quantity: qty,
+            quantity: netQty,
             costPrice: product.costPrice,
             totalCost: cost,
           });
@@ -2684,8 +2739,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           totalCost: stationTotalCost,
         };
       });
-
-      const consumedProducts = Array.from(consumptionByProduct.values());
 
       const totalReport = {
         eventId,
