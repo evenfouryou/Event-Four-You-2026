@@ -3,6 +3,7 @@ import {
   users,
   companies,
   companyFeatures,
+  userFeatures,
   locations,
   eventFormats,
   events,
@@ -32,6 +33,7 @@ import {
   type Company,
   type InsertCompany,
   type CompanyFeatures,
+  type UserFeatures,
   type Location,
   type InsertLocation,
   type EventFormat,
@@ -109,6 +111,11 @@ export interface IStorage {
   getAllCompanyFeatures(): Promise<CompanyFeatures[]>;
   getCompanyFeatures(companyId: string): Promise<CompanyFeatures | undefined>;
   upsertCompanyFeatures(companyId: string, features: Partial<CompanyFeatures>): Promise<CompanyFeatures>;
+  
+  // User Features operations
+  getAllUserFeatures(): Promise<UserFeatures[]>;
+  getUserFeatures(userId: string): Promise<UserFeatures | undefined>;
+  upsertUserFeatures(userId: string, features: Partial<UserFeatures>): Promise<UserFeatures>;
   
   // Location operations
   getLocationsByCompany(companyId: string): Promise<Location[]>;
@@ -456,6 +463,34 @@ export class DatabaseStorage implements IStorage {
       const [created] = await db
         .insert(companyFeatures)
         .values({ companyId, ...featuresData })
+        .returning();
+      return created;
+    }
+  }
+
+  // User Features operations
+  async getAllUserFeatures(): Promise<UserFeatures[]> {
+    return await db.select().from(userFeatures);
+  }
+
+  async getUserFeatures(userId: string): Promise<UserFeatures | undefined> {
+    const [features] = await db.select().from(userFeatures).where(eq(userFeatures.userId, userId));
+    return features;
+  }
+
+  async upsertUserFeatures(userId: string, featuresData: Partial<UserFeatures>): Promise<UserFeatures> {
+    const existing = await this.getUserFeatures(userId);
+    if (existing) {
+      const [updated] = await db
+        .update(userFeatures)
+        .set({ ...featuresData, updatedAt: new Date() })
+        .where(eq(userFeatures.userId, userId))
+        .returning();
+      return updated;
+    } else {
+      const [created] = await db
+        .insert(userFeatures)
+        .values({ userId, ...featuresData })
         .returning();
       return created;
     }

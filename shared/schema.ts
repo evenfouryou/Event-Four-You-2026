@@ -91,6 +91,26 @@ export const companyFeaturesRelations = relations(companyFeatures, ({ one }) => 
   }),
 }));
 
+// User Features table - Controls which modules are enabled for each user
+export const userFeatures = pgTable("user_features", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id).unique(),
+  beverageEnabled: boolean("beverage_enabled").notNull().default(true),
+  contabilitaEnabled: boolean("contabilita_enabled").notNull().default(false),
+  personaleEnabled: boolean("personale_enabled").notNull().default(false),
+  cassaEnabled: boolean("cassa_enabled").notNull().default(false),
+  nightFileEnabled: boolean("night_file_enabled").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const userFeaturesRelations = relations(userFeatures, ({ one }) => ({
+  user: one(users, {
+    fields: [userFeatures.userId],
+    references: [users.id],
+  }),
+}));
+
 // Locations table
 export const locations = pgTable("locations", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -883,6 +903,19 @@ export const updateCompanyFeaturesSchema = createInsertSchema(companyFeatures).o
   updatedAt: true,
 }).partial();
 
+export const insertUserFeaturesSchema = createInsertSchema(userFeatures).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const updateUserFeaturesSchema = createInsertSchema(userFeatures).omit({
+  id: true,
+  userId: true,
+  createdAt: true,
+  updatedAt: true,
+}).partial();
+
 export const insertLocationSchema = createInsertSchema(locations).omit({
   id: true,
   createdAt: true,
@@ -1026,6 +1059,10 @@ export type InsertCompany = z.infer<typeof insertCompanySchema>;
 export type CompanyFeatures = typeof companyFeatures.$inferSelect;
 export type InsertCompanyFeatures = z.infer<typeof insertCompanyFeaturesSchema>;
 export type UpdateCompanyFeatures = z.infer<typeof updateCompanyFeaturesSchema>;
+
+export type UserFeatures = typeof userFeatures.$inferSelect;
+export type InsertUserFeatures = z.infer<typeof insertUserFeaturesSchema>;
+export type UpdateUserFeatures = z.infer<typeof updateUserFeaturesSchema>;
 
 export type Location = typeof locations.$inferSelect;
 export type InsertLocation = z.infer<typeof insertLocationSchema>;
