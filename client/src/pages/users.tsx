@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -43,11 +43,13 @@ import {
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Users as UsersIcon, Edit, Trash2, Ban, CheckCircle, LogIn } from "lucide-react";
+import { Plus, Users as UsersIcon, Edit, Trash2, Ban, CheckCircle, LogIn, Settings2, Wine, Calculator, Users as PersonnelIcon, Receipt, FileText } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import type { User, Company } from "@shared/schema";
+import type { User, Company, UserFeatures } from "@shared/schema";
 
 const userFormSchema = z.object({
   email: z.string().email("Email non valida"),
@@ -81,10 +83,28 @@ const roleLabels: Record<string, string> = {
   bartender: 'Bartender',
 };
 
+interface FeatureConfig {
+  key: keyof Omit<UserFeatures, 'id' | 'userId' | 'createdAt' | 'updatedAt'>;
+  label: string;
+  description: string;
+  icon: React.ReactNode;
+}
+
+const featuresList: FeatureConfig[] = [
+  { key: 'beverageEnabled', label: 'Beverage', description: 'Gestione stock bevande e consumi', icon: <Wine className="h-4 w-4" /> },
+  { key: 'contabilitaEnabled', label: 'Contabilità', description: 'Costi fissi, extra e manutenzioni', icon: <Calculator className="h-4 w-4" /> },
+  { key: 'personaleEnabled', label: 'Personale', description: 'Anagrafica staff e pagamenti', icon: <PersonnelIcon className="h-4 w-4" /> },
+  { key: 'cassaEnabled', label: 'Cassa', description: 'Settori, postazioni e fondi cassa', icon: <Receipt className="h-4 w-4" /> },
+  { key: 'nightFileEnabled', label: 'File della Serata', description: 'Documento integrato per evento', icon: <FileText className="h-4 w-4" /> },
+];
+
 export default function UsersPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [deleteUserId, setDeleteUserId] = useState<string | null>(null);
+  const [featuresDialogOpen, setFeaturesDialogOpen] = useState(false);
+  const [selectedUserForFeatures, setSelectedUserForFeatures] = useState<User | null>(null);
+  const [localFeatures, setLocalFeatures] = useState<Partial<UserFeatures>>({});
   const { toast } = useToast();
   const { user: currentUser } = useAuth();
 
@@ -96,6 +116,23 @@ export default function UsersPage() {
     queryKey: ['/api/companies'],
     enabled: currentUser?.role === 'super_admin',
   });
+
+  const { data: userFeatures } = useQuery<UserFeatures>({
+    queryKey: [`/api/user-features/${selectedUserForFeatures?.id}`],
+    enabled: !!selectedUserForFeatures,
+  });
+
+  useEffect(() => {
+    if (userFeatures) {
+      setLocalFeatures({
+        beverageEnabled: userFeatures.beverageEnabled,
+        contabilitaEnabled: userFeatures.contabilitaEnabled,
+        personaleEnabled: userFeatures.personaleEnabled,
+        cassaEnabled: userFeatures.cassaEnabled,
+        nightFileEnabled: userFeatures.nightFileEnabled,
+      });
+    }
+  }, [userFeatures]);
 
   const isSuperAdmin = currentUser?.role === 'super_admin';
   const isAdmin = currentUser?.role === 'gestore';
@@ -265,6 +302,30 @@ export default function UsersPage() {
     },
   });
 
+  const updateFeaturesMutation = useMutation({
+    mutationFn: async (data: { userId: string; features: Partial<UserFeatures> }) => {
+      await apiRequest('PUT', `/api/user-features/${data.userId}`, data.features);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/user-features'] });
+      if (selectedUserForFeatures) {
+        queryClient.invalidateQueries({ queryKey: [`/api/user-features/${selectedUserForFeatures.id}`] });
+      }
+      setFeaturesDialogOpen(false);
+      toast({
+        title: "Successo",
+        description: "Moduli aggiornati con successo",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Errore",
+        description: "Impossibile aggiornare i moduli",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleSubmit = (data: UserFormData) => {
     if (editingUser) {
       // Se non è stata cambiata la password, non la inviamo
@@ -335,6 +396,34 @@ export default function UsersPage() {
     if (!companyId) return 'N/A';
     const company = companies?.find(c => c.id === companyId);
     return company?.name || 'Sconosciuta';
+  };
+
+  const handleOpenFeaturesDialog = (user: User) => {
+    setSelectedUserForFeatures(user);
+    setLocalFeatures({
+      beverageEnabled: true,
+      contabilitaEnabled: false,
+      personaleEnabled: false,
+      cassaEnabled: false,
+      nightFileEnabled: false,
+    });
+    setFeaturesDialogOpen(true);
+  };
+
+  const handleToggleFeature = (key: keyof Omit<UserFeatures, 'id' | 'userId' | 'createdAt' | 'updatedAt'>) => {
+    setLocalFeatures(prev => ({
+      ...prev,
+      [key]: !prev[key],
+    }));
+  };
+
+  const handleSaveFeatures = () => {
+    if (selectedUserForFeatures) {
+      updateFeaturesMutation.mutate({
+        userId: selectedUserForFeatures.id,
+        features: localFeatures,
+      });
+    }
   };
 
   return (
@@ -573,6 +662,17 @@ export default function UsersPage() {
                     </div>
                   </div>
                   <div className="flex gap-1 shrink-0 flex-wrap">
+                    {isSuperAdmin && user.role === 'gestore' && (
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => handleOpenFeaturesDialog(user)}
+                        data-testid={`button-features-user-${user.id}`}
+                        title="Gestisci Moduli"
+                      >
+                        <Settings2 className="h-4 w-4" />
+                      </Button>
+                    )}
                     <Button
                       size="icon"
                       variant="ghost"
@@ -653,6 +753,62 @@ export default function UsersPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={featuresDialogOpen} onOpenChange={setFeaturesDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Settings2 className="h-5 w-5" />
+              Gestione Moduli
+            </DialogTitle>
+            <DialogDescription>
+              {selectedUserForFeatures?.firstName} {selectedUserForFeatures?.lastName} - Attiva o disattiva i moduli disponibili
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            {featuresList.map((feature) => (
+              <div
+                key={feature.key}
+                className="flex items-center justify-between p-4 rounded-lg border hover-elevate cursor-pointer"
+                onClick={() => handleToggleFeature(feature.key)}
+                data-testid={`toggle-feature-${feature.key}`}
+              >
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-muted">
+                    {feature.icon}
+                  </div>
+                  <div>
+                    <Label className="text-base font-medium cursor-pointer">{feature.label}</Label>
+                    <p className="text-sm text-muted-foreground">{feature.description}</p>
+                  </div>
+                </div>
+                <Switch
+                  checked={!!localFeatures[feature.key]}
+                  onCheckedChange={() => handleToggleFeature(feature.key)}
+                  data-testid={`switch-feature-${feature.key}`}
+                />
+              </div>
+            ))}
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setFeaturesDialogOpen(false)}
+              data-testid="button-cancel-features"
+            >
+              Annulla
+            </Button>
+            <Button
+              onClick={handleSaveFeatures}
+              disabled={updateFeaturesMutation.isPending}
+              data-testid="button-save-features"
+            >
+              {updateFeaturesMutation.isPending ? 'Salvataggio...' : 'Salva Moduli'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -670,6 +670,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.delete('/api/companies/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      if (!(await isSuperAdmin(req))) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+      const deleted = await storage.deleteCompany(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ message: "Company not found" });
+      }
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Error deleting company:", error);
+      // Handle foreign key constraint errors
+      if (error.code === '23503') {
+        return res.status(400).json({ 
+          message: "Impossibile eliminare l'azienda: esistono dati collegati (utenti, eventi, prodotti, etc.)" 
+        });
+      }
+      res.status(500).json({ message: "Failed to delete company" });
+    }
+  });
+
   // ===== COMPANY FEATURES (Admin toggles for modules) =====
   app.get('/api/company-features', isAuthenticated, async (req: any, res) => {
     try {
@@ -740,6 +762,79 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error updating company features:", error);
       res.status(500).json({ message: "Failed to update company features" });
+    }
+  });
+
+  // ===== USER FEATURES (Admin toggles for modules per user) =====
+  app.get('/api/user-features', isAuthenticated, async (req: any, res) => {
+    try {
+      if (!(await isSuperAdmin(req))) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+      const features = await storage.getAllUserFeatures();
+      res.json(features);
+    } catch (error) {
+      console.error("Error fetching user features:", error);
+      res.status(500).json({ message: "Failed to fetch user features" });
+    }
+  });
+
+  app.get('/api/user-features/:userId', isAuthenticated, async (req: any, res) => {
+    try {
+      const features = await storage.getUserFeatures(req.params.userId);
+      if (!features) {
+        // Return default features if none exist
+        return res.json({
+          userId: req.params.userId,
+          beverageEnabled: true,
+          contabilitaEnabled: false,
+          personaleEnabled: false,
+          cassaEnabled: false,
+          nightFileEnabled: false,
+        });
+      }
+      res.json(features);
+    } catch (error) {
+      console.error("Error fetching user features:", error);
+      res.status(500).json({ message: "Failed to fetch user features" });
+    }
+  });
+
+  app.get('/api/user-features/current/my', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(403).json({ message: "User not found" });
+      }
+      const features = await storage.getUserFeatures(userId);
+      if (!features) {
+        // Return default features if none exist (beverage always enabled by default)
+        return res.json({
+          userId: userId,
+          beverageEnabled: true,
+          contabilitaEnabled: false,
+          personaleEnabled: false,
+          cassaEnabled: false,
+          nightFileEnabled: false,
+        });
+      }
+      res.json(features);
+    } catch (error) {
+      console.error("Error fetching current user features:", error);
+      res.status(500).json({ message: "Failed to fetch user features" });
+    }
+  });
+
+  app.put('/api/user-features/:userId', isAuthenticated, async (req: any, res) => {
+    try {
+      if (!(await isSuperAdmin(req))) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+      const features = await storage.upsertUserFeatures(req.params.userId, req.body);
+      res.json(features);
+    } catch (error) {
+      console.error("Error updating user features:", error);
+      res.status(500).json({ message: "Failed to update user features" });
     }
   });
 
