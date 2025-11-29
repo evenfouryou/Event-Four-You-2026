@@ -128,28 +128,29 @@ export default function Reports() {
     }) => {
       await apiRequest('POST', '/api/reports/correct-consumption', data);
     },
-    onSuccess: (_, variables) => {
-      // Invalidate cache first, then refetch to force fresh data
-      queryClient.setQueryData(['/api/reports/end-of-night', variables.eventId], undefined);
-      queryClient.setQueryData(['/api/events', variables.eventId, 'revenue-analysis'], undefined);
-      
-      setTimeout(() => {
-        queryClient.refetchQueries({ 
-          queryKey: ['/api/reports/end-of-night', variables.eventId],
-          type: 'active',
-          stale: true
-        });
-        queryClient.refetchQueries({ 
-          queryKey: ['/api/events', variables.eventId, 'revenue-analysis'],
-          type: 'active',
-          stale: true
-        });
-      }, 50);
-      
+    onSuccess: async (_, variables) => {
+      // Close dialog first
       setCorrectionDialogOpen(false);
       setCorrectingProduct(null);
       setNewQuantity("");
       setCorrectionReason("");
+      
+      // Force invalidate and refetch all related queries
+      await queryClient.invalidateQueries({ 
+        queryKey: ['/api/reports/end-of-night', variables.eventId]
+      });
+      await queryClient.invalidateQueries({ 
+        queryKey: ['/api/events', variables.eventId, 'revenue-analysis']
+      });
+      
+      // Force immediate refetch
+      await queryClient.refetchQueries({ 
+        queryKey: ['/api/reports/end-of-night', variables.eventId]
+      });
+      await queryClient.refetchQueries({ 
+        queryKey: ['/api/events', variables.eventId, 'revenue-analysis']
+      });
+      
       toast({
         title: "Correzione effettuata",
         description: "Il consumo è stato corretto e la giacenza aggiornata",
