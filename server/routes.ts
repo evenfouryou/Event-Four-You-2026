@@ -2672,11 +2672,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Correct consumption in report - only for gestore/admin
-  app.post('/api/reports/correct-consumption', isAdminOrSuperAdmin, async (req: any, res) => {
+  // Correct consumption in report - for gestore/admin/organizer
+  app.post('/api/reports/correct-consumption', isAuthenticated, async (req: any, res) => {
     try {
       const companyId = await getUserCompanyId(req);
       const userId = req.user.claims.sub;
+      const userRole = req.user?.role;
+      
+      // Only super_admin, gestore, and organizer can correct consumption
+      if (userRole !== 'super_admin' && userRole !== 'gestore' && userRole !== 'organizer') {
+        return res.status(403).json({ message: "Accesso negato: privilegi insufficienti" });
+      }
+      
       if (!companyId) {
         return res.status(403).json({ message: "No company associated" });
       }

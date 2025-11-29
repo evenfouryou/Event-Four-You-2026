@@ -79,8 +79,8 @@ export default function Reports() {
   const [newQuantity, setNewQuantity] = useState("");
   const [correctionReason, setCorrectionReason] = useState("");
 
-  // Check if user can correct (must be authenticated and gestore or super_admin)
-  const canCorrect = !!user && (user.role === 'gestore' || user.role === 'super_admin');
+  // Check if user can correct (must be authenticated and gestore, organizer or super_admin)
+  const canCorrect = !!user && (user.role === 'gestore' || user.role === 'organizer' || user.role === 'super_admin');
 
   const { data: events = [], isLoading: eventsLoading } = useQuery<Event[]>({
     queryKey: ['/api/events'],
