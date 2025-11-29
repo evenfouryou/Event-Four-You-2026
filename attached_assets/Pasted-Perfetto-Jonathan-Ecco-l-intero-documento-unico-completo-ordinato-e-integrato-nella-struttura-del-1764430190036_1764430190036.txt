@@ -1,0 +1,262 @@
+Perfetto Jonathan.
+Ecco l’intero documento unico, completo, ordinato e integrato nella struttura del Sistema Management di Event Four You.
+Ho incorporato tutte le sezioni, incluso il nuovo modulo Cassa, in un’unica architettura coerente.
+
+⸻
+
+📘 **DOCUMENTO UNICO – SISTEMA MANAGEMENT
+
+EVENT FOUR YOU**
+
+Questo documento descrive l’intera struttura funzionale della sezione Management dell’app Event Four You, integrando:
+	•	Creazione evento
+	•	Contabilità
+	•	File della serata
+	•	Personale
+	•	Cassa (nuovo modulo inserito)
+	•	Data Analysis
+
+Il sistema è progettato per offrire controllo totale su eventi, personale, contabilità e performance economiche.
+
+⸻
+
+🔷 1. MODULO CREAZIONE EVENTO
+
+La creazione dell’evento viene posizionata come modulo centrale (non più dentro “Beverage”), così da essere utilizzabile da tutte le sezioni del Management.
+
+Funzionalità:
+	•	Nome evento
+	•	Data, orari, location
+	•	Organizzatore responsabile
+	•	Tipologia evento (club, privato, corporate…)
+	•	Collegamento automatico a:
+	•	Contabilità
+	•	Personale
+	•	Beverage
+	•	File della Serata
+	•	Data Analysis
+
+Ogni evento diventa il nodo principale da cui dipendono tutti i moduli operativi.
+
+⸻
+
+🟦 2. MODULO CONTABILITÀ
+
+Gestisce costi fissi, costi variabili, manutenzioni e documenti economici.
+
+2.1 Costi fissi della location
+	•	Affitto
+	•	Service fisso (audio/luci)
+	•	Permessi e licenze
+	•	Sicurezza fissa
+	•	Costi amministrativi
+
+2.2 Costi extra
+	•	Extra personale
+	•	Service aggiuntivi
+	•	Noleggi
+	•	Acquisti specifici per un evento
+
+2.3 Manutenzioni
+	•	Manutenzioni ordinarie e straordinarie
+	•	Associazione a data o evento
+	•	Alert manutenzione
+	•	Upload documenti
+
+2.4 Documenti contabili
+	•	Fatture
+	•	Preventivi
+	•	Ricevute
+	•	Contratti
+
+Tutti questi elementi sono collegati agli eventi e ai file della serata.
+
+⸻
+
+🟩 3. MODULO PERSONALE
+
+Gestione completa dello staff, con anagrafiche, presenze, ruoli e compensi.
+
+3.1 Anagrafica personale
+	•	Dati personali
+	•	Ruolo (PR, bar, sicurezza, fotografo…)
+	•	Contatti
+	•	Documenti
+	•	Note interne
+
+3.2 Gestione presenze
+	•	Personale assegnato all’evento
+	•	Orari
+	•	Presenza confermata / sospesa / sostituita
+
+3.3 Compensi
+	•	Compenso base
+	•	Bonus
+	•	Compensi variabili per serata
+	•	Storico pagamenti
+
+⸻
+
+🟧 4. FILE DELLA SERATA (Documento Centrale)
+
+Per ogni evento viene generato un file della serata, che raccoglie:
+
+4.1 Informazioni generali
+	•	Evento collegato
+	•	Data e orari
+	•	Location
+	•	Responsabili
+	•	Note operative
+
+4.2 Costi della serata
+
+Collegati al modulo contabilità:
+	•	Costi fissi location
+	•	Costi extra
+	•	Manutenzioni collegate
+	•	Documentazione caricata
+
+4.3 Personale della serata
+
+Collegato al modulo personale:
+	•	Staff assegnato
+	•	Presenze
+	•	Compensi
+	•	Ruoli specifici della serata
+
+⸻
+
+🔴 5. MODULO CASSA (NUOVO) – Integrato nel File della Serata
+
+La sezione Cassa permette una gestione professionale e dettagliata delle entrate suddivise per settore e postazione.
+
+⸻
+
+5.1 Settori e postazioni
+
+Configurabili per ogni serata:
+
+Ingressi
+	•	Biglietteria
+	•	Liste
+	•	Tavoli
+
+Beverage
+	•	Bar 1
+	•	Bar 2
+	•	Shot Bar
+	•	VIP Bar
+
+Guardaroba
+
+Extra servizi
+	•	Foto
+	•	Merchandising
+	•	Parking
+
+Ogni settore può avere più postazioni operative.
+
+⸻
+
+5.2 Registrazione incassi
+
+A. Registrazione in pezzi (quantità)
+	•	Biglietti venduti
+	•	Drink venduti
+	•	Servizi extra venduti
+Il sistema calcola automaticamente il totale:
+
+➡️ incasso = quantità × prezzo unitario
+
+B. Registrazione monetaria
+	•	Totale incassato per la postazione
+	•	Riconciliazione automatica quantità/importo
+	•	Evidenziazione differenze
+
+⸻
+
+5.3 Metodi di pagamento
+
+Per ogni incasso è possibile selezionare:
+	•	Contanti
+	•	Carta/POS
+	•	Online (Stripe, PayPal, Satispay, App E4U)
+	•	Crediti/token
+
+Riepilogo automatico per:
+	•	Postazione
+	•	Settore
+	•	Serata
+
+⸻
+
+5.4 Fondi Cassa
+
+Gestione completa per ogni postazione:
+
+Apertura cassa
+	•	Fondo iniziale
+	•	Tagli (opzionale)
+
+Chiusura cassa
+	•	Contante finale
+	•	Totale reale
+	•	Calcolo differenza cassa
+	•	Alert differenze anomale
+
+⸻
+
+5.5 Report Cassa della serata
+
+Generazione automatica del report:
+	•	Totale per postazione
+	•	Totale per settore
+	•	Totale per metodo di pagamento
+	•	Quadratura fondi
+	•	Riconciliazione contabile
+	•	Integrazione con Modulo Contabilità
+	•	Invio dei dati alla Data Analysis
+
+⸻
+
+🟥 6. MODULO DATA ANALYSIS
+
+Dashboard avanzata basata su tutti i dati raccolti.
+
+Funzionalità:
+	•	Entrate vs Uscite
+	•	Margine netto della serata
+	•	Andamento mensile/annuale degli eventi
+	•	Performance settori (bar, ingressi, extra)
+	•	Costi personale vs incassi
+	•	Eventi più profittevoli
+	•	KPI personalizzati
+
+I dati provengono automaticamente da:
+	•	File della serata
+	•	Modulo contabilità
+	•	Modulo personale
+	•	Modulo cassa
+	•	Vendite digitali
+
+⸻
+
+🟦 DOCUMENTO UNICO COMPLETATO
+
+Adesso la tua struttura è coerente, professionale e pronta per:
+	•	PDF tecnico
+	•	Documentazione sviluppatori
+	•	Presentazione a investitori o partner
+	•	Creazione schema ER
+	•	Wireframe UI
+
+⸻
+
+🔧 Vuoi che trasformo questo documento in:
+
+📄 PDF tecnico professionale
+🧩 Schema ER del database
+🖥️ Wireframe grafici delle schermate
+📘 Versione per sviluppatori Laravel
+
+Dimmi solo sì e lo preparo subito.
