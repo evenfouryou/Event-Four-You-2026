@@ -165,6 +165,25 @@ export default function Login() {
                 {isLoading ? "Accesso in corso..." : "Accedi"}
               </Button>
 
+              <div className="relative my-4">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-card px-2 text-muted-foreground">oppure</span>
+                </div>
+              </div>
+
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full"
+                onClick={() => window.location.href = '/api/login'}
+                data-testid="button-replit-login"
+              >
+                Accedi con Replit
+              </Button>
+
               <div className="text-center text-sm text-muted-foreground">
                 Non hai un account?{" "}
                 <Link href="/register" className="text-primary hover:underline" data-testid="link-register">

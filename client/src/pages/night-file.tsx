@@ -1325,6 +1325,7 @@ function PersonnelSection({ eventId, isAdmin }: { eventId: string; isAdmin: bool
     mutationFn: (data: any) => apiRequest("POST", "/api/staff-assignments", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/staff-assignments"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/staff"] });
       toast({ title: "Staff assegnato" });
     },
     onError: (err: any) => {
@@ -1348,6 +1349,7 @@ function PersonnelSection({ eventId, isAdmin }: { eventId: string; isAdmin: bool
     mutationFn: (id: string) => apiRequest("DELETE", `/api/staff-assignments/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/staff-assignments"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/staff"] });
       toast({ title: "Assegnazione rimossa" });
     },
     onError: (err: any) => {
