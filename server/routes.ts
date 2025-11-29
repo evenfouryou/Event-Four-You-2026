@@ -975,51 +975,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         updateData.actualRevenue = validated.actualRevenue.toString();
       }
       
-      // If closing the event, return all remaining stock to general warehouse
+      // If trying to close the event, check that all stock has been unloaded first
       if (validated.status === 'closed' && event.status !== 'closed') {
-        const userId = req.user.claims.sub;
         const eventStocks = await storage.getEventStocks(id);
-        const generalStocks = await storage.getGeneralStocks(companyId);
+        const remainingStock = eventStocks.filter(s => parseFloat(s.quantity) > 0);
         
-        for (const eventStock of eventStocks) {
-          const qty = parseFloat(eventStock.quantity);
-          if (qty > 0) {
-            // Find or create general stock for this product
-            const existingGeneralStock = generalStocks.find(s => s.productId === eventStock.productId);
-            const currentGeneralQty = existingGeneralStock ? parseFloat(existingGeneralStock.quantity) : 0;
-            const newGeneralQty = currentGeneralQty + qty;
-            
-            // Update general warehouse stock
-            await storage.upsertStock({
-              eventId: null,
-              stationId: null,
-              productId: eventStock.productId,
-              quantity: newGeneralQty.toString(),
-              companyId,
-            });
-            
-            // Set event stock to 0
-            await storage.upsertStock({
-              eventId: id,
-              stationId: eventStock.stationId,
-              productId: eventStock.productId,
-              quantity: '0',
-              companyId,
-            });
-            
-            // Log movement
-            await storage.createStockMovement({
-              companyId,
-              productId: eventStock.productId,
-              quantity: qty.toString(),
-              type: 'RETURN',
-              reason: `Restituzione automatica a magazzino - chiusura evento`,
-              performedBy: userId,
-              fromEventId: id,
-              fromStationId: eventStock.stationId,
-              toEventId: null,
-            });
-          }
+        if (remainingStock.length > 0) {
+          // Get product names for better error message
+          const products = await storage.getProductsByCompany(companyId);
+          const remainingProducts = remainingStock.map(s => {
+            const product = products.find(p => p.id === s.productId);
+            return `${product?.name || 'Prodotto'}: ${parseFloat(s.quantity).toFixed(2)}`;
+          });
+          
+          return res.status(400).json({ 
+            message: `Impossibile chiudere l'evento: ci sono ancora prodotti da scaricare. Effettua prima lo scarico manuale dei seguenti prodotti: ${remainingProducts.join(', ')}`,
+            remainingStock: remainingStock.map(s => ({
+              productId: s.productId,
+              quantity: s.quantity,
+              stationId: s.stationId
+            }))
+          });
         }
       }
       
