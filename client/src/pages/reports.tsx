@@ -135,12 +135,18 @@ export default function Reports() {
       setNewQuantity("");
       setCorrectionReason("");
       
-      // Force invalidate and refetch all related queries
+      // Force invalidate all related queries (report, revenue, stocks)
       await queryClient.invalidateQueries({ 
         queryKey: ['/api/reports/end-of-night', variables.eventId]
       });
       await queryClient.invalidateQueries({ 
         queryKey: ['/api/events', variables.eventId, 'revenue-analysis']
+      });
+      await queryClient.invalidateQueries({ 
+        queryKey: ['/api/events', variables.eventId, 'stocks']
+      });
+      await queryClient.invalidateQueries({ 
+        queryKey: ['/api/stock/general']
       });
       
       // Force immediate refetch
