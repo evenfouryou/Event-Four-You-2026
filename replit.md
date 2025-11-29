@@ -10,6 +10,16 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
+### November 29, 2025
+- **Four New Management Modules Implemented**: Complete backend and frontend for Contabilità, Personale, Cassa, and File della Serata
+  - **Contabilità (Accounting)**: Fixed costs, extra costs, maintenances, and documents management with full CRUD operations
+  - **Personale (Personnel)**: Staff registry with event assignments and payment tracking
+  - **Cassa (Cash Register)**: Sectors, positions, cash entries, and funds reconciliation for events
+  - **File della Serata (Night File)**: Central document integrating all modules per event with generation, approval, and export workflows
+- **Database Schema Extended**: New tables for all modules with proper relations to events and companies
+- **API Routes with Role Protection**: Admin-only mutations protected with isAdminOrSuperAdmin middleware
+- **Home Page Navigation Updated**: All 4 new modules accessible from dashboard cards, "Dati" shows "Prossimamente"
+
 ### November 25, 2025
 - **Comprehensive Mobile Optimization**: Full mobile-first responsive design implementation
   - **Touch-Friendly Targets**: All interactive elements (buttons, inputs, selects) have 44px minimum touch height on mobile (iOS standard)
