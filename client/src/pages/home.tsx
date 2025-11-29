@@ -15,8 +15,9 @@ import {
   Plus,
   Building2,
   FileText,
+  Receipt,
 } from "lucide-react";
-import type { Company } from "@shared/schema";
+import type { Company, UserFeatures } from "@shared/schema";
 
 function SectionCard({
   title,
@@ -75,6 +76,11 @@ export default function Home() {
   const { data: companies, isLoading: companiesLoading } = useQuery<Company[]>({
     queryKey: ['/api/companies'],
     enabled: isSuperAdmin,
+  });
+
+  const { data: userFeatures } = useQuery<UserFeatures>({
+    queryKey: ['/api/user-features/current/my'],
+    enabled: !isSuperAdmin && !isBartender && !isWarehouse,
   });
 
   // Redirect baristi e magazzinieri direttamente a Beverage
@@ -217,34 +223,51 @@ export default function Home() {
           href="/events"
           color="bg-indigo-500"
         />
-        <SectionCard
-          title="Beverage"
-          description="Magazzino, postazioni e consumi. Monitora le scorte e gestisci l'inventario delle bevande."
-          icon={Wine}
-          href="/beverage"
-          color="bg-purple-500"
-        />
-        <SectionCard
-          title="Contabilità"
-          description="Costi fissi, costi extra, manutenzioni e documenti contabili. Gestione completa della contabilità aziendale."
-          icon={Calculator}
-          href="/accounting"
-          color="bg-emerald-500"
-        />
-        <SectionCard
-          title="Personale"
-          description="Anagrafica staff, assegnazioni agli eventi e gestione pagamenti. Organizza il tuo team efficacemente."
-          icon={Users}
-          href="/personnel"
-          color="bg-blue-500"
-        />
-        <SectionCard
-          title="File della Serata"
-          description="Documento completo dell'evento. Compila cassa, incassi, personale e costi per ogni serata."
-          icon={FileText}
-          href="/night-file"
-          color="bg-rose-500"
-        />
+        {(userFeatures?.beverageEnabled !== false) && (
+          <SectionCard
+            title="Beverage"
+            description="Magazzino, postazioni e consumi. Monitora le scorte e gestisci l'inventario delle bevande."
+            icon={Wine}
+            href="/beverage"
+            color="bg-purple-500"
+          />
+        )}
+        {(userFeatures?.contabilitaEnabled === true) && (
+          <SectionCard
+            title="Contabilità"
+            description="Costi fissi, costi extra, manutenzioni e documenti contabili. Gestione completa della contabilità aziendale."
+            icon={Calculator}
+            href="/accounting"
+            color="bg-emerald-500"
+          />
+        )}
+        {(userFeatures?.personaleEnabled === true) && (
+          <SectionCard
+            title="Personale"
+            description="Anagrafica staff, assegnazioni agli eventi e gestione pagamenti. Organizza il tuo team efficacemente."
+            icon={Users}
+            href="/personnel"
+            color="bg-blue-500"
+          />
+        )}
+        {(userFeatures?.cassaEnabled === true) && (
+          <SectionCard
+            title="Cassa"
+            description="Gestione settori, postazioni e fondi cassa per ogni evento. Monitora entrate e riconciliazioni."
+            icon={Receipt}
+            href="/cash-register"
+            color="bg-amber-500"
+          />
+        )}
+        {(userFeatures?.nightFileEnabled === true) && (
+          <SectionCard
+            title="File della Serata"
+            description="Documento completo dell'evento. Compila cassa, incassi, personale e costi per ogni serata."
+            icon={FileText}
+            href="/night-file"
+            color="bg-rose-500"
+          />
+        )}
         <SectionCard
           title="Dati"
           description="Analytics avanzati, report e statistiche. Ottieni insights per migliorare il tuo business."

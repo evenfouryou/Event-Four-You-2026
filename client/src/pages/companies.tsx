@@ -15,6 +15,16 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Form,
   FormControl,
   FormField,
@@ -27,7 +37,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Label } from "@/components/ui/label";
-import { Plus, Building2, Edit, Settings2, Wine, Calculator, Users, FileText, Receipt } from "lucide-react";
+import { Plus, Building2, Edit, Settings2, Wine, Calculator, Users, FileText, Receipt, Trash2 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { insertCompanySchema, type Company, type InsertCompany, type CompanyFeatures } from "@shared/schema";
@@ -53,6 +63,7 @@ export default function Companies() {
   const [featuresDialogOpen, setFeaturesDialogOpen] = useState(false);
   const [selectedCompanyForFeatures, setSelectedCompanyForFeatures] = useState<Company | null>(null);
   const [localFeatures, setLocalFeatures] = useState<Partial<CompanyFeatures>>({});
+  const [deleteCompanyId, setDeleteCompanyId] = useState<string | null>(null);
   const { toast } = useToast();
 
   const { data: companies, isLoading } = useQuery<Company[]>({
@@ -188,6 +199,27 @@ export default function Companies() {
     },
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: async (companyId: string) => {
+      await apiRequest('DELETE', `/api/companies/${companyId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/companies'] });
+      setDeleteCompanyId(null);
+      toast({
+        title: "Successo",
+        description: "Azienda eliminata con successo",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Errore",
+        description: error.message || "Impossibile eliminare l'azienda",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleSubmit = (data: InsertCompany) => {
     if (editingCompany) {
       updateMutation.mutate({ id: editingCompany.id, data });
@@ -231,6 +263,16 @@ export default function Companies() {
         companyId: selectedCompanyForFeatures.id,
         features: localFeatures,
       });
+    }
+  };
+
+  const handleDeleteClick = (companyId: string) => {
+    setDeleteCompanyId(companyId);
+  };
+
+  const handleDeleteConfirm = () => {
+    if (deleteCompanyId) {
+      deleteMutation.mutate(deleteCompanyId);
     }
   };
 
@@ -376,6 +418,15 @@ export default function Companies() {
                   >
                     <Edit className="h-4 w-4" />
                   </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => handleDeleteClick(company.id)}
+                    data-testid={`button-delete-company-${company.id}`}
+                    title="Elimina Azienda"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
                 </div>
               </CardHeader>
               <CardContent>
@@ -472,6 +523,30 @@ export default function Companies() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={!!deleteCompanyId} onOpenChange={(open) => !open && setDeleteCompanyId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Conferma eliminazione</AlertDialogTitle>
+            <AlertDialogDescription>
+              Sei sicuro di voler eliminare questa azienda? Questa azione non può essere annullata.
+              Se l'azienda ha dati collegati (utenti, eventi, etc.), l'eliminazione non sarà possibile.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete-company">
+              Annulla
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteConfirm}
+              disabled={deleteMutation.isPending}
+              data-testid="button-confirm-delete-company"
+            >
+              {deleteMutation.isPending ? 'Eliminazione...' : 'Elimina'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
