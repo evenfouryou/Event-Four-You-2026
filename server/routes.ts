@@ -2806,14 +2806,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Get current consumption for this product/event/station (already company-scoped via event)
       const movements = await storage.getMovementsByEvent(eventId);
+      
+      // Filter CONSUME movements
       const consumeMovements = movements.filter(m => 
         m.type === 'CONSUME' && 
         m.productId === productId &&
         (stationId === undefined ? true : (stationId === null ? m.fromStationId === null : m.fromStationId === stationId))
       );
+      
+      // Filter RETURN movements (corrections that reduced consumption)
+      const returnMovements = movements.filter(m => 
+        m.type === 'RETURN' && 
+        m.productId === productId &&
+        (stationId === undefined ? true : (stationId === null ? m.fromStationId === null : m.fromStationId === stationId))
+      );
 
-      // Calculate current total consumed with safe parsing
-      const currentConsumed = consumeMovements.reduce((sum, m) => sum + safeParseQuantity(m.quantity), 0);
+      // Calculate NET consumption (CONSUME - RETURN, never negative)
+      const totalConsumed = consumeMovements.reduce((sum, m) => sum + safeParseQuantity(m.quantity), 0);
+      const totalReturned = returnMovements.reduce((sum, m) => sum + safeParseQuantity(m.quantity), 0);
+      const currentConsumed = Math.max(totalConsumed - totalReturned, 0);
       const difference = newQuantity - currentConsumed;
 
       if (difference === 0) {
