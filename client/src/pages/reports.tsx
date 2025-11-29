@@ -132,7 +132,10 @@ export default function Reports() {
       queryClient.invalidateQueries({ queryKey: ['/api/reports/end-of-night', selectedEventId] });
       queryClient.invalidateQueries({ queryKey: ['/api/events', selectedEventId, 'revenue-analysis'] });
       queryClient.invalidateQueries({ queryKey: ['/api/stock'] });
-      queryClient.invalidateQueries({ predicate: (query) => query.queryKey[0]?.toString().includes('/api/stock') });
+      queryClient.invalidateQueries({ predicate: (query) => {
+        const key = query.queryKey[0];
+        return typeof key === 'string' ? key.includes('/api/stock') : false;
+      }});
       setCorrectionDialogOpen(false);
       setCorrectingProduct(null);
       setNewQuantity("");
