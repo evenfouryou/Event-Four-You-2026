@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -12,6 +12,7 @@ import {
   DialogTitle,
   DialogTrigger,
   DialogFooter,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import {
   Form,
@@ -25,14 +26,33 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Plus, Building2, Edit } from "lucide-react";
+import { Label } from "@/components/ui/label";
+import { Plus, Building2, Edit, Settings2, Wine, Calculator, Users, FileText, Receipt } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { insertCompanySchema, type Company, type InsertCompany } from "@shared/schema";
+import { insertCompanySchema, type Company, type InsertCompany, type CompanyFeatures } from "@shared/schema";
+
+interface FeatureConfig {
+  key: keyof Omit<CompanyFeatures, 'id' | 'companyId' | 'createdAt' | 'updatedAt'>;
+  label: string;
+  description: string;
+  icon: React.ReactNode;
+}
+
+const featuresList: FeatureConfig[] = [
+  { key: 'beverageEnabled', label: 'Beverage', description: 'Gestione stock bevande e consumi', icon: <Wine className="h-4 w-4" /> },
+  { key: 'contabilitaEnabled', label: 'Contabilità', description: 'Costi fissi, extra e manutenzioni', icon: <Calculator className="h-4 w-4" /> },
+  { key: 'personaleEnabled', label: 'Personale', description: 'Anagrafica staff e pagamenti', icon: <Users className="h-4 w-4" /> },
+  { key: 'cassaEnabled', label: 'Cassa', description: 'Settori, postazioni e fondi cassa', icon: <Receipt className="h-4 w-4" /> },
+  { key: 'nightFileEnabled', label: 'File della Serata', description: 'Documento integrato per evento', icon: <FileText className="h-4 w-4" /> },
+];
 
 export default function Companies() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingCompany, setEditingCompany] = useState<Company | null>(null);
+  const [featuresDialogOpen, setFeaturesDialogOpen] = useState(false);
+  const [selectedCompanyForFeatures, setSelectedCompanyForFeatures] = useState<Company | null>(null);
+  const [localFeatures, setLocalFeatures] = useState<Partial<CompanyFeatures>>({});
   const { toast } = useToast();
 
   const { data: companies, isLoading } = useQuery<Company[]>({
@@ -112,6 +132,62 @@ export default function Companies() {
     },
   });
 
+  const { data: companyFeatures } = useQuery<CompanyFeatures>({
+    queryKey: [`/api/company-features/${selectedCompanyForFeatures?.id}`],
+    enabled: !!selectedCompanyForFeatures,
+  });
+
+  useEffect(() => {
+    if (companyFeatures) {
+      setLocalFeatures({
+        beverageEnabled: companyFeatures.beverageEnabled,
+        contabilitaEnabled: companyFeatures.contabilitaEnabled,
+        personaleEnabled: companyFeatures.personaleEnabled,
+        cassaEnabled: companyFeatures.cassaEnabled,
+        nightFileEnabled: companyFeatures.nightFileEnabled,
+      });
+    } else if (selectedCompanyForFeatures) {
+      setLocalFeatures({
+        beverageEnabled: true,
+        contabilitaEnabled: false,
+        personaleEnabled: false,
+        cassaEnabled: false,
+        nightFileEnabled: false,
+      });
+    }
+  }, [companyFeatures, selectedCompanyForFeatures]);
+
+  const updateFeaturesMutation = useMutation({
+    mutationFn: async ({ companyId, features }: { companyId: string; features: Partial<CompanyFeatures> }) => {
+      await apiRequest('PUT', `/api/company-features/${companyId}`, features);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/company-features'] });
+      setFeaturesDialogOpen(false);
+      setSelectedCompanyForFeatures(null);
+      toast({
+        title: "Successo",
+        description: "Moduli aggiornati con successo",
+      });
+    },
+    onError: (error: Error) => {
+      if (isUnauthorizedError(error)) {
+        toast({
+          title: "Non autorizzato",
+          description: "Effettua nuovamente il login...",
+          variant: "destructive",
+        });
+        setTimeout(() => window.location.href = '/api/login', 500);
+        return;
+      }
+      toast({
+        title: "Errore",
+        description: "Impossibile aggiornare i moduli",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleSubmit = (data: InsertCompany) => {
     if (editingCompany) {
       updateMutation.mutate({ id: editingCompany.id, data });
@@ -135,6 +211,27 @@ export default function Companies() {
     setDialogOpen(false);
     setEditingCompany(null);
     form.reset();
+  };
+
+  const handleOpenFeaturesDialog = (company: Company) => {
+    setSelectedCompanyForFeatures(company);
+    setFeaturesDialogOpen(true);
+  };
+
+  const handleToggleFeature = (key: keyof Omit<CompanyFeatures, 'id' | 'companyId' | 'createdAt' | 'updatedAt'>) => {
+    setLocalFeatures(prev => ({
+      ...prev,
+      [key]: !prev[key],
+    }));
+  };
+
+  const handleSaveFeatures = () => {
+    if (selectedCompanyForFeatures) {
+      updateFeaturesMutation.mutate({
+        companyId: selectedCompanyForFeatures.id,
+        features: localFeatures,
+      });
+    }
   };
 
   return (
@@ -182,7 +279,7 @@ export default function Companies() {
                     <FormItem>
                       <FormLabel>P.IVA / Codice Fiscale</FormLabel>
                       <FormControl>
-                        <Input {...field} data-testid="input-company-taxid" />
+                        <Input {...field} value={field.value ?? ''} data-testid="input-company-taxid" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -196,7 +293,7 @@ export default function Companies() {
                     <FormItem>
                       <FormLabel>Indirizzo</FormLabel>
                       <FormControl>
-                        <Textarea {...field} data-testid="input-company-address" />
+                        <Textarea {...field} value={field.value ?? ''} data-testid="input-company-address" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -258,16 +355,28 @@ export default function Companies() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {companies.map((company) => (
             <Card key={company.id} data-testid={`company-card-${company.id}`}>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
                 <CardTitle className="text-lg">{company.name}</CardTitle>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => handleEdit(company)}
-                  data-testid={`button-edit-company-${company.id}`}
-                >
-                  <Edit className="h-4 w-4" />
-                </Button>
+                <div className="flex gap-1">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => handleOpenFeaturesDialog(company)}
+                    data-testid={`button-features-company-${company.id}`}
+                    title="Gestisci Moduli"
+                  >
+                    <Settings2 className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => handleEdit(company)}
+                    data-testid={`button-edit-company-${company.id}`}
+                    title="Modifica Azienda"
+                  >
+                    <Edit className="h-4 w-4" />
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
@@ -279,13 +388,13 @@ export default function Companies() {
                     <p className="text-sm text-muted-foreground">Indirizzo</p>
                     <p className="text-sm">{company.address || 'N/A'}</p>
                   </div>
-                  <div className="pt-2">
+                  <div className="pt-2 flex flex-wrap gap-2 items-center">
                     {company.active ? (
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
                         Attiva
                       </span>
                     ) : (
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200">
                         Inattiva
                       </span>
                     )}
@@ -307,6 +416,62 @@ export default function Companies() {
           </CardContent>
         </Card>
       )}
+
+      <Dialog open={featuresDialogOpen} onOpenChange={setFeaturesDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Settings2 className="h-5 w-5" />
+              Gestione Moduli
+            </DialogTitle>
+            <DialogDescription>
+              {selectedCompanyForFeatures?.name} - Attiva o disattiva i moduli disponibili
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            {featuresList.map((feature) => (
+              <div
+                key={feature.key}
+                className="flex items-center justify-between p-4 rounded-lg border hover-elevate cursor-pointer"
+                onClick={() => handleToggleFeature(feature.key)}
+                data-testid={`toggle-feature-${feature.key}`}
+              >
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-muted">
+                    {feature.icon}
+                  </div>
+                  <div>
+                    <Label className="text-base font-medium cursor-pointer">{feature.label}</Label>
+                    <p className="text-sm text-muted-foreground">{feature.description}</p>
+                  </div>
+                </div>
+                <Switch
+                  checked={!!localFeatures[feature.key]}
+                  onCheckedChange={() => handleToggleFeature(feature.key)}
+                  data-testid={`switch-feature-${feature.key}`}
+                />
+              </div>
+            ))}
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setFeaturesDialogOpen(false)}
+              data-testid="button-cancel-features"
+            >
+              Annulla
+            </Button>
+            <Button
+              onClick={handleSaveFeatures}
+              disabled={updateFeaturesMutation.isPending}
+              data-testid="button-save-features"
+            >
+              {updateFeaturesMutation.isPending ? 'Salvataggio...' : 'Salva Moduli'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
