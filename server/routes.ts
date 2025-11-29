@@ -2869,25 +2869,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
 
       const currentEventStock = safeParseQuantity(existingEventStock?.quantity ?? 0);
+      const isEventClosed = event.status === 'closed';
 
       if (difference > 0) {
         // AUMENTA il consumo: ridurre lo stock dell'evento
         const newEventStock = currentEventStock - difference;
         
-        if (newEventStock < 0) {
+        // Per eventi chiusi con stock 0, permetti correzione registrando solo il movimento
+        if (newEventStock < 0 && !isEventClosed) {
           return res.status(400).json({ 
             message: `Quantità insufficiente. Stock evento: ${currentEventStock.toFixed(2)}, correzione richiede: ${difference.toFixed(2)} in più` 
           });
         }
 
-        // Update event stock
-        await storage.upsertStock({
-          eventId,
-          stationId: targetStationId,
-          productId,
-          quantity: newEventStock.toString(),
-          companyId,
-        });
+        // Update event stock (solo se c'è stock da aggiornare e evento non chiuso)
+        if (currentEventStock > 0 || !isEventClosed) {
+          await storage.upsertStock({
+            eventId,
+            stationId: targetStationId,
+            productId,
+            quantity: Math.max(0, newEventStock).toString(),
+            companyId,
+          });
+        }
 
         // Create CONSUME movement
         await storage.createStockMovement({
@@ -2895,7 +2899,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           productId,
           quantity: Math.abs(difference).toString(),
           type: 'CONSUME',
-          reason: reason || `Correzione report: da ${currentConsumed.toFixed(2)} a ${newQuantity.toFixed(2)}`,
+          reason: reason || `Correzione report: da ${currentConsumed.toFixed(2)} a ${newQuantity.toFixed(2)}${isEventClosed ? ' (evento chiuso)' : ''}`,
           performedBy: userId,
           fromEventId: eventId,
           fromStationId: targetStationId,
@@ -2906,7 +2910,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           oldQuantity: currentConsumed,
           newQuantity,
           difference,
-          stockUpdated: newEventStock,
+          stockUpdated: isEventClosed && currentEventStock === 0 ? 0 : Math.max(0, newEventStock),
+          note: isEventClosed ? 'Correzione su evento chiuso - solo movimento registrato' : undefined,
         });
       } else {
         // DIMINUISCE il consumo: restituire al MAGAZZINO GENERALE
