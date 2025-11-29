@@ -134,8 +134,16 @@ export default function Reports() {
       queryClient.setQueryData(['/api/events', variables.eventId, 'revenue-analysis'], undefined);
       
       setTimeout(() => {
-        queryClient.refetchQueries({ queryKey: ['/api/reports/end-of-night', variables.eventId] });
-        queryClient.refetchQueries({ queryKey: ['/api/events', variables.eventId, 'revenue-analysis'] });
+        queryClient.refetchQueries({ 
+          queryKey: ['/api/reports/end-of-night', variables.eventId],
+          type: 'active',
+          stale: true
+        });
+        queryClient.refetchQueries({ 
+          queryKey: ['/api/events', variables.eventId, 'revenue-analysis'],
+          type: 'active',
+          stale: true
+        });
       }, 50);
       
       setCorrectionDialogOpen(false);

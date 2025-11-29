@@ -2589,6 +2589,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // End of night report
   app.get('/api/reports/end-of-night/:eventId', isAuthenticated, async (req: any, res) => {
     try {
+      // Disable caching for report endpoint
+      res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.set('Pragma', 'no-cache');
+      res.set('Expires', '0');
+      
       const companyId = await getUserCompanyId(req);
       if (!companyId) {
         return res.status(403).json({ message: "No company associated" });
