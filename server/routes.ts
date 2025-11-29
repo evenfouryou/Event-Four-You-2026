@@ -2740,6 +2740,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Non autorizzato ad accedere a questo prodotto" });
       }
 
+      // Helper function to safely parse quantities
+      const safeParseQuantity = (value: string | number): number => {
+        const parsed = parseFloat(String(value));
+        return isNaN(parsed) ? 0 : parsed;
+      };
+
       // Get current consumption for this product/event/station (already company-scoped via event)
       const movements = await storage.getMovementsByEvent(eventId);
       const consumeMovements = movements.filter(m => 
@@ -2748,8 +2754,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         (stationId === undefined ? true : (stationId === null ? m.fromStationId === null : m.fromStationId === stationId))
       );
 
-      // Calculate current total consumed
-      const currentConsumed = consumeMovements.reduce((sum, m) => sum + parseFloat(m.quantity), 0);
+      // Calculate current total consumed with safe parsing
+      const currentConsumed = consumeMovements.reduce((sum, m) => sum + safeParseQuantity(m.quantity), 0);
       const difference = newQuantity - currentConsumed;
 
       if (difference === 0) {
@@ -2768,7 +2774,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         (targetStationId === null ? s.stationId === null : s.stationId === targetStationId)
       );
 
-      const currentStock = existingStock ? parseFloat(existingStock.quantity) : 0;
+      const currentStock = safeParseQuantity(existingStock?.quantity ?? 0);
       
       // If we consumed MORE (difference > 0), we need to reduce stock more
       // If we consumed LESS (difference < 0), we need to add stock back
