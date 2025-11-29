@@ -1165,6 +1165,64 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get stocks for event (alternative endpoint used by return-to-warehouse)
+  app.get('/api/stocks/event/:eventId', isAuthenticated, async (req: any, res) => {
+    try {
+      const stocks = await storage.getEventStocks(req.params.eventId);
+      const products = await storage.getProductsByCompany(
+        (await getUserCompanyId(req)) || ''
+      );
+      
+      // Enrich stocks with product information
+      const enrichedStocks = stocks.map(stock => {
+        const product = products.find(p => p.id === stock.productId);
+        return {
+          ...stock,
+          product: product ? {
+            id: product.id,
+            name: product.name,
+            code: product.code,
+            unitOfMeasure: product.unitOfMeasure,
+          } : null,
+        };
+      });
+      
+      res.json(enrichedStocks);
+    } catch (error) {
+      console.error("Error fetching event stocks:", error);
+      res.status(500).json({ message: "Failed to fetch event stocks" });
+    }
+  });
+
+  // Get stocks for station (used by return-to-warehouse)
+  app.get('/api/stocks/station/:stationId', isAuthenticated, async (req: any, res) => {
+    try {
+      const stocks = await storage.getStationStocks(req.params.stationId);
+      const products = await storage.getProductsByCompany(
+        (await getUserCompanyId(req)) || ''
+      );
+      
+      // Enrich stocks with product information
+      const enrichedStocks = stocks.map(stock => {
+        const product = products.find(p => p.id === stock.productId);
+        return {
+          ...stock,
+          product: product ? {
+            id: product.id,
+            name: product.name,
+            code: product.code,
+            unitOfMeasure: product.unitOfMeasure,
+          } : null,
+        };
+      });
+      
+      res.json(enrichedStocks);
+    } catch (error) {
+      console.error("Error fetching station stocks:", error);
+      res.status(500).json({ message: "Failed to fetch station stocks" });
+    }
+  });
+
   // Create station for specific event
   app.post('/api/events/:id/stations', isAuthenticated, async (req: any, res) => {
     try {
