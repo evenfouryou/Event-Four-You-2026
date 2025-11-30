@@ -5,7 +5,6 @@ import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -40,14 +39,50 @@ import {
 } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Package, Edit, Search, ArrowLeft } from "lucide-react";
+import { Plus, Package, Edit, Search, ArrowLeft, TrendingUp, CheckCircle2, Tag } from "lucide-react";
 import { Link } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { insertProductSchema, type Product, type InsertProduct } from "@shared/schema";
+import { motion } from "framer-motion";
 
 const defaultCategories = ['drink', 'bottle', 'food', 'supplies', 'other'];
 const units = ['bottle', 'can', 'liter', 'case', 'piece', 'kg'];
+
+function StatsCard({
+  title,
+  value,
+  icon: Icon,
+  gradient,
+  testId,
+  delay = 0,
+}: {
+  title: string;
+  value: string | number;
+  icon: React.ElementType;
+  gradient: string;
+  testId: string;
+  delay?: number;
+}) {
+  return (
+    <motion.div 
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3, delay }}
+      className="glass-card p-5"
+    >
+      <div className="flex items-start justify-between mb-3">
+        <div className={`w-11 h-11 rounded-2xl bg-gradient-to-br ${gradient} flex items-center justify-center`}>
+          <Icon className="h-5 w-5 text-white" />
+        </div>
+      </div>
+      <p className="text-2xl font-bold mb-1" data-testid={testId}>
+        {value}
+      </p>
+      <p className="text-xs text-muted-foreground">{title}</p>
+    </motion.div>
+  );
+}
 
 export default function Products() {
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -68,9 +103,17 @@ export default function Products() {
     const productCategories = products
       .map(p => p.category)
       .filter((cat): cat is string => !!cat && cat.trim() !== '');
-    const uniqueCategories = [...new Set(productCategories)];
+    const uniqueCategories = Array.from(new Set(productCategories));
     return uniqueCategories.length > 0 ? uniqueCategories.sort() : defaultCategories;
   }, [products]);
+
+  const activeProducts = useMemo(() => {
+    return products?.filter(p => p.active).length || 0;
+  }, [products]);
+
+  const totalCategories = useMemo(() => {
+    return categories.length;
+  }, [categories]);
 
   const form = useForm<InsertProduct>({
     resolver: zodResolver(insertProductSchema),
@@ -191,19 +234,36 @@ export default function Products() {
   }, [products, searchQuery, categoryFilter]);
 
   return (
-    <div className="p-6 md:p-8 max-w-7xl mx-auto">
-      <div className="flex items-center gap-4 mb-8">
-        <Button variant="ghost" size="icon" asChild>
+    <div className="p-4 md:p-8 max-w-7xl mx-auto pb-24 md:pb-8">
+      <motion.div 
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="flex flex-col sm:flex-row sm:items-center gap-4 mb-6"
+      >
+        <div className="flex items-center gap-3 flex-1">
           <Link href="/beverage">
-            <ArrowLeft className="h-5 w-5" />
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="rounded-xl"
+              data-testid="button-back-beverage"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
           </Link>
-        </Button>
-        <div className="flex-1">
-          <h1 className="text-2xl font-semibold mb-1">Catalogo Prodotti</h1>
-          <p className="text-muted-foreground">
-            {canCreateProducts ? 'Gestisci i prodotti e le scorte minime' : 'Visualizza i prodotti'}
-          </p>
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center glow-golden">
+              <Package className="h-6 w-6 text-white" />
+            </div>
+            <div>
+              <h1 className="text-xl md:text-2xl font-bold">Catalogo Prodotti</h1>
+              <p className="text-sm text-muted-foreground">
+                {canCreateProducts ? 'Gestisci i prodotti e le scorte minime' : 'Visualizza i prodotti'}
+              </p>
+            </div>
+          </div>
         </div>
+        
         <Dialog open={dialogOpen} onOpenChange={(open) => {
           if (!canCreateProducts && open) {
             toast({
@@ -217,6 +277,7 @@ export default function Products() {
         }}>
           <DialogTrigger asChild>
             <Button 
+              className="gradient-golden text-black font-semibold"
               data-testid="button-create-product"
               disabled={!canCreateProducts}
               title={!canCreateProducts ? "Solo gli admin possono creare prodotti" : ""}
@@ -362,6 +423,7 @@ export default function Products() {
                   </Button>
                   <Button
                     type="submit"
+                    className="gradient-golden text-black font-semibold"
                     disabled={createMutation.isPending || updateMutation.isPending}
                     data-testid="button-submit-product"
                   >
@@ -372,21 +434,66 @@ export default function Products() {
             </Form>
           </DialogContent>
         </Dialog>
+      </motion.div>
+
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+        {isLoading ? (
+          <>
+            <Skeleton className="h-28 rounded-2xl" />
+            <Skeleton className="h-28 rounded-2xl" />
+            <Skeleton className="h-28 rounded-2xl" />
+          </>
+        ) : (
+          <>
+            <StatsCard
+              title="Prodotti Totali"
+              value={products?.length || 0}
+              icon={Package}
+              gradient="from-blue-500 to-indigo-600"
+              testId="stat-total-products"
+              delay={0.1}
+            />
+            <StatsCard
+              title="Prodotti Attivi"
+              value={activeProducts}
+              icon={CheckCircle2}
+              gradient="from-emerald-500 to-teal-600"
+              testId="stat-active-products"
+              delay={0.2}
+            />
+            <StatsCard
+              title="Categorie"
+              value={totalCategories}
+              icon={Tag}
+              gradient="from-amber-500 to-orange-600"
+              testId="stat-categories"
+              delay={0.3}
+            />
+          </>
+        )}
       </div>
 
-      <div className="flex flex-col sm:flex-row gap-4 mb-6">
+      <motion.div 
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.2 }}
+        className="flex flex-col sm:flex-row gap-4 mb-6"
+      >
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
           <Input
             placeholder="Cerca prodotti per nome o codice..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9"
+            className="pl-12 h-12 bg-white/5 border-white/10 rounded-xl"
             data-testid="input-search-products"
           />
         </div>
         <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-          <SelectTrigger className="w-full sm:w-48" data-testid="select-filter-category">
+          <SelectTrigger 
+            className="w-full sm:w-48 h-12 bg-white/5 border-white/10 rounded-xl" 
+            data-testid="select-filter-category"
+          >
             <SelectValue placeholder="Filtra per categoria" />
           </SelectTrigger>
           <SelectContent>
@@ -398,48 +505,77 @@ export default function Products() {
             ))}
           </SelectContent>
         </Select>
-      </div>
+      </motion.div>
 
       {isLoading ? (
-        <Card>
-          <CardContent className="p-6">
-            <Skeleton className="h-96" />
-          </CardContent>
-        </Card>
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="glass-card overflow-hidden"
+        >
+          <div className="p-6">
+            <Skeleton className="h-96 rounded-xl" />
+          </div>
+        </motion.div>
       ) : filteredProducts && filteredProducts.length > 0 ? (
-        <Card>
-          <CardContent className="p-0">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+          className="glass-card overflow-hidden"
+        >
+          <div className="p-5 border-b border-white/5 flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-primary/20 flex items-center justify-center">
+              <Package className="h-5 w-5 text-primary" />
+            </div>
+            <h2 className="font-semibold">Lista Prodotti</h2>
+            <Badge className="ml-auto bg-primary/20 text-primary border-primary/30">
+              {filteredProducts.length} prodotti
+            </Badge>
+          </div>
+          <div className="overflow-x-auto">
             <Table>
               <TableHeader>
-                <TableRow>
-                  <TableHead>Codice</TableHead>
-                  <TableHead>Nome</TableHead>
-                  <TableHead>Categoria</TableHead>
-                  <TableHead>Unità</TableHead>
-                  <TableHead>Costo</TableHead>
-                  <TableHead>Soglia Min.</TableHead>
-                  <TableHead>Stato</TableHead>
+                <TableRow className="border-white/5 hover:bg-white/5">
+                  <TableHead className="text-muted-foreground">Codice</TableHead>
+                  <TableHead className="text-muted-foreground">Nome</TableHead>
+                  <TableHead className="text-muted-foreground">Categoria</TableHead>
+                  <TableHead className="text-muted-foreground">Unità</TableHead>
+                  <TableHead className="text-muted-foreground">Costo</TableHead>
+                  <TableHead className="text-muted-foreground">Soglia Min.</TableHead>
+                  <TableHead className="text-muted-foreground">Stato</TableHead>
                   <TableHead></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredProducts.map((product) => (
-                  <TableRow key={product.id} data-testid={`product-row-${product.id}`}>
-                    <TableCell className="font-mono">{product.code}</TableCell>
+                {filteredProducts.map((product, index) => (
+                  <motion.tr
+                    key={product.id}
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.35 + index * 0.03 }}
+                    className="border-white/5 hover:bg-white/5 transition-colors"
+                    data-testid={`product-row-${product.id}`}
+                  >
+                    <TableCell className="font-mono text-sm">{product.code}</TableCell>
                     <TableCell className="font-medium">{product.name}</TableCell>
                     <TableCell>
-                      <Badge variant="outline">
+                      <Badge variant="outline" className="border-white/10 bg-white/5">
                         {product.category || 'N/A'}
                       </Badge>
                     </TableCell>
-                    <TableCell>{product.unitOfMeasure}</TableCell>
-                    <TableCell>€ {product.costPrice}</TableCell>
-                    <TableCell>{product.minThreshold || '-'}</TableCell>
+                    <TableCell className="text-muted-foreground">{product.unitOfMeasure}</TableCell>
+                    <TableCell className="text-muted-foreground">€ {product.costPrice}</TableCell>
+                    <TableCell className="text-muted-foreground">{product.minThreshold || '-'}</TableCell>
                     <TableCell>
                       {product.active ? (
-                        <Badge variant="secondary">Attivo</Badge>
+                        <Badge className="bg-teal-500/20 text-teal border-teal-500/30">
+                          Attivo
+                        </Badge>
                       ) : (
-                        <Badge variant="outline">Inattivo</Badge>
+                        <Badge variant="outline" className="border-white/10 text-muted-foreground">
+                          Inattivo
+                        </Badge>
                       )}
                     </TableCell>
                     <TableCell>
@@ -447,28 +583,45 @@ export default function Products() {
                         variant="ghost"
                         size="icon"
                         onClick={() => handleEdit(product)}
+                        className="rounded-xl hover:bg-primary/10"
                         data-testid={`button-edit-product-${product.id}`}
                       >
                         <Edit className="h-4 w-4" />
                       </Button>
                     </TableCell>
-                  </TableRow>
+                  </motion.tr>
                 ))}
               </TableBody>
             </Table>
-          </CardContent>
-        </Card>
+          </div>
+        </motion.div>
       ) : (
-        <Card>
-          <CardContent className="p-12 text-center">
-            <Package className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
-            <p className="text-muted-foreground mb-4">Nessun prodotto nel catalogo</p>
-            <Button onClick={() => setDialogOpen(true)} data-testid="button-create-first-product">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ delay: 0.3 }}
+          className="glass-card p-12 text-center"
+        >
+          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center mx-auto mb-4 glow-golden">
+            <Package className="h-8 w-8 text-white" />
+          </div>
+          <p className="text-muted-foreground mb-4">
+            {searchQuery || categoryFilter !== "all" 
+              ? "Nessun prodotto trovato con i filtri selezionati"
+              : "Nessun prodotto nel catalogo"
+            }
+          </p>
+          {canCreateProducts && (
+            <Button 
+              onClick={() => setDialogOpen(true)} 
+              className="gradient-golden text-black font-semibold"
+              data-testid="button-create-first-product"
+            >
               <Plus className="h-4 w-4 mr-2" />
               Crea Primo Prodotto
             </Button>
-          </CardContent>
-        </Card>
+          )}
+        </motion.div>
       )}
     </div>
   );

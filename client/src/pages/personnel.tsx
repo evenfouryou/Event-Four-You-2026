@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
+import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,6 +15,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Switch } from "@/components/ui/switch";
+import { Skeleton } from "@/components/ui/skeleton";
+import { motion } from "framer-motion";
 import { 
   Users, 
   Calendar, 
@@ -28,58 +30,179 @@ import {
   Euro,
   User,
   UserCheck,
+  ArrowLeft,
+  TrendingUp,
 } from "lucide-react";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
 import type { Staff, StaffAssignment, StaffPayment, Event } from "@shared/schema";
 
+function StatsCard({
+  title,
+  value,
+  icon: Icon,
+  gradient,
+  testId,
+  delay = 0,
+}: {
+  title: string;
+  value: string | number;
+  icon: React.ElementType;
+  gradient: string;
+  testId: string;
+  delay?: number;
+}) {
+  return (
+    <motion.div 
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3, delay }}
+      className="glass-card p-5"
+    >
+      <div className="flex items-start justify-between mb-3">
+        <div className={`w-11 h-11 rounded-2xl bg-gradient-to-br ${gradient} flex items-center justify-center`}>
+          <Icon className="h-5 w-5 text-white" />
+        </div>
+      </div>
+      <p className="text-2xl font-bold mb-1" data-testid={testId}>
+        {value}
+      </p>
+      <p className="text-xs text-muted-foreground">{title}</p>
+    </motion.div>
+  );
+}
+
 export default function Personnel() {
   const { user } = useAuth();
+  const [, setLocation] = useLocation();
   const [activeTab, setActiveTab] = useState("staff");
   const isAdmin = user?.role === "super_admin" || user?.role === "gestore";
 
+  const { data: staffList = [], isLoading: staffLoading } = useQuery<Staff[]>({
+    queryKey: ["/api/staff"],
+  });
+
+  const { data: assignments = [] } = useQuery<StaffAssignment[]>({
+    queryKey: ["/api/staff-assignments"],
+  });
+
+  const { data: payments = [] } = useQuery<StaffPayment[]>({
+    queryKey: ["/api/staff-payments"],
+  });
+
+  const activeStaffCount = staffList.filter(s => s.active).length;
+  const totalPayments = payments.reduce((sum, p) => sum + parseFloat(p.amount || "0"), 0);
+  const pendingPayments = payments.filter(p => p.status === "pending").length;
+
   return (
-    <div className="p-4 md:p-6 space-y-6">
-      <div className="flex flex-col gap-2">
-        <h1 className="text-2xl md:text-3xl font-bold" data-testid="text-personnel-title">
-          Personale
-        </h1>
-        <p className="text-muted-foreground">
-          Gestione anagrafica, presenze e pagamenti del personale
-        </p>
+    <div className="p-4 md:p-8 max-w-7xl mx-auto pb-24 md:pb-8">
+      <motion.div 
+        initial={{ opacity: 0, x: -20 }}
+        animate={{ opacity: 1, x: 0 }}
+        className="flex items-center gap-4 mb-8"
+      >
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          onClick={() => setLocation("/")}
+          className="rounded-xl"
+          data-testid="button-back"
+        >
+          <ArrowLeft className="h-5 w-5" />
+        </Button>
+        <div>
+          <h1 className="text-xl md:text-2xl font-bold" data-testid="text-personnel-title">
+            Personale
+          </h1>
+          <p className="text-muted-foreground text-sm">
+            Gestione anagrafica, presenze e pagamenti
+          </p>
+        </div>
+      </motion.div>
+
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        {staffLoading ? (
+          <>
+            <Skeleton className="h-32 rounded-2xl" />
+            <Skeleton className="h-32 rounded-2xl" />
+            <Skeleton className="h-32 rounded-2xl" />
+            <Skeleton className="h-32 rounded-2xl" />
+          </>
+        ) : (
+          <>
+            <StatsCard
+              icon={Users}
+              title="Totale Personale"
+              value={staffList.length}
+              gradient="from-blue-500 to-indigo-600"
+              testId="stat-total-staff"
+              delay={0}
+            />
+            <StatsCard
+              icon={UserCheck}
+              title="Personale Attivo"
+              value={activeStaffCount}
+              gradient="from-teal-500 to-cyan-600"
+              testId="stat-active-staff"
+              delay={0.1}
+            />
+            <StatsCard
+              icon={Calendar}
+              title="Assegnazioni"
+              value={assignments.length}
+              gradient="from-violet-500 to-purple-600"
+              testId="stat-assignments"
+              delay={0.2}
+            />
+            <StatsCard
+              icon={Euro}
+              title="Totale Pagamenti"
+              value={`€${totalPayments.toFixed(0)}`}
+              gradient="from-amber-500 to-orange-600"
+              testId="stat-total-payments"
+              delay={0.3}
+            />
+          </>
+        )}
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-3 h-auto">
-          <TabsTrigger value="staff" className="flex items-center gap-2 py-3" data-testid="tab-staff">
-            <Users className="h-4 w-4" />
-            <span className="hidden sm:inline">Anagrafica</span>
-            <span className="sm:hidden">Staff</span>
-          </TabsTrigger>
-          <TabsTrigger value="assignments" className="flex items-center gap-2 py-3" data-testid="tab-assignments">
-            <Calendar className="h-4 w-4" />
-            <span className="hidden sm:inline">Presenze</span>
-            <span className="sm:hidden">Pres.</span>
-          </TabsTrigger>
-          <TabsTrigger value="payments" className="flex items-center gap-2 py-3" data-testid="tab-payments">
-            <Wallet className="h-4 w-4" />
-            <span className="hidden sm:inline">Pagamenti</span>
-            <span className="sm:hidden">Pag.</span>
-          </TabsTrigger>
-        </TabsList>
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3, delay: 0.2 }}
+      >
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList className="grid w-full grid-cols-3 h-auto glass-card mb-6">
+            <TabsTrigger value="staff" className="flex items-center gap-2 py-3 data-[state=active]:bg-primary/20" data-testid="tab-staff">
+              <Users className="h-4 w-4" />
+              <span className="hidden sm:inline">Anagrafica</span>
+              <span className="sm:hidden">Staff</span>
+            </TabsTrigger>
+            <TabsTrigger value="assignments" className="flex items-center gap-2 py-3 data-[state=active]:bg-primary/20" data-testid="tab-assignments">
+              <Calendar className="h-4 w-4" />
+              <span className="hidden sm:inline">Presenze</span>
+              <span className="sm:hidden">Pres.</span>
+            </TabsTrigger>
+            <TabsTrigger value="payments" className="flex items-center gap-2 py-3 data-[state=active]:bg-primary/20" data-testid="tab-payments">
+              <Wallet className="h-4 w-4" />
+              <span className="hidden sm:inline">Pagamenti</span>
+              <span className="sm:hidden">Pag.</span>
+            </TabsTrigger>
+          </TabsList>
 
-        <TabsContent value="staff" className="mt-6">
-          <StaffSection isAdmin={isAdmin} />
-        </TabsContent>
+          <TabsContent value="staff" className="mt-0">
+            <StaffSection isAdmin={isAdmin} />
+          </TabsContent>
 
-        <TabsContent value="assignments" className="mt-6">
-          <AssignmentsSection isAdmin={isAdmin} />
-        </TabsContent>
+          <TabsContent value="assignments" className="mt-0">
+            <AssignmentsSection isAdmin={isAdmin} />
+          </TabsContent>
 
-        <TabsContent value="payments" className="mt-6">
-          <PaymentsSection isAdmin={isAdmin} />
-        </TabsContent>
-      </Tabs>
+          <TabsContent value="payments" className="mt-0">
+            <PaymentsSection isAdmin={isAdmin} />
+          </TabsContent>
+        </Tabs>
+      </motion.div>
     </div>
   );
 }
@@ -173,21 +296,33 @@ function StaffSection({ isAdmin }: { isAdmin: boolean }) {
   };
 
   if (isLoading) {
-    return <div className="text-center py-8">Caricamento...</div>;
+    return (
+      <div className="glass-card p-8">
+        <Skeleton className="h-10 w-full mb-4" />
+        <Skeleton className="h-64 w-full" />
+      </div>
+    );
   }
 
   return (
-    <Card>
-      <CardHeader>
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.2 }}
+      className="glass-card overflow-hidden"
+    >
+      <div className="p-5 border-b border-white/10">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div>
-            <CardTitle className="flex items-center gap-2">
-              <Users className="h-5 w-5" />
-              Anagrafica Personale
-            </CardTitle>
-            <CardDescription>
-              Gestione del registro del personale
-            </CardDescription>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
+              <Users className="h-5 w-5 text-white" />
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold">Anagrafica Personale</h2>
+              <p className="text-sm text-muted-foreground">
+                Gestione del registro del personale
+              </p>
+            </div>
           </div>
           {isAdmin && (
             <Dialog open={isDialogOpen} onOpenChange={(open) => {
@@ -195,7 +330,7 @@ function StaffSection({ isAdmin }: { isAdmin: boolean }) {
               if (!open) setEditingStaff(null);
             }}>
               <DialogTrigger asChild>
-                <Button data-testid="button-add-staff">
+                <Button className="gradient-golden text-black font-semibold" data-testid="button-add-staff">
                   <Plus className="h-4 w-4 mr-2" />
                   Nuovo
                 </Button>
@@ -342,7 +477,7 @@ function StaffSection({ isAdmin }: { isAdmin: boolean }) {
                     <Label htmlFor="active">Attivo</Label>
                   </div>
                   <DialogFooter>
-                    <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending} data-testid="button-save-staff">
+                    <Button type="submit" className="gradient-golden text-black font-semibold" disabled={createMutation.isPending || updateMutation.isPending} data-testid="button-save-staff">
                       {editingStaff ? "Aggiorna" : "Crea"}
                     </Button>
                   </DialogFooter>
@@ -351,8 +486,8 @@ function StaffSection({ isAdmin }: { isAdmin: boolean }) {
             </Dialog>
           )}
         </div>
-      </CardHeader>
-      <CardContent>
+      </div>
+      <div className="p-5">
         <div className="mb-4">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -367,14 +502,15 @@ function StaffSection({ isAdmin }: { isAdmin: boolean }) {
         </div>
 
         {filteredStaff.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground">
-            {searchTerm ? "Nessun risultato trovato" : "Nessun personale registrato"}
+          <div className="text-center py-12 text-muted-foreground">
+            <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
+            <p>{searchTerm ? "Nessun risultato trovato" : "Nessun personale registrato"}</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
-                <TableRow>
+                <TableRow className="border-white/10">
                   <TableHead>Nome</TableHead>
                   <TableHead>Ruolo</TableHead>
                   <TableHead>Contatti</TableHead>
@@ -385,10 +521,12 @@ function StaffSection({ isAdmin }: { isAdmin: boolean }) {
               </TableHeader>
               <TableBody>
                 {filteredStaff.map((s) => (
-                  <TableRow key={s.id} data-testid={`row-staff-${s.id}`}>
+                  <TableRow key={s.id} className="border-white/10" data-testid={`row-staff-${s.id}`}>
                     <TableCell>
-                      <div className="flex items-center gap-2">
-                        <User className="h-4 w-4 text-muted-foreground" />
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-blue-500/20 to-indigo-600/20 flex items-center justify-center">
+                          <User className="h-4 w-4 text-blue-400" />
+                        </div>
                         <div>
                           <div className="font-medium">{s.firstName} {s.lastName}</div>
                           {s.fiscalCode && (
@@ -398,7 +536,7 @@ function StaffSection({ isAdmin }: { isAdmin: boolean }) {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Badge variant="outline">
+                      <Badge variant="outline" className="border-primary/30">
                         {roleLabels[s.role] || s.role}
                       </Badge>
                     </TableCell>
@@ -425,9 +563,14 @@ function StaffSection({ isAdmin }: { isAdmin: boolean }) {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Badge variant={s.active ? "default" : "secondary"}>
+                      <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium ${
+                        s.active 
+                          ? 'bg-teal-500/20 text-teal' 
+                          : 'bg-muted/50 text-muted-foreground'
+                      }`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${s.active ? 'bg-teal-500' : 'bg-muted-foreground'}`} />
                         {s.active ? "Attivo" : "Inattivo"}
-                      </Badge>
+                      </span>
                     </TableCell>
                     {isAdmin && (
                       <TableCell className="text-right">
@@ -473,8 +616,8 @@ function StaffSection({ isAdmin }: { isAdmin: boolean }) {
             </Table>
           </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </motion.div>
   );
 }
 
@@ -566,30 +709,42 @@ function AssignmentsSection({ isAdmin }: { isAdmin: boolean }) {
     return e?.name || "N/D";
   };
 
-  const statusLabels: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
-    scheduled: { label: "Programmato", variant: "secondary" },
-    confirmed: { label: "Confermato", variant: "outline" },
-    present: { label: "Presente", variant: "default" },
-    absent: { label: "Assente", variant: "destructive" },
-    replaced: { label: "Sostituito", variant: "secondary" },
+  const statusConfig: Record<string, { label: string; color: string; bgColor: string }> = {
+    scheduled: { label: "Programmato", color: "text-blue-400", bgColor: "bg-blue-500/20" },
+    confirmed: { label: "Confermato", color: "text-violet-400", bgColor: "bg-violet-500/20" },
+    present: { label: "Presente", color: "text-teal", bgColor: "bg-teal-500/20" },
+    absent: { label: "Assente", color: "text-rose-400", bgColor: "bg-rose-500/20" },
+    replaced: { label: "Sostituito", color: "text-muted-foreground", bgColor: "bg-muted/50" },
   };
 
   if (isLoading) {
-    return <div className="text-center py-8">Caricamento...</div>;
+    return (
+      <div className="glass-card p-8">
+        <Skeleton className="h-10 w-full mb-4" />
+        <Skeleton className="h-64 w-full" />
+      </div>
+    );
   }
 
   return (
-    <Card>
-      <CardHeader>
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.2 }}
+      className="glass-card overflow-hidden"
+    >
+      <div className="p-5 border-b border-white/10">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div>
-            <CardTitle className="flex items-center gap-2">
-              <Calendar className="h-5 w-5" />
-              Presenze e Assegnazioni
-            </CardTitle>
-            <CardDescription>
-              Gestione delle presenze del personale agli eventi
-            </CardDescription>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
+              <Calendar className="h-5 w-5 text-white" />
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold">Presenze e Assegnazioni</h2>
+              <p className="text-sm text-muted-foreground">
+                Gestione delle presenze del personale agli eventi
+              </p>
+            </div>
           </div>
           {isAdmin && (
             <Dialog open={isDialogOpen} onOpenChange={(open) => {
@@ -597,7 +752,7 @@ function AssignmentsSection({ isAdmin }: { isAdmin: boolean }) {
               if (!open) setEditingAssignment(null);
             }}>
               <DialogTrigger asChild>
-                <Button data-testid="button-add-assignment">
+                <Button className="gradient-golden text-black font-semibold" data-testid="button-add-assignment">
                   <Plus className="h-4 w-4 mr-2" />
                   Nuova Assegnazione
                 </Button>
@@ -708,7 +863,7 @@ function AssignmentsSection({ isAdmin }: { isAdmin: boolean }) {
                     />
                   </div>
                   <DialogFooter>
-                    <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending} data-testid="button-save-assignment">
+                    <Button type="submit" className="gradient-golden text-black font-semibold" disabled={createMutation.isPending || updateMutation.isPending} data-testid="button-save-assignment">
                       {editingAssignment ? "Aggiorna" : "Crea"}
                     </Button>
                   </DialogFooter>
@@ -717,8 +872,8 @@ function AssignmentsSection({ isAdmin }: { isAdmin: boolean }) {
             </Dialog>
           )}
         </div>
-      </CardHeader>
-      <CardContent>
+      </div>
+      <div className="p-5">
         <div className="mb-4">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -733,14 +888,15 @@ function AssignmentsSection({ isAdmin }: { isAdmin: boolean }) {
         </div>
 
         {assignments.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground">
-            {searchTerm ? "Nessun risultato trovato" : "Nessuna assegnazione registrata"}
+          <div className="text-center py-12 text-muted-foreground">
+            <Calendar className="h-12 w-12 mx-auto mb-4 opacity-50" />
+            <p>{searchTerm ? "Nessun risultato trovato" : "Nessuna assegnazione registrata"}</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
-                <TableRow>
+                <TableRow className="border-white/10">
                   <TableHead>Personale</TableHead>
                   <TableHead>Evento</TableHead>
                   <TableHead>Ruolo</TableHead>
@@ -750,84 +906,89 @@ function AssignmentsSection({ isAdmin }: { isAdmin: boolean }) {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {assignments.map((a) => (
-                  <TableRow key={a.id} data-testid={`row-assignment-${a.id}`}>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <UserCheck className="h-4 w-4 text-muted-foreground" />
-                        {getStaffName(a.staffId)}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1">
-                        <Calendar className="h-3 w-3 text-muted-foreground" />
-                        {getEventName(a.eventId)}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      {a.role || "-"}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={statusLabels[a.status]?.variant || "secondary"}>
-                        {statusLabels[a.status]?.label || a.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="space-y-1 text-sm">
-                        {a.compensationAmount && (
-                          <div>€{parseFloat(a.compensationAmount).toFixed(2)}</div>
-                        )}
-                        {a.bonus && (
-                          <div className="text-green-600">+€{parseFloat(a.bonus).toFixed(2)}</div>
-                        )}
-                      </div>
-                    </TableCell>
-                    {isAdmin && (
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-1">
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            onClick={() => {
-                              setEditingAssignment(a);
-                              setIsDialogOpen(true);
-                            }}
-                            data-testid={`button-edit-assignment-${a.id}`}
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button size="icon" variant="ghost" data-testid={`button-delete-assignment-${a.id}`}>
-                                <Trash2 className="h-4 w-4 text-destructive" />
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Eliminare questa assegnazione?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Questa azione non può essere annullata.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Annulla</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => deleteMutation.mutate(a.id)}>
-                                  Elimina
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
+                {assignments.map((a) => {
+                  const status = statusConfig[a.status] || statusConfig.scheduled;
+                  return (
+                    <TableRow key={a.id} className="border-white/10" data-testid={`row-assignment-${a.id}`}>
+                      <TableCell>
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-violet-500/20 to-purple-600/20 flex items-center justify-center">
+                            <UserCheck className="h-4 w-4 text-violet-400" />
+                          </div>
+                          {getStaffName(a.staffId)}
                         </div>
                       </TableCell>
-                    )}
-                  </TableRow>
-                ))}
+                      <TableCell>
+                        <div className="flex items-center gap-1">
+                          <Calendar className="h-3 w-3 text-muted-foreground" />
+                          {getEventName(a.eventId)}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        {a.role || "-"}
+                      </TableCell>
+                      <TableCell>
+                        <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium ${status.bgColor} ${status.color}`}>
+                          {status.label}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="space-y-1 text-sm">
+                          {a.compensationAmount && (
+                            <div>€{parseFloat(a.compensationAmount).toFixed(2)}</div>
+                          )}
+                          {a.bonus && (
+                            <div className="text-teal">+€{parseFloat(a.bonus).toFixed(2)}</div>
+                          )}
+                        </div>
+                      </TableCell>
+                      {isAdmin && (
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-1">
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => {
+                                setEditingAssignment(a);
+                                setIsDialogOpen(true);
+                              }}
+                              data-testid={`button-edit-assignment-${a.id}`}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button size="icon" variant="ghost" data-testid={`button-delete-assignment-${a.id}`}>
+                                  <Trash2 className="h-4 w-4 text-destructive" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Eliminare questa assegnazione?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Questa azione non può essere annullata.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Annulla</AlertDialogCancel>
+                                  <AlertDialogAction onClick={() => deleteMutation.mutate(a.id)}>
+                                    Elimina
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </div>
+                        </TableCell>
+                      )}
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </motion.div>
   );
 }
 
@@ -917,10 +1078,10 @@ function PaymentsSection({ isAdmin }: { isAdmin: boolean }) {
     return e?.name || "N/D";
   };
 
-  const statusLabels: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
-    pending: { label: "In attesa", variant: "secondary" },
-    paid: { label: "Pagato", variant: "default" },
-    cancelled: { label: "Annullato", variant: "destructive" },
+  const statusConfig: Record<string, { label: string; color: string; bgColor: string }> = {
+    pending: { label: "In attesa", color: "text-amber-400", bgColor: "bg-amber-500/20" },
+    paid: { label: "Pagato", color: "text-teal", bgColor: "bg-teal-500/20" },
+    cancelled: { label: "Annullato", color: "text-rose-400", bgColor: "bg-rose-500/20" },
   };
 
   const methodLabels: Record<string, string> = {
@@ -929,22 +1090,37 @@ function PaymentsSection({ isAdmin }: { isAdmin: boolean }) {
     other: "Altro",
   };
 
+  const totalPaid = payments.filter(p => p.status === "paid").reduce((sum, p) => sum + parseFloat(p.amount || "0"), 0);
+  const totalPending = payments.filter(p => p.status === "pending").reduce((sum, p) => sum + parseFloat(p.amount || "0"), 0);
+
   if (isLoading) {
-    return <div className="text-center py-8">Caricamento...</div>;
+    return (
+      <div className="glass-card p-8">
+        <Skeleton className="h-10 w-full mb-4" />
+        <Skeleton className="h-64 w-full" />
+      </div>
+    );
   }
 
   return (
-    <Card>
-      <CardHeader>
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.2 }}
+      className="glass-card overflow-hidden"
+    >
+      <div className="p-5 border-b border-white/10">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div>
-            <CardTitle className="flex items-center gap-2">
-              <Wallet className="h-5 w-5" />
-              Pagamenti Personale
-            </CardTitle>
-            <CardDescription>
-              Gestione dei pagamenti e compensi
-            </CardDescription>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center">
+              <Wallet className="h-5 w-5 text-white" />
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold">Pagamenti Personale</h2>
+              <p className="text-sm text-muted-foreground">
+                Gestione dei pagamenti e compensi
+              </p>
+            </div>
           </div>
           {isAdmin && (
             <Dialog open={isDialogOpen} onOpenChange={(open) => {
@@ -952,7 +1128,7 @@ function PaymentsSection({ isAdmin }: { isAdmin: boolean }) {
               if (!open) setEditingPayment(null);
             }}>
               <DialogTrigger asChild>
-                <Button data-testid="button-add-payment">
+                <Button className="gradient-golden text-black font-semibold" data-testid="button-add-payment">
                   <Plus className="h-4 w-4 mr-2" />
                   Nuovo Pagamento
                 </Button>
@@ -1053,7 +1229,7 @@ function PaymentsSection({ isAdmin }: { isAdmin: boolean }) {
                     />
                   </div>
                   <DialogFooter>
-                    <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending} data-testid="button-save-payment">
+                    <Button type="submit" className="gradient-golden text-black font-semibold" disabled={createMutation.isPending || updateMutation.isPending} data-testid="button-save-payment">
                       {editingPayment ? "Aggiorna" : "Crea"}
                     </Button>
                   </DialogFooter>
@@ -1062,8 +1238,8 @@ function PaymentsSection({ isAdmin }: { isAdmin: boolean }) {
             </Dialog>
           )}
         </div>
-      </CardHeader>
-      <CardContent>
+      </div>
+      <div className="p-5">
         <div className="mb-4">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -1078,14 +1254,15 @@ function PaymentsSection({ isAdmin }: { isAdmin: boolean }) {
         </div>
 
         {payments.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground">
-            {searchTerm ? "Nessun risultato trovato" : "Nessun pagamento registrato"}
+          <div className="text-center py-12 text-muted-foreground">
+            <Wallet className="h-12 w-12 mx-auto mb-4 opacity-50" />
+            <p>{searchTerm ? "Nessun risultato trovato" : "Nessun pagamento registrato"}</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
-                <TableRow>
+                <TableRow className="border-white/10">
                   <TableHead>Personale</TableHead>
                   <TableHead>Evento</TableHead>
                   <TableHead className="text-right">Importo</TableHead>
@@ -1096,102 +1273,119 @@ function PaymentsSection({ isAdmin }: { isAdmin: boolean }) {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {payments.map((p) => (
-                  <TableRow key={p.id} data-testid={`row-payment-${p.id}`}>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <User className="h-4 w-4 text-muted-foreground" />
-                        {getStaffName(p.staffId)}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1">
-                        <Calendar className="h-3 w-3 text-muted-foreground" />
-                        {getEventName(p.eventId)}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right font-medium">
-                      €{parseFloat(p.amount).toFixed(2)}
-                    </TableCell>
-                    <TableCell>
-                      {p.paymentMethod ? (
-                        <Badge variant="outline">{methodLabels[p.paymentMethod] || p.paymentMethod}</Badge>
-                      ) : (
-                        <span className="text-muted-foreground">-</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={statusLabels[p.status]?.variant || "secondary"}>
-                        {statusLabels[p.status]?.label || p.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      {p.paymentDate ? (
-                        format(new Date(p.paymentDate), "dd/MM/yyyy", { locale: it })
-                      ) : (
-                        <span className="text-muted-foreground">-</span>
-                      )}
-                    </TableCell>
-                    {isAdmin && (
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-1">
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            onClick={() => {
-                              setEditingPayment(p);
-                              setIsDialogOpen(true);
-                            }}
-                            data-testid={`button-edit-payment-${p.id}`}
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button size="icon" variant="ghost" data-testid={`button-delete-payment-${p.id}`}>
-                                <Trash2 className="h-4 w-4 text-destructive" />
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Eliminare questo pagamento?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Questa azione non può essere annullata.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Annulla</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => deleteMutation.mutate(p.id)}>
-                                  Elimina
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
+                {payments.map((p) => {
+                  const status = statusConfig[p.status] || statusConfig.pending;
+                  return (
+                    <TableRow key={p.id} className="border-white/10" data-testid={`row-payment-${p.id}`}>
+                      <TableCell>
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-amber-500/20 to-orange-600/20 flex items-center justify-center">
+                            <User className="h-4 w-4 text-amber-400" />
+                          </div>
+                          {getStaffName(p.staffId)}
                         </div>
                       </TableCell>
-                    )}
-                  </TableRow>
-                ))}
+                      <TableCell>
+                        <div className="flex items-center gap-1">
+                          <Calendar className="h-3 w-3 text-muted-foreground" />
+                          {getEventName(p.eventId)}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right font-semibold">
+                        €{parseFloat(p.amount).toFixed(2)}
+                      </TableCell>
+                      <TableCell>
+                        {p.paymentMethod ? (
+                          <Badge variant="outline" className="border-white/10">{methodLabels[p.paymentMethod] || p.paymentMethod}</Badge>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium ${status.bgColor} ${status.color}`}>
+                          {status.label}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        {p.paymentDate ? (
+                          format(new Date(p.paymentDate), "dd/MM/yyyy", { locale: it })
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
+                      {isAdmin && (
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-1">
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => {
+                                setEditingPayment(p);
+                                setIsDialogOpen(true);
+                              }}
+                              data-testid={`button-edit-payment-${p.id}`}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button size="icon" variant="ghost" data-testid={`button-delete-payment-${p.id}`}>
+                                  <Trash2 className="h-4 w-4 text-destructive" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Eliminare questo pagamento?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Questa azione non può essere annullata.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Annulla</AlertDialogCancel>
+                                  <AlertDialogAction onClick={() => deleteMutation.mutate(p.id)}>
+                                    Elimina
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </div>
+                        </TableCell>
+                      )}
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </div>
         )}
 
-        <div className="mt-4 pt-4 border-t">
-          <div className="flex justify-between items-center">
-            <span className="text-muted-foreground">Totale pagamenti:</span>
-            <span className="text-lg font-bold">
-              €{payments.reduce((sum, p) => sum + parseFloat(p.amount), 0).toFixed(2)}
-            </span>
-          </div>
-          <div className="flex justify-between items-center text-sm">
-            <span className="text-muted-foreground">In attesa:</span>
-            <span className="text-orange-600">
-              €{payments.filter(p => p.status === 'pending').reduce((sum, p) => sum + parseFloat(p.amount), 0).toFixed(2)}
-            </span>
+        <div className="mt-6 pt-4 border-t border-white/10">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="glass-card p-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-teal-500 to-cyan-600 flex items-center justify-center">
+                  <TrendingUp className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Totale Pagato</p>
+                  <p className="text-xl font-bold text-teal" data-testid="text-total-paid">€{totalPaid.toFixed(2)}</p>
+                </div>
+              </div>
+            </div>
+            <div className="glass-card p-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center">
+                  <Euro className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">In Attesa</p>
+                  <p className="text-xl font-bold text-amber-400" data-testid="text-total-pending">€{totalPending.toFixed(2)}</p>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </motion.div>
   );
 }

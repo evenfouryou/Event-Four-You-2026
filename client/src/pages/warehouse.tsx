@@ -1,10 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog,
@@ -41,11 +40,12 @@ import {
 } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Warehouse as WarehouseIcon, TrendingUp, TrendingDown, Package, AlertTriangle, X, ListPlus, ArrowLeft, Pencil } from "lucide-react";
+import { Plus, Warehouse as WarehouseIcon, TrendingUp, TrendingDown, Package, AlertTriangle, X, ListPlus, ArrowLeft, Pencil, BoxesIcon, Activity } from "lucide-react";
 import { Link } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { motion } from "framer-motion";
 import type { Product, StockMovement, Supplier, Event, User } from "@shared/schema";
 
 const loadStockSchema = z.object({
@@ -71,6 +71,49 @@ interface MultiUnloadItem {
   reason?: string;
 }
 
+function StatsCard({
+  title,
+  value,
+  icon: Icon,
+  gradient,
+  trend,
+  testId,
+  delay = 0,
+}: {
+  title: string;
+  value: string | number;
+  icon: React.ElementType;
+  gradient: string;
+  trend?: string;
+  testId: string;
+  delay?: number;
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3, delay }}
+      className="glass-card p-5"
+    >
+      <div className="flex items-start justify-between mb-3">
+        <div className={`w-11 h-11 rounded-2xl bg-gradient-to-br ${gradient} flex items-center justify-center`}>
+          <Icon className="h-5 w-5 text-white" />
+        </div>
+        {trend && (
+          <span className="text-xs text-teal flex items-center gap-1">
+            <TrendingUp className="h-3 w-3" />
+            {trend}
+          </span>
+        )}
+      </div>
+      <p className="text-2xl font-bold mb-1" data-testid={testId}>
+        {value}
+      </p>
+      <p className="text-xs text-muted-foreground">{title}</p>
+    </motion.div>
+  );
+}
+
 export default function Warehouse() {
   const [loadDialogOpen, setLoadDialogOpen] = useState(false);
   const [unloadDialogOpen, setUnloadDialogOpen] = useState(false);
@@ -89,6 +132,16 @@ export default function Warehouse() {
   const [adjustQuantity, setAdjustQuantity] = useState("");
   const [adjustReason, setAdjustReason] = useState("");
   const { toast } = useToast();
+
+  // Auto-open load dialog if URL contains ?action=load
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('action') === 'load') {
+      setMultiLoadDialogOpen(true);
+      // Clear the URL parameter after opening
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, []);
 
   const { data: user } = useQuery<User>({
     queryKey: ['/api/auth/user'],
@@ -160,7 +213,7 @@ export default function Warehouse() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/stock/general'] });
       queryClient.invalidateQueries({ queryKey: ['/api/stock/movements'] });
-      queryClient.invalidateQueries({ predicate: (query) => query.queryKey[0]?.toString().includes('/api/reports') });
+      queryClient.invalidateQueries({ predicate: (query) => Boolean(query.queryKey[0]?.toString().includes('/api/reports')) });
       setLoadDialogOpen(false);
       loadForm.reset();
       toast({
@@ -193,7 +246,7 @@ export default function Warehouse() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/stock/general'] });
       queryClient.invalidateQueries({ queryKey: ['/api/stock/movements'] });
-      queryClient.invalidateQueries({ predicate: (query) => query.queryKey[0]?.toString().includes('/api/reports') });
+      queryClient.invalidateQueries({ predicate: (query) => Boolean(query.queryKey[0]?.toString().includes('/api/reports')) });
       setUnloadDialogOpen(false);
       unloadForm.reset();
       toast({
@@ -226,7 +279,7 @@ export default function Warehouse() {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['/api/stock/general'] });
       queryClient.invalidateQueries({ queryKey: ['/api/stock/movements'] });
-      queryClient.invalidateQueries({ predicate: (query) => query.queryKey[0]?.toString().includes('/api/reports') });
+      queryClient.invalidateQueries({ predicate: (query) => Boolean(query.queryKey[0]?.toString().includes('/api/reports')) });
       setMultiLoadDialogOpen(false);
       setMultiLoadItems([]);
       toast({
@@ -287,7 +340,6 @@ export default function Warehouse() {
       return;
     }
 
-    // Check if all items have valid quantities
     const invalidItems = multiLoadItems.filter(item => {
       if (!item.productId || !item.quantity) return false;
       const qty = parseFloat(item.quantity);
@@ -389,8 +441,8 @@ export default function Warehouse() {
       queryClient.invalidateQueries({ queryKey: ['/api/stock/general'] });
       queryClient.invalidateQueries({ queryKey: ['/api/events', selectedEventId, 'stocks'] });
       queryClient.invalidateQueries({ queryKey: ['/api/stock/movements'] });
-      queryClient.invalidateQueries({ predicate: (query) => query.queryKey[0]?.toString().includes('/api/reports') });
-      queryClient.invalidateQueries({ predicate: (query) => query.queryKey[0]?.toString().includes('/api/events') && query.queryKey[2] === 'revenue-analysis' });
+      queryClient.invalidateQueries({ predicate: (query) => Boolean(query.queryKey[0]?.toString().includes('/api/reports')) });
+      queryClient.invalidateQueries({ predicate: (query) => Boolean(query.queryKey[0]?.toString().includes('/api/events') && query.queryKey[2] === 'revenue-analysis') });
       setTransferQuantities(prev => ({ ...prev, [variables.productId]: "" }));
       toast({
         title: "Trasferimento completato",
@@ -427,8 +479,8 @@ export default function Warehouse() {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['/api/events', selectedEventId, 'stocks'] });
       queryClient.invalidateQueries({ queryKey: ['/api/stock/movements'] });
-      queryClient.invalidateQueries({ predicate: (query) => query.queryKey[0]?.toString().includes('/api/reports') });
-      queryClient.invalidateQueries({ predicate: (query) => query.queryKey[0]?.toString().includes('/api/events') && query.queryKey[2] === 'revenue-analysis' });
+      queryClient.invalidateQueries({ predicate: (query) => Boolean(query.queryKey[0]?.toString().includes('/api/reports')) });
+      queryClient.invalidateQueries({ predicate: (query) => Boolean(query.queryKey[0]?.toString().includes('/api/events') && query.queryKey[2] === 'revenue-analysis') });
       setConsumeQuantities(prev => ({ ...prev, [variables.productId]: "" }));
       toast({
         title: "Scarico registrato",
@@ -460,8 +512,8 @@ export default function Warehouse() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/stock/general'] });
       queryClient.invalidateQueries({ queryKey: ['/api/stock/movements'] });
-      queryClient.invalidateQueries({ predicate: (query) => query.queryKey[0]?.toString().includes('/api/reports') });
-      queryClient.invalidateQueries({ predicate: (query) => query.queryKey[0]?.toString().includes('/api/events') && query.queryKey[2] === 'revenue-analysis' });
+      queryClient.invalidateQueries({ predicate: (query) => Boolean(query.queryKey[0]?.toString().includes('/api/reports')) });
+      queryClient.invalidateQueries({ predicate: (query) => Boolean(query.queryKey[0]?.toString().includes('/api/events') && query.queryKey[2] === 'revenue-analysis') });
       setAdjustDialogOpen(false);
       setAdjustingProduct(null);
       setAdjustQuantity("");
@@ -566,475 +618,544 @@ export default function Warehouse() {
   const productsWithGeneralStock = products?.filter(p => p.active && getGeneralStock(p.id) > 0) || [];
   const productsWithEventStock = products?.filter(p => p.active && getEventStock(p.id) > 0) || [];
 
+  const totalProducts = stocks?.length || 0;
+  const totalQuantity = stocks?.reduce((sum, s) => sum + parseFloat(s.quantity || '0'), 0) || 0;
+  const lowStockCount = stocks?.filter(s => {
+    const product = products?.find(p => p.id === s.productId);
+    return product?.minThreshold && parseFloat(s.quantity) < parseFloat(product.minThreshold);
+  }).length || 0;
+  const todayMovements = movements?.filter(m => {
+    if (!m.createdAt) return false;
+    const today = new Date();
+    const movementDate = new Date(m.createdAt);
+    return movementDate.toDateString() === today.toDateString();
+  }).length || 0;
+
   return (
-    <div className="p-6 md:p-8 max-w-7xl mx-auto">
-      <div className="flex items-center gap-4 mb-8">
-        <Button variant="ghost" size="icon" asChild>
+    <div className="p-4 md:p-8 max-w-7xl mx-auto pb-24 md:pb-8">
+      <motion.div 
+        initial={{ opacity: 0, x: -20 }}
+        animate={{ opacity: 1, x: 0 }}
+        className="flex items-center gap-4 mb-6"
+      >
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          asChild
+          className="rounded-xl"
+          data-testid="button-back"
+        >
           <Link href="/beverage">
             <ArrowLeft className="h-5 w-5" />
           </Link>
         </Button>
         <div className="flex-1">
-          <h1 className="text-2xl font-semibold mb-1">Magazzino Generale</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-xl md:text-2xl font-bold">Magazzino Generale</h1>
+          <p className="text-muted-foreground text-sm">
             Gestisci carico e scarico dell'inventario
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Dialog open={multiUnloadDialogOpen} onOpenChange={setMultiUnloadDialogOpen}>
-            <DialogTrigger asChild>
-              <Button variant="destructive" data-testid="button-multi-unload">
-                <ListPlus className="h-4 w-4 mr-2" />
-                Scarico Multiplo
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-4xl">
-              <DialogHeader>
-                <DialogTitle>Scarico Multiprodotto</DialogTitle>
-              </DialogHeader>
-              
-              <div className="space-y-4">
-                <div className="border rounded-md">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Prodotto</TableHead>
-                        <TableHead>Quantità</TableHead>
-                        <TableHead>Motivo</TableHead>
-                        <TableHead className="w-[50px]"></TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {multiUnloadItems.length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
-                            Nessun prodotto aggiunto. Clicca "+ Aggiungi Prodotto" per iniziare.
-                          </TableCell>
-                        </TableRow>
-                      ) : (
-                        multiUnloadItems.map((item) => (
-                          <TableRow key={item.id}>
-                            <TableCell>
-                              <Select
-                                value={item.productId}
-                                onValueChange={(value) => handleUpdateMultiUnloadItem(item.id, 'productId', value)}
-                              >
-                                <SelectTrigger data-testid={`select-multi-unload-product-${item.id}`}>
-                                  <SelectValue placeholder="Seleziona prodotto" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {products?.filter(p => p.id).map((product) => (
-                                    <SelectItem key={product.id} value={product.id}>
-                                      {product.name} ({product.code})
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </TableCell>
-                            <TableCell>
-                              <Input
-                                type="number"
-                                step="0.01"
-                                placeholder="0"
-                                value={item.quantity}
-                                onChange={(e) => handleUpdateMultiUnloadItem(item.id, 'quantity', e.target.value)}
-                                data-testid={`input-multi-unload-quantity-${item.id}`}
-                              />
-                            </TableCell>
-                            <TableCell>
-                              <Input
-                                placeholder="Motivo (opzionale)"
-                                value={item.reason || ''}
-                                onChange={(e) => handleUpdateMultiUnloadItem(item.id, 'reason', e.target.value)}
-                                data-testid={`input-multi-unload-reason-${item.id}`}
-                              />
-                            </TableCell>
-                            <TableCell>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleRemoveMultiUnloadItem(item.id)}
-                                data-testid={`button-remove-multi-unload-${item.id}`}
-                              >
-                                <X className="h-4 w-4" />
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        ))
-                      )}
-                    </TableBody>
-                  </Table>
-                </div>
+      </motion.div>
 
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={handleAddMultiUnloadItem}
-                  data-testid="button-add-multi-unload-product"
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Aggiungi Prodotto
-                </Button>
-              </div>
-
-              <DialogFooter>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => {
-                    setMultiUnloadDialogOpen(false);
-                    setMultiUnloadItems([]);
-                  }}
-                  data-testid="button-cancel-multi-unload"
-                >
-                  Annulla
-                </Button>
-                <Button
-                  onClick={handleSubmitBulkUnload}
-                  disabled={bulkUnloadMutation.isPending || multiUnloadItems.length === 0}
-                  data-testid="button-submit-multi-unload"
-                >
-                  {bulkUnloadMutation.isPending ? 'Scaricando...' : `Scarica ${multiUnloadItems.length > 0 ? `(${multiUnloadItems.length})` : ''}`}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-
-          <Dialog open={unloadDialogOpen} onOpenChange={setUnloadDialogOpen}>
-            <DialogTrigger asChild>
-              <Button variant="outline" data-testid="button-unload-stock">
-                <TrendingDown className="h-4 w-4 mr-2" />
-                Scarico
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Scarico Merce</DialogTitle>
-              </DialogHeader>
-              <Form {...unloadForm}>
-                <form onSubmit={unloadForm.handleSubmit((data) => unloadMutation.mutate(data))} className="space-y-4">
-                  <FormField
-                    control={unloadForm.control}
-                    name="productId"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Prodotto</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
-                          <FormControl>
-                            <SelectTrigger data-testid="select-unload-product">
-                              <SelectValue placeholder="Seleziona prodotto" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {products?.map((product) => (
-                              <SelectItem key={product.id} value={product.id}>
-                                {product.name} ({product.code})
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={unloadForm.control}
-                    name="quantity"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Quantità</FormLabel>
-                        <FormControl>
-                          <Input {...field} type="number" step="0.01" data-testid="input-unload-quantity" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={unloadForm.control}
-                    name="reason"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Motivo</FormLabel>
-                        <FormControl>
-                          <Textarea {...field} placeholder="Es. rottura, scarto, ecc." data-testid="input-unload-reason" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <DialogFooter>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => setUnloadDialogOpen(false)}
-                      data-testid="button-cancel-unload"
-                    >
-                      Annulla
-                    </Button>
-                    <Button type="submit" disabled={unloadMutation.isPending} data-testid="button-submit-unload">
-                      Scarica
-                    </Button>
-                  </DialogFooter>
-                </form>
-              </Form>
-            </DialogContent>
-          </Dialog>
-
-          <Dialog open={loadDialogOpen} onOpenChange={setLoadDialogOpen}>
-            <DialogTrigger asChild>
-              <Button data-testid="button-load-stock">
-                <TrendingUp className="h-4 w-4 mr-2" />
-                Carico
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Carico Merce</DialogTitle>
-              </DialogHeader>
-              <Form {...loadForm}>
-                <form onSubmit={loadForm.handleSubmit((data) => loadMutation.mutate(data))} className="space-y-4">
-                  <FormField
-                    control={loadForm.control}
-                    name="productId"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Prodotto</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
-                          <FormControl>
-                            <SelectTrigger data-testid="select-load-product">
-                              <SelectValue placeholder="Seleziona prodotto" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {products?.map((product) => (
-                              <SelectItem key={product.id} value={product.id}>
-                                {product.name} ({product.code})
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={loadForm.control}
-                    name="quantity"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Quantità</FormLabel>
-                        <FormControl>
-                          <Input {...field} type="number" step="0.01" data-testid="input-load-quantity" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={loadForm.control}
-                    name="supplier"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Fornitore (opzionale)</FormLabel>
-                        <FormControl>
-                          <Input {...field} data-testid="input-load-supplier" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={loadForm.control}
-                    name="reason"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Note</FormLabel>
-                        <FormControl>
-                          <Textarea {...field} placeholder="Es. fattura, DDT, ecc." data-testid="input-load-reason" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <DialogFooter>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => setLoadDialogOpen(false)}
-                      data-testid="button-cancel-load"
-                    >
-                      Annulla
-                    </Button>
-                    <Button type="submit" disabled={loadMutation.isPending} data-testid="button-submit-load">
-                      Carica
-                    </Button>
-                  </DialogFooter>
-                </form>
-              </Form>
-            </DialogContent>
-          </Dialog>
-
-          <Dialog open={multiLoadDialogOpen} onOpenChange={setMultiLoadDialogOpen}>
-            <DialogTrigger asChild>
-              <Button variant="outline" data-testid="button-multi-load">
-                <ListPlus className="h-4 w-4 mr-2" />
-                Carico Multiplo
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-4xl">
-              <DialogHeader>
-                <DialogTitle>Carico Multiprodotto</DialogTitle>
-              </DialogHeader>
-              
-              <div className="space-y-4">
-                <div className="border rounded-md">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Prodotto</TableHead>
-                        <TableHead>Quantità</TableHead>
-                        <TableHead>Fornitore</TableHead>
-                        <TableHead className="w-[50px]"></TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {multiLoadItems.length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
-                            Nessun prodotto aggiunto. Clicca "+ Aggiungi Prodotto" per iniziare.
-                          </TableCell>
-                        </TableRow>
-                      ) : (
-                        multiLoadItems.map((item) => (
-                          <TableRow key={item.id}>
-                            <TableCell>
-                              <Select
-                                value={item.productId}
-                                onValueChange={(value) => handleUpdateMultiLoadItem(item.id, 'productId', value)}
-                              >
-                                <SelectTrigger data-testid={`select-multi-product-${item.id}`}>
-                                  <SelectValue placeholder="Seleziona prodotto" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {products?.map((product) => (
-                                    <SelectItem key={product.id} value={product.id}>
-                                      {product.name} ({product.code})
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </TableCell>
-                            <TableCell>
-                              <Input
-                                type="number"
-                                step="0.01"
-                                placeholder="0"
-                                value={item.quantity}
-                                onChange={(e) => handleUpdateMultiLoadItem(item.id, 'quantity', e.target.value)}
-                                data-testid={`input-multi-quantity-${item.id}`}
-                              />
-                            </TableCell>
-                            <TableCell>
-                              <Select
-                                value={item.supplierId || ''}
-                                onValueChange={(value) => handleUpdateMultiLoadItem(item.id, 'supplierId', value)}
-                              >
-                                <SelectTrigger data-testid={`select-multi-supplier-${item.id}`}>
-                                  <SelectValue placeholder="Nessuno" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="none">Nessuno</SelectItem>
-                                  {suppliers?.map((supplier) => (
-                                    <SelectItem key={supplier.id} value={supplier.id}>
-                                      {supplier.name}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </TableCell>
-                            <TableCell>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleRemoveMultiLoadItem(item.id)}
-                                data-testid={`button-remove-${item.id}`}
-                              >
-                                <X className="h-4 w-4" />
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        ))
-                      )}
-                    </TableBody>
-                  </Table>
-                </div>
-
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={handleAddMultiLoadItem}
-                  data-testid="button-add-multi-product"
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Aggiungi Prodotto
-                </Button>
-              </div>
-
-              <DialogFooter>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => {
-                    setMultiLoadDialogOpen(false);
-                    setMultiLoadItems([]);
-                  }}
-                  data-testid="button-cancel-multi-load"
-                >
-                  Annulla
-                </Button>
-                <Button
-                  onClick={handleSubmitBulkLoad}
-                  disabled={bulkLoadMutation.isPending || multiLoadItems.length === 0}
-                  data-testid="button-submit-multi-load"
-                >
-                  {bulkLoadMutation.isPending ? 'Caricamento...' : `Carica ${multiLoadItems.length > 0 ? `(${multiLoadItems.length})` : ''}`}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        </div>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <StatsCard
+          title="Prodotti"
+          value={totalProducts}
+          icon={BoxesIcon}
+          gradient="from-blue-500 to-indigo-600"
+          testId="stat-total-products"
+          delay={0}
+        />
+        <StatsCard
+          title="Quantità Totale"
+          value={totalQuantity.toFixed(0)}
+          icon={Package}
+          gradient="from-emerald-500 to-teal-600"
+          testId="stat-total-quantity"
+          delay={0.1}
+        />
+        <StatsCard
+          title="Stock Basso"
+          value={lowStockCount}
+          icon={AlertTriangle}
+          gradient="from-amber-500 to-orange-600"
+          testId="stat-low-stock"
+          delay={0.2}
+        />
+        <StatsCard
+          title="Movimenti Oggi"
+          value={todayMovements}
+          icon={Activity}
+          gradient="from-violet-500 to-purple-600"
+          testId="stat-today-movements"
+          delay={0.3}
+        />
       </div>
 
-      <Tabs defaultValue="stocks" className="space-y-6">
-        <TabsList>
-          <TabsTrigger value="stocks" data-testid="tab-stocks">Giacenze</TabsTrigger>
-          <TabsTrigger value="event-transfer" data-testid="tab-event-transfer">Trasferimento Evento</TabsTrigger>
-          <TabsTrigger value="movements" data-testid="tab-movements">Movimenti</TabsTrigger>
-        </TabsList>
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.2 }}
+        className="flex flex-wrap gap-2 mb-6"
+      >
+        <Dialog open={multiUnloadDialogOpen} onOpenChange={setMultiUnloadDialogOpen}>
+          <DialogTrigger asChild>
+            <Button variant="destructive" data-testid="button-multi-unload">
+              <ListPlus className="h-4 w-4 mr-2" />
+              Scarico Multiplo
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-4xl">
+            <DialogHeader>
+              <DialogTitle>Scarico Multiprodotto</DialogTitle>
+            </DialogHeader>
+            
+            <div className="space-y-4">
+              <div className="border border-white/5 rounded-xl overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="border-white/5">
+                      <TableHead>Prodotto</TableHead>
+                      <TableHead>Quantità</TableHead>
+                      <TableHead>Motivo</TableHead>
+                      <TableHead className="w-[50px]"></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {multiUnloadItems.length === 0 ? (
+                      <TableRow className="border-white/5">
+                        <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
+                          Nessun prodotto aggiunto. Clicca "+ Aggiungi Prodotto" per iniziare.
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      multiUnloadItems.map((item) => (
+                        <TableRow key={item.id} className="border-white/5">
+                          <TableCell>
+                            <Select
+                              value={item.productId}
+                              onValueChange={(value) => handleUpdateMultiUnloadItem(item.id, 'productId', value)}
+                            >
+                              <SelectTrigger data-testid={`select-multi-unload-product-${item.id}`}>
+                                <SelectValue placeholder="Seleziona prodotto" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {products?.filter(p => p.id).map((product) => (
+                                  <SelectItem key={product.id} value={product.id}>
+                                    {product.name} ({product.code})
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </TableCell>
+                          <TableCell>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              placeholder="0"
+                              value={item.quantity}
+                              onChange={(e) => handleUpdateMultiUnloadItem(item.id, 'quantity', e.target.value)}
+                              data-testid={`input-multi-unload-quantity-${item.id}`}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Input
+                              placeholder="Motivo (opzionale)"
+                              value={item.reason || ''}
+                              onChange={(e) => handleUpdateMultiUnloadItem(item.id, 'reason', e.target.value)}
+                              data-testid={`input-multi-unload-reason-${item.id}`}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleRemoveMultiUnloadItem(item.id)}
+                              data-testid={`button-remove-multi-unload-${item.id}`}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
 
-        <TabsContent value="stocks" className="space-y-4">
-          <div className="flex gap-2">
-            <Input
-              placeholder="Cerca prodotto per nome o codice..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              data-testid="input-search-products"
-              className="max-w-md"
-            />
-          </div>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleAddMultiUnloadItem}
+                data-testid="button-add-multi-unload-product"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Aggiungi Prodotto
+              </Button>
+            </div>
 
-          <Card>
-            <CardContent className="p-0">
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setMultiUnloadDialogOpen(false);
+                  setMultiUnloadItems([]);
+                }}
+                data-testid="button-cancel-multi-unload"
+              >
+                Annulla
+              </Button>
+              <Button
+                onClick={handleSubmitBulkUnload}
+                disabled={bulkUnloadMutation.isPending || multiUnloadItems.length === 0}
+                data-testid="button-submit-multi-unload"
+              >
+                {bulkUnloadMutation.isPending ? 'Scaricando...' : `Scarica ${multiUnloadItems.length > 0 ? `(${multiUnloadItems.length})` : ''}`}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={unloadDialogOpen} onOpenChange={setUnloadDialogOpen}>
+          <DialogTrigger asChild>
+            <Button variant="outline" data-testid="button-unload-stock">
+              <TrendingDown className="h-4 w-4 mr-2" />
+              Scarico
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Scarico Merce</DialogTitle>
+            </DialogHeader>
+            <Form {...unloadForm}>
+              <form onSubmit={unloadForm.handleSubmit((data) => unloadMutation.mutate(data))} className="space-y-4">
+                <FormField
+                  control={unloadForm.control}
+                  name="productId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Prodotto</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-unload-product">
+                            <SelectValue placeholder="Seleziona prodotto" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {products?.map((product) => (
+                            <SelectItem key={product.id} value={product.id}>
+                              {product.name} ({product.code})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={unloadForm.control}
+                  name="quantity"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Quantità</FormLabel>
+                      <FormControl>
+                        <Input {...field} type="number" step="0.01" data-testid="input-unload-quantity" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={unloadForm.control}
+                  name="reason"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Motivo</FormLabel>
+                      <FormControl>
+                        <Textarea {...field} placeholder="Es. rottura, scarto, ecc." data-testid="input-unload-reason" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <DialogFooter>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setUnloadDialogOpen(false)}
+                    data-testid="button-cancel-unload"
+                  >
+                    Annulla
+                  </Button>
+                  <Button type="submit" disabled={unloadMutation.isPending} data-testid="button-submit-unload">
+                    Scarica
+                  </Button>
+                </DialogFooter>
+              </form>
+            </Form>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={loadDialogOpen} onOpenChange={setLoadDialogOpen}>
+          <DialogTrigger asChild>
+            <Button className="gradient-golden text-black font-semibold glow-golden" data-testid="button-load-stock">
+              <TrendingUp className="h-4 w-4 mr-2" />
+              Carico
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Carico Merce</DialogTitle>
+            </DialogHeader>
+            <Form {...loadForm}>
+              <form onSubmit={loadForm.handleSubmit((data) => loadMutation.mutate(data))} className="space-y-4">
+                <FormField
+                  control={loadForm.control}
+                  name="productId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Prodotto</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-load-product">
+                            <SelectValue placeholder="Seleziona prodotto" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {products?.map((product) => (
+                            <SelectItem key={product.id} value={product.id}>
+                              {product.name} ({product.code})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={loadForm.control}
+                  name="quantity"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Quantità</FormLabel>
+                      <FormControl>
+                        <Input {...field} type="number" step="0.01" data-testid="input-load-quantity" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={loadForm.control}
+                  name="supplier"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Fornitore (opzionale)</FormLabel>
+                      <FormControl>
+                        <Input {...field} data-testid="input-load-supplier" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={loadForm.control}
+                  name="reason"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Note</FormLabel>
+                      <FormControl>
+                        <Textarea {...field} placeholder="Es. fattura, DDT, ecc." data-testid="input-load-reason" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <DialogFooter>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setLoadDialogOpen(false)}
+                    data-testid="button-cancel-load"
+                  >
+                    Annulla
+                  </Button>
+                  <Button type="submit" disabled={loadMutation.isPending} className="gradient-golden text-black font-semibold" data-testid="button-submit-load">
+                    Carica
+                  </Button>
+                </DialogFooter>
+              </form>
+            </Form>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={multiLoadDialogOpen} onOpenChange={setMultiLoadDialogOpen}>
+          <DialogTrigger asChild>
+            <Button variant="outline" data-testid="button-multi-load">
+              <ListPlus className="h-4 w-4 mr-2" />
+              Carico Multiplo
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-4xl">
+            <DialogHeader>
+              <DialogTitle>Carico Multiprodotto</DialogTitle>
+            </DialogHeader>
+            
+            <div className="space-y-4">
+              <div className="border border-white/5 rounded-xl overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="border-white/5">
+                      <TableHead>Prodotto</TableHead>
+                      <TableHead>Quantità</TableHead>
+                      <TableHead>Fornitore</TableHead>
+                      <TableHead className="w-[50px]"></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {multiLoadItems.length === 0 ? (
+                      <TableRow className="border-white/5">
+                        <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
+                          Nessun prodotto aggiunto. Clicca "+ Aggiungi Prodotto" per iniziare.
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      multiLoadItems.map((item) => (
+                        <TableRow key={item.id} className="border-white/5">
+                          <TableCell>
+                            <Select
+                              value={item.productId}
+                              onValueChange={(value) => handleUpdateMultiLoadItem(item.id, 'productId', value)}
+                            >
+                              <SelectTrigger data-testid={`select-multi-product-${item.id}`}>
+                                <SelectValue placeholder="Seleziona prodotto" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {products?.map((product) => (
+                                  <SelectItem key={product.id} value={product.id}>
+                                    {product.name} ({product.code})
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </TableCell>
+                          <TableCell>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              placeholder="0"
+                              value={item.quantity}
+                              onChange={(e) => handleUpdateMultiLoadItem(item.id, 'quantity', e.target.value)}
+                              data-testid={`input-multi-quantity-${item.id}`}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Select
+                              value={item.supplierId || ''}
+                              onValueChange={(value) => handleUpdateMultiLoadItem(item.id, 'supplierId', value)}
+                            >
+                              <SelectTrigger data-testid={`select-multi-supplier-${item.id}`}>
+                                <SelectValue placeholder="Nessuno" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="none">Nessuno</SelectItem>
+                                {suppliers?.map((supplier) => (
+                                  <SelectItem key={supplier.id} value={supplier.id}>
+                                    {supplier.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </TableCell>
+                          <TableCell>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleRemoveMultiLoadItem(item.id)}
+                              data-testid={`button-remove-${item.id}`}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleAddMultiLoadItem}
+                data-testid="button-add-multi-product"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Aggiungi Prodotto
+              </Button>
+            </div>
+
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setMultiLoadDialogOpen(false);
+                  setMultiLoadItems([]);
+                }}
+                data-testid="button-cancel-multi-load"
+              >
+                Annulla
+              </Button>
+              <Button
+                onClick={handleSubmitBulkLoad}
+                disabled={bulkLoadMutation.isPending || multiLoadItems.length === 0}
+                className="gradient-golden text-black font-semibold"
+                data-testid="button-submit-multi-load"
+              >
+                {bulkLoadMutation.isPending ? 'Caricamento...' : `Carica ${multiLoadItems.length > 0 ? `(${multiLoadItems.length})` : ''}`}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </motion.div>
+
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.3 }}
+      >
+        <Tabs defaultValue="stocks" className="space-y-6">
+          <TabsList className="glass-card p-1">
+            <TabsTrigger value="stocks" data-testid="tab-stocks">Giacenze</TabsTrigger>
+            <TabsTrigger value="event-transfer" data-testid="tab-event-transfer">Trasferimento Evento</TabsTrigger>
+            <TabsTrigger value="movements" data-testid="tab-movements">Movimenti</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="stocks" className="space-y-4">
+            <div className="flex gap-2">
+              <Input
+                placeholder="Cerca prodotto per nome o codice..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                data-testid="input-search-products"
+                className="max-w-md"
+              />
+            </div>
+
+            <div className="glass-card overflow-hidden">
               {stocksLoading ? (
                 <div className="p-6">
                   <Skeleton className="h-96" />
@@ -1042,7 +1163,7 @@ export default function Warehouse() {
               ) : stocks && stocks.length > 0 ? (
                 <Table>
                   <TableHeader>
-                    <TableRow>
+                    <TableRow className="border-white/5">
                       <TableHead>Codice</TableHead>
                       <TableHead>Prodotto</TableHead>
                       <TableHead className="text-right">Quantità</TableHead>
@@ -1063,19 +1184,21 @@ export default function Warehouse() {
                         const product = products?.find(p => p.id === stock.productId);
                         const isLowStock = product?.minThreshold && parseFloat(stock.quantity) < parseFloat(product.minThreshold);
                         return (
-                          <TableRow key={stock.productId} data-testid={`stock-row-${stock.productId}`}>
-                            <TableCell className="font-mono">{stock.productCode}</TableCell>
+                          <TableRow key={stock.productId} className="border-white/5" data-testid={`stock-row-${stock.productId}`}>
+                            <TableCell className="font-mono text-muted-foreground">{stock.productCode}</TableCell>
                             <TableCell className="font-medium">{stock.productName}</TableCell>
                             <TableCell className="text-right font-semibold tabular-nums">
                               {parseFloat(stock.quantity).toFixed(2)}
                             </TableCell>
-                            <TableCell>{stock.unitOfMeasure}</TableCell>
+                            <TableCell className="text-muted-foreground">{stock.unitOfMeasure}</TableCell>
                             <TableCell>
-                              {isLowStock && (
-                                <Badge variant="destructive" data-testid={`badge-low-stock-${stock.productId}`}>
-                                  <AlertTriangle className="h-3 w-3 mr-1" />
+                              {isLowStock ? (
+                                <Badge variant="destructive" className="gap-1" data-testid={`badge-low-stock-${stock.productId}`}>
+                                  <AlertTriangle className="h-3 w-3" />
                                   Stock Basso
                                 </Badge>
+                              ) : (
+                                <span className="text-teal text-sm font-medium">OK</span>
                               )}
                             </TableCell>
                             {canAdjustStock && (
@@ -1097,198 +1220,211 @@ export default function Warehouse() {
                 </Table>
               ) : (
                 <div className="p-12 text-center">
-                  <Package className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+                  <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center mx-auto mb-4">
+                    <Package className="h-8 w-8 text-white" />
+                  </div>
                   <p className="text-muted-foreground">Nessuna giacenza presente</p>
                 </div>
               )}
-            </CardContent>
-          </Card>
-        </TabsContent>
+            </div>
+          </TabsContent>
 
-        <TabsContent value="event-transfer" className="space-y-4">
-          <div className="space-y-4">
-            <div className="flex items-center gap-4">
-              <Select value={selectedEventId} onValueChange={setSelectedEventId}>
-                <SelectTrigger className="w-[300px]" data-testid="select-event">
-                  <SelectValue placeholder="Seleziona evento" />
+          <TabsContent value="event-transfer" className="space-y-4">
+            <div className="space-y-4">
+              <div className="flex items-center gap-4">
+                <Select value={selectedEventId} onValueChange={setSelectedEventId}>
+                  <SelectTrigger className="w-[300px]" data-testid="select-event">
+                    <SelectValue placeholder="Seleziona evento" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {activeEvents.map(event => (
+                      <SelectItem key={event.id} value={event.id}>
+                        <span className="flex items-center gap-2">
+                          {event.name}
+                          <span className={event.status === 'ongoing' ? 'text-teal' : 'text-muted-foreground'}>
+                            ({event.status === 'ongoing' ? 'In corso' : 'Programmato'})
+                          </span>
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {!selectedEventId ? (
+                <div className="glass-card p-12 text-center">
+                  <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center mx-auto mb-4">
+                    <Package className="h-8 w-8 text-white" />
+                  </div>
+                  <p className="text-muted-foreground">Seleziona un evento per gestire i trasferimenti</p>
+                </div>
+              ) : (
+                <div className="grid md:grid-cols-2 gap-6">
+                  <div className="glass-card overflow-hidden">
+                    <div className="p-5 border-b border-white/5">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center">
+                          <TrendingUp className="h-5 w-5 text-white" />
+                        </div>
+                        <div>
+                          <h3 className="font-semibold">Trasferisci a Evento</h3>
+                          <p className="text-sm text-muted-foreground">
+                            Sposta prodotti dal magazzino generale all'evento
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="p-0">
+                      {productsWithGeneralStock.length === 0 ? (
+                        <div className="p-8 text-center">
+                          <Package className="h-10 w-10 text-muted-foreground mx-auto mb-2" />
+                          <p className="text-muted-foreground">Nessun prodotto disponibile in magazzino</p>
+                        </div>
+                      ) : (
+                        <div className="divide-y divide-white/5 max-h-[400px] overflow-y-auto">
+                          {productsWithGeneralStock.map((product) => {
+                            const generalStock = getGeneralStock(product.id);
+                            return (
+                              <div 
+                                key={product.id} 
+                                className="flex items-center gap-3 p-4 hover:bg-white/5 transition-colors"
+                                data-testid={`transfer-row-${product.id}`}
+                              >
+                                <div className="flex-1 min-w-0">
+                                  <div className="font-medium truncate">{product.name}</div>
+                                  <div className="text-xs text-muted-foreground">{product.code}</div>
+                                </div>
+                                
+                                <div className="text-right text-sm shrink-0">
+                                  <div className="text-muted-foreground">Disponibile</div>
+                                  <div className="font-semibold text-teal">{generalStock.toFixed(1)}</div>
+                                </div>
+                                
+                                <div className="flex items-center gap-2 shrink-0">
+                                  <Input
+                                    type="number"
+                                    min="0"
+                                    step="1"
+                                    placeholder="Qtà"
+                                    value={transferQuantities[product.id] || ""}
+                                    onChange={(e) => setTransferQuantities(prev => ({ ...prev, [product.id]: e.target.value }))}
+                                    className="w-20 h-9 text-center"
+                                    data-testid={`input-transfer-${product.id}`}
+                                  />
+                                  <Button
+                                    size="sm"
+                                    onClick={() => handleTransferToEvent(product.id)}
+                                    disabled={transferToEventMutation.isPending}
+                                    className="gradient-golden text-black h-9"
+                                    data-testid={`button-transfer-${product.id}`}
+                                  >
+                                    <Plus className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="glass-card overflow-hidden">
+                    <div className="p-5 border-b border-white/5">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-orange-500 to-red-600 flex items-center justify-center">
+                          <TrendingDown className="h-5 w-5 text-white" />
+                        </div>
+                        <div>
+                          <h3 className="font-semibold">Scarica da Evento</h3>
+                          <p className="text-sm text-muted-foreground">
+                            Registra il consumo dei prodotti nell'evento
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="p-0">
+                      {productsWithEventStock.length === 0 ? (
+                        <div className="p-8 text-center">
+                          <Package className="h-10 w-10 text-muted-foreground mx-auto mb-2" />
+                          <p className="text-muted-foreground">Nessun prodotto trasferito all'evento</p>
+                        </div>
+                      ) : (
+                        <div className="divide-y divide-white/5 max-h-[400px] overflow-y-auto">
+                          {productsWithEventStock.map((product) => {
+                            const eventStock = getEventStock(product.id);
+                            return (
+                              <div 
+                                key={product.id} 
+                                className="flex items-center gap-3 p-4 hover:bg-white/5 transition-colors"
+                                data-testid={`consume-row-${product.id}`}
+                              >
+                                <div className="flex-1 min-w-0">
+                                  <div className="font-medium truncate">{product.name}</div>
+                                  <div className="text-xs text-muted-foreground">{product.code}</div>
+                                </div>
+                                
+                                <div className="text-right text-sm shrink-0">
+                                  <div className="text-muted-foreground">Nell'evento</div>
+                                  <div className="font-semibold text-amber-500">{eventStock.toFixed(1)}</div>
+                                </div>
+                                
+                                <div className="flex items-center gap-2 shrink-0">
+                                  <Input
+                                    type="number"
+                                    min="0"
+                                    step="1"
+                                    placeholder="Qtà"
+                                    value={consumeQuantities[product.id] || ""}
+                                    onChange={(e) => setConsumeQuantities(prev => ({ ...prev, [product.id]: e.target.value }))}
+                                    className="w-20 h-9 text-center"
+                                    data-testid={`input-consume-${product.id}`}
+                                  />
+                                  <Button
+                                    size="sm"
+                                    variant="destructive"
+                                    onClick={() => handleConsumeFromEvent(product.id)}
+                                    disabled={consumeFromEventMutation.isPending}
+                                    className="h-9"
+                                    data-testid={`button-consume-${product.id}`}
+                                  >
+                                    <TrendingDown className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="movements" className="space-y-4">
+            <div className="flex flex-wrap gap-2">
+              <Input
+                placeholder="Cerca prodotto, fornitore o motivo..."
+                value={movementSearchQuery}
+                onChange={(e) => setMovementSearchQuery(e.target.value)}
+                data-testid="input-search-movements"
+                className="max-w-md"
+              />
+              <Select value={movementTypeFilter} onValueChange={setMovementTypeFilter}>
+                <SelectTrigger className="w-[180px]" data-testid="select-movement-type">
+                  <SelectValue placeholder="Tipo movimento" />
                 </SelectTrigger>
                 <SelectContent>
-                  {activeEvents.map(event => (
-                    <SelectItem key={event.id} value={event.id}>
-                      {event.name} ({event.status === 'ongoing' ? 'In corso' : 'Programmato'})
-                    </SelectItem>
-                  ))}
+                  <SelectItem value="all">Tutti</SelectItem>
+                  <SelectItem value="LOAD">Carico</SelectItem>
+                  <SelectItem value="UNLOAD">Scarico</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
-            {!selectedEventId ? (
-              <Card>
-                <CardContent className="p-12 text-center">
-                  <Package className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
-                  <p className="text-muted-foreground">Seleziona un evento per gestire i trasferimenti</p>
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="grid md:grid-cols-2 gap-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-lg">
-                      <TrendingUp className="h-5 w-5 text-green-600" />
-                      Trasferisci a Evento
-                    </CardTitle>
-                    <p className="text-sm text-muted-foreground">
-                      Sposta prodotti dal magazzino generale all'evento
-                    </p>
-                  </CardHeader>
-                  <CardContent className="p-0">
-                    {productsWithGeneralStock.length === 0 ? (
-                      <div className="p-8 text-center">
-                        <Package className="h-10 w-10 text-muted-foreground mx-auto mb-2" />
-                        <p className="text-muted-foreground">Nessun prodotto disponibile in magazzino</p>
-                      </div>
-                    ) : (
-                      <div className="divide-y max-h-[400px] overflow-y-auto">
-                        {productsWithGeneralStock.map((product) => {
-                          const generalStock = getGeneralStock(product.id);
-                          return (
-                            <div 
-                              key={product.id} 
-                              className="flex items-center gap-3 p-4 hover:bg-muted/50"
-                              data-testid={`transfer-row-${product.id}`}
-                            >
-                              <div className="flex-1 min-w-0">
-                                <div className="font-medium truncate">{product.name}</div>
-                                <div className="text-xs text-muted-foreground">{product.code}</div>
-                              </div>
-                              
-                              <div className="text-right text-sm shrink-0">
-                                <div className="text-muted-foreground">Disponibile</div>
-                                <div className="font-semibold text-green-600">{generalStock.toFixed(1)}</div>
-                              </div>
-                              
-                              <div className="flex items-center gap-2 shrink-0">
-                                <Input
-                                  type="number"
-                                  min="0"
-                                  step="1"
-                                  placeholder="Qtà"
-                                  value={transferQuantities[product.id] || ""}
-                                  onChange={(e) => setTransferQuantities(prev => ({ ...prev, [product.id]: e.target.value }))}
-                                  className="w-20 h-9 text-center"
-                                  data-testid={`input-transfer-${product.id}`}
-                                />
-                                <Button
-                                  size="sm"
-                                  onClick={() => handleTransferToEvent(product.id)}
-                                  disabled={transferToEventMutation.isPending}
-                                  className="bg-green-600 hover:bg-green-700 h-9"
-                                  data-testid={`button-transfer-${product.id}`}
-                                >
-                                  <Plus className="h-4 w-4" />
-                                </Button>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-lg">
-                      <TrendingDown className="h-5 w-5 text-orange-500" />
-                      Scarica da Evento
-                    </CardTitle>
-                    <p className="text-sm text-muted-foreground">
-                      Registra il consumo dei prodotti nell'evento
-                    </p>
-                  </CardHeader>
-                  <CardContent className="p-0">
-                    {productsWithEventStock.length === 0 ? (
-                      <div className="p-8 text-center">
-                        <Package className="h-10 w-10 text-muted-foreground mx-auto mb-2" />
-                        <p className="text-muted-foreground">Nessun prodotto trasferito all'evento</p>
-                      </div>
-                    ) : (
-                      <div className="divide-y max-h-[400px] overflow-y-auto">
-                        {productsWithEventStock.map((product) => {
-                          const eventStock = getEventStock(product.id);
-                          return (
-                            <div 
-                              key={product.id} 
-                              className="flex items-center gap-3 p-4 hover:bg-muted/50"
-                              data-testid={`consume-row-${product.id}`}
-                            >
-                              <div className="flex-1 min-w-0">
-                                <div className="font-medium truncate">{product.name}</div>
-                                <div className="text-xs text-muted-foreground">{product.code}</div>
-                              </div>
-                              
-                              <div className="text-right text-sm shrink-0">
-                                <div className="text-muted-foreground">Nell'evento</div>
-                                <div className="font-semibold text-orange-500">{eventStock.toFixed(1)}</div>
-                              </div>
-                              
-                              <div className="flex items-center gap-2 shrink-0">
-                                <Input
-                                  type="number"
-                                  min="0"
-                                  step="1"
-                                  placeholder="Qtà"
-                                  value={consumeQuantities[product.id] || ""}
-                                  onChange={(e) => setConsumeQuantities(prev => ({ ...prev, [product.id]: e.target.value }))}
-                                  className="w-20 h-9 text-center"
-                                  data-testid={`input-consume-${product.id}`}
-                                />
-                                <Button
-                                  size="sm"
-                                  variant="destructive"
-                                  onClick={() => handleConsumeFromEvent(product.id)}
-                                  disabled={consumeFromEventMutation.isPending}
-                                  className="h-9"
-                                  data-testid={`button-consume-${product.id}`}
-                                >
-                                  <TrendingDown className="h-4 w-4" />
-                                </Button>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </div>
-            )}
-          </div>
-        </TabsContent>
-
-        <TabsContent value="movements" className="space-y-4">
-          <div className="flex gap-2">
-            <Input
-              placeholder="Cerca prodotto, fornitore o motivo..."
-              value={movementSearchQuery}
-              onChange={(e) => setMovementSearchQuery(e.target.value)}
-              data-testid="input-search-movements"
-              className="max-w-md"
-            />
-            <Select value={movementTypeFilter} onValueChange={setMovementTypeFilter}>
-              <SelectTrigger className="w-[180px]" data-testid="select-movement-type">
-                <SelectValue placeholder="Tipo movimento" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Tutti</SelectItem>
-                <SelectItem value="LOAD">Carico</SelectItem>
-                <SelectItem value="UNLOAD">Scarico</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <Card>
-            <CardContent className="p-0">
+            <div className="glass-card overflow-hidden">
               {movementsLoading ? (
                 <div className="p-6">
                   <Skeleton className="h-96" />
@@ -1296,7 +1432,7 @@ export default function Warehouse() {
               ) : movements && movements.length > 0 ? (
                 <Table>
                   <TableHeader>
-                    <TableRow>
+                    <TableRow className="border-white/5">
                       <TableHead>Data</TableHead>
                       <TableHead>Prodotto</TableHead>
                       <TableHead>Tipo</TableHead>
@@ -1308,11 +1444,9 @@ export default function Warehouse() {
                   <TableBody>
                     {movements
                       .filter(movement => {
-                        // Filter by type
                         if (movementTypeFilter !== 'all' && movement.type !== movementTypeFilter) {
                           return false;
                         }
-                        // Filter by search query
                         if (movementSearchQuery) {
                           const query = movementSearchQuery.toLowerCase();
                           const product = products?.find(p => p.id === movement.productId);
@@ -1331,23 +1465,26 @@ export default function Warehouse() {
                       .map((movement) => {
                         const product = products?.find(p => p.id === movement.productId);
                         return (
-                          <TableRow key={movement.id} data-testid={`movement-row-${movement.id}`}>
-                            <TableCell>
-                              {new Date(movement.createdAt).toLocaleString('it-IT')}
+                          <TableRow key={movement.id} className="border-white/5" data-testid={`movement-row-${movement.id}`}>
+                            <TableCell className="text-muted-foreground">
+                              {movement.createdAt ? new Date(movement.createdAt).toLocaleString('it-IT') : '-'}
                             </TableCell>
                             <TableCell>
                               <div className="font-medium">{product?.name || 'Sconosciuto'}</div>
                               <div className="text-xs text-muted-foreground font-mono">{product?.code || '-'}</div>
                             </TableCell>
                             <TableCell>
-                              <Badge variant={movement.type === 'LOAD' ? 'secondary' : 'outline'}>
+                              <Badge 
+                                variant={movement.type === 'LOAD' ? 'secondary' : 'outline'}
+                                className={movement.type === 'LOAD' ? 'bg-teal-500/20 text-teal border-teal-500/30' : ''}
+                              >
                                 {movement.type === 'LOAD' ? 'Carico' : 'Scarico'}
                               </Badge>
                             </TableCell>
-                            <TableCell className="font-semibold tabular-nums">
+                            <TableCell className={`font-semibold tabular-nums ${movement.type === 'LOAD' ? 'text-teal' : 'text-amber-500'}`}>
                               {movement.type === 'LOAD' ? '+' : '-'}{parseFloat(movement.quantity).toFixed(2)}
                             </TableCell>
-                            <TableCell className="text-sm">
+                            <TableCell className="text-sm text-muted-foreground">
                               {movement.supplier || '-'}
                             </TableCell>
                             <TableCell className="text-sm text-muted-foreground">
@@ -1360,16 +1497,17 @@ export default function Warehouse() {
                 </Table>
               ) : (
                 <div className="p-12 text-center">
-                  <WarehouseIcon className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+                  <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center mx-auto mb-4">
+                    <WarehouseIcon className="h-8 w-8 text-white" />
+                  </div>
                   <p className="text-muted-foreground">Nessun movimento registrato</p>
                 </div>
               )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+            </div>
+          </TabsContent>
+        </Tabs>
+      </motion.div>
 
-      {/* Dialog per correzione quantità */}
       <Dialog open={adjustDialogOpen} onOpenChange={setAdjustDialogOpen}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
@@ -1417,6 +1555,7 @@ export default function Warehouse() {
             <Button
               onClick={handleAdjustStock}
               disabled={adjustStockMutation.isPending}
+              className="gradient-golden text-black font-semibold"
               data-testid="button-confirm-adjust"
             >
               {adjustStockMutation.isPending ? 'Salvataggio...' : 'Salva'}

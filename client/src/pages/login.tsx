@@ -2,13 +2,12 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle, Mail } from "lucide-react";
+import { AlertCircle, Mail, Sparkles, ArrowLeft } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { ThemeToggle } from "@/components/theme-toggle";
+import { motion } from "framer-motion";
 
 export default function Login() {
   const [, setLocation] = useLocation();
@@ -31,7 +30,6 @@ export default function Login() {
       window.location.href = '/';
     } catch (err: any) {
       setError(err.message || "Credenziali non valide");
-      // Show resend verification option if email not verified
       if (err.message && err.message.includes("non verificata")) {
         setShowResendVerification(true);
       }
@@ -61,57 +59,93 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
-      <header className="border-b">
-        <div className="container mx-auto px-4 md:px-6 py-3 md:py-4 flex items-center justify-between gap-2">
-          <Link href="/">
-            <img 
-              src="/logo.png" 
-              alt="EventFourYou" 
-              className="h-8 md:h-10 w-auto cursor-pointer"
-            />
-          </Link>
-          <div className="flex items-center gap-2 md:gap-3">
-            <ThemeToggle />
-            <Button variant="outline" size="sm" asChild className="hidden md:inline-flex" data-testid="button-back-home">
-              <Link href="/">Home</Link>
-            </Button>
-            <Button size="sm" asChild data-testid="button-register">
-              <Link href="/register">Registrati</Link>
-            </Button>
-          </div>
-        </div>
-      </header>
+    <div className="min-h-screen bg-background flex flex-col relative overflow-hidden">
+      {/* Animated background */}
+      <div className="fixed inset-0 pointer-events-none">
+        <motion.div 
+          className="absolute top-0 left-0 w-[500px] h-[500px] rounded-full opacity-20"
+          style={{ background: "radial-gradient(circle, rgba(255,215,0,0.2) 0%, transparent 70%)" }}
+          animate={{ 
+            x: [0, 30, 0],
+            y: [0, -20, 0],
+          }}
+          transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
+        />
+        <motion.div 
+          className="absolute bottom-0 right-0 w-[600px] h-[600px] rounded-full opacity-15"
+          style={{ background: "radial-gradient(circle, rgba(0,206,209,0.2) 0%, transparent 70%)" }}
+          animate={{ 
+            x: [0, -20, 0],
+            y: [0, 30, 0],
+          }}
+          transition={{ duration: 15, repeat: Infinity, ease: "easeInOut" }}
+        />
+      </div>
 
-      <main className="flex-1 flex items-center justify-center p-4 md:p-6">
-        <Card className="w-full max-w-md">
-          <CardHeader>
-            <CardTitle>Accedi</CardTitle>
-            <CardDescription>
-              Inserisci le tue credenziali per accedere al sistema
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
+      {/* Header */}
+      <motion.header 
+        initial={{ y: -20, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ duration: 0.4 }}
+        className="p-4 md:p-6 relative z-10"
+      >
+        <div className="container mx-auto flex items-center justify-between">
+          <Link href="/">
+            <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground hover:text-foreground" data-testid="button-back-home">
+              <ArrowLeft className="h-4 w-4" />
+              <span className="hidden sm:inline">Torna alla Home</span>
+            </Button>
+          </Link>
+          <Link href="/" className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-yellow-400 to-amber-500 flex items-center justify-center">
+              <Sparkles className="h-4 w-4 text-black" />
+            </div>
+            <span className="text-lg font-bold hidden sm:block">
+              Event<span className="text-primary">4</span>U
+            </span>
+          </Link>
+        </div>
+      </motion.header>
+
+      {/* Main content */}
+      <main className="flex-1 flex items-center justify-center p-4 md:p-6 relative z-10">
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="w-full max-w-md"
+        >
+          <div className="glass-card p-8">
+            {/* Header */}
+            <div className="text-center mb-8">
+              <h1 className="text-2xl md:text-3xl font-bold mb-2">Bentornato</h1>
+              <p className="text-muted-foreground">
+                Accedi al tuo account per continuare
+              </p>
+            </div>
+
+            {/* Form */}
+            <form onSubmit={handleSubmit} className="space-y-5">
               {error && (
-                <Alert variant="destructive" data-testid="alert-error">
+                <Alert variant="destructive" data-testid="alert-error" className="border-destructive/50 bg-destructive/10">
                   <AlertCircle className="h-4 w-4" />
                   <AlertDescription>{error}</AlertDescription>
                 </Alert>
               )}
 
               {showResendVerification && (
-                <Alert data-testid="alert-resend-verification">
-                  <Mail className="h-4 w-4" />
+                <Alert data-testid="alert-resend-verification" className="border-primary/50 bg-primary/10">
+                  <Mail className="h-4 w-4 text-primary" />
                   <AlertDescription>
                     <div className="space-y-2">
-                      <p>La tua email non è stata ancora verificata.</p>
+                      <p className="text-sm">La tua email non è stata ancora verificata.</p>
                       <Button 
                         type="button"
                         variant="outline"
                         size="sm"
                         onClick={handleResendVerification}
                         disabled={isResending}
+                        className="border-primary/30 hover:bg-primary/10"
                         data-testid="button-resend-verification"
                       >
                         {isResending ? "Invio in corso..." : "Rinvia Email di Verifica"}
@@ -122,7 +156,7 @@ export default function Login() {
               )}
 
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email" className="text-sm font-medium">Email</Label>
                 <Input
                   id="email"
                   type="email"
@@ -130,13 +164,14 @@ export default function Login() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
+                  className="h-12 bg-background/50 border-white/10 focus:border-primary"
                   data-testid="input-email"
                 />
               </div>
 
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <Label htmlFor="password">Password</Label>
+                  <Label htmlFor="password" className="text-sm font-medium">Password</Label>
                   <Link 
                     href="/forgot-password" 
                     className="text-sm text-primary hover:underline"
@@ -152,53 +187,56 @@ export default function Login() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
+                  className="h-12 bg-background/50 border-white/10 focus:border-primary"
                   data-testid="input-password"
                 />
               </div>
 
               <Button
                 type="submit"
-                className="w-full"
+                className="w-full h-12 gradient-golden text-black font-semibold text-base"
                 disabled={isLoading}
                 data-testid="button-submit"
               >
                 {isLoading ? "Accesso in corso..." : "Accedi"}
               </Button>
 
-              <div className="relative my-4">
+              <div className="relative my-6">
                 <div className="absolute inset-0 flex items-center">
-                  <span className="w-full border-t" />
+                  <span className="w-full border-t border-white/10" />
                 </div>
                 <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-card px-2 text-muted-foreground">oppure</span>
+                  <span className="bg-card px-3 text-muted-foreground">oppure</span>
                 </div>
               </div>
 
               <Button
                 type="button"
                 variant="outline"
-                className="w-full"
+                className="w-full h-12 border-white/10 hover:bg-white/5"
                 onClick={() => window.location.href = '/api/login'}
                 data-testid="button-replit-login"
               >
+                <svg className="h-5 w-5 mr-2" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.6 0 12 0zm0 3c4.97 0 9 4.03 9 9s-4.03 9-9 9-9-4.03-9-9 4.03-9 9-9z"/>
+                </svg>
                 Accedi con Replit
               </Button>
 
-              <div className="text-center text-sm text-muted-foreground">
+              <p className="text-center text-sm text-muted-foreground pt-4">
                 Non hai un account?{" "}
-                <Link href="/register" className="text-primary hover:underline" data-testid="link-register">
-                  Registrati
+                <Link href="/register" className="text-primary hover:underline font-medium" data-testid="link-register">
+                  Registrati gratis
                 </Link>
-              </div>
+              </p>
             </form>
-          </CardContent>
-        </Card>
+          </div>
+        </motion.div>
       </main>
 
-      <footer className="border-t py-8">
-        <div className="container mx-auto px-6 text-center text-sm text-muted-foreground">
-          © {new Date().getFullYear()} Event Four You. Sistema di gestione eventi e inventario.
-        </div>
+      {/* Footer */}
+      <footer className="py-6 text-center text-sm text-muted-foreground relative z-10">
+        © {new Date().getFullYear()} Event Four You
       </footer>
     </div>
   );

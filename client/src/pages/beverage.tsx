@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useQuery } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
@@ -11,16 +10,20 @@ import {
   Package,
   AlertTriangle,
   TrendingUp,
-  Plus,
   Warehouse,
   BarChart3,
   ArrowLeft,
   MapPin,
-  Clock,
   Wine,
   Users,
   Sparkles,
+  Truck,
+  Tag,
+  ShoppingCart,
+  ArrowRight,
+  ChevronRight,
 } from "lucide-react";
+import { motion } from "framer-motion";
 import type { Event, Product, Station } from "@shared/schema";
 
 function StatsCard({
@@ -28,36 +31,72 @@ function StatsCard({
   value,
   icon: Icon,
   trend,
+  gradient,
   testId,
+  delay = 0,
 }: {
   title: string;
   value: string | number;
   icon: React.ElementType;
   trend?: string;
+  gradient: string;
   testId: string;
+  delay?: number;
 }) {
   return (
-    <Card>
-      <CardContent className="p-6">
-        <div className="flex items-start justify-between">
-          <div className="flex-1">
-            <p className="text-sm text-muted-foreground mb-1">{title}</p>
-            <p className="text-3xl font-semibold" data-testid={testId}>
-              {value}
-            </p>
-            {trend && (
-              <p className="text-sm text-muted-foreground mt-2 flex items-center gap-1">
-                <TrendingUp className="h-3 w-3" />
-                {trend}
-              </p>
-            )}
-          </div>
-          <div className="rounded-lg bg-primary/10 p-3">
-            <Icon className="h-5 w-5 text-primary" />
-          </div>
+    <motion.div 
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3, delay }}
+      className="glass-card p-5"
+    >
+      <div className="flex items-start justify-between mb-3">
+        <div className={`w-11 h-11 rounded-xl bg-gradient-to-br ${gradient} flex items-center justify-center`}>
+          <Icon className="h-5 w-5 text-white" />
         </div>
-      </CardContent>
-    </Card>
+        {trend && (
+          <span className="text-xs text-teal flex items-center gap-1">
+            <TrendingUp className="h-3 w-3" />
+            {trend}
+          </span>
+        )}
+      </div>
+      <p className="text-2xl font-bold mb-1" data-testid={testId}>
+        {value}
+      </p>
+      <p className="text-xs text-muted-foreground">{title}</p>
+    </motion.div>
+  );
+}
+
+function QuickActionCard({
+  title,
+  icon: Icon,
+  href,
+  gradient,
+  delay = 0,
+}: {
+  title: string;
+  icon: React.ElementType;
+  href: string;
+  gradient: string;
+  delay?: number;
+}) {
+  return (
+    <Link href={href}>
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.2, delay }}
+        className="glass-card p-4 flex items-center gap-3 group hover:border-primary/30 transition-all cursor-pointer"
+      >
+        <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${gradient} flex items-center justify-center group-hover:scale-110 transition-transform`}>
+          <Icon className="h-5 w-5 text-white" />
+        </div>
+        <span className="font-medium flex-1">{title}</span>
+        <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary group-hover:translate-x-1 transition-all" />
+      </motion.div>
+    </Link>
   );
 }
 
@@ -86,377 +125,352 @@ export default function Beverage() {
     enabled: !isBartender,
   });
 
-  // Fetch all stations for bartender (both event-specific and general)
   const { data: allStations, isLoading: stationsLoading } = useQuery<Station[]>({
     queryKey: ['/api/stations'],
     enabled: isBartender && !!selectedEventId,
   });
 
   const ongoingEvents = events?.filter(e => e.status === 'ongoing') || [];
-  const scheduledEvents = events?.filter(e => e.status === 'scheduled') || [];
   const lowStockProducts = generalStocks?.filter(s => Number(s.quantity) < 10) || [];
 
-  // Filter stations where the bartender is assigned (both event-specific and general stations)
   const myStations = allStations?.filter(s => 
     s.bartenderIds?.includes(user?.id || '') && 
-    (s.eventId === selectedEventId || !s.eventId) // Event stations or general stations
+    (s.eventId === selectedEventId || !s.eventId)
   ) || [];
 
   const selectedEvent = events?.find(e => e.id === selectedEventId);
 
+  // Bartender View - Station Selection
   if (isBartender) {
-    // Step 2: Show stations for selected event
     if (selectedEventId && selectedEvent) {
       return (
-        <div className="p-6 md:p-8 max-w-7xl mx-auto">
-          <div className="flex items-center gap-4 mb-8">
+        <div className="p-4 md:p-8 max-w-4xl mx-auto pb-24 md:pb-8">
+          <motion.div 
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            className="flex items-center gap-4 mb-8"
+          >
             <Button 
               variant="ghost" 
               size="icon" 
               onClick={() => setSelectedEventId(null)}
+              className="rounded-xl"
               data-testid="button-back-events"
             >
               <ArrowLeft className="h-5 w-5" />
             </Button>
             <div>
-              <h1 className="text-2xl font-semibold mb-1">{selectedEvent.name}</h1>
-              <p className="text-muted-foreground">
-                Seleziona la tua postazione
-              </p>
+              <h1 className="text-xl md:text-2xl font-bold">{selectedEvent.name}</h1>
+              <p className="text-muted-foreground text-sm">Seleziona la tua postazione</p>
             </div>
-          </div>
+          </motion.div>
 
           {stationsLoading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <Skeleton className="h-32" />
-              <Skeleton className="h-32" />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Skeleton className="h-24 rounded-2xl" />
+              <Skeleton className="h-24 rounded-2xl" />
             </div>
           ) : myStations.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {myStations.map((station) => (
-                <Card 
-                  key={station.id} 
-                  className="hover-elevate cursor-pointer"
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {myStations.map((station, index) => (
+                <motion.div
+                  key={station.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: index * 0.1 }}
                   onClick={() => setLocation(`/consumption-tracking?eventId=${selectedEventId}&stationId=${station.id}`)}
+                  className="glass-card p-5 cursor-pointer hover:border-teal/30 transition-all group"
                   data-testid={`station-card-${station.id}`}
                 >
-                  <CardContent className="p-6">
-                    <div className="flex items-center gap-4">
-                      <div className="rounded-xl bg-green-500/10 p-4">
-                        <MapPin className="h-8 w-8 text-green-500" />
-                      </div>
-                      <div>
-                        <h3 className="text-xl font-semibold">{station.name}</h3>
-                        <p className="text-sm text-muted-foreground">
-                          Postazione assegnata
-                        </p>
-                      </div>
+                  <div className="flex items-center gap-4">
+                    <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-teal-500 to-cyan-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+                      <MapPin className="h-7 w-7 text-white" />
                     </div>
-                  </CardContent>
-                </Card>
+                    <div className="flex-1">
+                      <h3 className="text-lg font-semibold">{station.name}</h3>
+                      <p className="text-sm text-muted-foreground">Postazione assegnata</p>
+                    </div>
+                    <ArrowRight className="h-5 w-5 text-muted-foreground group-hover:text-teal group-hover:translate-x-1 transition-all" />
+                  </div>
+                </motion.div>
               ))}
             </div>
-          ) : allStations && allStations.length > 0 ? (
-            <Card>
-              <CardContent className="p-12 text-center">
-                <Users className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
-                <p className="text-muted-foreground mb-2">Non sei assegnato a nessuna postazione</p>
-                <p className="text-sm text-muted-foreground">Contatta il gestore per essere assegnato</p>
-              </CardContent>
-            </Card>
           ) : (
-            <Card>
-              <CardContent className="p-12 text-center">
-                <MapPin className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
-                <p className="text-muted-foreground">Nessuna postazione configurata per questo evento</p>
-              </CardContent>
-            </Card>
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="glass-card p-12 text-center"
+            >
+              <div className="w-16 h-16 rounded-2xl bg-muted/50 flex items-center justify-center mx-auto mb-4">
+                <Users className="h-8 w-8 text-muted-foreground" />
+              </div>
+              <p className="text-muted-foreground mb-2">Non sei assegnato a nessuna postazione</p>
+              <p className="text-sm text-muted-foreground">Contatta il gestore per essere assegnato</p>
+            </motion.div>
           )}
         </div>
       );
     }
 
-    // Step 1: Show events to select
+    // Bartender Event Selection
     return (
-      <div className="p-6 md:p-8 max-w-7xl mx-auto">
-        <div className="mb-8">
-          <h1 className="text-2xl font-semibold mb-1">Ciao, {user?.firstName || 'Barista'}</h1>
-          <p className="text-muted-foreground">
-            Seleziona un evento per registrare i consumi
-          </p>
-        </div>
+      <div className="p-4 md:p-8 max-w-4xl mx-auto pb-24 md:pb-8">
+        <motion.div 
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-8"
+        >
+          <div className="flex items-center gap-3 mb-2">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center">
+              <Wine className="h-5 w-5 text-white" />
+            </div>
+            <div>
+              <h1 className="text-xl md:text-2xl font-bold">Ciao, {user?.firstName || 'Barista'}</h1>
+              <p className="text-muted-foreground text-sm">Seleziona un evento attivo</p>
+            </div>
+          </div>
+        </motion.div>
 
         {eventsLoading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <Skeleton className="h-32" />
-            <Skeleton className="h-32" />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Skeleton className="h-24 rounded-2xl" />
+            <Skeleton className="h-24 rounded-2xl" />
           </div>
         ) : ongoingEvents.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {ongoingEvents.map((event) => (
-              <Card 
-                key={event.id} 
-                className="hover-elevate cursor-pointer"
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {ongoingEvents.map((event, index) => (
+              <motion.div
+                key={event.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.1 }}
                 onClick={() => setSelectedEventId(event.id)}
+                className="glass-card p-5 cursor-pointer hover:border-primary/30 transition-all group"
                 data-testid={`event-card-${event.id}`}
               >
-                <CardContent className="p-6">
-                  <div className="flex items-center gap-4">
-                    <div className="rounded-xl bg-primary/10 p-4">
-                      <Wine className="h-8 w-8 text-primary" />
-                    </div>
-                    <div>
-                      <h3 className="text-xl font-semibold">{event.name}</h3>
-                      <p className="text-sm text-muted-foreground">
-                        {new Date(event.startDatetime).toLocaleDateString('it-IT')}
-                      </p>
-                    </div>
+                <div className="flex items-center gap-4">
+                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary to-amber-600 flex items-center justify-center group-hover:scale-110 transition-transform glow-golden">
+                    <Wine className="h-7 w-7 text-black" />
                   </div>
-                </CardContent>
-              </Card>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="w-2 h-2 rounded-full bg-teal animate-pulse" />
+                      <span className="text-xs text-teal font-medium">In Corso</span>
+                    </div>
+                    <h3 className="text-lg font-semibold">{event.name}</h3>
+                    <p className="text-sm text-muted-foreground">
+                      {new Date(event.startDatetime).toLocaleDateString('it-IT')}
+                    </p>
+                  </div>
+                  <ArrowRight className="h-5 w-5 text-muted-foreground group-hover:text-primary group-hover:translate-x-1 transition-all" />
+                </div>
+              </motion.div>
             ))}
           </div>
         ) : (
-          <Card>
-            <CardContent className="p-12 text-center">
-              <Calendar className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
-              <p className="text-muted-foreground">Nessun evento attivo al momento</p>
-            </CardContent>
-          </Card>
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="glass-card p-12 text-center"
+          >
+            <div className="w-16 h-16 rounded-2xl bg-muted/50 flex items-center justify-center mx-auto mb-4">
+              <Calendar className="h-8 w-8 text-muted-foreground" />
+            </div>
+            <p className="text-muted-foreground">Nessun evento attivo al momento</p>
+          </motion.div>
         )}
       </div>
     );
   }
 
+  // Warehouse View
   if (isWarehouse) {
     return (
-      <div className="p-6 md:p-8 max-w-7xl mx-auto">
-        <div className="flex items-center gap-4 mb-8">
-          <Button variant="ghost" size="icon" asChild>
-            <Link href="/">
+      <div className="p-4 md:p-8 max-w-4xl mx-auto pb-24 md:pb-8">
+        <motion.div 
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex items-center gap-4 mb-8"
+        >
+          <Link href="/">
+            <Button variant="ghost" size="icon" className="rounded-xl">
               <ArrowLeft className="h-5 w-5" />
-            </Link>
-          </Button>
+            </Button>
+          </Link>
           <div>
-            <h1 className="text-2xl font-semibold mb-1">Ciao, {user?.firstName || 'Magazziniere'}</h1>
-            <p className="text-muted-foreground">
-              Gestisci il magazzino e le scorte
-            </p>
+            <h1 className="text-xl md:text-2xl font-bold">Ciao, {user?.firstName || 'Magazziniere'}</h1>
+            <p className="text-muted-foreground text-sm">Gestisci il magazzino e le scorte</p>
           </div>
-        </div>
+        </motion.div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+        <div className="grid grid-cols-2 gap-4 mb-6">
           <StatsCard
             title="Prodotti in Magazzino"
             value={products?.length || 0}
             icon={Package}
+            gradient="from-blue-500 to-indigo-600"
             testId="stat-products"
+            delay={0.1}
           />
           <StatsCard
             title="Scorte Basse"
             value={lowStockProducts.length}
             icon={AlertTriangle}
+            gradient="from-amber-500 to-orange-600"
             testId="stat-low-stock"
+            delay={0.2}
           />
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <Link href="/warehouse">
-            <Card className="hover-elevate cursor-pointer h-full">
-              <CardContent className="p-6">
-                <div className="flex items-center gap-4">
-                  <div className="rounded-xl bg-blue-500 p-4">
-                    <Package className="h-8 w-8 text-white" />
-                  </div>
-                  <div>
-                    <h3 className="text-xl font-semibold">Magazzino</h3>
-                    <p className="text-muted-foreground text-sm">Gestisci le scorte</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </Link>
-          <Link href="/products">
-            <Card className="hover-elevate cursor-pointer h-full">
-              <CardContent className="p-6">
-                <div className="flex items-center gap-4">
-                  <div className="rounded-xl bg-green-500 p-4">
-                    <Wine className="h-8 w-8 text-white" />
-                  </div>
-                  <div>
-                    <h3 className="text-xl font-semibold">Prodotti</h3>
-                    <p className="text-muted-foreground text-sm">Catalogo prodotti</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </Link>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <QuickActionCard title="Magazzino" icon={Warehouse} href="/warehouse" gradient="from-blue-500 to-indigo-600" delay={0.3} />
+          <QuickActionCard title="Prodotti" icon={Wine} href="/products" gradient="from-emerald-500 to-teal-600" delay={0.4} />
         </div>
       </div>
     );
   }
 
+  // Admin/Gestore View
   return (
-    <div className="p-6 md:p-8 max-w-7xl mx-auto">
-      <div className="flex items-center gap-4 mb-8">
-        <Button variant="ghost" size="icon" asChild>
-          <Link href="/">
+    <div className="p-4 md:p-8 max-w-6xl mx-auto pb-24 md:pb-8">
+      {/* Header */}
+      <motion.div 
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="flex items-center gap-4 mb-8"
+      >
+        <Link href="/">
+          <Button variant="ghost" size="icon" className="rounded-xl">
             <ArrowLeft className="h-5 w-5" />
-          </Link>
-        </Button>
-        <div className="flex-1">
-          <h1 className="text-2xl font-semibold mb-1 flex items-center gap-2">
-            <Wine className="h-6 w-6 text-purple-500" />
-            Beverage
-          </h1>
-          <p className="text-muted-foreground">
-            Gestione magazzino, prodotti e consumi
-          </p>
+          </Button>
+        </Link>
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center glow-golden">
+            <Wine className="h-6 w-6 text-black" />
+          </div>
+          <div>
+            <h1 className="text-xl md:text-2xl font-bold">Beverage</h1>
+            <p className="text-muted-foreground text-sm">Gestione magazzino e consumi</p>
+          </div>
         </div>
-      </div>
+      </motion.div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+      {/* Stats */}
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
         {productsLoading ? (
           <>
-            <Skeleton className="h-32" />
-            <Skeleton className="h-32" />
-            <Skeleton className="h-32" />
+            <Skeleton className="h-28 rounded-2xl" />
+            <Skeleton className="h-28 rounded-2xl" />
+            <Skeleton className="h-28 rounded-2xl" />
           </>
         ) : (
           <>
             <StatsCard
-              title="Prodotti"
+              title="Prodotti Totali"
               value={products?.length || 0}
               icon={Package}
+              gradient="from-blue-500 to-indigo-600"
               testId="stat-products"
+              delay={0.1}
             />
             <StatsCard
               title="Scorte Basse"
               value={lowStockProducts.length}
               icon={AlertTriangle}
+              gradient="from-amber-500 to-orange-600"
               testId="stat-low-stock"
+              delay={0.2}
             />
             <StatsCard
               title="In Magazzino"
               value={generalStocks?.reduce((sum, s) => sum + Number(s.quantity), 0) || 0}
               icon={Warehouse}
+              gradient="from-emerald-500 to-teal-600"
               testId="stat-total-stock"
+              delay={0.3}
             />
           </>
         )}
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-        <Link href="/warehouse">
-          <Card className="hover-elevate cursor-pointer">
-            <CardContent className="p-4 flex items-center gap-3">
-              <Warehouse className="h-5 w-5 text-primary" />
-              <span className="font-medium">Magazzino</span>
-            </CardContent>
-          </Card>
-        </Link>
-        <Link href="/products">
-          <Card className="hover-elevate cursor-pointer">
-            <CardContent className="p-4 flex items-center gap-3">
-              <Package className="h-5 w-5 text-primary" />
-              <span className="font-medium">Prodotti</span>
-            </CardContent>
-          </Card>
-        </Link>
-        <Link href="/stations">
-          <Card className="hover-elevate cursor-pointer">
-            <CardContent className="p-4 flex items-center gap-3">
-              <MapPin className="h-5 w-5 text-primary" />
-              <span className="font-medium">Postazioni</span>
-            </CardContent>
-          </Card>
-        </Link>
-        <Link href="/suppliers">
-          <Card className="hover-elevate cursor-pointer">
-            <CardContent className="p-4 flex items-center gap-3">
-              <Package className="h-5 w-5 text-primary" />
-              <span className="font-medium">Fornitori</span>
-            </CardContent>
-          </Card>
-        </Link>
-        <Link href="/purchase-orders">
-          <Card className="hover-elevate cursor-pointer">
-            <CardContent className="p-4 flex items-center gap-3">
-              <Package className="h-5 w-5 text-primary" />
-              <span className="font-medium">Ordini</span>
-            </CardContent>
-          </Card>
-        </Link>
-        <Link href="/price-lists">
-          <Card className="hover-elevate cursor-pointer">
-            <CardContent className="p-4 flex items-center gap-3">
-              <Package className="h-5 w-5 text-primary" />
-              <span className="font-medium">Listini</span>
-            </CardContent>
-          </Card>
-        </Link>
-        <Link href="/reports">
-          <Card className="hover-elevate cursor-pointer">
-            <CardContent className="p-4 flex items-center gap-3">
-              <BarChart3 className="h-5 w-5 text-primary" />
-              <span className="font-medium">Report</span>
-            </CardContent>
-          </Card>
-        </Link>
-        <Link href="/ai-analysis">
-          <Card className="hover-elevate cursor-pointer">
-            <CardContent className="p-4 flex items-center gap-3">
-              <Sparkles className="h-5 w-5 text-primary" />
-              <span className="font-medium">Analisi AI</span>
-            </CardContent>
-          </Card>
-        </Link>
-      </div>
+      {/* Quick Actions */}
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.2 }}
+        className="mb-8"
+      >
+        <h2 className="text-sm font-medium text-muted-foreground mb-4 uppercase tracking-wider">Azioni Rapide</h2>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <QuickActionCard title="Magazzino" icon={Warehouse} href="/warehouse" gradient="from-blue-500 to-indigo-600" delay={0.3} />
+          <QuickActionCard title="Prodotti" icon={Package} href="/products" gradient="from-emerald-500 to-teal-600" delay={0.35} />
+          <QuickActionCard title="Postazioni" icon={MapPin} href="/stations" gradient="from-violet-500 to-purple-600" delay={0.4} />
+          <QuickActionCard title="Fornitori" icon={Truck} href="/suppliers" gradient="from-rose-500 to-pink-600" delay={0.45} />
+          <QuickActionCard title="Ordini" icon={ShoppingCart} href="/purchase-orders" gradient="from-cyan-500 to-blue-600" delay={0.5} />
+          <QuickActionCard title="Listini" icon={Tag} href="/price-lists" gradient="from-amber-500 to-orange-600" delay={0.55} />
+          <QuickActionCard title="Report" icon={BarChart3} href="/reports" gradient="from-indigo-500 to-violet-600" delay={0.6} />
+          <QuickActionCard title="Analisi AI" icon={Sparkles} href="/ai-analysis" gradient="from-primary to-amber-600" delay={0.65} />
+        </div>
+      </motion.div>
 
-      <div className="grid grid-cols-1 gap-6">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between gap-2">
-            <CardTitle>Scorte Basse</CardTitle>
-            <Button variant="outline" size="sm" asChild>
-              <Link href="/warehouse">Magazzino</Link>
-            </Button>
-          </CardHeader>
-          <CardContent>
-            {productsLoading ? (
-              <div className="space-y-3">
-                <Skeleton className="h-12" />
-                <Skeleton className="h-12" />
-                <Skeleton className="h-12" />
-              </div>
-            ) : lowStockProducts.length > 0 ? (
-              <div className="space-y-3">
-                {lowStockProducts.slice(0, 5).map((stock) => (
-                  <div
-                    key={stock.productId}
-                    className="flex items-center justify-between p-3 rounded-lg bg-orange-50 dark:bg-orange-950/20"
-                    data-testid={`low-stock-${stock.productId}`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="rounded-lg bg-orange-100 dark:bg-orange-900/50 p-2">
-                        <AlertTriangle className="h-4 w-4 text-orange-600" />
-                      </div>
-                      <p className="font-medium">{stock.productName}</p>
-                    </div>
-                    <Badge variant="outline" className="text-orange-600 border-orange-300">
-                      {Number(stock.quantity).toFixed(0)} unità
-                    </Badge>
+      {/* Low Stock Alert */}
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.4 }}
+        className="glass-card overflow-hidden"
+      >
+        <div className="p-5 border-b border-white/5 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-amber-500/20 flex items-center justify-center">
+              <AlertTriangle className="h-5 w-5 text-amber-500" />
+            </div>
+            <h2 className="font-semibold">Scorte Basse</h2>
+          </div>
+          <Button variant="ghost" size="sm" asChild className="text-muted-foreground hover:text-foreground">
+            <Link href="/warehouse">
+              Vedi tutto
+              <ArrowRight className="h-4 w-4 ml-1" />
+            </Link>
+          </Button>
+        </div>
+        <div className="p-4">
+          {productsLoading ? (
+            <div className="space-y-3">
+              <Skeleton className="h-14 rounded-xl" />
+              <Skeleton className="h-14 rounded-xl" />
+            </div>
+          ) : lowStockProducts.length > 0 ? (
+            <div className="space-y-2">
+              {lowStockProducts.slice(0, 5).map((stock, index) => (
+                <motion.div
+                  key={stock.productId}
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.5 + index * 0.1 }}
+                  className="flex items-center justify-between p-3 rounded-xl bg-amber-500/10 border border-amber-500/20"
+                  data-testid={`low-stock-${stock.productId}`}
+                >
+                  <div className="flex items-center gap-3">
+                    <Package className="h-5 w-5 text-amber-500" />
+                    <p className="font-medium">{stock.productName}</p>
                   </div>
-                ))}
+                  <Badge className="bg-amber-500/20 text-amber-400 border-amber-500/30">
+                    {Number(stock.quantity).toFixed(0)} unità
+                  </Badge>
+                </motion.div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <div className="w-12 h-12 rounded-2xl bg-teal-500/20 flex items-center justify-center mx-auto mb-3">
+                <Package className="h-6 w-6 text-teal" />
               </div>
-            ) : (
-              <div className="text-center py-8">
-                <Package className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
-                <p className="text-muted-foreground">Tutte le scorte sono ok</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+              <p className="text-muted-foreground">Tutte le scorte sono ok</p>
+            </div>
+          )}
+        </div>
+      </motion.div>
     </div>
   );
 }

@@ -1,7 +1,6 @@
 import { useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useQuery } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Link, useLocation } from "wouter";
@@ -16,52 +15,113 @@ import {
   Building2,
   FileText,
   Receipt,
+  TrendingUp,
+  Sparkles,
+  Clock,
+  CheckCircle2,
 } from "lucide-react";
+import { motion } from "framer-motion";
 import type { Company, UserFeatures } from "@shared/schema";
 
-function SectionCard({
-  title,
-  description,
-  icon: Icon,
-  href,
-  color,
-  available = true,
-}: {
+interface ModuleCardProps {
   title: string;
   description: string;
   icon: React.ElementType;
   href: string;
-  color: string;
+  gradient: string;
+  iconBg: string;
   available?: boolean;
-}) {
+  delay?: number;
+}
+
+function ModuleCard({
+  title,
+  description,
+  icon: Icon,
+  href,
+  gradient,
+  iconBg,
+  available = true,
+  delay = 0,
+}: ModuleCardProps) {
   const content = (
-    <Card className={`hover-elevate cursor-pointer h-full transition-all ${!available ? 'opacity-60' : ''}`}>
-      <CardContent className="p-8">
-        <div className="flex items-start gap-6">
-          <div className={`rounded-2xl p-5 ${color}`}>
-            <Icon className="h-10 w-10 text-white" />
-          </div>
-          <div className="flex-1">
-            <h3 className="text-2xl font-semibold mb-2">{title}</h3>
-            <p className="text-muted-foreground">{description}</p>
+    <motion.div 
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4, delay }}
+      className={`glass-card p-6 h-full transition-all duration-300 group ${
+        available 
+          ? 'hover:border-primary/30 cursor-pointer' 
+          : 'opacity-60 cursor-not-allowed'
+      }`}
+    >
+      <div className="flex items-start gap-4">
+        <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${gradient} flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform duration-300`}>
+          <Icon className="h-7 w-7 text-white" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-1">
+            <h3 className="text-lg font-semibold truncate">{title}</h3>
             {!available && (
-              <p className="text-sm text-orange-500 font-medium mt-3">Prossimamente</p>
+              <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 font-medium">
+                Soon
+              </span>
             )}
           </div>
-          <ArrowRight className="h-6 w-6 text-muted-foreground mt-2" />
+          <p className="text-sm text-muted-foreground line-clamp-2">{description}</p>
         </div>
-      </CardContent>
-    </Card>
+        {available && (
+          <ArrowRight className="h-5 w-5 text-muted-foreground group-hover:text-primary group-hover:translate-x-1 transition-all flex-shrink-0 mt-1" />
+        )}
+      </div>
+    </motion.div>
   );
 
   if (!available) {
-    return <div className="cursor-not-allowed">{content}</div>;
+    return content;
   }
 
   return (
-    <Link href={href} data-testid={`section-${title.toLowerCase()}`}>
+    <Link href={href} data-testid={`module-${title.toLowerCase().replace(/\s+/g, '-')}`}>
       {content}
     </Link>
+  );
+}
+
+function StatsCard({ 
+  icon: Icon, 
+  label, 
+  value, 
+  trend,
+  delay = 0 
+}: { 
+  icon: React.ElementType; 
+  label: string; 
+  value: string | number; 
+  trend?: string;
+  delay?: number;
+}) {
+  return (
+    <motion.div 
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ duration: 0.3, delay }}
+      className="glass-card p-5"
+    >
+      <div className="flex items-start justify-between mb-3">
+        <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+          <Icon className="h-5 w-5 text-primary" />
+        </div>
+        {trend && (
+          <span className="text-xs text-teal flex items-center gap-1">
+            <TrendingUp className="h-3 w-3" />
+            {trend}
+          </span>
+        )}
+      </div>
+      <p className="text-2xl font-bold mb-1">{value}</p>
+      <p className="text-xs text-muted-foreground">{label}</p>
+    </motion.div>
   );
 }
 
@@ -83,7 +143,6 @@ export default function Home() {
     enabled: !isSuperAdmin && !isBartender && !isWarehouse,
   });
 
-  // Redirect baristi e magazzinieri direttamente a Beverage
   useEffect(() => {
     if (isBartender || isWarehouse) {
       setLocation('/beverage');
@@ -94,103 +153,132 @@ export default function Home() {
     return null;
   }
 
+  // Super Admin Dashboard
   if (isSuperAdmin) {
     return (
-      <div className="p-6 md:p-8 max-w-7xl mx-auto">
-        <div className="flex items-center justify-between mb-8">
+      <div className="p-4 md:p-8 max-w-7xl mx-auto pb-24 md:pb-8">
+        {/* Header */}
+        <motion.div 
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8"
+        >
           <div>
-            <h1 className="text-2xl font-semibold mb-1">Benvenuto, {user?.firstName}</h1>
+            <div className="flex items-center gap-2 mb-1">
+              <div className="w-2 h-2 rounded-full bg-teal animate-pulse" />
+              <span className="text-xs text-teal font-medium">Sistema Attivo</span>
+            </div>
+            <h1 className="text-2xl md:text-3xl font-bold">
+              Ciao, {user?.firstName}
+            </h1>
             <p className="text-muted-foreground">
-              Panoramica sistema EventFourYou
+              Panoramica del sistema Event4U
             </p>
           </div>
-          <Button asChild data-testid="button-create-company">
+          <Button asChild className="gradient-golden text-black font-semibold" data-testid="button-create-company">
             <Link href="/companies">
               <Plus className="h-4 w-4 mr-2" />
               Nuova Azienda
             </Link>
           </Button>
-        </div>
+        </motion.div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        {/* Stats Grid */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           {companiesLoading ? (
             <>
-              <Skeleton className="h-32" />
-              <Skeleton className="h-32" />
+              <Skeleton className="h-32 rounded-2xl" />
+              <Skeleton className="h-32 rounded-2xl" />
+              <Skeleton className="h-32 rounded-2xl" />
+              <Skeleton className="h-32 rounded-2xl" />
             </>
           ) : (
             <>
-              <Card>
-                <CardContent className="p-6">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <p className="text-sm text-muted-foreground mb-1">Aziende Totali</p>
-                      <p className="text-3xl font-semibold" data-testid="stat-companies-total">
-                        {companies?.length || 0}
-                      </p>
-                    </div>
-                    <div className="rounded-lg bg-primary/10 p-3">
-                      <Building2 className="h-5 w-5 text-primary" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-6">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <p className="text-sm text-muted-foreground mb-1">Aziende Attive</p>
-                      <p className="text-3xl font-semibold" data-testid="stat-companies-active">
-                        {companies?.filter(c => c.active).length || 0}
-                      </p>
-                    </div>
-                    <div className="rounded-lg bg-primary/10 p-3">
-                      <Building2 className="h-5 w-5 text-primary" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+              <StatsCard 
+                icon={Building2} 
+                label="Aziende Totali" 
+                value={companies?.length || 0}
+                delay={0.1}
+              />
+              <StatsCard 
+                icon={CheckCircle2} 
+                label="Aziende Attive" 
+                value={companies?.filter(c => c.active).length || 0}
+                trend="+12%"
+                delay={0.2}
+              />
+              <StatsCard 
+                icon={Users} 
+                label="Utenti Totali" 
+                value="--"
+                delay={0.3}
+              />
+              <StatsCard 
+                icon={Calendar} 
+                label="Eventi Questo Mese" 
+                value="--"
+                delay={0.4}
+              />
             </>
           )}
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Aziende Recenti</CardTitle>
-          </CardHeader>
-          <CardContent>
+        {/* Companies List */}
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+          className="glass-card overflow-hidden"
+        >
+          <div className="p-6 border-b border-white/5">
+            <h2 className="text-lg font-semibold flex items-center gap-2">
+              <Building2 className="h-5 w-5 text-primary" />
+              Aziende Recenti
+            </h2>
+          </div>
+          <div className="p-4">
             {companiesLoading ? (
               <div className="space-y-3">
-                <Skeleton className="h-12" />
-                <Skeleton className="h-12" />
+                <Skeleton className="h-16 rounded-xl" />
+                <Skeleton className="h-16 rounded-xl" />
               </div>
             ) : companies && companies.length > 0 ? (
               <div className="space-y-2">
-                {companies.slice(0, 5).map((company) => (
-                  <div
+                {companies.slice(0, 5).map((company, index) => (
+                  <motion.div
                     key={company.id}
-                    className="flex items-center justify-between p-3 rounded-lg hover-elevate"
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.1 * index }}
+                    className="flex items-center justify-between p-4 rounded-xl bg-background/50 hover:bg-background/80 transition-colors"
                     data-testid={`company-item-${company.id}`}
                   >
-                    <div>
-                      <p className="font-medium">{company.name}</p>
-                      <p className="text-sm text-muted-foreground">{company.taxId || 'N/A'}</p>
+                    <div className="flex items-center gap-4">
+                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center">
+                        <Building2 className="h-5 w-5 text-primary" />
+                      </div>
+                      <div>
+                        <p className="font-medium">{company.name}</p>
+                        <p className="text-sm text-muted-foreground">{company.taxId || 'P.IVA non specificata'}</p>
+                      </div>
                     </div>
-                    <div className="text-sm">
-                      {company.active ? (
-                        <span className="text-green-600">Attiva</span>
-                      ) : (
-                        <span className="text-muted-foreground">Inattiva</span>
-                      )}
+                    <div className={`px-3 py-1 rounded-full text-xs font-medium ${
+                      company.active 
+                        ? 'bg-teal-500/20 text-teal' 
+                        : 'bg-muted text-muted-foreground'
+                    }`}>
+                      {company.active ? 'Attiva' : 'Inattiva'}
                     </div>
-                  </div>
+                  </motion.div>
                 ))}
               </div>
             ) : (
-              <div className="text-center py-8">
-                <Building2 className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
-                <p className="text-muted-foreground">Nessuna azienda presente</p>
-                <Button asChild className="mt-4" data-testid="button-create-first-company">
+              <div className="text-center py-12">
+                <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-4">
+                  <Building2 className="h-8 w-8 text-primary" />
+                </div>
+                <p className="text-muted-foreground mb-4">Nessuna azienda presente</p>
+                <Button asChild className="gradient-golden text-black" data-testid="button-create-first-company">
                   <Link href="/companies">
                     <Plus className="h-4 w-4 mr-2" />
                     Crea Prima Azienda
@@ -198,85 +286,184 @@ export default function Home() {
                 </Button>
               </div>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </motion.div>
       </div>
     );
   }
 
+  // Gestore/Organizer Dashboard
+  const modules = [
+    {
+      title: "Eventi",
+      description: "Crea e gestisci i tuoi eventi. Pianifica date, location e ogni dettaglio.",
+      icon: Calendar,
+      href: "/events",
+      gradient: "from-indigo-500 to-purple-600",
+      iconBg: "bg-indigo-500",
+      enabled: true,
+    },
+    {
+      title: "Beverage",
+      description: "Magazzino, postazioni e consumi. Monitora scorte e inventario.",
+      icon: Wine,
+      href: "/beverage",
+      gradient: "from-amber-500 to-orange-600",
+      iconBg: "bg-amber-500",
+      enabled: userFeatures?.beverageEnabled !== false,
+    },
+    {
+      title: "Contabilità",
+      description: "Costi fissi, extra, manutenzioni e documenti contabili.",
+      icon: Calculator,
+      href: "/accounting",
+      gradient: "from-emerald-500 to-teal-600",
+      iconBg: "bg-emerald-500",
+      enabled: userFeatures?.contabilitaEnabled === true,
+    },
+    {
+      title: "Personale",
+      description: "Anagrafica staff, assegnazioni eventi e gestione pagamenti.",
+      icon: Users,
+      href: "/personnel",
+      gradient: "from-blue-500 to-indigo-600",
+      iconBg: "bg-blue-500",
+      enabled: userFeatures?.personaleEnabled === true,
+    },
+    {
+      title: "Cassa",
+      description: "Settori, postazioni e fondi cassa. Monitora entrate e riconciliazioni.",
+      icon: Receipt,
+      href: "/cash-register",
+      gradient: "from-violet-500 to-purple-600",
+      iconBg: "bg-violet-500",
+      enabled: userFeatures?.cassaEnabled === true,
+    },
+    {
+      title: "File della Serata",
+      description: "Documento completo dell'evento con tutti i dati della serata.",
+      icon: FileText,
+      href: "/night-file",
+      gradient: "from-rose-500 to-pink-600",
+      iconBg: "bg-rose-500",
+      enabled: userFeatures?.nightFileEnabled === true,
+    },
+    {
+      title: "Analytics",
+      description: "Report avanzati, statistiche e insights per il tuo business.",
+      icon: Database,
+      href: "/analytics",
+      gradient: "from-slate-500 to-gray-600",
+      iconBg: "bg-slate-500",
+      enabled: false,
+    },
+  ];
+
+  const enabledModules = modules.filter(m => m.enabled);
+  const disabledModules = modules.filter(m => !m.enabled && m.title !== "Analytics");
+
   return (
-    <div className="p-6 md:p-8 max-w-5xl mx-auto">
-      <div className="mb-10 text-center">
-        <h1 className="text-3xl font-semibold mb-2">
-          Benvenuto, {user?.firstName || 'Gestore'}
+    <div className="p-4 md:p-8 max-w-6xl mx-auto pb-24 md:pb-8">
+      {/* Welcome Header */}
+      <motion.div 
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="text-center mb-10"
+      >
+        <motion.div
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
+          className="w-16 h-16 rounded-2xl bg-gradient-to-br from-yellow-400 to-amber-500 flex items-center justify-center mx-auto mb-4 glow-golden"
+        >
+          <Sparkles className="h-8 w-8 text-black" />
+        </motion.div>
+        <h1 className="text-2xl md:text-3xl font-bold mb-2">
+          Ciao, {user?.firstName || 'Gestore'}
         </h1>
-        <p className="text-muted-foreground text-lg">
-          Seleziona una sezione per iniziare
+        <p className="text-muted-foreground">
+          Seleziona un modulo per iniziare
         </p>
+      </motion.div>
+
+      {/* Quick Stats */}
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.1 }}
+        className="glass-card p-4 mb-8 flex items-center justify-around"
+      >
+        <div className="text-center px-4">
+          <div className="flex items-center justify-center gap-1 text-teal mb-1">
+            <Clock className="h-4 w-4" />
+            <span className="text-lg font-bold">0</span>
+          </div>
+          <p className="text-xs text-muted-foreground">Eventi Oggi</p>
+        </div>
+        <div className="w-px h-10 bg-white/10" />
+        <div className="text-center px-4">
+          <div className="flex items-center justify-center gap-1 text-primary mb-1">
+            <Calendar className="h-4 w-4" />
+            <span className="text-lg font-bold">0</span>
+          </div>
+          <p className="text-xs text-muted-foreground">Questa Settimana</p>
+        </div>
+        <div className="w-px h-10 bg-white/10" />
+        <div className="text-center px-4">
+          <div className="flex items-center justify-center gap-1 text-amber-400 mb-1">
+            <Wine className="h-4 w-4" />
+            <span className="text-lg font-bold">0</span>
+          </div>
+          <p className="text-xs text-muted-foreground">Prodotti</p>
+        </div>
+      </motion.div>
+
+      {/* Modules Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+        {enabledModules.map((module, index) => (
+          <ModuleCard
+            key={module.title}
+            {...module}
+            available={true}
+            delay={0.1 + index * 0.1}
+          />
+        ))}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <SectionCard
-          title="Eventi"
-          description="Crea e gestisci i tuoi eventi. Pianifica date, location e organizza ogni dettaglio della serata."
-          icon={Calendar}
-          href="/events"
-          color="bg-indigo-500"
-        />
-        {(userFeatures?.beverageEnabled !== false) && (
-          <SectionCard
-            title="Beverage"
-            description="Magazzino, postazioni e consumi. Monitora le scorte e gestisci l'inventario delle bevande."
-            icon={Wine}
-            href="/beverage"
-            color="bg-purple-500"
-          />
-        )}
-        {(userFeatures?.contabilitaEnabled === true) && (
-          <SectionCard
-            title="Contabilità"
-            description="Costi fissi, costi extra, manutenzioni e documenti contabili. Gestione completa della contabilità aziendale."
-            icon={Calculator}
-            href="/accounting"
-            color="bg-emerald-500"
-          />
-        )}
-        {(userFeatures?.personaleEnabled === true) && (
-          <SectionCard
-            title="Personale"
-            description="Anagrafica staff, assegnazioni agli eventi e gestione pagamenti. Organizza il tuo team efficacemente."
-            icon={Users}
-            href="/personnel"
-            color="bg-blue-500"
-          />
-        )}
-        {(userFeatures?.cassaEnabled === true) && (
-          <SectionCard
-            title="Cassa"
-            description="Gestione settori, postazioni e fondi cassa per ogni evento. Monitora entrate e riconciliazioni."
-            icon={Receipt}
-            href="/cash-register"
-            color="bg-amber-500"
-          />
-        )}
-        {(userFeatures?.nightFileEnabled === true) && (
-          <SectionCard
-            title="File della Serata"
-            description="Documento completo dell'evento. Compila cassa, incassi, personale e costi per ogni serata."
-            icon={FileText}
-            href="/night-file"
-            color="bg-rose-500"
-          />
-        )}
-        <SectionCard
-          title="Dati"
-          description="Analytics avanzati, report e statistiche. Ottieni insights per migliorare il tuo business."
-          icon={Database}
-          href="/data"
-          color="bg-slate-500"
-          available={false}
-        />
-      </div>
+      {/* Coming Soon Section */}
+      {disabledModules.length > 0 && (
+        <motion.div 
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.5 }}
+        >
+          <p className="text-sm text-muted-foreground mb-4 flex items-center gap-2">
+            <span className="w-8 h-px bg-white/10" />
+            Altri moduli disponibili
+            <span className="flex-1 h-px bg-white/10" />
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {disabledModules.map((module, index) => (
+              <ModuleCard
+                key={module.title}
+                {...module}
+                available={false}
+                delay={0.6 + index * 0.1}
+              />
+            ))}
+            <ModuleCard
+              title="Analytics"
+              description="Report avanzati, statistiche e insights per il tuo business."
+              icon={Database}
+              href="/analytics"
+              gradient="from-slate-500 to-gray-600"
+              iconBg="bg-slate-500"
+              available={false}
+              delay={0.7}
+            />
+          </div>
+        </motion.div>
+      )}
     </div>
   );
 }

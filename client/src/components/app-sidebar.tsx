@@ -10,13 +10,14 @@ import {
   Settings,
   LogOut,
   ShoppingCart,
-  DollarSign,
-  Upload,
-  FileText,
-  PackageOpen,
   Home,
   Sparkles,
-  Tag,
+  Wine,
+  Calculator,
+  UserCheck,
+  Receipt,
+  FileText,
+  ChevronRight,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import {
@@ -32,8 +33,8 @@ import {
 } from "@/components/ui/sidebar";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/hooks/useAuth";
+import { cn } from "@/lib/utils";
 
 export function AppSidebar() {
   const [location] = useLocation();
@@ -51,7 +52,7 @@ export function AppSidebar() {
   if (isSuperAdmin) {
     menuItems.push(
       {
-        title: "Analytics",
+        title: "Dashboard",
         icon: BarChart3,
         url: "/super-admin",
         group: "Sistema",
@@ -77,25 +78,50 @@ export function AppSidebar() {
         title: "Home",
         icon: Home,
         url: "/",
-        group: "Menu",
+        group: "Bacheca",
       },
       {
         title: "Beverage",
-        icon: Package,
+        icon: Wine,
         url: "/beverage",
-        group: "Menu",
+        group: "Moduli",
+        accent: true,
+      },
+      {
+        title: "Contabilità",
+        icon: Calculator,
+        url: "/accounting",
+        group: "Moduli",
+      },
+      {
+        title: "Personale",
+        icon: UserCheck,
+        url: "/personnel",
+        group: "Moduli",
+      },
+      {
+        title: "Cassa",
+        icon: Receipt,
+        url: "/cash-register",
+        group: "Moduli",
+      },
+      {
+        title: "File Serata",
+        icon: FileText,
+        url: "/night-file",
+        group: "Moduli",
       },
       {
         title: "Location",
         icon: MapPin,
         url: "/locations",
-        group: "Menu",
+        group: "Gestione",
       },
       {
         title: "Utenti",
         icon: Users,
         url: "/users",
-        group: "Menu",
+        group: "Gestione",
       }
     );
   }
@@ -113,12 +139,7 @@ export function AppSidebar() {
         icon: Calendar,
         url: "/events",
         group: "Generale",
-      }
-    );
-  }
-
-  if (isWarehouse) {
-    menuItems.push(
+      },
       {
         title: "Prodotti",
         icon: Package,
@@ -168,7 +189,7 @@ export function AppSidebar() {
         title: "Impostazioni",
         icon: Settings,
         url: "/settings",
-        group: "Configurazione",
+        group: "Sistema",
       }
     );
   }
@@ -197,60 +218,94 @@ export function AppSidebar() {
   };
 
   return (
-    <Sidebar>
-      <SidebarContent className="p-4">
-        <div className="mb-6 flex justify-center">
-          <Link href="/">
-            <img 
-              src="/logo.png" 
-              alt="EventFourYou" 
-              className="h-10 max-w-[160px] object-contain cursor-pointer"
-            />
+    <Sidebar className="border-r border-white/5">
+      <SidebarContent className="p-4 bg-sidebar">
+        {/* Logo */}
+        <div className="mb-8 flex items-center gap-3 px-2">
+          <Link href="/" className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-yellow-400 to-amber-500 flex items-center justify-center glow-golden">
+              <Sparkles className="h-5 w-5 text-black" />
+            </div>
+            <div>
+              <span className="text-lg font-bold">
+                Event<span className="text-primary">4</span>U
+              </span>
+              <p className="text-[10px] text-muted-foreground -mt-1">Management System</p>
+            </div>
           </Link>
         </div>
 
+        {/* Menu Groups */}
         {Object.entries(groupedItems).map(([group, items]) => (
-          <SidebarGroup key={group}>
-            <SidebarGroupLabel>{group}</SidebarGroupLabel>
+          <SidebarGroup key={group} className="mb-2">
+            <SidebarGroupLabel className="text-xs uppercase tracking-wider text-muted-foreground/70 font-medium mb-2 px-2">
+              {group}
+            </SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
-                {items.map((item) => (
-                  <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton
-                      asChild
-                      data-active={location === item.url}
-                      data-testid={`link-${item.url.slice(1) || 'home'}`}
-                    >
-                      <Link href={item.url}>
-                        <item.icon className="h-4 w-4" />
-                        <span>{item.title}</span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
+                {items.map((item: any) => {
+                  const isActive = location === item.url || 
+                    (item.url !== "/" && location.startsWith(item.url));
+                  
+                  return (
+                    <SidebarMenuItem key={item.title}>
+                      <SidebarMenuButton
+                        asChild
+                        data-active={isActive}
+                        data-testid={`link-${item.url.slice(1) || 'home'}`}
+                        className={cn(
+                          "transition-all duration-200 rounded-xl mb-1",
+                          isActive && "bg-primary/10 border-l-2 border-primary"
+                        )}
+                      >
+                        <Link href={item.url} className="flex items-center gap-3">
+                          <item.icon className={cn(
+                            "h-5 w-5 transition-colors",
+                            isActive ? "text-primary" : "text-muted-foreground"
+                          )} />
+                          <span className={cn(
+                            "flex-1",
+                            isActive && "text-foreground font-medium"
+                          )}>
+                            {item.title}
+                          </span>
+                          {isActive && (
+                            <ChevronRight className="h-4 w-4 text-primary" />
+                          )}
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  );
+                })}
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
         ))}
       </SidebarContent>
 
-      <SidebarFooter className="p-4">
-        <Separator className="mb-4" />
-        <div className="flex items-center gap-3 mb-4">
-          <Avatar className="h-9 w-9">
-            <AvatarImage src={user.profileImageUrl || undefined} style={{ objectFit: 'cover' }} />
-            <AvatarFallback>{initials}</AvatarFallback>
-          </Avatar>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium truncate">{displayName}</p>
-            <p className="text-xs text-muted-foreground truncate">
-              {roleLabels[user.role] || user.role}
-            </p>
+      <SidebarFooter className="p-4 border-t border-white/5">
+        {/* User Profile Card */}
+        <div className="glass rounded-xl p-3 mb-3">
+          <div className="flex items-center gap-3">
+            <Avatar className="h-10 w-10 ring-2 ring-primary/20">
+              <AvatarImage src={user.profileImageUrl || undefined} style={{ objectFit: 'cover' }} />
+              <AvatarFallback className="bg-primary/10 text-primary font-semibold">
+                {initials}
+              </AvatarFallback>
+            </Avatar>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium truncate">{displayName}</p>
+              <p className="text-xs text-muted-foreground truncate">
+                {roleLabels[user.role] || user.role}
+              </p>
+            </div>
           </div>
         </div>
+
+        {/* Logout Button */}
         <Button
-          variant="outline"
-          className="w-full justify-start"
+          variant="ghost"
+          className="w-full justify-start text-muted-foreground hover:text-foreground hover:bg-destructive/10"
           onClick={async () => {
             try {
               await fetch('/api/logout');
@@ -262,7 +317,7 @@ export function AppSidebar() {
           }}
           data-testid="button-logout"
         >
-          <LogOut className="h-4 w-4 mr-2" />
+          <LogOut className="h-4 w-4 mr-3" />
           Esci
         </Button>
       </SidebarFooter>

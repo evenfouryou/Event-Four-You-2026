@@ -1,12 +1,11 @@
 import { useState } from "react";
-import { useParams, Link } from "wouter";
+import { useParams, Link, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -45,7 +44,22 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ArrowLeft, Plus, Users, Package, Warehouse, AlertTriangle, CheckCircle2, Circle } from "lucide-react";
+import { 
+  ArrowLeft, 
+  Plus, 
+  Users, 
+  Package, 
+  Warehouse, 
+  AlertTriangle, 
+  CheckCircle2, 
+  Circle, 
+  Calendar, 
+  Clock, 
+  FilePenLine, 
+  CalendarCheck,
+  MapPin
+} from "lucide-react";
+import { motion } from "framer-motion";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -61,8 +75,50 @@ type TransferResult = {
   failed: { productId: string; productName: string; error: string }[];
 };
 
+const statusConfig: Record<string, { label: string; color: string; bgColor: string; icon: React.ElementType }> = {
+  draft: { label: 'Bozza', color: 'text-muted-foreground', bgColor: 'bg-muted/50', icon: FilePenLine },
+  scheduled: { label: 'Programmato', color: 'text-blue-400', bgColor: 'bg-blue-500/20', icon: CalendarCheck },
+  ongoing: { label: 'In Corso', color: 'text-teal', bgColor: 'bg-teal-500/20', icon: Clock },
+  closed: { label: 'Chiuso', color: 'text-rose-400', bgColor: 'bg-rose-500/20', icon: CheckCircle2 },
+};
+
+function StatsCard({
+  title,
+  value,
+  icon: Icon,
+  gradient,
+  testId,
+  delay = 0,
+}: {
+  title: string;
+  value: string | number;
+  icon: React.ElementType;
+  gradient: string;
+  testId: string;
+  delay?: number;
+}) {
+  return (
+    <motion.div 
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3, delay }}
+      className="glass-card p-5"
+      data-testid={testId}
+    >
+      <div className="flex items-start justify-between mb-3">
+        <div className={`w-11 h-11 rounded-2xl bg-gradient-to-br ${gradient} flex items-center justify-center`}>
+          <Icon className="h-5 w-5 text-white" />
+        </div>
+      </div>
+      <p className="text-2xl font-bold mb-1">{value}</p>
+      <p className="text-xs text-muted-foreground">{title}</p>
+    </motion.div>
+  );
+}
+
 export default function EventDetail() {
   const { id } = useParams();
+  const [, setLocation] = useLocation();
   const [stationDialogOpen, setStationDialogOpen] = useState(false);
   const [transferDialogOpen, setTransferDialogOpen] = useState(false);
   const [statusChangeDialogOpen, setStatusChangeDialogOpen] = useState(false);
@@ -237,8 +293,8 @@ export default function EventDetail() {
       queryClient.invalidateQueries({ queryKey: ['/api/stock/general'] });
       queryClient.invalidateQueries({ queryKey: ['/api/events', id, 'stocks'] });
       queryClient.invalidateQueries({ queryKey: ['/api/stock/movements'] });
-      queryClient.invalidateQueries({ predicate: (query) => query.queryKey[0]?.toString().includes('/api/reports') });
-      queryClient.invalidateQueries({ predicate: (query) => query.queryKey[0]?.toString().includes('/api/events') && query.queryKey[2] === 'revenue-analysis' });
+      queryClient.invalidateQueries({ predicate: (query) => Boolean(query.queryKey[0]?.toString().includes('/api/reports')) });
+      queryClient.invalidateQueries({ predicate: (query) => Boolean(query.queryKey[0]?.toString().includes('/api/events') && query.queryKey[2] === 'revenue-analysis') });
       setTransferDialogOpen(false);
       setSelectedProducts(new Map());
       setDestinationStationId('general');
@@ -379,7 +435,6 @@ export default function EventDetail() {
     transferStockMutation.mutate(transfers);
   };
 
-  // Filter only fixed (general) stations that are not deleted
   const fixedStations = (generalStations || []).filter(s => !s.eventId && !s.deletedAt);
   
   const allStations = [
@@ -389,212 +444,280 @@ export default function EventDetail() {
 
   if (eventLoading) {
     return (
-      <div className="p-6 md:p-8 max-w-7xl mx-auto">
-        <Skeleton className="h-96" />
+      <div className="p-4 md:p-8 max-w-7xl mx-auto pb-24 md:pb-8">
+        <Skeleton className="h-12 w-32 mb-8 rounded-xl" />
+        <Skeleton className="h-48 rounded-2xl mb-6" />
+        <Skeleton className="h-64 rounded-2xl" />
       </div>
     );
   }
 
   if (!event) {
     return (
-      <div className="p-6 md:p-8 max-w-7xl mx-auto">
-        <Card>
-          <CardContent className="p-12 text-center">
-            <p className="text-muted-foreground">Evento non trovato</p>
-          </CardContent>
-        </Card>
+      <div className="p-4 md:p-8 max-w-7xl mx-auto pb-24 md:pb-8">
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="glass-card p-12 text-center"
+        >
+          <Package className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+          <p className="text-muted-foreground">Evento non trovato</p>
+          <Button 
+            variant="outline" 
+            className="mt-4"
+            onClick={() => setLocation('/events')}
+            data-testid="button-back-to-events"
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Torna agli Eventi
+          </Button>
+        </motion.div>
       </div>
     );
   }
 
-  const statusLabels: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
-    draft: { label: 'Bozza', variant: 'outline' },
-    scheduled: { label: 'Programmato', variant: 'secondary' },
-    ongoing: { label: 'In Corso', variant: 'default' },
-    closed: { label: 'Chiuso', variant: 'destructive' },
-  };
-  const statusInfo = statusLabels[event.status] || statusLabels.draft;
+  const status = statusConfig[event.status] || statusConfig.draft;
+  const StatusIcon = status.icon;
+
+  const totalStockItems = eventStocks?.length || 0;
+  const totalStations = allStations.length;
+  const assignedBartendersCount = new Set(allStations.flatMap(s => s.bartenderIds || [])).size;
 
   return (
-    <div className="p-6 md:p-8 max-w-7xl mx-auto">
-      <Button asChild variant="ghost" className="mb-6" data-testid="button-back">
-        <Link href="/events">
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Torna agli Eventi
-        </Link>
-      </Button>
-
-      <div className="mb-8">
-        <div className="flex items-start justify-between mb-4">
-          <div>
-            <h1 className="text-2xl font-semibold mb-2">{event.name}</h1>
-            <div className="flex items-center gap-3">
-              <Badge variant={statusInfo.variant} data-testid="badge-event-status">{statusInfo.label}</Badge>
-              <span className="text-sm text-muted-foreground">
-                {new Date(event.startDatetime).toLocaleDateString('it-IT', {
-                  day: 'numeric',
-                  month: 'long',
-                  year: 'numeric'
-                })}
-              </span>
-            </div>
+    <div className="p-4 md:p-8 max-w-7xl mx-auto pb-24 md:pb-8">
+      <motion.div 
+        initial={{ opacity: 0, x: -20 }}
+        animate={{ opacity: 1, x: 0 }}
+        className="flex items-center gap-4 mb-8"
+      >
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          onClick={() => setLocation('/events')}
+          className="rounded-xl"
+          data-testid="button-back"
+        >
+          <ArrowLeft className="h-5 w-5" />
+        </Button>
+        <div className="flex-1">
+          <h1 className="text-xl md:text-2xl font-bold">{event.name}</h1>
+          <div className="flex items-center gap-2 mt-1 flex-wrap">
+            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${status.bgColor} ${status.color}`}>
+              <StatusIcon className="h-3 w-3" />
+              {status.label}
+            </span>
+            <span className="text-sm text-muted-foreground flex items-center gap-1">
+              <Calendar className="h-3.5 w-3.5" />
+              {new Date(event.startDatetime).toLocaleDateString('it-IT', {
+                day: 'numeric',
+                month: 'short',
+                year: 'numeric'
+              })}
+            </span>
           </div>
-          <div className="flex gap-2">
-            <Button asChild variant="outline" data-testid="button-view-report">
-              <Link href={`/reports?eventId=${id}`}>
-                Report
-              </Link>
-            </Button>
+        </div>
+        <Button asChild variant="outline" data-testid="button-view-report">
+          <Link href={`/reports?eventId=${id}`}>
+            Report
+          </Link>
+        </Button>
+      </motion.div>
+
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <StatsCard
+          title="Prodotti in Evento"
+          value={totalStockItems}
+          icon={Package}
+          gradient="from-blue-500 to-indigo-600"
+          testId="stats-products"
+          delay={0.1}
+        />
+        <StatsCard
+          title="Postazioni"
+          value={totalStations}
+          icon={MapPin}
+          gradient="from-violet-500 to-purple-600"
+          testId="stats-stations"
+          delay={0.15}
+        />
+        <StatsCard
+          title="Baristi Assegnati"
+          value={assignedBartendersCount}
+          icon={Users}
+          gradient="from-teal-500 to-cyan-600"
+          testId="stats-bartenders"
+          delay={0.2}
+        />
+        <StatsCard
+          title="Orario"
+          value={new Date(event.startDatetime).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}
+          icon={Clock}
+          gradient="from-amber-500 to-orange-600"
+          testId="stats-time"
+          delay={0.25}
+        />
+      </div>
+
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.2 }}
+        className="glass-card p-6 mb-6"
+      >
+        <div className="mb-4">
+          <div className="flex items-center justify-between mb-4">
+            <span className="text-sm font-medium">Stato Evento</span>
+          </div>
+          <div className="flex items-center gap-2">
+            {[
+              { key: 'draft', label: 'Bozza' },
+              { key: 'scheduled', label: 'Programmato' },
+              { key: 'ongoing', label: 'In Corso' },
+              { key: 'closed', label: 'Chiuso' }
+            ].map((statusItem, index) => {
+              const isActive = event.status === statusItem.key;
+              const isPassed = ['draft', 'scheduled', 'ongoing', 'closed'].indexOf(event.status) > index;
+              const isCompleted = isPassed || isActive;
+
+              return (
+                <div key={statusItem.key} className="flex items-center flex-1">
+                  <div className="flex flex-col items-center gap-1 flex-1">
+                    <div 
+                      className={`flex items-center justify-center w-8 h-8 rounded-full border-2 transition-colors ${
+                        isActive 
+                          ? 'border-primary bg-primary text-primary-foreground glow-golden' 
+                          : isPassed 
+                          ? 'border-primary bg-primary text-primary-foreground' 
+                          : 'border-muted bg-background text-muted-foreground'
+                      }`}
+                      data-testid={`status-step-${statusItem.key}`}
+                    >
+                      {isCompleted ? (
+                        <CheckCircle2 className="h-4 w-4" />
+                      ) : (
+                        <Circle className="h-4 w-4" />
+                      )}
+                    </div>
+                    <span className={`text-xs text-center ${isActive ? 'font-medium text-primary' : 'text-muted-foreground'}`}>
+                      {statusItem.label}
+                    </span>
+                  </div>
+                  {index < 3 && (
+                    <div 
+                      className={`h-0.5 flex-1 mx-2 rounded-full ${
+                        isPassed ? 'bg-primary' : 'bg-muted'
+                      }`}
+                    />
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
 
-        {/* Status Stepper and Change Controls */}
-        <Card className="mb-6">
-          <CardContent className="p-6">
-            {/* Status Stepper */}
-            <div className="mb-4">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium">Stato Evento</span>
-              </div>
-              <div className="flex items-center gap-2">
-                {[
-                  { key: 'draft', label: 'Bozza' },
-                  { key: 'scheduled', label: 'Programmato' },
-                  { key: 'ongoing', label: 'In Corso' },
-                  { key: 'closed', label: 'Chiuso' }
-                ].map((status, index) => {
-                  const isActive = event.status === status.key;
-                  const isPassed = ['draft', 'scheduled', 'ongoing', 'closed'].indexOf(event.status) > index;
-                  const isCompleted = isPassed || isActive;
+        {(() => {
+          const canChangeStatus = user && (user.role === 'super_admin' || user.role === 'gestore');
+          const statusTransitions: Record<string, { next: string; label: string; description: string }> = {
+            'draft': { 
+              next: 'scheduled', 
+              label: 'Imposta come Programmato',
+              description: 'Confermi di voler impostare questo evento come Programmato?'
+            },
+            'scheduled': { 
+              next: 'ongoing', 
+              label: 'Inizia Evento',
+              description: 'Confermi di voler iniziare questo evento?'
+            },
+            'ongoing': { 
+              next: 'closed', 
+              label: 'Chiudi Evento',
+              description: 'Confermi di voler chiudere questo evento? Questa azione segna l\'evento come completato.'
+            },
+          };
 
-                  return (
-                    <div key={status.key} className="flex items-center flex-1">
-                      <div className="flex flex-col items-center gap-1 flex-1">
-                        <div 
-                          className={`flex items-center justify-center w-8 h-8 rounded-full border-2 transition-colors ${
-                            isActive 
-                              ? 'border-primary bg-primary text-primary-foreground' 
-                              : isPassed 
-                              ? 'border-primary bg-primary text-primary-foreground' 
-                              : 'border-muted bg-background text-muted-foreground'
-                          }`}
-                          data-testid={`status-step-${status.key}`}
-                        >
-                          {isCompleted ? (
-                            <CheckCircle2 className="h-4 w-4" />
-                          ) : (
-                            <Circle className="h-4 w-4" />
-                          )}
-                        </div>
-                        <span className={`text-xs text-center ${isActive ? 'font-medium' : 'text-muted-foreground'}`}>
-                          {status.label}
-                        </span>
-                      </div>
-                      {index < 3 && (
-                        <div 
-                          className={`h-0.5 flex-1 mx-2 ${
-                            isPassed ? 'bg-primary' : 'bg-muted'
-                          }`}
-                        />
-                      )}
-                    </div>
-                  );
-                })}
+          const transition = statusTransitions[event.status];
+
+          if (!transition) {
+            return (
+              <div className="text-sm text-muted-foreground flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4 text-teal" />
+                Evento completato
               </div>
+            );
+          }
+
+          if (!canChangeStatus) {
+            return (
+              <div className="text-sm text-muted-foreground">
+                Solo amministratori e gestori possono modificare lo stato dell'evento
+              </div>
+            );
+          }
+
+          return (
+            <>
+              <Button 
+                onClick={() => setStatusChangeDialogOpen(true)}
+                disabled={changeStatusMutation.isPending}
+                className="gradient-golden text-black font-semibold"
+                data-testid={`button-change-status-${transition.next}`}
+              >
+                {changeStatusMutation.isPending ? 'Aggiornamento...' : transition.label}
+              </Button>
+
+              <AlertDialog open={statusChangeDialogOpen} onOpenChange={setStatusChangeDialogOpen}>
+                <AlertDialogContent data-testid="dialog-confirm-status-change">
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Conferma Cambio Stato</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      {transition.description}
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel data-testid="button-cancel-status-change">
+                      Annulla
+                    </AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={() => changeStatusMutation.mutate(transition.next)}
+                      disabled={changeStatusMutation.isPending}
+                      className="gradient-golden text-black"
+                      data-testid="button-confirm-status-change"
+                    >
+                      Conferma
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </>
+          );
+        })()}
+      </motion.div>
+
+      {event.notes && (
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.25 }}
+          className="glass-card p-5 mb-6"
+        >
+          <h3 className="text-sm font-semibold mb-2">Note</h3>
+          <p className="text-sm text-muted-foreground">{event.notes}</p>
+        </motion.div>
+      )}
+
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.3 }}
+        className="mb-8"
+      >
+        <div className="flex items-center justify-between gap-4 mb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
+              <Package className="h-5 w-5 text-white" />
             </div>
-
-            {/* Status Change Button */}
-            {(() => {
-              const canChangeStatus = user && (user.role === 'super_admin' || user.role === 'gestore');
-              const statusTransitions: Record<string, { next: string; label: string; description: string }> = {
-                'draft': { 
-                  next: 'scheduled', 
-                  label: 'Imposta come Programmato',
-                  description: 'Confermi di voler impostare questo evento come Programmato?'
-                },
-                'scheduled': { 
-                  next: 'ongoing', 
-                  label: 'Inizia Evento',
-                  description: 'Confermi di voler iniziare questo evento?'
-                },
-                'ongoing': { 
-                  next: 'closed', 
-                  label: 'Chiudi Evento',
-                  description: 'Confermi di voler chiudere questo evento? Questa azione segna l\'evento come completato.'
-                },
-              };
-
-              const transition = statusTransitions[event.status];
-
-              if (!transition) {
-                return (
-                  <div className="text-sm text-muted-foreground">
-                    Evento chiuso - nessuna azione disponibile
-                  </div>
-                );
-              }
-
-              if (!canChangeStatus) {
-                return (
-                  <div className="text-sm text-muted-foreground">
-                    Solo amministratori e gestori possono modificare lo stato dell'evento
-                  </div>
-                );
-              }
-
-              return (
-                <>
-                  <Button 
-                    onClick={() => setStatusChangeDialogOpen(true)}
-                    disabled={changeStatusMutation.isPending}
-                    data-testid={`button-change-status-${transition.next}`}
-                  >
-                    {changeStatusMutation.isPending ? 'Aggiornamento...' : transition.label}
-                  </Button>
-
-                  <AlertDialog open={statusChangeDialogOpen} onOpenChange={setStatusChangeDialogOpen}>
-                    <AlertDialogContent data-testid="dialog-confirm-status-change">
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Conferma Cambio Stato</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          {transition.description}
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel data-testid="button-cancel-status-change">
-                          Annulla
-                        </AlertDialogCancel>
-                        <AlertDialogAction
-                          onClick={() => changeStatusMutation.mutate(transition.next)}
-                          disabled={changeStatusMutation.isPending}
-                          data-testid="button-confirm-status-change"
-                        >
-                          Conferma
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-                </>
-              );
-            })()}
-          </CardContent>
-        </Card>
-
-        {event.notes && (
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle className="text-base">Note</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">{event.notes}</p>
-            </CardContent>
-          </Card>
-        )}
-      </div>
-
-      <div className="mb-8">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-semibold">Inventario Evento</h2>
+            <h2 className="text-xl font-semibold">Inventario Evento</h2>
+          </div>
           <Dialog open={transferDialogOpen} onOpenChange={(open) => {
             setTransferDialogOpen(open);
             if (!open) {
@@ -603,14 +726,14 @@ export default function EventDetail() {
             }
           }}>
             <DialogTrigger asChild>
-              <Button data-testid="button-transfer-stock">
+              <Button className="gradient-golden text-black font-semibold" data-testid="button-transfer-stock">
                 <Warehouse className="h-4 w-4 mr-2" />
                 Trasferisci Stock
               </Button>
             </DialogTrigger>
             <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between gap-4">
                   <DialogTitle>Trasferisci Stock da Magazzino</DialogTitle>
                   {selectedProducts.size > 0 && (
                     <Badge variant="secondary" data-testid="badge-selected-products-count">
@@ -637,7 +760,10 @@ export default function EventDetail() {
                             </div>
                             {generalStations.map((station) => (
                               <SelectItem key={station.id} value={station.id} data-testid={`select-item-general-station-${station.id}`}>
-                                📍 {station.name}
+                                <span className="flex items-center gap-2">
+                                  <MapPin className="h-3 w-3" />
+                                  {station.name}
+                                </span>
                               </SelectItem>
                             ))}
                           </>
@@ -658,7 +784,7 @@ export default function EventDetail() {
                     </Select>
                   </div>
 
-                  <div className="border rounded-lg">
+                  <div className="border rounded-xl overflow-hidden">
                     <Table>
                       <TableHeader>
                         <TableRow>
@@ -734,6 +860,7 @@ export default function EventDetail() {
                     <Button
                       onClick={validateAndSubmitTransfers}
                       disabled={transferStockMutation.isPending || selectedProducts.size === 0}
+                      className="gradient-golden text-black font-semibold"
                       data-testid="button-submit-transfer"
                     >
                       {transferStockMutation.isPending ? 'Trasferimento in corso...' : 'Trasferisci Prodotti'}
@@ -742,6 +869,7 @@ export default function EventDetail() {
                 </div>
               ) : (
                 <div className="text-center py-8">
+                  <Package className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
                   <p className="text-muted-foreground mb-2">Nessun prodotto disponibile in magazzino</p>
                   <p className="text-sm text-muted-foreground">Carica prodotti nel magazzino generale prima di trasferirli</p>
                   <DialogFooter className="mt-4">
@@ -756,64 +884,86 @@ export default function EventDetail() {
         </div>
 
         {eventStocksLoading ? (
-          <Skeleton className="h-48" />
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <Skeleton className="h-32 rounded-2xl" />
+            <Skeleton className="h-32 rounded-2xl" />
+            <Skeleton className="h-32 rounded-2xl" />
+          </div>
         ) : eventStocks && eventStocks.length > 0 ? (
-          <div className="mt-6">
-            <h3 className="text-lg font-semibold mb-3">Prodotti Presenti</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {eventStocks.map((stock) => {
-                const product = products?.find(p => p.id === stock.productId);
-                const station = eventStations?.find(s => s.id === stock.stationId);
-                const quantity = parseFloat(stock.quantity);
-                const isLowStock = product?.minThreshold && !isNaN(quantity) && quantity < parseFloat(product.minThreshold);
-                
-                return (
-                  <Card key={stock.id} data-testid={`event-stock-${stock.id}`}>
-                    <CardHeader className="pb-3">
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <CardTitle className="text-base">{product?.name || 'Unknown'}</CardTitle>
-                          <p className="text-sm text-muted-foreground mt-1">
-                            {station ? station.name : 'Magazzino Evento'}
-                          </p>
-                        </div>
-                        {isLowStock && (
-                          <Badge variant="destructive" data-testid={`badge-low-stock-event-${stock.id}`}>
-                            <AlertTriangle className="h-3 w-3 mr-1" />
-                            Stock Basso
-                          </Badge>
-                        )}
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="flex items-center gap-2">
-                        <Package className="h-4 w-4 text-muted-foreground" />
-                        <span className="font-semibold tabular-nums">
-                          {isNaN(quantity) ? '0.00' : quantity.toFixed(2)} {product?.unitOfMeasure || ''}
-                        </span>
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {eventStocks.map((stock, index) => {
+              const product = products?.find(p => p.id === stock.productId);
+              const station = eventStations?.find(s => s.id === stock.stationId);
+              const quantity = parseFloat(stock.quantity);
+              const isLowStock = product?.minThreshold && !isNaN(quantity) && quantity < parseFloat(product.minThreshold);
+              
+              return (
+                <motion.div
+                  key={stock.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.1 + index * 0.05 }}
+                  className="glass-card p-5"
+                  data-testid={`event-stock-${stock.id}`}
+                >
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex-1 min-w-0">
+                      <h4 className="font-semibold truncate">{product?.name || 'Unknown'}</h4>
+                      <p className="text-sm text-muted-foreground">
+                        {station ? station.name : 'Magazzino Evento'}
+                      </p>
+                    </div>
+                    {isLowStock && (
+                      <Badge variant="destructive" className="flex-shrink-0 ml-2" data-testid={`badge-low-stock-event-${stock.id}`}>
+                        <AlertTriangle className="h-3 w-3 mr-1" />
+                        Basso
+                      </Badge>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-xl bg-blue-500/20 flex items-center justify-center">
+                      <Package className="h-4 w-4 text-blue-400" />
+                    </div>
+                    <span className="font-bold text-lg tabular-nums">
+                      {isNaN(quantity) ? '0.00' : quantity.toFixed(2)}
+                    </span>
+                    <span className="text-sm text-muted-foreground">
+                      {product?.unitOfMeasure || ''}
+                    </span>
+                  </div>
+                </motion.div>
+              );
+            })}
           </div>
         ) : (
-          <div className="mt-6 text-center p-6 border-2 border-dashed rounded-lg">
-            <Package className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+          <div className="glass-card p-8 text-center border-2 border-dashed border-white/10">
+            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500/20 to-indigo-600/20 flex items-center justify-center mx-auto mb-4">
+              <Package className="h-7 w-7 text-blue-400" />
+            </div>
+            <p className="text-muted-foreground mb-1">Nessun prodotto trasferito all'evento</p>
             <p className="text-sm text-muted-foreground">
-              Nessun prodotto trasferito all'evento. Usa il pulsante "Trasferisci Stock" per iniziare.
+              Usa il pulsante "Trasferisci Stock" per iniziare
             </p>
           </div>
         )}
-      </div>
+      </motion.div>
 
-      <div className="mb-8">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-semibold">Postazioni</h2>
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.35 }}
+        className="mb-8"
+      >
+        <div className="flex items-center justify-between gap-4 mb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
+              <MapPin className="h-5 w-5 text-white" />
+            </div>
+            <h2 className="text-xl font-semibold">Postazioni</h2>
+          </div>
           <Dialog open={stationDialogOpen} onOpenChange={setStationDialogOpen}>
             <DialogTrigger asChild>
-              <Button data-testid="button-create-station">
+              <Button className="gradient-golden text-black font-semibold" data-testid="button-create-station">
                 <Plus className="h-4 w-4 mr-2" />
                 Nuova Postazione
               </Button>
@@ -842,7 +992,7 @@ export default function EventDetail() {
 
                   <FormItem>
                     <FormLabel>Baristi Assegnati (opzionale)</FormLabel>
-                    <div className="border rounded-md p-3 space-y-2 max-h-48 overflow-y-auto" data-testid="bartenders-list">
+                    <div className="border rounded-xl p-3 space-y-2 max-h-48 overflow-y-auto" data-testid="bartenders-list">
                       {bartenders && bartenders.length > 0 ? (
                         bartenders.map((bartender) => (
                           <div key={bartender.id} className="flex items-center space-x-2">
@@ -888,7 +1038,12 @@ export default function EventDetail() {
                     >
                       Annulla
                     </Button>
-                    <Button type="submit" disabled={createStationMutation.isPending} data-testid="button-submit-station">
+                    <Button 
+                      type="submit" 
+                      disabled={createStationMutation.isPending}
+                      className="gradient-golden text-black font-semibold"
+                      data-testid="button-submit-station"
+                    >
                       Crea Postazione
                     </Button>
                   </DialogFooter>
@@ -899,163 +1054,180 @@ export default function EventDetail() {
         </div>
 
         {stationsLoading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <Skeleton className="h-32" />
-            <Skeleton className="h-32" />
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <Skeleton className="h-32 rounded-2xl" />
+            <Skeleton className="h-32 rounded-2xl" />
           </div>
         ) : allStations && allStations.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {allStations.map((station) => {
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {allStations.map((station, index) => {
               const assignedBartenders = users?.filter(u => station.bartenderIds?.includes(u.id)) || [];
               const isEditing = editingStationIds.has(station.id);
               return (
-                <Card key={station.id} data-testid={`station-card-${station.id}`}>
-                  <CardHeader className="pb-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <CardTitle className="text-lg">{station.name}</CardTitle>
+                <motion.div
+                  key={station.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.1 + index * 0.05 }}
+                  className="glass-card p-5"
+                  data-testid={`station-card-${station.id}`}
+                >
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-xl bg-violet-500/20 flex items-center justify-center">
+                        <MapPin className="h-4 w-4 text-violet-400" />
+                      </div>
+                      <div>
+                        <h4 className="font-semibold">{station.name}</h4>
                         {station.isGeneral && (
-                          <Badge variant="secondary" className="text-xs">Fissa</Badge>
+                          <Badge variant="secondary" className="text-xs mt-0.5">Fissa</Badge>
                         )}
                       </div>
-                      {!isEditing && (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => {
-                            setEditingStationIds(prev => new Set(prev).add(station.id));
-                            setEditingBartenderIds(prev => {
-                              const newMap = new Map(prev);
-                              if (!newMap.has(station.id)) {
-                                newMap.set(station.id, station.bartenderIds || []);
-                              }
-                              return newMap;
-                            });
-                          }}
-                          data-testid={`button-edit-bartenders-${station.id}`}
-                        >
-                          Modifica
-                        </Button>
+                    </div>
+                    {!isEditing && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          setEditingStationIds(prev => new Set(prev).add(station.id));
+                          setEditingBartenderIds(prev => {
+                            const newMap = new Map(prev);
+                            if (!newMap.has(station.id)) {
+                              newMap.set(station.id, station.bartenderIds || []);
+                            }
+                            return newMap;
+                          });
+                        }}
+                        data-testid={`button-edit-bartenders-${station.id}`}
+                      >
+                        Modifica
+                      </Button>
+                    )}
+                  </div>
+                  {!isEditing ? (
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Users className="h-4 w-4" />
+                        <span className="font-medium">Baristi:</span>
+                      </div>
+                      {assignedBartenders.length > 0 ? (
+                        <div className="pl-6 space-y-1">
+                          {assignedBartenders.map(bartender => (
+                            <div key={bartender.id} className="text-sm flex items-center gap-2" data-testid={`bartender-${bartender.id}`}>
+                              <div className="w-1.5 h-1.5 rounded-full bg-teal-500" />
+                              {bartender.firstName && bartender.lastName 
+                                ? `${bartender.firstName} ${bartender.lastName}` 
+                                : bartender.email}
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-muted-foreground pl-6">Nessun barista assegnato</p>
                       )}
                     </div>
-                  </CardHeader>
-                  <CardContent>
-                    {!isEditing ? (
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <Users className="h-4 w-4" />
-                          <span className="font-medium">Baristi:</span>
-                        </div>
-                        {assignedBartenders.length > 0 ? (
-                          <div className="pl-6 space-y-1">
-                            {assignedBartenders.map(bartender => (
-                              <div key={bartender.id} className="text-sm" data-testid={`bartender-${bartender.id}`}>
+                  ) : (
+                    <div className="space-y-3">
+                      <div className="border rounded-xl p-2 space-y-2 max-h-40 overflow-y-auto">
+                        {bartenders.map((bartender) => {
+                          const currentIds = editingBartenderIds.get(station.id) || [];
+                          return (
+                            <div key={bartender.id} className="flex items-center space-x-2">
+                              <Checkbox
+                                id={`edit-bartender-${station.id}-${bartender.id}`}
+                                checked={currentIds.includes(bartender.id)}
+                                onCheckedChange={(checked) => {
+                                  setEditingBartenderIds(prev => {
+                                    const newMap = new Map(prev);
+                                    const currentIds = newMap.get(station.id) || [];
+                                    if (checked) {
+                                      newMap.set(station.id, [...currentIds, bartender.id]);
+                                    } else {
+                                      newMap.set(station.id, currentIds.filter(id => id !== bartender.id));
+                                    }
+                                    return newMap;
+                                  });
+                                }}
+                                data-testid={`checkbox-edit-bartender-${bartender.id}`}
+                              />
+                              <label
+                                htmlFor={`edit-bartender-${station.id}-${bartender.id}`}
+                                className="text-sm font-medium leading-none cursor-pointer"
+                              >
                                 {bartender.firstName && bartender.lastName 
                                   ? `${bartender.firstName} ${bartender.lastName}` 
                                   : bartender.email}
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <p className="text-sm text-muted-foreground pl-6">Nessun barista assegnato</p>
-                        )}
+                              </label>
+                            </div>
+                          );
+                        })}
                       </div>
-                    ) : (
-                      <div className="space-y-3">
-                        <div className="border rounded-md p-2 space-y-2 max-h-40 overflow-y-auto">
-                          {bartenders.map((bartender) => {
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          onClick={() => {
                             const currentIds = editingBartenderIds.get(station.id) || [];
-                            return (
-                              <div key={bartender.id} className="flex items-center space-x-2">
-                                <Checkbox
-                                  id={`edit-bartender-${station.id}-${bartender.id}`}
-                                  checked={currentIds.includes(bartender.id)}
-                                  onCheckedChange={(checked) => {
-                                    setEditingBartenderIds(prev => {
-                                      const newMap = new Map(prev);
-                                      const currentIds = newMap.get(station.id) || [];
-                                      if (checked) {
-                                        newMap.set(station.id, [...currentIds, bartender.id]);
-                                      } else {
-                                        newMap.set(station.id, currentIds.filter(id => id !== bartender.id));
-                                      }
-                                      return newMap;
-                                    });
-                                  }}
-                                  data-testid={`checkbox-edit-bartender-${bartender.id}`}
-                                />
-                                <label
-                                  htmlFor={`edit-bartender-${station.id}-${bartender.id}`}
-                                  className="text-sm font-medium leading-none cursor-pointer"
-                                >
-                                  {bartender.firstName && bartender.lastName 
-                                    ? `${bartender.firstName} ${bartender.lastName}` 
-                                    : bartender.email}
-                                </label>
-                              </div>
-                            );
-                          })}
-                        </div>
-                        <div className="flex gap-2">
-                          <Button
-                            size="sm"
-                            onClick={() => {
-                              const currentIds = editingBartenderIds.get(station.id) || [];
-                              updateBartendersMutation.mutate({
-                                stationId: station.id,
-                                bartenderIds: currentIds
-                              });
-                            }}
-                            disabled={updateBartendersMutation.isPending}
-                            data-testid={`button-save-bartenders-${station.id}`}
-                          >
-                            {updateBartendersMutation.isPending ? "Salvataggio..." : "Salva"}
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => {
-                              setEditingStationIds(prev => {
-                                const newSet = new Set(prev);
-                                newSet.delete(station.id);
-                                return newSet;
-                              });
-                              setEditingBartenderIds(prev => {
-                                const newMap = new Map(prev);
-                                newMap.delete(station.id);
-                                return newMap;
-                              });
-                            }}
-                            data-testid={`button-cancel-bartenders-${station.id}`}
-                          >
-                            Annulla
-                          </Button>
-                        </div>
+                            updateBartendersMutation.mutate({
+                              stationId: station.id,
+                              bartenderIds: currentIds
+                            });
+                          }}
+                          disabled={updateBartendersMutation.isPending}
+                          className="gradient-golden text-black font-semibold"
+                          data-testid={`button-save-bartenders-${station.id}`}
+                        >
+                          {updateBartendersMutation.isPending ? "Salvataggio..." : "Salva"}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setEditingStationIds(prev => {
+                              const newSet = new Set(prev);
+                              newSet.delete(station.id);
+                              return newSet;
+                            });
+                            setEditingBartenderIds(prev => {
+                              const newMap = new Map(prev);
+                              newMap.delete(station.id);
+                              return newMap;
+                            });
+                          }}
+                          data-testid={`button-cancel-bartenders-${station.id}`}
+                        >
+                          Annulla
+                        </Button>
                       </div>
-                    )}
-                  </CardContent>
-                </Card>
+                    </div>
+                  )}
+                </motion.div>
               );
             })}
           </div>
         ) : (
-          <Card>
-            <CardContent className="p-12 text-center">
-              <Package className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
-              <p className="text-muted-foreground mb-4">
-                {fixedStations.length > 0 
-                  ? `Hai ${fixedStations.length} postazioni fisse disponibili. Puoi anche creare postazioni specifiche per questo evento.`
-                  : "Nessuna postazione disponibile"
-                }
-              </p>
-              <Button onClick={() => setStationDialogOpen(true)} data-testid="button-create-first-station">
-                <Plus className="h-4 w-4 mr-2" />
-                Crea Postazione Evento
-              </Button>
-            </CardContent>
-          </Card>
+          <div className="glass-card p-8 text-center border-2 border-dashed border-white/10">
+            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-violet-500/20 to-purple-600/20 flex items-center justify-center mx-auto mb-4">
+              <MapPin className="h-7 w-7 text-violet-400" />
+            </div>
+            <p className="text-muted-foreground mb-2">
+              {fixedStations.length > 0 
+                ? `Hai ${fixedStations.length} postazioni fisse disponibili`
+                : "Nessuna postazione disponibile"
+              }
+            </p>
+            <p className="text-sm text-muted-foreground mb-4">
+              Puoi creare postazioni specifiche per questo evento
+            </p>
+            <Button 
+              onClick={() => setStationDialogOpen(true)}
+              className="gradient-golden text-black font-semibold"
+              data-testid="button-create-first-station"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Crea Postazione Evento
+            </Button>
+          </div>
         )}
-      </div>
+      </motion.div>
     </div>
   );
 }

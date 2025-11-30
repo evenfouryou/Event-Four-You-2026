@@ -5,7 +5,6 @@ import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -41,21 +40,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Boxes, Edit, Trash2, ArrowLeft } from "lucide-react";
+import { Plus, Boxes, Edit, Trash2, ArrowLeft, MapPin, Calendar, Users } from "lucide-react";
 import { Link } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { motion } from "framer-motion";
 import type { Station, User, Event } from "@shared/schema";
 
 const stationFormSchema = z.object({
@@ -66,6 +58,82 @@ const stationFormSchema = z.object({
 });
 
 type StationFormData = z.infer<typeof stationFormSchema>;
+
+function StationCard({
+  station,
+  eventName,
+  bartenderNames,
+  canEdit,
+  onEdit,
+  onDelete,
+  delay = 0,
+}: {
+  station: Station;
+  eventName: string | null;
+  bartenderNames: string;
+  canEdit: boolean;
+  onEdit: () => void;
+  onDelete: () => void;
+  delay?: number;
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3, delay }}
+      className="glass-card p-5 group"
+      data-testid={`station-card-${station.id}`}
+    >
+      <div className="flex items-start gap-4">
+        <div className={`w-12 h-12 rounded-2xl bg-gradient-to-br ${eventName ? 'from-amber-500 to-orange-600' : 'from-violet-500 to-purple-600'} flex items-center justify-center flex-shrink-0`}>
+          <MapPin className="h-6 w-6 text-white" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <h3 className="font-semibold text-lg mb-1 truncate">{station.name}</h3>
+          <div className="flex flex-wrap gap-2 mb-2">
+            {eventName ? (
+              <Badge variant="secondary" className="text-xs" data-testid={`badge-station-type-${station.id}`}>
+                <Calendar className="h-3 w-3 mr-1" />
+                {eventName}
+              </Badge>
+            ) : (
+              <Badge variant="outline" className="text-xs text-teal border-teal/30" data-testid={`badge-station-type-${station.id}`}>
+                <MapPin className="h-3 w-3 mr-1" />
+                Generale
+              </Badge>
+            )}
+          </div>
+          <div className="flex items-center gap-1 text-sm text-muted-foreground">
+            <Users className="h-3.5 w-3.5" />
+            <span className="truncate">{bartenderNames}</span>
+          </div>
+        </div>
+        {canEdit && (
+          <div className="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onEdit}
+              className="h-8 w-8"
+              data-testid={`button-edit-station-${station.id}`}
+            >
+              <Edit className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onDelete}
+              className="h-8 w-8 text-destructive hover:text-destructive"
+              data-testid={`button-delete-station-${station.id}`}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
+      </div>
+    </motion.div>
+  );
+}
 
 export default function StationsPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -255,7 +323,7 @@ export default function StationsPage() {
   };
 
   const getBartenderNames = (bartenderIds: string[] | null) => {
-    if (!bartenderIds || bartenderIds.length === 0) return 'Nessuno';
+    if (!bartenderIds || bartenderIds.length === 0) return 'Nessun barista assegnato';
     const names = bartenderIds.map(id => {
       const bartender = users?.find(u => u.id === id);
       if (!bartender) return 'Sconosciuto';
@@ -265,19 +333,42 @@ export default function StationsPage() {
   };
 
   return (
-    <div className="p-6 md:p-8 max-w-7xl mx-auto">
-      <div className="flex items-center gap-4 mb-8">
-        <Button variant="ghost" size="icon" asChild>
+    <div className="p-4 md:p-8 max-w-7xl mx-auto pb-24 md:pb-8">
+      <motion.div 
+        initial={{ opacity: 0, x: -20 }}
+        animate={{ opacity: 1, x: 0 }}
+        className="flex items-center gap-4 mb-8"
+      >
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          asChild
+          className="rounded-xl"
+          data-testid="button-back-beverage"
+        >
           <Link href="/beverage">
             <ArrowLeft className="h-5 w-5" />
           </Link>
         </Button>
         <div className="flex-1">
-          <h1 className="text-2xl font-semibold mb-1">Gestione Postazioni</h1>
-          <p className="text-muted-foreground">
+          <div className="flex items-center gap-3 mb-1">
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center glow-golden">
+              <Boxes className="h-5 w-5 text-white" />
+            </div>
+            <h1 className="text-xl md:text-2xl font-bold">Gestione Postazioni</h1>
+          </div>
+          <p className="text-muted-foreground text-sm ml-13">
             Crea e gestisci le postazioni generali dell'azienda
           </p>
         </div>
+      </motion.div>
+
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.1 }}
+        className="flex justify-end mb-6"
+      >
         <Dialog open={dialogOpen} onOpenChange={(open) => {
           if (!canCreateStations && open) {
             toast({
@@ -291,6 +382,7 @@ export default function StationsPage() {
         }}>
           <DialogTrigger asChild>
             <Button 
+              className="gradient-golden text-black font-semibold glow-golden"
               data-testid="button-create-station"
               disabled={!canCreateStations}
               title={!canCreateStations ? "Solo gli admin possono creare postazioni" : ""}
@@ -299,12 +391,12 @@ export default function StationsPage() {
               Nuova Postazione
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-md">
+          <DialogContent className="max-w-md glass-card border-white/10">
             <DialogHeader>
-              <DialogTitle>
+              <DialogTitle className="text-lg font-semibold">
                 {editingStation ? 'Modifica Postazione' : 'Nuova Postazione'}
               </DialogTitle>
-              <DialogDescription>
+              <DialogDescription className="text-muted-foreground">
                 {editingStation 
                   ? 'Modifica i dettagli della postazione.' 
                   : 'Inserisci i dettagli della nuova postazione.'}
@@ -348,8 +440,18 @@ export default function StationsPage() {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="general">📍 Postazione Generale (Fissa)</SelectItem>
-                          <SelectItem value="event">🎪 Postazione per Evento</SelectItem>
+                          <SelectItem value="general">
+                            <div className="flex items-center gap-2">
+                              <MapPin className="h-4 w-4 text-violet-500" />
+                              Postazione Generale (Fissa)
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="event">
+                            <div className="flex items-center gap-2">
+                              <Calendar className="h-4 w-4 text-amber-500" />
+                              Postazione per Evento
+                            </div>
+                          </SelectItem>
                         </SelectContent>
                       </Select>
                       <FormMessage />
@@ -415,7 +517,7 @@ export default function StationsPage() {
                     </FormItem>
                   )}
                 />
-                <DialogFooter>
+                <DialogFooter className="gap-2">
                   <Button
                     type="button"
                     variant="outline"
@@ -426,6 +528,7 @@ export default function StationsPage() {
                   </Button>
                   <Button
                     type="submit"
+                    className="gradient-golden text-black font-semibold"
                     disabled={createMutation.isPending || updateMutation.isPending}
                     data-testid="button-save-station"
                   >
@@ -436,94 +539,54 @@ export default function StationsPage() {
             </Form>
           </DialogContent>
         </Dialog>
-      </div>
+      </motion.div>
 
       {stationsLoading ? (
-        <Card>
-          <CardContent className="p-6">
-            <Skeleton className="h-96" />
-          </CardContent>
-        </Card>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[1, 2, 3].map((i) => (
+            <Skeleton key={i} className="h-32 rounded-2xl" />
+          ))}
+        </div>
       ) : stations && stations.length > 0 ? (
-        <Card>
-          <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Nome</TableHead>
-                  <TableHead>Tipo</TableHead>
-                  <TableHead>Barista Assegnato</TableHead>
-                  <TableHead></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {stations.map((station) => {
-                  const eventName = getEventName(station.eventId);
-                  return (
-                    <TableRow key={station.id} data-testid={`station-row-${station.id}`}>
-                      <TableCell className="font-medium">{station.name}</TableCell>
-                      <TableCell>
-                        {eventName ? (
-                          <Badge variant="secondary" data-testid={`badge-station-type-${station.id}`}>
-                            🎪 {eventName}
-                          </Badge>
-                        ) : (
-                          <Badge variant="outline" data-testid={`badge-station-type-${station.id}`}>
-                            📍 Generale
-                          </Badge>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline">
-                          {getBartenderNames(station.bartenderIds)}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex gap-2">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleEdit(station)}
-                            disabled={!canCreateStations}
-                            data-testid={`button-edit-station-${station.id}`}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => setDeleteStationId(station.id)}
-                            disabled={!canCreateStations}
-                            data-testid={`button-delete-station-${station.id}`}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {stations.map((station, index) => (
+            <StationCard
+              key={station.id}
+              station={station}
+              eventName={getEventName(station.eventId)}
+              bartenderNames={getBartenderNames(station.bartenderIds)}
+              canEdit={canCreateStations}
+              onEdit={() => handleEdit(station)}
+              onDelete={() => setDeleteStationId(station.id)}
+              delay={index * 0.05}
+            />
+          ))}
+        </div>
       ) : (
-        <Card>
-          <CardContent className="p-12 text-center">
-            <Boxes className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
-            <p className="text-muted-foreground mb-4">Nessuna postazione configurata</p>
-            {canCreateStations && (
-              <Button onClick={() => setDialogOpen(true)} data-testid="button-create-first-station">
-                <Plus className="h-4 w-4 mr-2" />
-                Crea Prima Postazione
-              </Button>
-            )}
-          </CardContent>
-        </Card>
+        <motion.div 
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="glass-card p-12 text-center"
+        >
+          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center mx-auto mb-4">
+            <Boxes className="h-8 w-8 text-white" />
+          </div>
+          <p className="text-muted-foreground mb-4">Nessuna postazione configurata</p>
+          {canCreateStations && (
+            <Button 
+              onClick={() => setDialogOpen(true)} 
+              className="gradient-golden text-black font-semibold"
+              data-testid="button-create-first-station"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Crea Prima Postazione
+            </Button>
+          )}
+        </motion.div>
       )}
 
       <AlertDialog open={!!deleteStationId} onOpenChange={(open) => !open && setDeleteStationId(null)}>
-        <AlertDialogContent>
+        <AlertDialogContent className="glass-card border-white/10">
           <AlertDialogHeader>
             <AlertDialogTitle>Conferma Eliminazione</AlertDialogTitle>
             <AlertDialogDescription>
@@ -531,12 +594,13 @@ export default function StationsPage() {
               Questa azione non può essere annullata.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
+          <AlertDialogFooter className="gap-2">
             <AlertDialogCancel data-testid="button-cancel-delete-station">
               Annulla
             </AlertDialogCancel>
             <AlertDialogAction
               onClick={() => deleteStationId && deleteMutation.mutate(deleteStationId)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               data-testid="button-confirm-delete-station"
             >
               Elimina

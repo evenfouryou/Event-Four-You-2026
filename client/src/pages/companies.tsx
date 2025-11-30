@@ -4,7 +4,6 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -12,7 +11,6 @@ import {
   DialogTitle,
   DialogTrigger,
   DialogFooter,
-  DialogDescription,
 } from "@/components/ui/dialog";
 import {
   AlertDialog,
@@ -36,10 +34,12 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Plus, Building2, Edit, Trash2 } from "lucide-react";
+import { Plus, Building2, Edit, Trash2, ArrowLeft, MapPin } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { insertCompanySchema, type Company, type InsertCompany } from "@shared/schema";
+import { Link } from "wouter";
+import { motion } from "framer-motion";
 
 export default function Companies() {
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -181,17 +181,36 @@ export default function Companies() {
   };
 
   return (
-    <div className="p-6 md:p-8 max-w-7xl mx-auto">
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-2xl font-semibold mb-1">Gestione Aziende</h1>
-          <p className="text-muted-foreground">
-            Crea e gestisci le aziende del sistema
-          </p>
+    <div className="p-4 md:p-8 max-w-7xl mx-auto pb-24 md:pb-8">
+      <motion.div 
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="flex items-center gap-4 mb-8"
+      >
+        <Link href="/">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="rounded-xl"
+            data-testid="button-back-home"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+        </Link>
+        <div className="flex items-center gap-3 flex-1">
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
+            <Building2 className="h-6 w-6 text-white" />
+          </div>
+          <div>
+            <h1 className="text-xl md:text-2xl font-bold">Gestione Aziende</h1>
+            <p className="text-muted-foreground text-sm">
+              Crea e gestisci le aziende del sistema
+            </p>
+          </div>
         </div>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
-            <Button data-testid="button-create-company">
+            <Button className="gradient-golden text-black font-semibold" data-testid="button-create-company">
               <Plus className="h-4 w-4 mr-2" />
               Nuova Azienda
             </Button>
@@ -280,6 +299,7 @@ export default function Companies() {
                   <Button
                     type="submit"
                     disabled={createMutation.isPending || updateMutation.isPending}
+                    className="gradient-golden text-black font-semibold"
                     data-testid="button-submit-company"
                   >
                     {editingCompany ? 'Aggiorna' : 'Crea'}
@@ -289,25 +309,48 @@ export default function Companies() {
             </Form>
           </DialogContent>
         </Dialog>
-      </div>
+      </motion.div>
 
       {isLoading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <Skeleton className="h-48" />
-          <Skeleton className="h-48" />
-          <Skeleton className="h-48" />
+          <Skeleton className="h-48 rounded-2xl" />
+          <Skeleton className="h-48 rounded-2xl" />
+          <Skeleton className="h-48 rounded-2xl" />
         </div>
       ) : companies && companies.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {companies.map((company) => (
-            <Card key={company.id} data-testid={`company-card-${company.id}`}>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
-                <CardTitle className="text-lg">{company.name}</CardTitle>
+          {companies.map((company, index) => (
+            <motion.div 
+              key={company.id}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3, delay: index * 0.1 }}
+              className="glass-card p-5 group hover:border-primary/30 transition-all"
+              data-testid={`company-card-${company.id}`}
+            >
+              <div className="flex items-start justify-between gap-2 mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
+                    <Building2 className="h-5 w-5 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold">{company.name}</h3>
+                    {company.active ? (
+                      <span className="text-xs text-teal font-medium flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-teal animate-pulse" />
+                        Attiva
+                      </span>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">Inattiva</span>
+                    )}
+                  </div>
+                </div>
                 <div className="flex gap-1">
                   <Button
                     variant="ghost"
                     size="icon"
                     onClick={() => handleEdit(company)}
+                    className="rounded-xl opacity-0 group-hover:opacity-100 transition-opacity"
                     data-testid={`button-edit-company-${company.id}`}
                     title="Modifica Azienda"
                   >
@@ -317,50 +360,52 @@ export default function Companies() {
                     variant="ghost"
                     size="icon"
                     onClick={() => handleDeleteClick(company.id)}
+                    className="rounded-xl opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive"
                     data-testid={`button-delete-company-${company.id}`}
                     title="Elimina Azienda"
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  <div>
-                    <p className="text-sm text-muted-foreground">P.IVA</p>
-                    <p className="font-medium">{company.taxId || 'N/A'}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Indirizzo</p>
-                    <p className="text-sm">{company.address || 'N/A'}</p>
-                  </div>
-                  <div className="pt-2 flex flex-wrap gap-2 items-center">
-                    {company.active ? (
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-                        Attiva
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200">
-                        Inattiva
-                      </span>
-                    )}
-                  </div>
+              </div>
+              <div className="space-y-3">
+                <div className="flex items-start gap-2">
+                  <span className="text-muted-foreground text-sm">P.IVA:</span>
+                  <span className="text-sm font-medium" data-testid={`text-taxid-${company.id}`}>
+                    {company.taxId || 'N/A'}
+                  </span>
                 </div>
-              </CardContent>
-            </Card>
+                {company.address && (
+                  <div className="flex items-start gap-2">
+                    <MapPin className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
+                    <span className="text-sm text-muted-foreground" data-testid={`text-address-${company.id}`}>
+                      {company.address}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </motion.div>
           ))}
         </div>
       ) : (
-        <Card>
-          <CardContent className="p-12 text-center">
-            <Building2 className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
-            <p className="text-muted-foreground mb-4">Nessuna azienda presente</p>
-            <Button onClick={() => setDialogOpen(true)} data-testid="button-create-first-company">
-              <Plus className="h-4 w-4 mr-2" />
-              Crea Prima Azienda
-            </Button>
-          </CardContent>
-        </Card>
+        <motion.div 
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="glass-card p-12 text-center"
+        >
+          <div className="w-16 h-16 rounded-2xl bg-muted/50 flex items-center justify-center mx-auto mb-4">
+            <Building2 className="h-8 w-8 text-muted-foreground" />
+          </div>
+          <p className="text-muted-foreground mb-4">Nessuna azienda presente</p>
+          <Button 
+            onClick={() => setDialogOpen(true)} 
+            className="gradient-golden text-black font-semibold"
+            data-testid="button-create-first-company"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Crea Prima Azienda
+          </Button>
+        </motion.div>
       )}
 
       <AlertDialog open={!!deleteCompanyId} onOpenChange={(open) => !open && setDeleteCompanyId(null)}>

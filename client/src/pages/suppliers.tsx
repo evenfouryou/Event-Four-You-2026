@@ -4,13 +4,11 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
   DialogFooter,
   DialogDescription,
 } from "@/components/ui/dialog";
@@ -24,14 +22,6 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -44,12 +34,116 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Plus, Truck, Edit, Trash2, Search, ArrowLeft } from "lucide-react";
+import { Plus, Truck, Edit, Trash2, Search, ArrowLeft, Mail, Phone, MapPin, FileText } from "lucide-react";
 import { Link } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { insertSupplierSchema, type Supplier, type InsertSupplier } from "@shared/schema";
 import { useAuth } from "@/hooks/useAuth";
+import { motion } from "framer-motion";
+
+function SupplierCard({
+  supplier,
+  onEdit,
+  onDelete,
+  canManage,
+  delay = 0,
+}: {
+  supplier: Supplier;
+  onEdit: () => void;
+  onDelete: () => void;
+  canManage: boolean;
+  delay?: number;
+}) {
+  const isInactive = !supplier.active;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3, delay }}
+      className={`glass-card p-5 ${isInactive ? 'opacity-60' : ''}`}
+      data-testid={`card-supplier-${supplier.id}`}
+    >
+      <div className="flex items-start gap-4">
+        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-rose-500 to-pink-600 flex items-center justify-center flex-shrink-0">
+          <Truck className="h-6 w-6 text-white" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-1">
+            <h3 className="font-semibold text-lg truncate">{supplier.name}</h3>
+            <Badge 
+              variant={supplier.active ? "default" : "secondary"} 
+              className="text-xs flex-shrink-0"
+            >
+              {supplier.active ? 'Attivo' : 'Disattivo'}
+            </Badge>
+          </div>
+          
+          {supplier.vatNumber && (
+            <p className="text-sm text-muted-foreground mb-2">
+              P.IVA: {supplier.vatNumber}
+            </p>
+          )}
+          
+          <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
+            {supplier.email && (
+              <div className="flex items-center gap-1.5">
+                <Mail className="h-3.5 w-3.5" />
+                <span className="truncate">{supplier.email}</span>
+              </div>
+            )}
+            {supplier.phone && (
+              <div className="flex items-center gap-1.5">
+                <Phone className="h-3.5 w-3.5" />
+                <span>{supplier.phone}</span>
+              </div>
+            )}
+          </div>
+          
+          {supplier.address && (
+            <div className="flex items-start gap-1.5 mt-2 text-sm text-muted-foreground">
+              <MapPin className="h-3.5 w-3.5 mt-0.5 flex-shrink-0" />
+              <span className="line-clamp-2">{supplier.address}</span>
+            </div>
+          )}
+          
+          {supplier.notes && (
+            <div className="flex items-start gap-1.5 mt-2 text-sm text-muted-foreground">
+              <FileText className="h-3.5 w-3.5 mt-0.5 flex-shrink-0" />
+              <span className="line-clamp-2">{supplier.notes}</span>
+            </div>
+          )}
+        </div>
+        
+        <div className="flex flex-col gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onEdit}
+            data-testid={`button-edit-supplier-${supplier.id}`}
+            disabled={!canManage}
+            title={!canManage ? "Solo gli admin possono modificare fornitori" : "Modifica"}
+            className="rounded-xl"
+          >
+            <Edit className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onDelete}
+            data-testid={`button-delete-supplier-${supplier.id}`}
+            disabled={!canManage}
+            title={!canManage ? "Solo gli admin possono eliminare fornitori" : "Elimina"}
+            className="rounded-xl text-destructive hover:text-destructive"
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+    </motion.div>
+  );
+}
 
 export default function Suppliers() {
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -225,192 +319,139 @@ export default function Suppliers() {
   const inactiveSuppliers = filteredSuppliers.filter(s => !s.active);
 
   return (
-    <div className="flex flex-col gap-6 p-6">
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" asChild>
-          <Link href="/beverage">
+    <div className="p-4 md:p-8 max-w-4xl mx-auto pb-24 md:pb-8">
+      <motion.div 
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="flex items-center gap-4 mb-8"
+      >
+        <Link href="/beverage">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="rounded-xl"
+            data-testid="button-back-beverage"
+          >
             <ArrowLeft className="h-5 w-5" />
-          </Link>
-        </Button>
+          </Button>
+        </Link>
         <div className="flex items-center gap-3 flex-1">
-          <Truck className="h-6 w-6 text-primary" />
-          <h1 className="text-2xl font-semibold">Fornitori</h1>
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-rose-500 to-pink-600 flex items-center justify-center">
+            <Truck className="h-6 w-6 text-white" />
+          </div>
+          <div>
+            <h1 className="text-xl md:text-2xl font-bold">Fornitori</h1>
+            <p className="text-muted-foreground text-sm">Gestisci i tuoi fornitori</p>
+          </div>
         </div>
         <Button 
           onClick={() => handleOpenDialog()} 
           data-testid="button-create-supplier"
           disabled={!canManageSuppliers}
           title={!canManageSuppliers ? "Solo gli admin possono gestire fornitori" : ""}
+          className="gradient-golden text-black font-semibold"
         >
           <Plus className="h-4 w-4" />
-          Nuovo Fornitore
+          <span className="hidden sm:inline">Nuovo</span>
         </Button>
-      </div>
+      </motion.div>
 
-      <Card>
-        <CardContent className="p-6">
-          <div className="relative mb-6">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Cerca per nome o partita IVA..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
-              data-testid="input-search-suppliers"
-            />
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.1 }}
+        className="glass-card p-4 mb-6"
+      >
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Cerca per nome o partita IVA..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10 bg-transparent border-white/10"
+            data-testid="input-search-suppliers"
+          />
+        </div>
+      </motion.div>
+
+      {isLoading ? (
+        <div className="space-y-4">
+          {[...Array(3)].map((_, i) => (
+            <Skeleton key={i} className="h-32 w-full rounded-2xl" />
+          ))}
+        </div>
+      ) : filteredSuppliers.length === 0 ? (
+        <motion.div 
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="glass-card p-12 text-center"
+        >
+          <div className="w-16 h-16 rounded-2xl bg-muted/50 flex items-center justify-center mx-auto mb-4">
+            <Truck className="h-8 w-8 text-muted-foreground" />
           </div>
-
-          {isLoading ? (
-            <div className="space-y-2">
-              {[...Array(5)].map((_, i) => (
-                <Skeleton key={i} className="h-16 w-full" />
-              ))}
-            </div>
-          ) : filteredSuppliers.length === 0 ? (
-            <div className="text-center py-12">
-              <Truck className="h-12 w-12 mx-auto text-muted-foreground mb-2" />
-              <p className="text-muted-foreground">
-                {searchQuery ? "Nessun fornitore trovato" : "Nessun fornitore configurato"}
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-6">
-              {activeSuppliers.length > 0 && (
-                <div>
-                  <h3 className="text-sm font-medium mb-3 text-muted-foreground">Fornitori Attivi</h3>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Nome</TableHead>
-                        <TableHead>P.IVA</TableHead>
-                        <TableHead>Contatti</TableHead>
-                        <TableHead>Stato</TableHead>
-                        <TableHead className="text-right">Azioni</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {activeSuppliers.map((supplier) => (
-                        <TableRow key={supplier.id} data-testid={`row-supplier-${supplier.id}`}>
-                          <TableCell className="font-medium">{supplier.name}</TableCell>
-                          <TableCell className="text-muted-foreground">
-                            {supplier.vatNumber || '-'}
-                          </TableCell>
-                          <TableCell className="text-sm">
-                            <div className="space-y-0.5">
-                              {supplier.email && (
-                                <div className="text-muted-foreground">{supplier.email}</div>
-                              )}
-                              {supplier.phone && (
-                                <div className="text-muted-foreground">{supplier.phone}</div>
-                              )}
-                              {!supplier.email && !supplier.phone && '-'}
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant="default" className="text-xs">Attivo</Badge>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex justify-end gap-2">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleOpenDialog(supplier)}
-                                data-testid={`button-edit-supplier-${supplier.id}`}
-                                disabled={!canManageSuppliers}
-                                title={!canManageSuppliers ? "Solo gli admin possono modificare fornitori" : ""}
-                              >
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => setDeletingSupplier(supplier)}
-                                data-testid={`button-delete-supplier-${supplier.id}`}
-                                disabled={!canManageSuppliers}
-                                title={!canManageSuppliers ? "Solo gli admin possono eliminare fornitori" : ""}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-
-              {inactiveSuppliers.length > 0 && (
-                <div>
-                  <h3 className="text-sm font-medium mb-3 text-muted-foreground">Fornitori Disattivati</h3>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Nome</TableHead>
-                        <TableHead>P.IVA</TableHead>
-                        <TableHead>Contatti</TableHead>
-                        <TableHead>Stato</TableHead>
-                        <TableHead className="text-right">Azioni</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {inactiveSuppliers.map((supplier) => (
-                        <TableRow key={supplier.id} data-testid={`row-supplier-${supplier.id}`}>
-                          <TableCell className="font-medium opacity-60">{supplier.name}</TableCell>
-                          <TableCell className="text-muted-foreground opacity-60">
-                            {supplier.vatNumber || '-'}
-                          </TableCell>
-                          <TableCell className="text-sm opacity-60">
-                            <div className="space-y-0.5">
-                              {supplier.email && (
-                                <div className="text-muted-foreground">{supplier.email}</div>
-                              )}
-                              {supplier.phone && (
-                                <div className="text-muted-foreground">{supplier.phone}</div>
-                              )}
-                              {!supplier.email && !supplier.phone && '-'}
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant="secondary" className="text-xs">Disattivo</Badge>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex justify-end gap-2">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleOpenDialog(supplier)}
-                                data-testid={`button-edit-supplier-${supplier.id}`}
-                                disabled={!canManageSuppliers}
-                                title={!canManageSuppliers ? "Solo gli admin possono modificare fornitori" : ""}
-                              >
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => setDeletingSupplier(supplier)}
-                                data-testid={`button-delete-supplier-${supplier.id}`}
-                                disabled={!canManageSuppliers}
-                                title={!canManageSuppliers ? "Solo gli admin possono eliminare fornitori" : ""}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-            </div>
+          <p className="text-muted-foreground mb-2">
+            {searchQuery ? "Nessun fornitore trovato" : "Nessun fornitore configurato"}
+          </p>
+          {!searchQuery && canManageSuppliers && (
+            <p className="text-sm text-muted-foreground">
+              Clicca su "Nuovo" per aggiungere il primo fornitore
+            </p>
           )}
-        </CardContent>
-      </Card>
+        </motion.div>
+      ) : (
+        <div className="space-y-8">
+          {activeSuppliers.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+            >
+              <h2 className="text-sm font-medium text-muted-foreground mb-4 uppercase tracking-wider">
+                Fornitori Attivi ({activeSuppliers.length})
+              </h2>
+              <div className="space-y-4">
+                {activeSuppliers.map((supplier, index) => (
+                  <SupplierCard
+                    key={supplier.id}
+                    supplier={supplier}
+                    onEdit={() => handleOpenDialog(supplier)}
+                    onDelete={() => setDeletingSupplier(supplier)}
+                    canManage={canManageSuppliers}
+                    delay={0.1 + index * 0.05}
+                  />
+                ))}
+              </div>
+            </motion.div>
+          )}
+
+          {inactiveSuppliers.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3 }}
+            >
+              <h2 className="text-sm font-medium text-muted-foreground mb-4 uppercase tracking-wider">
+                Fornitori Disattivati ({inactiveSuppliers.length})
+              </h2>
+              <div className="space-y-4">
+                {inactiveSuppliers.map((supplier, index) => (
+                  <SupplierCard
+                    key={supplier.id}
+                    supplier={supplier}
+                    onEdit={() => handleOpenDialog(supplier)}
+                    onDelete={() => setDeletingSupplier(supplier)}
+                    canManage={canManageSuppliers}
+                    delay={0.1 + index * 0.05}
+                  />
+                ))}
+              </div>
+            </motion.div>
+          )}
+        </div>
+      )}
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl glass border-white/10">
           <DialogHeader>
             <DialogTitle>
               {editingSupplier ? 'Modifica Fornitore' : 'Nuovo Fornitore'}
@@ -421,7 +462,7 @@ export default function Suppliers() {
           </DialogHeader>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
                   name="name"
@@ -429,7 +470,12 @@ export default function Suppliers() {
                     <FormItem>
                       <FormLabel>Nome *</FormLabel>
                       <FormControl>
-                        <Input {...field} placeholder="Nome fornitore" data-testid="input-supplier-name" />
+                        <Input 
+                          {...field} 
+                          placeholder="Nome fornitore" 
+                          data-testid="input-supplier-name"
+                          className="bg-white/5 border-white/10"
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -442,7 +488,13 @@ export default function Suppliers() {
                     <FormItem>
                       <FormLabel>Partita IVA</FormLabel>
                       <FormControl>
-                        <Input {...field} value={field.value ?? ''} placeholder="IT12345678901" data-testid="input-supplier-vat" />
+                        <Input 
+                          {...field} 
+                          value={field.value ?? ''} 
+                          placeholder="IT12345678901" 
+                          data-testid="input-supplier-vat"
+                          className="bg-white/5 border-white/10"
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -450,7 +502,7 @@ export default function Suppliers() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
                   name="email"
@@ -458,7 +510,14 @@ export default function Suppliers() {
                     <FormItem>
                       <FormLabel>Email</FormLabel>
                       <FormControl>
-                        <Input {...field} value={field.value ?? ''} type="email" placeholder="info@fornitore.it" data-testid="input-supplier-email" />
+                        <Input 
+                          {...field} 
+                          value={field.value ?? ''} 
+                          type="email" 
+                          placeholder="info@fornitore.it" 
+                          data-testid="input-supplier-email"
+                          className="bg-white/5 border-white/10"
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -471,7 +530,13 @@ export default function Suppliers() {
                     <FormItem>
                       <FormLabel>Telefono</FormLabel>
                       <FormControl>
-                        <Input {...field} value={field.value ?? ''} placeholder="+39 02 1234567" data-testid="input-supplier-phone" />
+                        <Input 
+                          {...field} 
+                          value={field.value ?? ''} 
+                          placeholder="+39 02 1234567" 
+                          data-testid="input-supplier-phone"
+                          className="bg-white/5 border-white/10"
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -486,7 +551,14 @@ export default function Suppliers() {
                   <FormItem>
                     <FormLabel>Indirizzo</FormLabel>
                     <FormControl>
-                      <Textarea {...field} value={field.value ?? ''} placeholder="Via, Città, CAP" rows={2} data-testid="input-supplier-address" />
+                      <Textarea 
+                        {...field} 
+                        value={field.value ?? ''} 
+                        placeholder="Via, Città, CAP" 
+                        rows={2} 
+                        data-testid="input-supplier-address"
+                        className="bg-white/5 border-white/10 resize-none"
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -500,7 +572,14 @@ export default function Suppliers() {
                   <FormItem>
                     <FormLabel>Note</FormLabel>
                     <FormControl>
-                      <Textarea {...field} value={field.value ?? ''} placeholder="Note aggiuntive..." rows={3} data-testid="input-supplier-notes" />
+                      <Textarea 
+                        {...field} 
+                        value={field.value ?? ''} 
+                        placeholder="Note aggiuntive..." 
+                        rows={3} 
+                        data-testid="input-supplier-notes"
+                        className="bg-white/5 border-white/10 resize-none"
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -517,7 +596,7 @@ export default function Suppliers() {
                         type="checkbox"
                         checked={field.value}
                         onChange={field.onChange}
-                        className="h-4 w-4"
+                        className="h-4 w-4 rounded"
                         data-testid="checkbox-supplier-active"
                       />
                     </FormControl>
@@ -527,12 +606,13 @@ export default function Suppliers() {
                 )}
               />
 
-              <DialogFooter>
+              <DialogFooter className="gap-2">
                 <Button
                   type="button"
                   variant="outline"
                   onClick={() => setDialogOpen(false)}
                   data-testid="button-cancel-supplier"
+                  className="border-white/10"
                 >
                   Annulla
                 </Button>
@@ -540,6 +620,7 @@ export default function Suppliers() {
                   type="submit"
                   disabled={createMutation.isPending || updateMutation.isPending}
                   data-testid="button-submit-supplier"
+                  className="gradient-golden text-black font-semibold"
                 >
                   {editingSupplier ? 'Aggiorna' : 'Crea'}
                 </Button>
@@ -550,7 +631,7 @@ export default function Suppliers() {
       </Dialog>
 
       <AlertDialog open={!!deletingSupplier} onOpenChange={() => setDeletingSupplier(null)}>
-        <AlertDialogContent>
+        <AlertDialogContent className="glass border-white/10">
           <AlertDialogHeader>
             <AlertDialogTitle>Conferma Eliminazione</AlertDialogTitle>
             <AlertDialogDescription>
@@ -559,7 +640,12 @@ export default function Suppliers() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel data-testid="button-cancel-delete-supplier">Annulla</AlertDialogCancel>
+            <AlertDialogCancel 
+              data-testid="button-cancel-delete-supplier"
+              className="border-white/10"
+            >
+              Annulla
+            </AlertDialogCancel>
             <AlertDialogAction
               onClick={() => deletingSupplier && deleteMutation.mutate(deletingSupplier.id)}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"

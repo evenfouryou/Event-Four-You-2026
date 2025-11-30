@@ -1,205 +1,182 @@
-# Event4U Management System - Design Guidelines
+# Event4U Management System - Updated Design Guidelines
 
 ## Design Approach
 
-**Selected System:** Material Design 3 with Linear-inspired data presentation  
-**Justification:** Enterprise-grade management platform requiring information density, role-based workflows, and real-time data visualization. Material Design 3 provides robust dark mode theming and Italian language support.
+**Selected Style:** Custom nightclub/social events aesthetic inspired by modern event discovery platforms  
+**Justification:** Club management system requiring immersive visual experience with event imagery, real-time status tracking, and mobile-first bartender workflows. Dark theme reduces eye strain in low-light venue environments.
 
-## Language & Localization
+## Color System
 
-**Primary Language:** Italian (it-IT)
-- Use Italian labels throughout: "Dashboard" → "Bacheca", "Events" → "Eventi", "Inventory" → "Inventario"
-- Date formats: DD/MM/YYYY, 24-hour time
-- Number formatting: European decimals (1.234,56)
-- Maintain English as optional secondary language toggle in user settings
+**Primary Palette:**
+- Background: #0a0e17 (near-black with blue tint)
+- Surface Cards: #151922 (slightly elevated from background)
+- Golden Accent: #FFD700 (primary CTAs, highlights, active states)
+- Teal Status: #00CED1 (live events, active indicators, success states)
+- Text Primary: #FFFFFF (high contrast)
+- Text Secondary: #94A3B8 (reduced opacity for metadata)
+- Border Subtle: #1e2533 (card borders, dividers)
+- Error: #EF4444
+- Warning: #F59E0B
+
+**Glass-Morphism Treatment:**
+- backdrop-blur-xl on overlays and floating elements
+- background: rgba(21, 25, 34, 0.7) for glass cards
+- border: 1px solid rgba(255, 255, 255, 0.1)
 
 ## Typography System
 
-**Font Family:** Inter (Google Fonts CDN)  
-**Weights:** 400 (regular), 500 (medium), 600 (semibold)
+**Font Family:** Inter (Google Fonts)  
+**Weights:** 400, 500, 600, 700
 
 **Hierarchy:**
-- Page Titles: text-2xl, font-semibold
-- Section Headers: text-xl, font-semibold  
-- Card Titles: text-lg, font-medium
-- Body Text: text-base, font-normal
-- Labels/Metadata: text-sm, font-normal
-- Table Data: text-sm, font-medium (tabular-nums)
+- Hero Headings: text-4xl, font-bold (on event cards)
+- Page Titles: text-3xl, font-bold
+- Section Headers: text-xl, font-semibold
+- Card Titles: text-lg, font-semibold
+- Body: text-base, font-normal
+- Metadata: text-sm, font-medium, text-secondary
+- Labels: text-xs, font-medium, uppercase, tracking-wide
 
 ## Layout System
 
-**Spacing Primitives:** Tailwind units 2, 4, 6, 8 (gap-4, p-6, py-8, etc.)
+**Spacing:** Tailwind units 2, 4, 6, 8, 12
 
-**Application Structure:**
-- Fixed sidebar: w-64 on desktop, collapsible drawer on mobile
-- Top header: h-16 with breadcrumbs, search, notifications, profile
-- Content container: max-w-7xl, px-6, py-8
-- Cards: rounded-lg, shadow-sm, p-6
+**Desktop Structure:**
+- Fixed sidebar: w-72, glass-morphism treatment
+- Content area: max-w-7xl, px-6, py-8
+- Cards: rounded-2xl, overflow-hidden for image crops
 
-**Responsive Grid Patterns:**
-- Dashboard metrics: grid-cols-1 md:grid-cols-2 lg:grid-cols-4, gap-6
-- Event cards: grid-cols-1 md:grid-cols-2 lg:grid-cols-3, gap-4
-- Forms: grid-cols-1 lg:grid-cols-2, gap-6
-- Tables: full-width with horizontal scroll below lg breakpoint
+**Mobile Structure:**
+- Full-width content with px-4
+- Fixed bottom navigation: h-20, backdrop-blur-xl, safe-area-inset-bottom
+- Floating action buttons: bottom-24 offset to clear nav
 
-## Dark Mode Implementation
-
-**Mode Toggle:** 
-- Icon switch in top header (sun/moon using Heroicons)
-- Persists preference in localStorage
-- System preference detection as default
-
-**Semantic Contrast Levels:**
-- Surface elevation through subtle backdrop variations
-- Text hierarchy: primary/secondary/tertiary opacity levels
-- Borders: reduced opacity in dark mode for softer appearance
-- Shadows: deeper and more pronounced in dark mode
-- Interactive states: more visible in dark backgrounds
-
-**Component Adaptations:**
-- Cards: elevated surface treatment in dark mode
-- Tables: alternating row treatment with subtle backdrop shift
-- Inputs: darker backgrounds with lighter borders
-- Buttons: higher contrast states for visibility
-- Charts/graphs: adjusted line weights and opacity for dark backgrounds
+**Grid Patterns:**
+- Event grid: grid-cols-1 md:grid-cols-2 xl:grid-cols-3, gap-6
+- Stats dashboard: grid-cols-2 lg:grid-cols-4, gap-4
+- Product grid: grid-cols-2 md:grid-cols-3 lg:grid-cols-4, gap-4
 
 ## Navigation Components
 
-**Sidebar:**
-- Logo at top (h-16)
-- Role-filtered menu sections with Heroicons (outline style)
-- Active state: subtle accent border-l-3 indicator
-- Sections: "Bacheca", "Eventi", "Inventario", "Rapporti", "Impostazioni"
-- Bottom area: Company selector dropdown, user mini-profile
-- Mobile: Full-screen drawer overlay with backdrop blur
+**Desktop Sidebar:**
+- Logo area: h-20, golden accent glow effect
+- Module sections: Bacheca, Eventi, Beverage, Contabilità, Personale, Cassa, File della Serata
+- Icons: Heroicons (outline, 24px)
+- Active state: golden left border-l-3, golden icon tint, bg-surface highlight
+- Bottom: User profile card with glass background
 
-**Top Bar:**
-- Left: Breadcrumb with slash separators  
-- Center: Global search (⌘K shortcut hint)
-- Right: Dark mode toggle, notification bell with badge, user avatar dropdown
+**Mobile Bottom Nav:**
+- 5 primary actions: Eventi, Beverage, Scansione (center FAB with golden bg, elevated), Cassa, Profilo
+- Icons: 28px, active state with golden fill
+- Labels: text-xs below icons
+- Center FAB: w-14 h-14, rounded-full, shadow-2xl, golden gradient
 
-## Data Display Components
+**Top Bar (Both Platforms):**
+- Left: Current module title
+- Center: Global search with glass background, golden focus ring
+- Right: Live event indicator (teal pulse dot), notifications, avatar
 
-**Dashboard Stats Cards:**
-- Large metric: text-3xl, font-semibold, tabular-nums
-- Label: text-sm below metric
-- Trend indicator: icon + percentage with directional arrow (Heroicons)
-- Corner icon: large decorative icon (opacity-20 in light, opacity-10 in dark)
-- Min height: h-32
-
-**Tables:**
-- Sticky header with filter/sort controls
-- Hover state on rows (subtle backdrop change)
-- Inline actions: appear on row hover (edit, delete icons)
-- Pagination: bottom-aligned with items-per-page selector
-- Empty states: centered icon, heading, description, CTA button
-- Loading state: skeleton rows with shimmer animation
+## Core Components
 
 **Event Cards:**
-- Header: Event name + status badge (Draft/Attivo/Concluso)
-- Body: Date/time row with calendar icon, location row with pin icon, participant count
-- Footer: Assigned staff avatars (max 3 + overflow count), quick actions menu
-- Hover: subtle lift with shadow elevation change
+- Aspect ratio: 16:9 hero image with gradient overlay (linear-gradient(180deg, transparent 0%, rgba(10,14,23,0.9) 100%))
+- Content overlay: absolute bottom positioning, p-6
+- Event name: text-2xl, font-bold, white
+- Date/time row: teal icon, text-sm
+- Location: pin icon, text-sm
+- Status badge: top-right absolute, glass pill with teal/golden glow
+- Hover: scale-105 transform, enhanced shadow
+- CTA buttons on overlay: glass background with blur, white text, no hover effects (inherit button states)
 
-**Inventory Cards:**
-- Product name + thumbnail image (64x64, rounded)
-- Stock level progress bar (current/capacity) 
-- Critical/warning thresholds indicated by progress fill treatment
-- Last updated timestamp
-- Quick action: consumption adjustment buttons
+**Filter Pills:**
+- Horizontal scroll row: flex, gap-3, overflow-x-auto, pb-2
+- Pill style: px-4 py-2, rounded-full, border border-subtle
+- Active: bg-golden, text-black, font-semibold
+- Inactive: bg-surface, text-secondary
+- Icons: 16px leading icon
 
-## Form Components
+**Beverage Cards:**
+- Product image: 96x96, rounded-lg, left-aligned
+- Right content: product name (text-lg, font-semibold), category badge, stock bar
+- Stock bar: h-2, rounded-full, bg-surface, fill based on threshold (teal: healthy, golden: medium, red: critical)
+- Quantity controls: Large -/+ buttons (min-h-12 touch targets), golden on active
+- Background: glass-morphism card
 
-**Input Fields:**
-- Height: h-11 for text inputs
-- Labels: top-aligned, text-sm, font-medium, required asterisk
-- Helper text: text-xs below input
-- Error states: red accent border, error icon right-aligned, error message below
-- Success states: green accent border, checkmark icon
-- Disabled states: reduced opacity, no-pointer cursor
+**Forms:**
+- Input height: h-12
+- Background: rgba(21, 25, 34, 0.5), border border-subtle
+- Focus: golden ring-2, enhanced backdrop blur
+- Labels: text-sm, font-medium, text-secondary, mb-2
+- Error states: red border, shake animation
+- Date/time pickers: Modal with glass backdrop, teal accents for selections
+- Submit area: sticky bottom on mobile, glass background, golden primary button
 
-**Special Inputs:**
-- Date/Time: Material Design 3 picker modals
-- Quantity: Large +/- buttons flanking display (mobile: min-h-14 touch targets)
-- Selects: Dropdown with search for 10+ options
-- Multi-select: Chip-based selection with overflow scroll
+**Tables (Desktop Reports):**
+- Glass card container with rounded-2xl
+- Header: sticky, bg-surface, border-b border-subtle
+- Rows: hover bg-surface with subtle glow
+- Alternating rows: subtle opacity shift
+- Actions: golden icon buttons, appear on row hover
+- Pagination: bottom-right, golden active page
 
-**Form Layout:**
-- Section headers with divider below (text-lg, font-semibold, pb-4, border-b)
-- Field groups with gap-6 vertical spacing
-- Submit actions: right-aligned, primary + secondary buttons, gap-3
-- Validation: real-time on blur, full validation on submit
+**Map Discovery (Eventi Module):**
+- Full-height map view with Mapbox/Google Maps
+- Event markers: custom golden pin icons, cluster on zoom out
+- Selected event: floating glass card overlay (bottom-anchored on mobile, sidebar on desktop)
+- Card shows: event image (small), name, date, distance, CTA button
+- Toggle: map/list view switch in header
 
-## Role-Specific Dashboards
+## Module-Specific Interfaces
 
-**Super Admin:**
-- Company management grid with quick stats per company
-- System health monitor (API status, storage usage)
-- Activity feed with filterable user actions
+**Beverage Dashboard:**
+- Top: Filter pills (Categoria, Stazione, Stock Level)
+- Quick stats: 4-card grid (Prodotti Totali, Stock Critico, Consumo Oggi, Valore Inventario)
+- Main grid: Product cards with images, scrollable
+- Floating action: "Registra Consumo" golden button
 
-**Company Admin:**  
-- Quick metrics: upcoming events count, low stock alerts, active staff
-- Calendar month-view of events
-- Team overview with role distribution
-- Inventory alerts prominently displayed
+**File della Serata (Event Night File):**
+- Timeline view: vertical line with time markers on left
+- Activity cards: glass containers with staff avatar, action type, timestamp, product details
+- Real-time indicator: teal pulse animation at current time
+- Filters: By station, by staff, by product
+- Export button: top-right, golden outline
 
-**Organizer:**
-- Active events carousel (horizontally scrollable cards)
-- Today's timeline view with real-time consumption tracking
-- Quick create event floating action button (bottom-right, mobile)
-- Stock status dashboard with critical items highlighted
-
-**Warehouse Manager:**
-- Stock levels table sortable by quantity/last update
-- Transfer requests queue with approve/reject actions  
-- Load/unload quick forms accessible from header
-- Movement log with timeline visualization
-
-**Bartender (Mobile-Optimized):**
-- Today's events: large card list with station assignments
-- Product list: searchable with large touch-friendly quantity controls
-- Offline mode indicator with sync status
-- Bottom navigation: Events, Scan Product, Profile
-
-## Mobile Considerations
-
-- Bottom tab navigation (4-5 primary actions)
-- Simplified header: logo + notifications only
-- Touch targets: min 44x44px (iOS) / 48x48px (Android)
-- Swipe gestures: right-to-left for delete, pull-to-refresh
-- Sticky CTAs at bottom with backdrop blur
-- Haptic feedback on increment/decrement actions
-- Reduced motion option respects system preferences
-
-## Analytics & Reports
-
-**Report Header:**
-- Date range selector with presets (Oggi, Questa Settimana, Questo Mese, Personalizzato)
-- Export buttons (PDF, Excel) with download icons
-- Filter controls (by location, product category, event)
-
-**Visualization Components:**
-- Summary cards grid at top (total consumption, revenue, variance)
-- Charts: Use Chart.js or similar library - bar charts for consumption, line charts for trends, donut charts for distribution
-- Data tables: expandable rows for detailed breakdowns
-- Comparison mode: side-by-side event analysis
-
-**Station Reports:**
-- Accordion-style expandable sections per station
-- Per-station summary with bartender info, duration, total sales
-- Product breakdown table: columns (Prodotto, Iniziale, Consumato, Rimanente, Costo)
+**Cassa (Cash Register):**
+- Large number display: tabular-nums, text-5xl, golden for totals
+- Quick add buttons: 2x3 grid of preset amounts, glass background
+- Transaction list: scrollable with glass cards, timestamp + amount
+- Bottom totals: sticky glass container, breakdown (Cash, Card, Total)
 
 ## Images
 
-**No hero images** - This is a utility-focused management application. All visual elements are component-based (icons, charts, data visualization).
+**Hero Images Required:**
+- Event cards: 16:9 landscape, 800x450px minimum, show venue/crowd/atmosphere
+- Event detail pages: Full-width hero, 1920x600px, darker gradient overlay for text
+- Product thumbnails: 96x96px, white/transparent background, rounded corners
+- Staff avatars: 48x48px circles throughout
+- Company/venue logos: Top sidebar, 200x60px max, maintain aspect ratio
 
-**Product thumbnails:** Use throughout inventory cards and consumption logs (64x64 rounded squares).
+**Image Treatment:**
+- All event images: Subtle blue tint overlay to match theme (multiply blend mode, rgba(10,14,23,0.15))
+- Gradient overlays: Always bottom-to-top, darker at text areas
+- Loading states: Shimmer animation on skeleton rectangles
+
+## Mobile Considerations
+
+- Bottom nav clears content with pb-24 on container
+- Swipe gestures: Left-to-right for sidebar drawer, down for refresh
+- Touch targets: 48x48px minimum, 56x56px for primary actions
+- Sticky headers: Collapse on scroll down, reappear on scroll up
+- Modal sheets: Slide up from bottom with glass backdrop, rounded-t-3xl
+- Haptic feedback: On quantity increment/decrement, on successful actions
+- Safe areas: Respect notch/home indicator with safe-area-inset padding
 
 ## Accessibility
 
-- Consistent focus indicators: 2px outline with offset
-- ARIA labels on all icon-only buttons (Italian labels)
-- Keyboard shortcuts documented in help modal (⌘K search, N new event, etc.)
-- Screen reader announcements for real-time updates (stock changes, notifications)
-- High contrast mode support in both light/dark themes
-- Reduced motion: disable all transitions when prefers-reduced-motion is active
+- Focus indicators: 2px golden ring with 2px offset
+- Icon-only buttons: Italian ARIA labels (es. "Apri menu", "Cerca eventi")
+- Keyboard shortcuts: ⌘K search, N nuovo evento, B beverage module
+- Screen reader: Announce live event updates, stock changes
+- Contrast: All text meets WCAG AA on dark backgrounds (4.5:1 minimum)
+- Reduced motion: Disable scale transforms, pulse animations when prefers-reduced-motion active
+- Touch feedback: Visual state changes (opacity 0.8) on press for all interactive elements

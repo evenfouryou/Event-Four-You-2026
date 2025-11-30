@@ -16,6 +16,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
+import { motion } from "framer-motion";
 import { 
   FileText, 
   Calendar, 
@@ -40,6 +41,7 @@ import {
   Check,
   UserPlus,
   ListPlus,
+  ChevronRight,
 } from "lucide-react";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
@@ -64,6 +66,49 @@ interface EndOfNightReport {
   }>>;
 }
 
+function StatsCard({
+  title,
+  value,
+  icon: Icon,
+  trend,
+  gradient,
+  testId,
+  delay = 0,
+}: {
+  title: string;
+  value: string | number;
+  icon: React.ElementType;
+  trend?: string;
+  gradient: string;
+  testId: string;
+  delay?: number;
+}) {
+  return (
+    <motion.div 
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3, delay }}
+      className="glass-card p-5"
+    >
+      <div className="flex items-start justify-between mb-3">
+        <div className={`w-11 h-11 rounded-2xl bg-gradient-to-br ${gradient} flex items-center justify-center`}>
+          <Icon className="h-5 w-5 text-white" />
+        </div>
+        {trend && (
+          <span className="text-xs text-teal flex items-center gap-1">
+            <TrendingUp className="h-3 w-3" />
+            {trend}
+          </span>
+        )}
+      </div>
+      <p className="text-2xl font-bold mb-1" data-testid={testId}>
+        {value}
+      </p>
+      <p className="text-xs text-muted-foreground">{title}</p>
+    </motion.div>
+  );
+}
+
 export default function NightFilePage() {
   const { user } = useAuth();
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
@@ -86,165 +131,227 @@ export default function NightFilePage() {
   ).sort((a, b) => new Date(b.startDatetime || 0).getTime() - new Date(a.startDatetime || 0).getTime());
 
   if (eventsLoading) {
-    return <div className="text-center py-8">Caricamento...</div>;
+    return (
+      <div className="p-4 md:p-8 pb-24 md:pb-8 flex items-center justify-center min-h-[50vh]">
+        <div className="text-center text-muted-foreground">Caricamento...</div>
+      </div>
+    );
   }
 
   if (selectedEventId && selectedEvent) {
     return (
-      <div className="p-4 md:p-6 space-y-6">
-        <div className="flex items-center gap-4">
+      <div className="p-4 md:p-8 pb-24 md:pb-8 max-w-7xl mx-auto">
+        <motion.div 
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex items-start gap-4 mb-8"
+        >
           <Button 
             variant="ghost" 
             size="icon" 
             onClick={() => setSelectedEventId(null)}
+            className="rounded-xl flex-shrink-0"
             data-testid="button-back-events"
           >
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          <div className="flex-1">
-            <h1 className="text-2xl md:text-3xl font-bold flex items-center gap-3" data-testid="text-event-file-title">
-              <FileText className="h-7 w-7 text-primary" />
-              {selectedEvent.name}
-            </h1>
-            <div className="flex items-center gap-4 text-muted-foreground mt-1">
-              {selectedEvent.startDatetime && (
-                <span className="flex items-center gap-1">
-                  <Calendar className="h-4 w-4" />
-                  {format(new Date(selectedEvent.startDatetime), "dd MMMM yyyy", { locale: it })}
-                </span>
-              )}
-              {eventLocation && (
-                <span className="flex items-center gap-1">
-                  <MapPin className="h-4 w-4" />
-                  {eventLocation.name}
-                </span>
-              )}
-              <Badge variant={selectedEvent.status === 'ongoing' ? 'default' : selectedEvent.status === 'closed' ? 'secondary' : 'outline'}>
-                {selectedEvent.status === 'ongoing' ? 'In Corso' : selectedEvent.status === 'closed' ? 'Chiuso' : 'Programmato'}
-              </Badge>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center flex-shrink-0">
+                <FileText className="h-6 w-6 text-white" />
+              </div>
+              <div>
+                <h1 className="text-xl md:text-2xl font-bold truncate" data-testid="text-event-file-title">
+                  {selectedEvent.name}
+                </h1>
+                <div className="flex items-center gap-3 flex-wrap text-sm text-muted-foreground">
+                  {selectedEvent.startDatetime && (
+                    <span className="flex items-center gap-1">
+                      <Calendar className="h-3.5 w-3.5" />
+                      {format(new Date(selectedEvent.startDatetime), "dd MMMM yyyy", { locale: it })}
+                    </span>
+                  )}
+                  {eventLocation && (
+                    <span className="flex items-center gap-1">
+                      <MapPin className="h-3.5 w-3.5" />
+                      {eventLocation.name}
+                    </span>
+                  )}
+                </div>
+              </div>
             </div>
+            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${
+              selectedEvent.status === 'ongoing' 
+                ? 'bg-teal-500/20 text-teal' 
+                : selectedEvent.status === 'closed' 
+                  ? 'bg-rose-500/20 text-rose-400' 
+                  : 'bg-blue-500/20 text-blue-400'
+            }`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${
+                selectedEvent.status === 'ongoing' ? 'bg-teal animate-pulse' : 
+                selectedEvent.status === 'closed' ? 'bg-rose-400' : 'bg-blue-400'
+              }`} />
+              {selectedEvent.status === 'ongoing' ? 'In Corso' : selectedEvent.status === 'closed' ? 'Chiuso' : 'Programmato'}
+            </span>
           </div>
-        </div>
+        </motion.div>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-3 lg:grid-cols-6 h-auto">
-            <TabsTrigger value="beverage" className="flex items-center gap-2 py-3" data-testid="tab-beverage">
-              <Wine className="h-4 w-4" />
-              <span className="hidden sm:inline">Beverage</span>
-            </TabsTrigger>
-            <TabsTrigger value="cassa" className="flex items-center gap-2 py-3" data-testid="tab-cassa">
-              <Wallet className="h-4 w-4" />
-              <span className="hidden sm:inline">Cassa</span>
-            </TabsTrigger>
-            <TabsTrigger value="incassi" className="flex items-center gap-2 py-3" data-testid="tab-incassi">
-              <Receipt className="h-4 w-4" />
-              <span className="hidden sm:inline">Incassi</span>
-            </TabsTrigger>
-            <TabsTrigger value="personale" className="flex items-center gap-2 py-3" data-testid="tab-personale">
-              <Users className="h-4 w-4" />
-              <span className="hidden sm:inline">Personale</span>
-            </TabsTrigger>
-            <TabsTrigger value="costi" className="flex items-center gap-2 py-3" data-testid="tab-costi">
-              <TrendingDown className="h-4 w-4" />
-              <span className="hidden sm:inline">Costi</span>
-            </TabsTrigger>
-            <TabsTrigger value="riepilogo" className="flex items-center gap-2 py-3" data-testid="tab-riepilogo">
-              <TrendingUp className="h-4 w-4" />
-              <span className="hidden sm:inline">Riepilogo</span>
-            </TabsTrigger>
-          </TabsList>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+        >
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
+            <TabsList className="glass-card w-full flex flex-wrap h-auto p-1 gap-1 mb-6">
+              <TabsTrigger value="beverage" className="flex-1 min-w-[80px] flex items-center justify-center gap-2 py-3 rounded-xl data-[state=active]:bg-primary data-[state=active]:text-black" data-testid="tab-beverage">
+                <Wine className="h-4 w-4" />
+                <span className="hidden sm:inline">Beverage</span>
+              </TabsTrigger>
+              <TabsTrigger value="cassa" className="flex-1 min-w-[80px] flex items-center justify-center gap-2 py-3 rounded-xl data-[state=active]:bg-primary data-[state=active]:text-black" data-testid="tab-cassa">
+                <Wallet className="h-4 w-4" />
+                <span className="hidden sm:inline">Cassa</span>
+              </TabsTrigger>
+              <TabsTrigger value="incassi" className="flex-1 min-w-[80px] flex items-center justify-center gap-2 py-3 rounded-xl data-[state=active]:bg-primary data-[state=active]:text-black" data-testid="tab-incassi">
+                <Receipt className="h-4 w-4" />
+                <span className="hidden sm:inline">Incassi</span>
+              </TabsTrigger>
+              <TabsTrigger value="personale" className="flex-1 min-w-[80px] flex items-center justify-center gap-2 py-3 rounded-xl data-[state=active]:bg-primary data-[state=active]:text-black" data-testid="tab-personale">
+                <Users className="h-4 w-4" />
+                <span className="hidden sm:inline">Personale</span>
+              </TabsTrigger>
+              <TabsTrigger value="costi" className="flex-1 min-w-[80px] flex items-center justify-center gap-2 py-3 rounded-xl data-[state=active]:bg-primary data-[state=active]:text-black" data-testid="tab-costi">
+                <TrendingDown className="h-4 w-4" />
+                <span className="hidden sm:inline">Costi</span>
+              </TabsTrigger>
+              <TabsTrigger value="riepilogo" className="flex-1 min-w-[80px] flex items-center justify-center gap-2 py-3 rounded-xl data-[state=active]:bg-primary data-[state=active]:text-black" data-testid="tab-riepilogo">
+                <TrendingUp className="h-4 w-4" />
+                <span className="hidden sm:inline">Riepilogo</span>
+              </TabsTrigger>
+            </TabsList>
 
-          <TabsContent value="beverage" className="mt-6">
-            <BeverageSection eventId={selectedEventId} />
-          </TabsContent>
+            <TabsContent value="beverage" className="mt-0">
+              <BeverageSection eventId={selectedEventId} />
+            </TabsContent>
 
-          <TabsContent value="cassa" className="mt-6 space-y-6">
-            <CashPositionsSection eventId={selectedEventId} isAdmin={isAdmin} />
-            <CashFundsSection eventId={selectedEventId} isAdmin={isAdmin} />
-          </TabsContent>
+            <TabsContent value="cassa" className="mt-0 space-y-6">
+              <CashPositionsSection eventId={selectedEventId} isAdmin={isAdmin} />
+              <CashFundsSection eventId={selectedEventId} isAdmin={isAdmin} />
+            </TabsContent>
 
-          <TabsContent value="incassi" className="mt-6">
-            <CashEntriesSection eventId={selectedEventId} isAdmin={isAdmin} />
-          </TabsContent>
+            <TabsContent value="incassi" className="mt-0">
+              <CashEntriesSection eventId={selectedEventId} isAdmin={isAdmin} />
+            </TabsContent>
 
-          <TabsContent value="personale" className="mt-6">
-            <PersonnelSection eventId={selectedEventId} isAdmin={isAdmin} />
-          </TabsContent>
+            <TabsContent value="personale" className="mt-0">
+              <PersonnelSection eventId={selectedEventId} isAdmin={isAdmin} />
+            </TabsContent>
 
-          <TabsContent value="costi" className="mt-6">
-            <CostsSection eventId={selectedEventId} isAdmin={isAdmin} />
-          </TabsContent>
+            <TabsContent value="costi" className="mt-0">
+              <CostsSection eventId={selectedEventId} isAdmin={isAdmin} />
+            </TabsContent>
 
-          <TabsContent value="riepilogo" className="mt-6">
-            <SummarySection eventId={selectedEventId} />
-          </TabsContent>
-        </Tabs>
+            <TabsContent value="riepilogo" className="mt-0">
+              <SummarySection eventId={selectedEventId} />
+            </TabsContent>
+          </Tabs>
+        </motion.div>
       </div>
     );
   }
 
   return (
-    <div className="p-4 md:p-6 space-y-6">
-      <div className="flex flex-col gap-2">
-        <h1 className="text-2xl md:text-3xl font-bold flex items-center gap-3" data-testid="text-night-file-title">
-          <FileText className="h-8 w-8 text-primary" />
-          File della Serata
-        </h1>
-        <p className="text-muted-foreground">
-          Seleziona un evento per compilare il documento con beverage, cassa, incassi, personale e costi
-        </p>
-      </div>
+    <div className="p-4 md:p-8 pb-24 md:pb-8 max-w-7xl mx-auto">
+      <motion.div 
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="flex items-center gap-4 mb-8"
+      >
+        <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center glow-golden">
+          <FileText className="h-7 w-7 text-white" />
+        </div>
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold" data-testid="text-night-file-title">
+            File della Serata
+          </h1>
+          <p className="text-muted-foreground text-sm">
+            Seleziona un evento per compilare il documento
+          </p>
+        </div>
+      </motion.div>
 
       {activeEvents.length === 0 ? (
-        <Card>
-          <CardContent className="text-center py-12">
-            <Calendar className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
-            <h3 className="text-lg font-medium mb-2">Nessun Evento</h3>
-            <p className="text-muted-foreground">
-              Crea prima un evento dalla sezione Eventi per poter compilare il file della serata
-            </p>
-          </CardContent>
-        </Card>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="glass-card p-12 text-center"
+        >
+          <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-slate-600 to-slate-700 flex items-center justify-center mx-auto mb-6">
+            <Calendar className="h-10 w-10 text-white/70" />
+          </div>
+          <h3 className="text-lg font-semibold mb-2">Nessun Evento</h3>
+          <p className="text-muted-foreground max-w-sm mx-auto">
+            Crea prima un evento dalla sezione Eventi per poter compilare il file della serata
+          </p>
+        </motion.div>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {activeEvents.map((event) => {
+          {activeEvents.map((event, index) => {
             const location = locations.find(l => l.id === event.locationId);
             return (
-              <Card 
-                key={event.id} 
-                className="hover-elevate cursor-pointer" 
+              <motion.div
+                key={event.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.05 }}
+                className="glass-card overflow-hidden group cursor-pointer hover:border-primary/30 transition-all"
                 onClick={() => setSelectedEventId(event.id)}
                 data-testid={`card-event-${event.id}`}
               >
-                <CardHeader className="pb-3">
-                  <div className="flex justify-between items-start gap-2">
-                    <CardTitle className="text-lg">{event.name}</CardTitle>
-                    <Badge variant={event.status === 'ongoing' ? 'default' : event.status === 'closed' ? 'secondary' : 'outline'}>
+                <div className={`h-1 ${
+                  event.status === 'ongoing' ? 'bg-gradient-to-r from-teal-500 to-cyan-500' : 
+                  event.status === 'closed' ? 'bg-gradient-to-r from-rose-500 to-pink-500' :
+                  'bg-gradient-to-r from-blue-500 to-indigo-500'
+                }`} />
+                <div className="p-5">
+                  <div className="flex justify-between items-start gap-3 mb-3">
+                    <h3 className="text-lg font-semibold truncate">{event.name}</h3>
+                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium flex-shrink-0 ${
+                      event.status === 'ongoing' 
+                        ? 'bg-teal-500/20 text-teal' 
+                        : event.status === 'closed' 
+                          ? 'bg-rose-500/20 text-rose-400' 
+                          : 'bg-blue-500/20 text-blue-400'
+                    }`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${
+                        event.status === 'ongoing' ? 'bg-teal animate-pulse' : 
+                        event.status === 'closed' ? 'bg-rose-400' : 'bg-blue-400'
+                      }`} />
                       {event.status === 'ongoing' ? 'In Corso' : event.status === 'closed' ? 'Chiuso' : 'Programmato'}
-                    </Badge>
+                    </span>
                   </div>
-                  {event.startDatetime && (
-                    <CardDescription className="flex items-center gap-1">
-                      <Calendar className="h-3 w-3" />
-                      {format(new Date(event.startDatetime), "dd MMMM yyyy", { locale: it })}
-                    </CardDescription>
-                  )}
-                </CardHeader>
-                <CardContent className="pb-3">
-                  {location && (
-                    <p className="text-sm text-muted-foreground flex items-center gap-1">
-                      <MapPin className="h-3 w-3" />
-                      {location.name}
-                    </p>
-                  )}
-                </CardContent>
-                <CardFooter className="pt-0">
-                  <Button variant="outline" size="sm" className="w-full" data-testid={`button-open-file-${event.id}`}>
-                    <FileText className="h-4 w-4 mr-2" />
-                    Apri File Serata
-                  </Button>
-                </CardFooter>
-              </Card>
+                  
+                  <div className="space-y-2 mb-4">
+                    {event.startDatetime && (
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Calendar className="h-4 w-4" />
+                        {format(new Date(event.startDatetime), "dd MMMM yyyy", { locale: it })}
+                      </div>
+                    )}
+                    {location && (
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <MapPin className="h-4 w-4" />
+                        {location.name}
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="flex items-center justify-between pt-3 border-t border-white/10">
+                    <span className="text-sm text-muted-foreground">Apri file serata</span>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary group-hover:translate-x-1 transition-all" />
+                  </div>
+                </div>
+              </motion.div>
             );
           })}
         </div>
@@ -281,7 +388,11 @@ function BeverageSection({ eventId }: { eventId: string }) {
   });
 
   if (isLoading) {
-    return <div className="text-center py-8">Caricamento dati beverage...</div>;
+    return (
+      <div className="glass-card p-8 text-center">
+        <div className="text-muted-foreground">Caricamento dati beverage...</div>
+      </div>
+    );
   }
 
   const enrichedStocks = stocks.map(stock => {
@@ -291,17 +402,23 @@ function BeverageSection({ eventId }: { eventId: string }) {
 
   return (
     <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Package className="h-5 w-5" />
-            Stock Evento
-          </CardTitle>
-          <CardDescription>
-            Inventario attuale caricato per l'evento
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="glass-card overflow-hidden"
+      >
+        <div className="p-5 border-b border-white/10">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
+              <Package className="h-5 w-5 text-white" />
+            </div>
+            <div>
+              <h3 className="font-semibold">Stock Evento</h3>
+              <p className="text-sm text-muted-foreground">Inventario attuale caricato per l'evento</p>
+            </div>
+          </div>
+        </div>
+        <div className="p-5">
           {enrichedStocks.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               Nessuno stock caricato per questo evento.
@@ -321,31 +438,38 @@ function BeverageSection({ eventId }: { eventId: string }) {
                 </TableHeader>
                 <TableBody>
                   {enrichedStocks.map((stock, idx) => (
-                    <TableRow key={idx}>
+                    <TableRow key={idx} data-testid={`row-stock-${idx}`}>
                       <TableCell className="font-medium">{stock.product?.name || "N/D"}</TableCell>
-                      <TableCell>{stock.product?.code || "-"}</TableCell>
+                      <TableCell className="text-muted-foreground">{stock.product?.code || "-"}</TableCell>
                       <TableCell className="text-right font-medium">{parseFloat(stock.quantity).toFixed(2)}</TableCell>
-                      <TableCell>{stock.product?.unitOfMeasure || "-"}</TableCell>
+                      <TableCell className="text-muted-foreground">{stock.product?.unitOfMeasure || "-"}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </motion.div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <ArrowDownUp className="h-5 w-5" />
-            Consumi Evento
-          </CardTitle>
-          <CardDescription>
-            Riepilogo consumazioni e resi durante l'evento
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.1 }}
+        className="glass-card overflow-hidden"
+      >
+        <div className="p-5 border-b border-white/10">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-rose-500 to-pink-600 flex items-center justify-center">
+              <ArrowDownUp className="h-5 w-5 text-white" />
+            </div>
+            <div>
+              <h3 className="font-semibold">Consumi Evento</h3>
+              <p className="text-sm text-muted-foreground">Riepilogo consumazioni e resi durante l'evento</p>
+            </div>
+          </div>
+        </div>
+        <div className="p-5">
           {!report?.consumption || report.consumption.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               Nessun consumo registrato per questo evento
@@ -365,26 +489,26 @@ function BeverageSection({ eventId }: { eventId: string }) {
                   </TableHeader>
                   <TableBody>
                     {report.consumption.map((item, idx) => (
-                      <TableRow key={idx}>
+                      <TableRow key={idx} data-testid={`row-consumption-${idx}`}>
                         <TableCell className="font-medium">{item.productName}</TableCell>
                         <TableCell className="text-right">{item.totalConsumed.toFixed(2)}</TableCell>
-                        <TableCell className="text-right text-green-600">{item.totalReturned.toFixed(2)}</TableCell>
+                        <TableCell className="text-right text-teal">{item.totalReturned.toFixed(2)}</TableCell>
                         <TableCell className="text-right font-medium">{item.netConsumed.toFixed(2)}</TableCell>
-                        <TableCell className="text-right text-red-600">€{item.totalCost.toFixed(2)}</TableCell>
+                        <TableCell className="text-right text-rose-400">€{item.totalCost.toFixed(2)}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
                 </Table>
               </div>
 
-              <div className="mt-4 pt-4 border-t flex justify-between items-center">
+              <div className="mt-4 pt-4 border-t border-white/10 flex justify-between items-center">
                 <span className="text-muted-foreground">Costo totale beverage:</span>
-                <span className="text-xl font-bold text-red-600">€{report.totalCost.toFixed(2)}</span>
+                <span className="text-xl font-bold text-rose-400">€{report.totalCost.toFixed(2)}</span>
               </div>
             </>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </motion.div>
     </div>
   );
 }
@@ -476,21 +600,29 @@ function CashPositionsSection({ eventId, isAdmin }: { eventId: string; isAdmin: 
   };
 
   if (isLoading) {
-    return <div className="text-center py-4">Caricamento...</div>;
+    return (
+      <div className="glass-card p-8 text-center">
+        <div className="text-muted-foreground">Caricamento...</div>
+      </div>
+    );
   }
 
   return (
-    <Card>
-      <CardHeader>
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="glass-card overflow-hidden"
+    >
+      <div className="p-5 border-b border-white/10">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div>
-            <CardTitle className="flex items-center gap-2">
-              <LayoutGrid className="h-5 w-5" />
-              Postazioni Cassa
-            </CardTitle>
-            <CardDescription>
-              Postazioni cassa dell'evento (Bar, Biglietteria, VIP, ecc.)
-            </CardDescription>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
+              <LayoutGrid className="h-5 w-5 text-white" />
+            </div>
+            <div>
+              <h3 className="font-semibold">Postazioni Cassa</h3>
+              <p className="text-sm text-muted-foreground">Postazioni cassa dell'evento</p>
+            </div>
           </div>
           {isAdmin && (
             <Dialog open={isDialogOpen} onOpenChange={(open) => {
@@ -498,7 +630,7 @@ function CashPositionsSection({ eventId, isAdmin }: { eventId: string; isAdmin: 
               if (!open) setEditingPosition(null);
             }}>
               <DialogTrigger asChild>
-                <Button data-testid="button-add-position">
+                <Button className="gradient-golden text-black font-semibold" data-testid="button-add-position">
                   <Plus className="h-4 w-4 mr-2" />
                   Nuova Postazione
                 </Button>
@@ -556,7 +688,7 @@ function CashPositionsSection({ eventId, isAdmin }: { eventId: string; isAdmin: 
                     />
                   </div>
                   <DialogFooter>
-                    <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending} data-testid="button-save-position">
+                    <Button type="submit" className="gradient-golden text-black font-semibold" disabled={createMutation.isPending || updateMutation.isPending} data-testid="button-save-position">
                       {editingPosition ? "Aggiorna" : "Crea"}
                     </Button>
                   </DialogFooter>
@@ -565,8 +697,8 @@ function CashPositionsSection({ eventId, isAdmin }: { eventId: string; isAdmin: 
             </Dialog>
           )}
         </div>
-      </CardHeader>
-      <CardContent>
+      </div>
+      <div className="p-5">
         {eventPositions.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">
             Nessuna postazione cassa per questo evento
@@ -579,17 +711,19 @@ function CashPositionsSection({ eventId, isAdmin }: { eventId: string; isAdmin: 
                   <TableHead>Nome</TableHead>
                   <TableHead>Settore</TableHead>
                   <TableHead>Operatore</TableHead>
+                  <TableHead>Note</TableHead>
                   {isAdmin && <TableHead className="text-right">Azioni</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {eventPositions.map((pos) => (
-                  <TableRow key={pos.id} data-testid={`row-position-${pos.id}`}>
-                    <TableCell className="font-medium">{pos.name}</TableCell>
+                {eventPositions.map((position) => (
+                  <TableRow key={position.id} data-testid={`row-position-${position.id}`}>
+                    <TableCell className="font-medium">{position.name}</TableCell>
                     <TableCell>
-                      <Badge variant="outline">{getSectorName(pos.sectorId)}</Badge>
+                      <Badge variant="outline">{getSectorName(position.sectorId)}</Badge>
                     </TableCell>
-                    <TableCell>{getStaffName(pos.operatorId)}</TableCell>
+                    <TableCell>{getStaffName(position.operatorId)}</TableCell>
+                    <TableCell className="text-muted-foreground">{position.notes || "-"}</TableCell>
                     {isAdmin && (
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1">
@@ -597,16 +731,16 @@ function CashPositionsSection({ eventId, isAdmin }: { eventId: string; isAdmin: 
                             size="icon"
                             variant="ghost"
                             onClick={() => {
-                              setEditingPosition(pos);
+                              setEditingPosition(position);
                               setIsDialogOpen(true);
                             }}
-                            data-testid={`button-edit-position-${pos.id}`}
+                            data-testid={`button-edit-position-${position.id}`}
                           >
                             <Pencil className="h-4 w-4" />
                           </Button>
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
-                              <Button size="icon" variant="ghost" data-testid={`button-delete-position-${pos.id}`}>
+                              <Button size="icon" variant="ghost" data-testid={`button-delete-position-${position.id}`}>
                                 <Trash2 className="h-4 w-4 text-destructive" />
                               </Button>
                             </AlertDialogTrigger>
@@ -619,7 +753,7 @@ function CashPositionsSection({ eventId, isAdmin }: { eventId: string; isAdmin: 
                               </AlertDialogHeader>
                               <AlertDialogFooter>
                                 <AlertDialogCancel>Annulla</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => deleteMutation.mutate(pos.id)}>
+                                <AlertDialogAction onClick={() => deleteMutation.mutate(position.id)}>
                                   Elimina
                                 </AlertDialogAction>
                               </AlertDialogFooter>
@@ -634,8 +768,8 @@ function CashPositionsSection({ eventId, isAdmin }: { eventId: string; isAdmin: 
             </Table>
           </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </motion.div>
   );
 }
 
@@ -650,10 +784,6 @@ function CashFundsSection({ eventId, isAdmin }: { eventId: string; isAdmin: bool
 
   const { data: positions = [] } = useQuery<CashPosition[]>({
     queryKey: ["/api/cash-positions"],
-  });
-
-  const { data: staffList = [] } = useQuery<Staff[]>({
-    queryKey: ["/api/staff"],
   });
 
   const eventPositions = positions.filter(p => p.eventId === eventId);
@@ -699,14 +829,12 @@ function CashFundsSection({ eventId, isAdmin }: { eventId: string; isAdmin: bool
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
-    const operatorValue = formData.get("operatorId") as string;
+    const positionValue = formData.get("positionId") as string;
     const data = {
       eventId: eventId,
-      positionId: formData.get("positionId") as string,
+      positionId: positionValue === "_none" ? null : positionValue || null,
       type: formData.get("type") as string,
       amount: formData.get("amount") as string,
-      expectedAmount: formData.get("expectedAmount") as string || null,
-      operatorId: operatorValue === "_none" ? null : operatorValue || null,
       notes: formData.get("notes") as string || null,
     };
 
@@ -717,119 +845,94 @@ function CashFundsSection({ eventId, isAdmin }: { eventId: string; isAdmin: bool
     }
   };
 
-  const getPositionName = (positionId: string) => {
-    const p = positions.find(x => x.id === positionId);
+  const getPositionName = (positionId: string | null) => {
+    if (!positionId) return "Generale";
+    const p = eventPositions.find(x => x.id === positionId);
     return p?.name || "N/D";
   };
 
-  const getStaffName = (operatorId: string | null) => {
-    if (!operatorId) return "-";
-    const s = staffList.find(x => x.id === operatorId);
-    return s ? `${s.firstName} ${s.lastName}` : "N/D";
-  };
-
-  const typeLabels: Record<string, { label: string; variant: "default" | "secondary" }> = {
-    opening: { label: "Apertura", variant: "secondary" },
-    closing: { label: "Chiusura", variant: "default" },
-  };
+  const openingTotal = eventFunds.filter(f => f.type === 'opening').reduce((sum, f) => sum + parseFloat(f.amount), 0);
+  const closingTotal = eventFunds.filter(f => f.type === 'closing').reduce((sum, f) => sum + parseFloat(f.amount), 0);
 
   if (isLoading) {
-    return <div className="text-center py-4">Caricamento...</div>;
+    return (
+      <div className="glass-card p-8 text-center">
+        <div className="text-muted-foreground">Caricamento...</div>
+      </div>
+    );
   }
 
   return (
-    <Card>
-      <CardHeader>
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.1 }}
+      className="glass-card overflow-hidden"
+    >
+      <div className="p-5 border-b border-white/10">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div>
-            <CardTitle className="flex items-center gap-2">
-              <Wallet className="h-5 w-5" />
-              Fondi Cassa
-            </CardTitle>
-            <CardDescription>
-              Apertura e chiusura dei fondi cassa
-            </CardDescription>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-emerald-500 to-green-600 flex items-center justify-center">
+              <Wallet className="h-5 w-5 text-white" />
+            </div>
+            <div>
+              <h3 className="font-semibold">Fondi Cassa</h3>
+              <p className="text-sm text-muted-foreground">Apertura e chiusura cassa</p>
+            </div>
           </div>
-          {isAdmin && eventPositions.length > 0 && (
+          {isAdmin && (
             <Dialog open={isDialogOpen} onOpenChange={(open) => {
               setIsDialogOpen(open);
               if (!open) setEditingFund(null);
             }}>
               <DialogTrigger asChild>
-                <Button data-testid="button-add-fund">
+                <Button className="gradient-golden text-black font-semibold" data-testid="button-add-fund">
                   <Plus className="h-4 w-4 mr-2" />
-                  Nuovo Fondo
+                  Registra Fondo
                 </Button>
               </DialogTrigger>
               <DialogContent className="max-w-md">
                 <DialogHeader>
-                  <DialogTitle>{editingFund ? "Modifica Fondo" : "Nuovo Fondo"}</DialogTitle>
+                  <DialogTitle>{editingFund ? "Modifica Fondo" : "Registra Fondo"}</DialogTitle>
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="positionId">Postazione *</Label>
-                    <Select name="positionId" defaultValue={editingFund?.positionId || ""}>
+                    <Label htmlFor="positionId">Postazione</Label>
+                    <Select name="positionId" defaultValue={editingFund?.positionId || "_none"}>
                       <SelectTrigger data-testid="select-fund-position">
                         <SelectValue placeholder="Seleziona postazione" />
                       </SelectTrigger>
                       <SelectContent>
+                        <SelectItem value="_none">Generale</SelectItem>
                         {eventPositions.map((p) => (
                           <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="type">Tipo *</Label>
-                      <Select name="type" defaultValue={editingFund?.type || "opening"}>
-                        <SelectTrigger data-testid="select-fund-type">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="opening">Apertura</SelectItem>
-                          <SelectItem value="closing">Chiusura</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="amount">Importo (€) *</Label>
-                      <Input
-                        id="amount"
-                        name="amount"
-                        type="number"
-                        step="0.01"
-                        defaultValue={editingFund?.amount || ""}
-                        required
-                        data-testid="input-fund-amount"
-                      />
-                    </div>
-                  </div>
                   <div className="space-y-2">
-                    <Label htmlFor="expectedAmount">Importo Atteso (€)</Label>
-                    <Input
-                      id="expectedAmount"
-                      name="expectedAmount"
-                      type="number"
-                      step="0.01"
-                      defaultValue={editingFund?.expectedAmount || ""}
-                      placeholder="Solo per chiusura"
-                      data-testid="input-fund-expected"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="operatorId">Operatore</Label>
-                    <Select name="operatorId" defaultValue={editingFund?.operatorId || "_none"}>
-                      <SelectTrigger data-testid="select-fund-operator">
-                        <SelectValue placeholder="Seleziona operatore" />
+                    <Label htmlFor="type">Tipo *</Label>
+                    <Select name="type" defaultValue={editingFund?.type || "opening"}>
+                      <SelectTrigger data-testid="select-fund-type">
+                        <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="_none">Non specificato</SelectItem>
-                        {staffList.filter(s => s.active).map((s) => (
-                          <SelectItem key={s.id} value={s.id}>{s.firstName} {s.lastName}</SelectItem>
-                        ))}
+                        <SelectItem value="opening">Apertura</SelectItem>
+                        <SelectItem value="closing">Chiusura</SelectItem>
                       </SelectContent>
                     </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="amount">Importo (€) *</Label>
+                    <Input
+                      id="amount"
+                      name="amount"
+                      type="number"
+                      step="0.01"
+                      defaultValue={editingFund?.amount || ""}
+                      required
+                      data-testid="input-fund-amount"
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="notes">Note</Label>
@@ -841,7 +944,7 @@ function CashFundsSection({ eventId, isAdmin }: { eventId: string; isAdmin: bool
                     />
                   </div>
                   <DialogFooter>
-                    <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending} data-testid="button-save-fund">
+                    <Button type="submit" className="gradient-golden text-black font-semibold" disabled={createMutation.isPending || updateMutation.isPending} data-testid="button-save-fund">
                       {editingFund ? "Aggiorna" : "Registra"}
                     </Button>
                   </DialogFooter>
@@ -850,55 +953,40 @@ function CashFundsSection({ eventId, isAdmin }: { eventId: string; isAdmin: bool
             </Dialog>
           )}
         </div>
-      </CardHeader>
-      <CardContent>
-        {eventPositions.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground">
-            Crea prima delle postazioni cassa per registrare i fondi
-          </div>
-        ) : eventFunds.length === 0 ? (
+      </div>
+      <div className="p-5">
+        {eventFunds.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">
             Nessun fondo cassa registrato per questo evento
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Postazione</TableHead>
-                  <TableHead>Tipo</TableHead>
-                  <TableHead className="text-right">Importo</TableHead>
-                  <TableHead className="text-right">Atteso</TableHead>
-                  <TableHead className="text-right">Differenza</TableHead>
-                  <TableHead>Operatore</TableHead>
-                  {isAdmin && <TableHead className="text-right">Azioni</TableHead>}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {eventFunds.map((fund) => {
-                  const diff = fund.expectedAmount ? parseFloat(fund.amount) - parseFloat(fund.expectedAmount) : null;
-                  return (
+          <>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Postazione</TableHead>
+                    <TableHead>Tipo</TableHead>
+                    <TableHead className="text-right">Importo</TableHead>
+                    <TableHead>Note</TableHead>
+                    <TableHead>Data</TableHead>
+                    {isAdmin && <TableHead className="text-right">Azioni</TableHead>}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {eventFunds.map((fund) => (
                     <TableRow key={fund.id} data-testid={`row-fund-${fund.id}`}>
                       <TableCell className="font-medium">{getPositionName(fund.positionId)}</TableCell>
                       <TableCell>
-                        <Badge variant={typeLabels[fund.type]?.variant || "secondary"}>
-                          {typeLabels[fund.type]?.label || fund.type}
+                        <Badge variant={fund.type === 'opening' ? 'outline' : 'secondary'}>
+                          {fund.type === 'opening' ? 'Apertura' : 'Chiusura'}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-right font-medium">
-                        €{parseFloat(fund.amount).toFixed(2)}
+                      <TableCell className="text-right font-medium">€{parseFloat(fund.amount).toFixed(2)}</TableCell>
+                      <TableCell className="text-muted-foreground">{fund.notes || "-"}</TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {fund.recordedAt && format(new Date(fund.recordedAt), "dd/MM HH:mm", { locale: it })}
                       </TableCell>
-                      <TableCell className="text-right">
-                        {fund.expectedAmount ? `€${parseFloat(fund.expectedAmount).toFixed(2)}` : "-"}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {diff !== null ? (
-                          <span className={diff >= 0 ? "text-green-600" : "text-destructive"}>
-                            {diff >= 0 ? "+" : ""}€{diff.toFixed(2)}
-                          </span>
-                        ) : "-"}
-                      </TableCell>
-                      <TableCell>{getStaffName(fund.operatorId)}</TableCell>
                       {isAdmin && (
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-1">
@@ -938,14 +1026,25 @@ function CashFundsSection({ eventId, isAdmin }: { eventId: string; isAdmin: bool
                         </TableCell>
                       )}
                     </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </div>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+
+            <div className="mt-4 pt-4 border-t border-white/10 grid grid-cols-2 gap-4">
+              <div className="text-center">
+                <p className="text-sm text-muted-foreground">Totale Apertura</p>
+                <p className="text-lg font-bold">€{openingTotal.toFixed(2)}</p>
+              </div>
+              <div className="text-center">
+                <p className="text-sm text-muted-foreground">Totale Chiusura</p>
+                <p className="text-lg font-bold">€{closingTotal.toFixed(2)}</p>
+              </div>
+            </div>
+          </>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </motion.div>
   );
 }
 
@@ -1047,21 +1146,29 @@ function CashEntriesSection({ eventId, isAdmin }: { eventId: string; isAdmin: bo
   const cardTotal = eventEntries.filter(e => e.paymentMethod === 'card').reduce((sum, e) => sum + parseFloat(e.totalAmount), 0);
 
   if (isLoading) {
-    return <div className="text-center py-8">Caricamento...</div>;
+    return (
+      <div className="glass-card p-8 text-center">
+        <div className="text-muted-foreground">Caricamento...</div>
+      </div>
+    );
   }
 
   return (
-    <Card>
-      <CardHeader>
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="glass-card overflow-hidden"
+    >
+      <div className="p-5 border-b border-white/10">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div>
-            <CardTitle className="flex items-center gap-2">
-              <Receipt className="h-5 w-5" />
-              Registrazione Incassi
-            </CardTitle>
-            <CardDescription>
-              Registra gli incassi per postazione
-            </CardDescription>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-amber-500 to-yellow-600 flex items-center justify-center">
+              <Receipt className="h-5 w-5 text-white" />
+            </div>
+            <div>
+              <h3 className="font-semibold">Registrazione Incassi</h3>
+              <p className="text-sm text-muted-foreground">Registra gli incassi per postazione</p>
+            </div>
           </div>
           {isAdmin && eventPositions.length > 0 && (
             <Dialog open={isDialogOpen} onOpenChange={(open) => {
@@ -1069,7 +1176,7 @@ function CashEntriesSection({ eventId, isAdmin }: { eventId: string; isAdmin: bo
               if (!open) setEditingEntry(null);
             }}>
               <DialogTrigger asChild>
-                <Button data-testid="button-add-entry">
+                <Button className="gradient-golden text-black font-semibold" data-testid="button-add-entry">
                   <Plus className="h-4 w-4 mr-2" />
                   Nuovo Incasso
                 </Button>
@@ -1190,7 +1297,7 @@ function CashEntriesSection({ eventId, isAdmin }: { eventId: string; isAdmin: bo
                     />
                   </div>
                   <DialogFooter>
-                    <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending} data-testid="button-save-entry">
+                    <Button type="submit" className="gradient-golden text-black font-semibold" disabled={createMutation.isPending || updateMutation.isPending} data-testid="button-save-entry">
                       {editingEntry ? "Aggiorna" : "Registra"}
                     </Button>
                   </DialogFooter>
@@ -1199,8 +1306,8 @@ function CashEntriesSection({ eventId, isAdmin }: { eventId: string; isAdmin: bo
             </Dialog>
           )}
         </div>
-      </CardHeader>
-      <CardContent>
+      </div>
+      <div className="p-5">
         {eventPositions.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">
             Crea prima delle postazioni cassa per registrare gli incassi
@@ -1227,7 +1334,7 @@ function CashEntriesSection({ eventId, isAdmin }: { eventId: string; isAdmin: bo
                   {eventEntries.map((entry) => (
                     <TableRow key={entry.id} data-testid={`row-entry-${entry.id}`}>
                       <TableCell className="font-medium">{getPositionName(entry.positionId)}</TableCell>
-                      <TableCell>{entry.description || "-"}</TableCell>
+                      <TableCell className="text-muted-foreground">{entry.description || "-"}</TableCell>
                       <TableCell>
                         <Badge variant="outline">
                           {paymentMethodLabels[entry.paymentMethod]?.label || entry.paymentMethod}
@@ -1236,7 +1343,7 @@ function CashEntriesSection({ eventId, isAdmin }: { eventId: string; isAdmin: bo
                       <TableCell className="text-right font-medium">
                         €{parseFloat(entry.totalAmount).toFixed(2)}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="text-muted-foreground">
                         {entry.entryTime && format(new Date(entry.entryTime), "dd/MM HH:mm", { locale: it })}
                       </TableCell>
                       {isAdmin && (
@@ -1283,14 +1390,14 @@ function CashEntriesSection({ eventId, isAdmin }: { eventId: string; isAdmin: bo
               </Table>
             </div>
 
-            <div className="mt-4 pt-4 border-t grid grid-cols-3 gap-4">
+            <div className="mt-4 pt-4 border-t border-white/10 grid grid-cols-3 gap-4">
               <div className="text-center">
                 <p className="text-sm text-muted-foreground">Contanti</p>
-                <p className="text-lg font-bold text-green-600">€{cashTotal.toFixed(2)}</p>
+                <p className="text-lg font-bold text-teal">€{cashTotal.toFixed(2)}</p>
               </div>
               <div className="text-center">
                 <p className="text-sm text-muted-foreground">Carta</p>
-                <p className="text-lg font-bold text-blue-600">€{cardTotal.toFixed(2)}</p>
+                <p className="text-lg font-bold text-blue-400">€{cardTotal.toFixed(2)}</p>
               </div>
               <div className="text-center">
                 <p className="text-sm text-muted-foreground">Totale</p>
@@ -1299,8 +1406,8 @@ function CashEntriesSection({ eventId, isAdmin }: { eventId: string; isAdmin: bo
             </div>
           </>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </motion.div>
   );
 }
 
@@ -1398,26 +1505,34 @@ function PersonnelSection({ eventId, isAdmin }: { eventId: string; isAdmin: bool
   }, 0);
 
   if (isLoading) {
-    return <div className="text-center py-8">Caricamento...</div>;
+    return (
+      <div className="glass-card p-8 text-center">
+        <div className="text-muted-foreground">Caricamento...</div>
+      </div>
+    );
   }
 
   return (
-    <Card>
-      <CardHeader>
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="glass-card overflow-hidden"
+    >
+      <div className="p-5 border-b border-white/10">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div>
-            <CardTitle className="flex items-center gap-2">
-              <Users className="h-5 w-5" />
-              Personale Assegnato
-            </CardTitle>
-            <CardDescription>
-              Seleziona e gestisci lo staff per questo evento
-            </CardDescription>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center">
+              <Users className="h-5 w-5 text-white" />
+            </div>
+            <div>
+              <h3 className="font-semibold">Personale Assegnato</h3>
+              <p className="text-sm text-muted-foreground">Seleziona e gestisci lo staff per questo evento</p>
+            </div>
           </div>
           {isAdmin && (
             <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
               <DialogTrigger asChild>
-                <Button data-testid="button-add-staff">
+                <Button className="gradient-golden text-black font-semibold" data-testid="button-add-staff">
                   <UserPlus className="h-4 w-4 mr-2" />
                   Aggiungi Staff
                 </Button>
@@ -1436,8 +1551,8 @@ function PersonnelSection({ eventId, isAdmin }: { eventId: string; isAdmin: bool
                       {availableStaff.map((staff) => (
                         <div 
                           key={staff.id} 
-                          className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
-                            selectedStaffIds.includes(staff.id) ? 'bg-primary/10 border-primary' : 'hover:bg-muted'
+                          className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${
+                            selectedStaffIds.includes(staff.id) ? 'bg-primary/10 border-primary' : 'border-white/10 hover:bg-white/5'
                           }`}
                           onClick={() => toggleStaffSelection(staff.id)}
                           data-testid={`staff-select-${staff.id}`}
@@ -1461,6 +1576,7 @@ function PersonnelSection({ eventId, isAdmin }: { eventId: string; isAdmin: bool
                 <DialogFooter>
                   <Button 
                     onClick={handleAddStaff} 
+                    className="gradient-golden text-black font-semibold"
                     disabled={selectedStaffIds.length === 0 || createMutation.isPending}
                     data-testid="button-confirm-add-staff"
                   >
@@ -1472,8 +1588,8 @@ function PersonnelSection({ eventId, isAdmin }: { eventId: string; isAdmin: bool
             </Dialog>
           )}
         </div>
-      </CardHeader>
-      <CardContent>
+      </div>
+      <div className="p-5">
         {eventAssignments.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">
             Nessun personale assegnato a questo evento.
@@ -1499,7 +1615,7 @@ function PersonnelSection({ eventId, isAdmin }: { eventId: string; isAdmin: bool
                   {eventAssignments.map((assignment) => (
                     <TableRow key={assignment.id} data-testid={`row-assignment-${assignment.id}`}>
                       <TableCell className="font-medium">{getStaffName(assignment.staffId)}</TableCell>
-                      <TableCell>{getStaffRole(assignment.staffId)}</TableCell>
+                      <TableCell className="text-muted-foreground">{getStaffRole(assignment.staffId)}</TableCell>
                       <TableCell>
                         {isAdmin ? (
                           <Input 
@@ -1510,11 +1626,11 @@ function PersonnelSection({ eventId, isAdmin }: { eventId: string; isAdmin: bool
                               if (e.target.value !== (assignment.role || "")) {
                                 updateMutation.mutate({ 
                                   id: assignment.id, 
-                                  data: { role: e.target.value || null } 
+                                  data: { role: e.target.value || null }
                                 });
                               }
                             }}
-                            data-testid={`input-role-${assignment.id}`}
+                            data-testid={`input-assignment-role-${assignment.id}`}
                           />
                         ) : (
                           assignment.role || "-"
@@ -1528,15 +1644,17 @@ function PersonnelSection({ eventId, isAdmin }: { eventId: string; isAdmin: bool
                             defaultValue={assignment.compensationAmount || "0"} 
                             className="h-8 w-24 text-right"
                             onBlur={(e) => {
-                              updateMutation.mutate({ 
-                                id: assignment.id, 
-                                data: { compensationAmount: e.target.value } 
-                              });
+                              if (e.target.value !== (assignment.compensationAmount || "0")) {
+                                updateMutation.mutate({ 
+                                  id: assignment.id, 
+                                  data: { compensationAmount: e.target.value }
+                                });
+                              }
                             }}
-                            data-testid={`input-compensation-${assignment.id}`}
+                            data-testid={`input-assignment-compensation-${assignment.id}`}
                           />
                         ) : (
-                          `€${parseFloat(assignment.compensationAmount || '0').toFixed(2)}`
+                          `€${parseFloat(assignment.compensationAmount || "0").toFixed(2)}`
                         )}
                       </TableCell>
                       <TableCell className="text-right">
@@ -1545,31 +1663,59 @@ function PersonnelSection({ eventId, isAdmin }: { eventId: string; isAdmin: bool
                             type="number"
                             step="0.01"
                             defaultValue={assignment.bonus || "0"} 
-                            className="h-8 w-20 text-right"
+                            className="h-8 w-24 text-right"
                             onBlur={(e) => {
-                              updateMutation.mutate({ 
-                                id: assignment.id, 
-                                data: { bonus: e.target.value } 
-                              });
+                              if (e.target.value !== (assignment.bonus || "0")) {
+                                updateMutation.mutate({ 
+                                  id: assignment.id, 
+                                  data: { bonus: e.target.value }
+                                });
+                              }
                             }}
-                            data-testid={`input-bonus-${assignment.id}`}
+                            data-testid={`input-assignment-bonus-${assignment.id}`}
                           />
                         ) : (
-                          `€${parseFloat(assignment.bonus || '0').toFixed(2)}`
+                          `€${parseFloat(assignment.bonus || "0").toFixed(2)}`
                         )}
                       </TableCell>
                       <TableCell>
-                        <Badge variant={assignment.status === 'present' ? 'default' : 'outline'}>
-                          {assignment.status === 'present' ? 'Presente' : 
-                           assignment.status === 'absent' ? 'Assente' : 
-                           assignment.status === 'confirmed' ? 'Confermato' : 'Programmato'}
-                        </Badge>
+                        {isAdmin ? (
+                          <Select 
+                            value={assignment.status} 
+                            onValueChange={(value) => {
+                              updateMutation.mutate({ 
+                                id: assignment.id, 
+                                data: { status: value }
+                              });
+                            }}
+                          >
+                            <SelectTrigger className="h-8 w-28" data-testid={`select-assignment-status-${assignment.id}`}>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="scheduled">Programmato</SelectItem>
+                              <SelectItem value="confirmed">Confermato</SelectItem>
+                              <SelectItem value="present">Presente</SelectItem>
+                              <SelectItem value="absent">Assente</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <Badge variant={
+                            assignment.status === 'present' ? 'default' :
+                            assignment.status === 'confirmed' ? 'secondary' :
+                            assignment.status === 'absent' ? 'destructive' : 'outline'
+                          }>
+                            {assignment.status === 'scheduled' ? 'Programmato' :
+                             assignment.status === 'confirmed' ? 'Confermato' :
+                             assignment.status === 'present' ? 'Presente' : 'Assente'}
+                          </Badge>
+                        )}
                       </TableCell>
                       {isAdmin && (
                         <TableCell className="text-right">
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
-                              <Button size="icon" variant="ghost" data-testid={`button-remove-staff-${assignment.id}`}>
+                              <Button size="icon" variant="ghost" data-testid={`button-delete-assignment-${assignment.id}`}>
                                 <Trash2 className="h-4 w-4 text-destructive" />
                               </Button>
                             </AlertDialogTrigger>
@@ -1577,7 +1723,7 @@ function PersonnelSection({ eventId, isAdmin }: { eventId: string; isAdmin: bool
                               <AlertDialogHeader>
                                 <AlertDialogTitle>Rimuovere questo staff?</AlertDialogTitle>
                                 <AlertDialogDescription>
-                                  Lo staff verrà rimosso dall'evento.
+                                  Questa azione rimuoverà l'assegnazione dall'evento.
                                 </AlertDialogDescription>
                               </AlertDialogHeader>
                               <AlertDialogFooter>
@@ -1596,22 +1742,21 @@ function PersonnelSection({ eventId, isAdmin }: { eventId: string; isAdmin: bool
               </Table>
             </div>
 
-            <div className="mt-4 pt-4 border-t flex justify-between items-center">
-              <span className="text-muted-foreground">Totale costo personale:</span>
-              <span className="text-xl font-bold">€{totalCost.toFixed(2)}</span>
+            <div className="mt-4 pt-4 border-t border-white/10 flex justify-between items-center">
+              <span className="text-muted-foreground">Costo totale personale:</span>
+              <span className="text-xl font-bold text-rose-400">€{totalCost.toFixed(2)}</span>
             </div>
           </>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </motion.div>
   );
 }
 
 function CostsSection({ eventId, isAdmin }: { eventId: string; isAdmin: boolean }) {
   const { toast } = useToast();
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [isNewCostDialogOpen, setIsNewCostDialogOpen] = useState(false);
-  const [selectedCostIds, setSelectedCostIds] = useState<string[]>([]);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingCost, setEditingCost] = useState<ExtraCost | null>(null);
 
   const { data: extraCosts = [], isLoading } = useQuery<ExtraCost[]>({
     queryKey: ["/api/extra-costs"],
@@ -1622,15 +1767,14 @@ function CostsSection({ eventId, isAdmin }: { eventId: string; isAdmin: boolean 
   });
 
   const eventCosts = extraCosts.filter(c => c.eventId === eventId);
-  const unassignedCosts = extraCosts.filter(c => !c.eventId);
   const activeFixedCosts = fixedCosts.filter(c => c.active);
 
   const createMutation = useMutation({
     mutationFn: (data: any) => apiRequest("POST", "/api/extra-costs", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/extra-costs"] });
-      setIsNewCostDialogOpen(false);
-      toast({ title: "Costo registrato" });
+      setIsDialogOpen(false);
+      toast({ title: "Costo aggiunto" });
     },
     onError: (err: any) => {
       toast({ title: "Errore", description: err.message, variant: "destructive" });
@@ -1642,6 +1786,8 @@ function CostsSection({ eventId, isAdmin }: { eventId: string; isAdmin: boolean 
       apiRequest("PATCH", `/api/extra-costs/${id}`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/extra-costs"] });
+      setEditingCost(null);
+      setIsDialogOpen(false);
       toast({ title: "Costo aggiornato" });
     },
     onError: (err: any) => {
@@ -1653,216 +1799,148 @@ function CostsSection({ eventId, isAdmin }: { eventId: string; isAdmin: boolean 
     mutationFn: (id: string) => apiRequest("DELETE", `/api/extra-costs/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/extra-costs"] });
-      toast({ title: "Costo rimosso" });
+      toast({ title: "Costo eliminato" });
     },
     onError: (err: any) => {
       toast({ title: "Errore", description: err.message, variant: "destructive" });
     },
   });
 
-  const handleAssignCosts = () => {
-    selectedCostIds.forEach(costId => {
-      updateMutation.mutate({ id: costId, data: { eventId } });
-    });
-    setSelectedCostIds([]);
-    setIsAddDialogOpen(false);
-  };
-
-  const handleNewCostSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
-    createMutation.mutate({
-      eventId,
+    const data = {
+      eventId: eventId,
       name: formData.get("name") as string,
       category: formData.get("category") as string,
       amount: formData.get("amount") as string,
       notes: formData.get("notes") as string || null,
-    });
-  };
+    };
 
-  const toggleCostSelection = (costId: string) => {
-    setSelectedCostIds(prev => 
-      prev.includes(costId) 
-        ? prev.filter(id => id !== costId)
-        : [...prev, costId]
-    );
+    if (editingCost) {
+      updateMutation.mutate({ id: editingCost.id, data });
+    } else {
+      createMutation.mutate(data);
+    }
   };
 
   const categoryLabels: Record<string, string> = {
-    personale: "Personale",
-    service: "Service",
-    noleggi: "Noleggi",
-    acquisti: "Acquisti",
-    equipment: "Attrezzature",
+    venue: "Location",
+    equipment: "Attrezzatura",
     marketing: "Marketing",
-    transport: "Trasporto",
+    staff: "Personale",
+    supplies: "Forniture",
     other: "Altro",
   };
 
   const totalExtraCosts = eventCosts.reduce((sum, c) => sum + parseFloat(c.amount), 0);
-  const totalFixedCosts = activeFixedCosts.reduce((sum, c) => {
-    if (c.frequency === 'per_event') return sum + parseFloat(c.amount);
-    return sum;
-  }, 0);
-  const totalCosts = totalExtraCosts + totalFixedCosts;
+  const totalFixedCosts = activeFixedCosts.filter(c => c.frequency === 'per_event').reduce((sum, c) => sum + parseFloat(c.amount), 0);
 
   if (isLoading) {
-    return <div className="text-center py-8">Caricamento...</div>;
+    return (
+      <div className="glass-card p-8 text-center">
+        <div className="text-muted-foreground">Caricamento...</div>
+      </div>
+    );
   }
 
   return (
     <div className="space-y-6">
-      <Card>
-        <CardHeader>
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="glass-card overflow-hidden"
+      >
+        <div className="p-5 border-b border-white/10">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                <TrendingDown className="h-5 w-5" />
-                Costi Extra Evento
-              </CardTitle>
-              <CardDescription>
-                Seleziona dalla contabilità o aggiungi nuovi costi
-              </CardDescription>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-rose-500 to-red-600 flex items-center justify-center">
+                <ListPlus className="h-5 w-5 text-white" />
+              </div>
+              <div>
+                <h3 className="font-semibold">Costi Extra Evento</h3>
+                <p className="text-sm text-muted-foreground">Spese aggiuntive specifiche per questo evento</p>
+              </div>
             </div>
             {isAdmin && (
-              <div className="flex gap-2">
-                <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-                  <DialogTrigger asChild>
-                    <Button variant="outline" data-testid="button-select-costs">
-                      <ListPlus className="h-4 w-4 mr-2" />
-                      Seleziona Esistenti
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="max-w-md max-h-[80vh]">
-                    <DialogHeader>
-                      <DialogTitle>Seleziona Costi da Contabilità</DialogTitle>
-                    </DialogHeader>
-                    <div className="space-y-4">
-                      {unassignedCosts.length === 0 ? (
-                        <div className="text-center py-8 text-muted-foreground">
-                          Nessun costo disponibile da assegnare.
-                          <br />
-                          <span className="text-sm">Crea nuovi costi dalla sezione Contabilità.</span>
-                        </div>
-                      ) : (
-                        <div className="space-y-2 max-h-[400px] overflow-y-auto">
-                          {unassignedCosts.map((cost) => (
-                            <div 
-                              key={cost.id} 
-                              className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
-                                selectedCostIds.includes(cost.id) ? 'bg-primary/10 border-primary' : 'hover:bg-muted'
-                              }`}
-                              onClick={() => toggleCostSelection(cost.id)}
-                              data-testid={`cost-select-${cost.id}`}
-                            >
-                              <Checkbox 
-                                checked={selectedCostIds.includes(cost.id)}
-                                onCheckedChange={() => toggleCostSelection(cost.id)}
-                              />
-                              <div className="flex-1">
-                                <p className="font-medium">{cost.name}</p>
-                                <p className="text-sm text-muted-foreground">
-                                  {categoryLabels[cost.category] || cost.category}
-                                </p>
-                              </div>
-                              <Badge variant="outline" className="text-red-600">
-                                €{parseFloat(cost.amount).toFixed(2)}
-                              </Badge>
-                            </div>
-                          ))}
-                        </div>
-                      )}
+              <Dialog open={isDialogOpen} onOpenChange={(open) => {
+                setIsDialogOpen(open);
+                if (!open) setEditingCost(null);
+              }}>
+                <DialogTrigger asChild>
+                  <Button className="gradient-golden text-black font-semibold" data-testid="button-add-cost">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Aggiungi Costo
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>{editingCost ? "Modifica Costo" : "Nuovo Costo Extra"}</DialogTitle>
+                  </DialogHeader>
+                  <form onSubmit={handleSubmit} className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="name">Descrizione *</Label>
+                      <Input
+                        id="name"
+                        name="name"
+                        defaultValue={editingCost?.name || ""}
+                        placeholder="es. Noleggio impianto audio"
+                        required
+                        data-testid="input-cost-name"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="category">Categoria *</Label>
+                      <Select name="category" defaultValue={editingCost?.category || "other"}>
+                        <SelectTrigger data-testid="select-cost-category">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="venue">Location</SelectItem>
+                          <SelectItem value="equipment">Attrezzatura</SelectItem>
+                          <SelectItem value="marketing">Marketing</SelectItem>
+                          <SelectItem value="staff">Personale</SelectItem>
+                          <SelectItem value="supplies">Forniture</SelectItem>
+                          <SelectItem value="other">Altro</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="amount">Importo (€) *</Label>
+                      <Input
+                        id="amount"
+                        name="amount"
+                        type="number"
+                        step="0.01"
+                        defaultValue={editingCost?.amount || ""}
+                        required
+                        data-testid="input-cost-amount"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="notes">Note</Label>
+                      <Textarea
+                        id="notes"
+                        name="notes"
+                        defaultValue={editingCost?.notes || ""}
+                        data-testid="input-cost-notes"
+                      />
                     </div>
                     <DialogFooter>
-                      <Button 
-                        onClick={handleAssignCosts} 
-                        disabled={selectedCostIds.length === 0 || updateMutation.isPending}
-                        data-testid="button-confirm-assign-costs"
-                      >
-                        <Check className="h-4 w-4 mr-2" />
-                        Assegna {selectedCostIds.length > 0 && `(${selectedCostIds.length})`}
+                      <Button type="submit" className="gradient-golden text-black font-semibold" disabled={createMutation.isPending || updateMutation.isPending} data-testid="button-save-cost">
+                        {editingCost ? "Aggiorna" : "Aggiungi"}
                       </Button>
                     </DialogFooter>
-                  </DialogContent>
-                </Dialog>
-
-                <Dialog open={isNewCostDialogOpen} onOpenChange={setIsNewCostDialogOpen}>
-                  <DialogTrigger asChild>
-                    <Button data-testid="button-add-new-cost">
-                      <Plus className="h-4 w-4 mr-2" />
-                      Nuovo Costo
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="max-w-md">
-                    <DialogHeader>
-                      <DialogTitle>Nuovo Costo</DialogTitle>
-                    </DialogHeader>
-                    <form onSubmit={handleNewCostSubmit} className="space-y-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="name">Descrizione *</Label>
-                        <Input
-                          id="name"
-                          name="name"
-                          placeholder="es. Noleggio luci extra"
-                          required
-                          data-testid="input-new-cost-name"
-                        />
-                      </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="category">Categoria *</Label>
-                          <Select name="category" defaultValue="other">
-                            <SelectTrigger data-testid="select-new-cost-category">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="personale">Personale</SelectItem>
-                              <SelectItem value="service">Service</SelectItem>
-                              <SelectItem value="noleggi">Noleggi</SelectItem>
-                              <SelectItem value="acquisti">Acquisti</SelectItem>
-                              <SelectItem value="equipment">Attrezzature</SelectItem>
-                              <SelectItem value="marketing">Marketing</SelectItem>
-                              <SelectItem value="transport">Trasporto</SelectItem>
-                              <SelectItem value="other">Altro</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="amount">Importo (€) *</Label>
-                          <Input
-                            id="amount"
-                            name="amount"
-                            type="number"
-                            step="0.01"
-                            required
-                            data-testid="input-new-cost-amount"
-                          />
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="notes">Note</Label>
-                        <Textarea
-                          id="notes"
-                          name="notes"
-                          data-testid="input-new-cost-notes"
-                        />
-                      </div>
-                      <DialogFooter>
-                        <Button type="submit" disabled={createMutation.isPending} data-testid="button-save-new-cost">
-                          Registra
-                        </Button>
-                      </DialogFooter>
-                    </form>
-                  </DialogContent>
-                </Dialog>
-              </div>
+                  </form>
+                </DialogContent>
+              </Dialog>
             )}
           </div>
-        </CardHeader>
-        <CardContent>
+        </div>
+        <div className="p-5">
           {eventCosts.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
-              Nessun costo extra assegnato a questo evento
+              Nessun costo extra registrato per questo evento
             </div>
           ) : (
             <>
@@ -1873,6 +1951,7 @@ function CostsSection({ eventId, isAdmin }: { eventId: string; isAdmin: boolean 
                       <TableHead>Descrizione</TableHead>
                       <TableHead>Categoria</TableHead>
                       <TableHead className="text-right">Importo</TableHead>
+                      <TableHead>Note</TableHead>
                       {isAdmin && <TableHead className="text-right">Azioni</TableHead>}
                     </TableRow>
                   </TableHeader>
@@ -1883,32 +1962,46 @@ function CostsSection({ eventId, isAdmin }: { eventId: string; isAdmin: boolean 
                         <TableCell>
                           <Badge variant="outline">{categoryLabels[cost.category] || cost.category}</Badge>
                         </TableCell>
-                        <TableCell className="text-right font-medium text-red-600">
+                        <TableCell className="text-right font-medium text-rose-400">
                           €{parseFloat(cost.amount).toFixed(2)}
                         </TableCell>
+                        <TableCell className="text-muted-foreground">{cost.notes || "-"}</TableCell>
                         {isAdmin && (
                           <TableCell className="text-right">
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <Button size="icon" variant="ghost" data-testid={`button-remove-cost-${cost.id}`}>
-                                  <Trash2 className="h-4 w-4 text-destructive" />
-                                </Button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>Rimuovere questo costo?</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    Il costo verrà dissociato dall'evento (non eliminato).
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel>Annulla</AlertDialogCancel>
-                                  <AlertDialogAction onClick={() => updateMutation.mutate({ id: cost.id, data: { eventId: null } })}>
-                                    Rimuovi
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
+                            <div className="flex justify-end gap-1">
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                onClick={() => {
+                                  setEditingCost(cost);
+                                  setIsDialogOpen(true);
+                                }}
+                                data-testid={`button-edit-cost-${cost.id}`}
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button size="icon" variant="ghost" data-testid={`button-delete-cost-${cost.id}`}>
+                                    <Trash2 className="h-4 w-4 text-destructive" />
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>Eliminare questo costo?</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      Questa azione non può essere annullata.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Annulla</AlertDialogCancel>
+                                    <AlertDialogAction onClick={() => deleteMutation.mutate(cost.id)}>
+                                      Elimina
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            </div>
                           </TableCell>
                         )}
                       </TableRow>
@@ -1916,28 +2009,34 @@ function CostsSection({ eventId, isAdmin }: { eventId: string; isAdmin: boolean 
                   </TableBody>
                 </Table>
               </div>
-
-              <div className="mt-4 pt-4 border-t flex justify-between items-center">
+              <div className="mt-4 pt-4 border-t border-white/10 flex justify-between items-center">
                 <span className="text-muted-foreground">Totale costi extra:</span>
-                <span className="text-xl font-bold text-red-600">€{totalExtraCosts.toFixed(2)}</span>
+                <span className="text-xl font-bold text-rose-400">€{totalExtraCosts.toFixed(2)}</span>
               </div>
             </>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </motion.div>
 
       {activeFixedCosts.filter(c => c.frequency === 'per_event').length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Euro className="h-5 w-5" />
-              Costi Fissi (Per Evento)
-            </CardTitle>
-            <CardDescription>
-              Costi fissi applicati automaticamente a ogni evento
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="glass-card overflow-hidden"
+        >
+          <div className="p-5 border-b border-white/10">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-orange-500 to-amber-600 flex items-center justify-center">
+                <Euro className="h-5 w-5 text-white" />
+              </div>
+              <div>
+                <h3 className="font-semibold">Costi Fissi per Evento</h3>
+                <p className="text-sm text-muted-foreground">Costi fissi applicati automaticamente ad ogni evento</p>
+              </div>
+            </div>
+          </div>
+          <div className="p-5">
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
@@ -1949,12 +2048,12 @@ function CostsSection({ eventId, isAdmin }: { eventId: string; isAdmin: boolean 
                 </TableHeader>
                 <TableBody>
                   {activeFixedCosts.filter(c => c.frequency === 'per_event').map((cost) => (
-                    <TableRow key={cost.id}>
+                    <TableRow key={cost.id} data-testid={`row-fixed-cost-${cost.id}`}>
                       <TableCell className="font-medium">{cost.name}</TableCell>
                       <TableCell>
                         <Badge variant="outline">{categoryLabels[cost.category] || cost.category}</Badge>
                       </TableCell>
-                      <TableCell className="text-right font-medium text-red-600">
+                      <TableCell className="text-right font-medium text-rose-400">
                         €{parseFloat(cost.amount).toFixed(2)}
                       </TableCell>
                     </TableRow>
@@ -1962,12 +2061,12 @@ function CostsSection({ eventId, isAdmin }: { eventId: string; isAdmin: boolean 
                 </TableBody>
               </Table>
             </div>
-            <div className="mt-4 pt-4 border-t flex justify-between items-center">
+            <div className="mt-4 pt-4 border-t border-white/10 flex justify-between items-center">
               <span className="text-muted-foreground">Totale costi fissi:</span>
-              <span className="text-xl font-bold text-red-600">€{totalFixedCosts.toFixed(2)}</span>
+              <span className="text-xl font-bold text-rose-400">€{totalFixedCosts.toFixed(2)}</span>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </motion.div>
       )}
     </div>
   );
@@ -2033,149 +2132,137 @@ function SummarySection({ eventId }: { eventId: string }) {
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>Totale Incassi</CardDescription>
-            <CardTitle className="text-2xl text-green-600">€{totalRevenue.toFixed(2)}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-sm text-muted-foreground space-y-1">
-              <div className="flex justify-between">
-                <span>Contanti:</span>
-                <span>€{cashRevenue.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Carta:</span>
-                <span>€{cardRevenue.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Online:</span>
-                <span>€{onlineRevenue.toFixed(2)}</span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>Totale Costi</CardDescription>
-            <CardTitle className="text-2xl text-red-600">€{totalCosts.toFixed(2)}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-sm text-muted-foreground space-y-1">
-              <div className="flex justify-between">
-                <span>Beverage:</span>
-                <span>€{beverageCost.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Personale:</span>
-                <span>€{totalStaffCosts.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Extra:</span>
-                <span>€{totalExtraCosts.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Fissi:</span>
-                <span>€{totalFixedCosts.toFixed(2)}</span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>Risultato Netto</CardDescription>
-            <CardTitle className={`text-2xl ${netResult >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-              {netResult >= 0 ? '+' : ''}€{netResult.toFixed(2)}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-sm text-muted-foreground">
-              {netResult >= 0 ? 'Profitto' : 'Perdita'} dell'evento
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>Fondi Cassa</CardDescription>
-            <CardTitle className="text-2xl">€{closingFunds.toFixed(2)}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-sm text-muted-foreground space-y-1">
-              <div className="flex justify-between">
-                <span>Apertura:</span>
-                <span>€{openingFunds.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Chiusura:</span>
-                <span>€{closingFunds.toFixed(2)}</span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+      <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+        <StatsCard
+          title="Totale Incassi"
+          value={`€${totalRevenue.toFixed(2)}`}
+          icon={TrendingUp}
+          gradient="from-emerald-500 to-green-600"
+          testId="stat-total-revenue"
+          delay={0}
+        />
+        <StatsCard
+          title="Totale Costi"
+          value={`€${totalCosts.toFixed(2)}`}
+          icon={TrendingDown}
+          gradient="from-rose-500 to-red-600"
+          testId="stat-total-costs"
+          delay={0.1}
+        />
+        <StatsCard
+          title="Risultato Netto"
+          value={`${netResult >= 0 ? '+' : ''}€${netResult.toFixed(2)}`}
+          icon={Euro}
+          gradient={netResult >= 0 ? "from-teal-500 to-cyan-600" : "from-rose-500 to-red-600"}
+          testId="stat-net-result"
+          delay={0.2}
+        />
+        <StatsCard
+          title="Fondi Chiusura"
+          value={`€${closingFunds.toFixed(2)}`}
+          icon={Wallet}
+          gradient="from-amber-500 to-orange-600"
+          testId="stat-closing-funds"
+          delay={0.3}
+        />
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <FileText className="h-5 w-5" />
-            Riepilogo Dettagliato
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-6">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.4 }}
+        className="glass-card overflow-hidden"
+      >
+        <div className="p-5 border-b border-white/10">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
+              <FileText className="h-5 w-5 text-white" />
+            </div>
+            <h3 className="font-semibold">Riepilogo Dettagliato</h3>
+          </div>
+        </div>
+        <div className="p-5 space-y-6">
           <div>
-            <h4 className="font-medium mb-2 flex items-center gap-2">
-              <TrendingUp className="h-4 w-4 text-green-600" />
+            <h4 className="font-medium mb-3 flex items-center gap-2">
+              <TrendingUp className="h-4 w-4 text-teal" />
               Entrate
             </h4>
-            <div className="pl-6 space-y-1 text-sm">
+            <div className="pl-6 space-y-2 text-sm">
               <div className="flex justify-between">
-                <span>Incassi totali ({eventEntries.length} transazioni)</span>
+                <span className="text-muted-foreground">Incassi totali ({eventEntries.length} transazioni)</span>
                 <span className="font-medium">€{totalRevenue.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between text-muted-foreground">
+                <span>Contanti</span>
+                <span>€{cashRevenue.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between text-muted-foreground">
+                <span>Carta</span>
+                <span>€{cardRevenue.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between text-muted-foreground">
+                <span>Online</span>
+                <span>€{onlineRevenue.toFixed(2)}</span>
               </div>
             </div>
           </div>
 
-          <Separator />
+          <Separator className="bg-white/10" />
 
           <div>
-            <h4 className="font-medium mb-2 flex items-center gap-2">
-              <TrendingDown className="h-4 w-4 text-red-600" />
+            <h4 className="font-medium mb-3 flex items-center gap-2">
+              <TrendingDown className="h-4 w-4 text-rose-400" />
               Uscite
             </h4>
-            <div className="pl-6 space-y-1 text-sm">
+            <div className="pl-6 space-y-2 text-sm">
               <div className="flex justify-between">
-                <span>Costo beverage</span>
+                <span className="text-muted-foreground">Costo beverage</span>
                 <span className="font-medium">€{beverageCost.toFixed(2)}</span>
               </div>
               <div className="flex justify-between">
-                <span>Personale ({eventAssignments.length} staff)</span>
+                <span className="text-muted-foreground">Personale ({eventAssignments.length} staff)</span>
                 <span className="font-medium">€{totalStaffCosts.toFixed(2)}</span>
               </div>
               <div className="flex justify-between">
-                <span>Costi extra ({eventCosts.length} voci)</span>
+                <span className="text-muted-foreground">Costi extra ({eventCosts.length} voci)</span>
                 <span className="font-medium">€{totalExtraCosts.toFixed(2)}</span>
               </div>
               <div className="flex justify-between">
-                <span>Costi fissi ({perEventFixedCosts.length} voci)</span>
+                <span className="text-muted-foreground">Costi fissi ({perEventFixedCosts.length} voci)</span>
                 <span className="font-medium">€{totalFixedCosts.toFixed(2)}</span>
               </div>
             </div>
           </div>
 
-          <Separator />
+          <Separator className="bg-white/10" />
+
+          <div>
+            <h4 className="font-medium mb-3 flex items-center gap-2">
+              <Wallet className="h-4 w-4 text-amber-400" />
+              Fondi Cassa
+            </h4>
+            <div className="pl-6 space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Apertura</span>
+                <span className="font-medium">€{openingFunds.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Chiusura</span>
+                <span className="font-medium">€{closingFunds.toFixed(2)}</span>
+              </div>
+            </div>
+          </div>
+
+          <Separator className="bg-white/10" />
 
           <div className="flex justify-between items-center text-lg font-bold">
             <span>RISULTATO NETTO</span>
-            <span className={netResult >= 0 ? 'text-green-600' : 'text-red-600'}>
+            <span className={netResult >= 0 ? 'text-teal' : 'text-rose-400'}>
               {netResult >= 0 ? '+' : ''}€{netResult.toFixed(2)}
             </span>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </motion.div>
     </div>
   );
 }

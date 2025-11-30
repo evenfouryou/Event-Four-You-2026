@@ -5,7 +5,6 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -43,12 +42,34 @@ import {
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Users as UsersIcon, Edit, Trash2, Ban, CheckCircle, LogIn, Settings2, Wine, Calculator, Users as PersonnelIcon, Receipt, FileText } from "lucide-react";
+import { 
+  Plus, 
+  Users as UsersIcon, 
+  Edit, 
+  Trash2, 
+  Ban, 
+  CheckCircle, 
+  LogIn, 
+  Settings2, 
+  Wine, 
+  Calculator, 
+  Users as PersonnelIcon, 
+  Receipt, 
+  FileText,
+  ArrowLeft,
+  Mail,
+  Building2,
+  Shield,
+  UserCheck,
+  UserX
+} from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { Link } from "wouter";
+import { motion } from "framer-motion";
 import type { User, Company, UserFeatures } from "@shared/schema";
 
 const userFormSchema = z.object({
@@ -60,11 +81,9 @@ const userFormSchema = z.object({
   companyId: z.string().optional().nullable(),
   isEditing: z.boolean().optional(),
 }).refine((data) => {
-  // Password required when creating new user
   if (!data.isEditing && (!data.password || data.password.length < 8)) {
     return false;
   }
-  // Password optional when editing, but if provided must be >= 8 chars
   if (data.isEditing && data.password && data.password.length < 8) {
     return false;
   }
@@ -81,6 +100,13 @@ const roleLabels: Record<string, string> = {
   gestore: 'Gestore',
   warehouse: 'Magazzino',
   bartender: 'Bartender',
+};
+
+const roleGradients: Record<string, string> = {
+  super_admin: 'from-purple-500 to-indigo-600',
+  gestore: 'from-amber-500 to-orange-600',
+  warehouse: 'from-blue-500 to-cyan-600',
+  bartender: 'from-teal-500 to-emerald-600',
 };
 
 interface FeatureConfig {
@@ -112,7 +138,7 @@ export default function UsersPage() {
     queryKey: ['/api/users'],
   });
 
-  const { data: companies, isLoading: companiesLoading } = useQuery<Company[]>({
+  const { data: companies } = useQuery<Company[]>({
     queryKey: ['/api/companies'],
     enabled: currentUser?.role === 'super_admin',
   });
@@ -281,7 +307,6 @@ export default function UsersPage() {
         title: "Impersonificazione attivata",
         description: "Accesso come utente effettuato",
       });
-      // Redirect alla homepage per applicare la nuova sessione
       setTimeout(() => window.location.href = '/', 500);
     },
     onError: (error: any) => {
@@ -328,7 +353,6 @@ export default function UsersPage() {
 
   const handleSubmit = (data: UserFormData) => {
     if (editingUser) {
-      // Se non è stata cambiata la password, non la inviamo
       const updateData: Partial<UserFormData> = {
         email: data.email,
         firstName: data.firstName,
@@ -341,7 +365,6 @@ export default function UsersPage() {
       }
       updateMutation.mutate({ id: editingUser.id, data: updateData });
     } else {
-      // Rimuovi campi non necessari e pulisci i dati
       const { isEditing, ...createData } = data;
       const cleanData = {
         ...createData,
@@ -355,7 +378,7 @@ export default function UsersPage() {
     setEditingUser(user);
     form.reset({
       email: user.email || '',
-      password: '', // Non mostriamo la password esistente
+      password: '',
       firstName: user.firstName || '',
       lastName: user.lastName || '',
       role: user.role as any,
@@ -368,7 +391,6 @@ export default function UsersPage() {
   const handleDialogOpenChange = (open: boolean) => {
     setDialogOpen(open);
     if (!open) {
-      // Reset quando si chiude
       setEditingUser(null);
       form.reset({
         email: '',
@@ -426,18 +448,41 @@ export default function UsersPage() {
     }
   };
 
+  const totalUsers = users?.length || 0;
+  const activeUsers = users?.filter(u => u.isActive).length || 0;
+  const verifiedUsers = users?.filter(u => u.emailVerified).length || 0;
+
   return (
-    <div className="p-6 md:p-8 max-w-7xl mx-auto">
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-2xl font-semibold mb-1">Gestione Utenti</h1>
-          <p className="text-muted-foreground">
-            Crea e gestisci gli utenti del sistema
-          </p>
+    <div className="p-4 md:p-8 max-w-7xl mx-auto pb-24 md:pb-8">
+      <motion.div 
+        initial={{ opacity: 0, x: -20 }}
+        animate={{ opacity: 1, x: 0 }}
+        className="flex items-center gap-4 mb-8"
+      >
+        <Link href="/">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="rounded-xl"
+            data-testid="button-back-home"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+        </Link>
+        <div className="flex-1">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
+              <UsersIcon className="h-5 w-5 text-white" />
+            </div>
+            <div>
+              <h1 className="text-xl md:text-2xl font-bold" data-testid="text-page-title">Gestione Utenti</h1>
+              <p className="text-muted-foreground text-sm">Crea e gestisci gli utenti del sistema</p>
+            </div>
+          </div>
         </div>
         <Dialog open={dialogOpen} onOpenChange={handleDialogOpenChange}>
           <DialogTrigger asChild>
-            <Button data-testid="button-create-user">
+            <Button className="gradient-golden text-black font-semibold" data-testid="button-create-user">
               <Plus className="h-4 w-4 mr-2" />
               Nuovo Utente
             </Button>
@@ -583,6 +628,7 @@ export default function UsersPage() {
                   <Button
                     type="submit"
                     disabled={createMutation.isPending || updateMutation.isPending}
+                    className="gradient-golden text-black font-semibold"
                     data-testid="button-save-user"
                   >
                     {editingUser ? 'Aggiorna' : 'Crea'}
@@ -592,144 +638,195 @@ export default function UsersPage() {
             </Form>
           </DialogContent>
         </Dialog>
-      </div>
+      </motion.div>
+
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.1 }}
+        className="grid grid-cols-3 gap-3 md:gap-4 mb-6"
+      >
+        <div className="glass-card p-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
+              <UsersIcon className="h-5 w-5 text-white" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold" data-testid="text-total-users">{totalUsers}</p>
+              <p className="text-xs text-muted-foreground">Totale</p>
+            </div>
+          </div>
+        </div>
+        <div className="glass-card p-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-teal-500 to-cyan-600 flex items-center justify-center">
+              <UserCheck className="h-5 w-5 text-white" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-teal" data-testid="text-active-users">{activeUsers}</p>
+              <p className="text-xs text-muted-foreground">Attivi</p>
+            </div>
+          </div>
+        </div>
+        <div className="glass-card p-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center">
+              <Mail className="h-5 w-5 text-white" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold" data-testid="text-verified-users">{verifiedUsers}</p>
+              <p className="text-xs text-muted-foreground">Verificati</p>
+            </div>
+          </div>
+        </div>
+      </motion.div>
 
       {usersLoading ? (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {[1, 2, 3].map((i) => (
-            <Card key={i}>
-              <CardHeader className="space-y-0 pb-2">
-                <Skeleton className="h-4 w-32" />
-                <Skeleton className="h-3 w-24 mt-2" />
-              </CardHeader>
-              <CardContent>
-                <Skeleton className="h-3 w-full" />
-                <Skeleton className="h-3 w-3/4 mt-2" />
-              </CardContent>
-            </Card>
+            <div key={i} className="glass-card p-5">
+              <div className="flex items-start gap-4">
+                <Skeleton className="h-12 w-12 rounded-2xl" />
+                <div className="flex-1">
+                  <Skeleton className="h-4 w-32 mb-2" />
+                  <Skeleton className="h-3 w-24" />
+                </div>
+              </div>
+            </div>
           ))}
         </div>
       ) : users && users.length > 0 ? (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {users.map((user) => (
-            <Card key={user.id} data-testid={`card-user-${user.id}`}>
-              <CardHeader className="space-y-0 pb-2">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex-1 min-w-0">
-                    <CardTitle className="text-base font-medium truncate">
-                      {user.firstName} {user.lastName}
-                    </CardTitle>
-                    <p className="text-xs text-muted-foreground truncate mt-1">
-                      {user.email}
-                    </p>
-                  </div>
-                  <Badge variant="outline" className="shrink-0">
+          {users.map((user, index) => (
+            <motion.div
+              key={user.id}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: index * 0.05 }}
+              className="glass-card p-5 hover:border-primary/30 transition-all"
+              data-testid={`card-user-${user.id}`}
+            >
+              <div className="flex items-start gap-4 mb-4">
+                <div className={`w-12 h-12 rounded-2xl bg-gradient-to-br ${roleGradients[user.role] || 'from-gray-500 to-gray-600'} flex items-center justify-center shrink-0`}>
+                  <Shield className="h-6 w-6 text-white" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-semibold text-lg truncate" data-testid={`text-user-name-${user.id}`}>
+                    {user.firstName} {user.lastName}
+                  </h3>
+                  <p className="text-sm text-muted-foreground truncate flex items-center gap-1">
+                    <Mail className="h-3 w-3" />
+                    {user.email}
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Badge variant="outline" className="shrink-0" data-testid={`badge-role-${user.id}`}>
                     {roleLabels[user.role]}
                   </Badge>
+                  {user.isActive ? (
+                    <Badge variant="outline" className="text-teal border-teal/30" data-testid={`badge-active-${user.id}`}>
+                      <CheckCircle className="h-3 w-3 mr-1" />
+                      Attivo
+                    </Badge>
+                  ) : (
+                    <Badge variant="destructive" className="text-xs" data-testid={`badge-inactive-${user.id}`}>
+                      <UserX className="h-3 w-3 mr-1" />
+                      Disattivato
+                    </Badge>
+                  )}
+                  {user.emailVerified && (
+                    <Badge variant="secondary" className="text-xs" data-testid={`badge-verified-${user.id}`}>
+                      Verificato
+                    </Badge>
+                  )}
                 </div>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex-1 min-w-0">
-                      {isSuperAdmin && (
-                        <p className="text-xs text-muted-foreground truncate">
-                          {getCompanyName(user.companyId)}
-                        </p>
-                      )}
-                      <div className="flex gap-2 mt-1 flex-wrap">
-                        {user.emailVerified ? (
-                          <Badge variant="secondary" className="text-xs">
-                            Verificato
-                          </Badge>
-                        ) : (
-                          <Badge variant="outline" className="text-xs">
-                            Non verificato
-                          </Badge>
-                        )}
-                        {user.isActive ? (
-                          <Badge variant="outline" className="text-xs">
-                            <CheckCircle className="h-3 w-3 mr-1" />
-                            Attivo
-                          </Badge>
-                        ) : (
-                          <Badge variant="destructive" className="text-xs">
-                            <Ban className="h-3 w-3 mr-1" />
-                            Disattivato
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
+
+                {isSuperAdmin && (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Building2 className="h-3 w-3" />
+                    <span className="truncate" data-testid={`text-company-${user.id}`}>{getCompanyName(user.companyId)}</span>
                   </div>
-                  <div className="flex gap-1 shrink-0 flex-wrap">
-                    {isSuperAdmin && user.role === 'gestore' && (
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        onClick={() => handleOpenFeaturesDialog(user)}
-                        data-testid={`button-features-user-${user.id}`}
-                        title="Gestisci Moduli"
-                      >
-                        <Settings2 className="h-4 w-4" />
-                      </Button>
-                    )}
+                )}
+
+                <div className="flex gap-1 pt-2 border-t border-white/5">
+                  {isSuperAdmin && user.role === 'gestore' && (
                     <Button
                       size="icon"
                       variant="ghost"
-                      onClick={() => handleEdit(user)}
-                      data-testid={`button-edit-user-${user.id}`}
-                      title="Modifica utente"
+                      onClick={() => handleOpenFeaturesDialog(user)}
+                      data-testid={`button-features-user-${user.id}`}
+                      title="Gestisci Moduli"
+                      className="rounded-xl"
                     >
-                      <Edit className="h-4 w-4" />
+                      <Settings2 className="h-4 w-4" />
                     </Button>
-                    {user.id !== currentUser?.id && (
-                      <>
+                  )}
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    onClick={() => handleEdit(user)}
+                    data-testid={`button-edit-user-${user.id}`}
+                    title="Modifica utente"
+                    className="rounded-xl"
+                  >
+                    <Edit className="h-4 w-4" />
+                  </Button>
+                  {user.id !== currentUser?.id && (
+                    <>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => toggleActiveMutation.mutate({ id: user.id, isActive: !user.isActive })}
+                        data-testid={`button-toggle-active-user-${user.id}`}
+                        title={user.isActive ? "Disattiva utente" : "Riattiva utente"}
+                        className="rounded-xl"
+                      >
+                        {user.isActive ? <Ban className="h-4 w-4" /> : <CheckCircle className="h-4 w-4" />}
+                      </Button>
+                      {(isSuperAdmin || (isAdmin && user.role !== 'super_admin' && user.role !== 'gestore' && user.companyId === currentUser.companyId)) && (
                         <Button
                           size="icon"
                           variant="ghost"
-                          onClick={() => toggleActiveMutation.mutate({ id: user.id, isActive: !user.isActive })}
-                          data-testid={`button-toggle-active-user-${user.id}`}
-                          title={user.isActive ? "Disattiva utente" : "Riattiva utente"}
+                          onClick={() => impersonateMutation.mutate(user.id)}
+                          data-testid={`button-impersonate-user-${user.id}`}
+                          title="Impersonifica utente"
+                          className="rounded-xl"
                         >
-                          {user.isActive ? <Ban className="h-4 w-4" /> : <CheckCircle className="h-4 w-4" />}
+                          <LogIn className="h-4 w-4" />
                         </Button>
-                        {(isSuperAdmin || (isAdmin && user.role !== 'super_admin' && user.role !== 'gestore' && user.companyId === currentUser.companyId)) && (
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            onClick={() => impersonateMutation.mutate(user.id)}
-                            data-testid={`button-impersonate-user-${user.id}`}
-                            title="Impersonifica utente"
-                          >
-                            <LogIn className="h-4 w-4" />
-                          </Button>
-                        )}
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          onClick={() => handleDeleteClick(user.id)}
-                          data-testid={`button-delete-user-${user.id}`}
-                          title="Elimina utente"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </>
-                    )}
-                  </div>
+                      )}
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => handleDeleteClick(user.id)}
+                        data-testid={`button-delete-user-${user.id}`}
+                        title="Elimina utente"
+                        className="rounded-xl text-destructive hover:text-destructive"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </>
+                  )}
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </motion.div>
           ))}
         </div>
       ) : (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <UsersIcon className="h-12 w-12 text-muted-foreground mb-4" />
-            <p className="text-muted-foreground text-center">
-              Nessun utente trovato.
-            </p>
-          </CardContent>
-        </Card>
+        <motion.div 
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="glass-card p-12 text-center"
+        >
+          <div className="w-16 h-16 rounded-2xl bg-muted/50 flex items-center justify-center mx-auto mb-4">
+            <UsersIcon className="h-8 w-8 text-muted-foreground" />
+          </div>
+          <p className="text-muted-foreground mb-2" data-testid="text-no-users">Nessun utente trovato.</p>
+          <p className="text-sm text-muted-foreground">Clicca su "Nuovo Utente" per aggiungere il primo utente</p>
+        </motion.div>
       )}
 
       <AlertDialog open={!!deleteUserId} onOpenChange={() => setDeleteUserId(null)}>
@@ -746,6 +843,7 @@ export default function UsersPage() {
             </AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDeleteConfirm}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               data-testid="button-confirm-delete"
             >
               Elimina
@@ -765,16 +863,16 @@ export default function UsersPage() {
               {selectedUserForFeatures?.firstName} {selectedUserForFeatures?.lastName} - Attiva o disattiva i moduli disponibili
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
+          <div className="space-y-3 py-4">
             {featuresList.map((feature) => (
               <div
                 key={feature.key}
-                className="flex items-center justify-between p-4 rounded-lg border hover-elevate cursor-pointer"
+                className="glass-card p-4 flex items-center justify-between cursor-pointer hover:border-primary/30 transition-all"
                 onClick={() => handleToggleFeature(feature.key)}
                 data-testid={`toggle-feature-${feature.key}`}
               >
                 <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-muted">
+                  <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
                     {feature.icon}
                   </div>
                   <div>
@@ -802,6 +900,7 @@ export default function UsersPage() {
             <Button
               onClick={handleSaveFeatures}
               disabled={updateFeaturesMutation.isPending}
+              className="gradient-golden text-black font-semibold"
               data-testid="button-save-features"
             >
               {updateFeaturesMutation.isPending ? 'Salvataggio...' : 'Salva Moduli'}
