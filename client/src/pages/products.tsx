@@ -286,7 +286,7 @@ export default function Products() {
               Nuovo Prodotto
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-2xl">
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>
                 {editingProduct ? 'Modifica Prodotto' : 'Nuovo Prodotto'}
@@ -294,7 +294,7 @@ export default function Products() {
             </DialogHeader>
             <Form {...form}>
               <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
                     name="code"
@@ -324,7 +324,7 @@ export default function Products() {
                   />
                 </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
                     name="category"
@@ -376,7 +376,7 @@ export default function Products() {
                   />
                 </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
                     name="costPrice"
@@ -412,10 +412,11 @@ export default function Products() {
                   />
                 </div>
 
-                <DialogFooter>
+                <DialogFooter className="flex-col sm:flex-row gap-2">
                   <Button
                     type="button"
                     variant="outline"
+                    className="min-h-[48px]"
                     onClick={handleDialogClose}
                     data-testid="button-cancel-product"
                   >
@@ -423,7 +424,7 @@ export default function Products() {
                   </Button>
                   <Button
                     type="submit"
-                    className="gradient-golden text-black font-semibold"
+                    className="gradient-golden text-black font-semibold min-h-[48px]"
                     disabled={createMutation.isPending || updateMutation.isPending}
                     data-testid="button-submit-product"
                   >
@@ -533,7 +534,9 @@ export default function Products() {
               {filteredProducts.length} prodotti
             </Badge>
           </div>
-          <div className="overflow-x-auto">
+
+          {/* Desktop Table */}
+          <div className="hidden md:block overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow className="border-white/5 hover:bg-white/5">
@@ -593,6 +596,57 @@ export default function Products() {
                 ))}
               </TableBody>
             </Table>
+          </div>
+
+          {/* Mobile Cards */}
+          <div className="md:hidden space-y-3 p-4">
+            {filteredProducts.map((product, index) => (
+              <motion.div
+                key={product.id}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.35 + index * 0.03 }}
+                className="glass-card p-4"
+                data-testid={`product-card-${product.id}`}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium truncate">{product.name}</div>
+                    <div className="text-xs text-muted-foreground font-mono">{product.code}</div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {product.active ? (
+                      <Badge className="bg-teal-500/20 text-teal border-teal-500/30">
+                        Attivo
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="border-white/10 text-muted-foreground">
+                        Inattivo
+                      </Badge>
+                    )}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleEdit(product)}
+                      className="min-h-[48px] min-w-[48px] rounded-xl hover:bg-primary/10"
+                      data-testid={`button-edit-product-mobile-${product.id}`}
+                    >
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+                <div className="flex flex-wrap items-center gap-2 mt-3 pt-3 border-t border-white/5">
+                  <Badge variant="outline" className="border-white/10 bg-white/5">
+                    {product.category || 'N/A'}
+                  </Badge>
+                  <span className="text-sm text-muted-foreground">{product.unitOfMeasure}</span>
+                  <span className="text-sm font-medium">€ {product.costPrice}</span>
+                  {product.minThreshold && (
+                    <span className="text-xs text-muted-foreground">Min: {product.minThreshold}</span>
+                  )}
+                </div>
+              </motion.div>
+            ))}
           </div>
         </motion.div>
       ) : (

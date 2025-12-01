@@ -1,7 +1,9 @@
 import { Link, useLocation } from "wouter";
 import { Home, Calendar, Wine, Warehouse, User, Plus, Package, BarChart3 } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
+import type { UserFeatures } from "@shared/schema";
 
 interface NavItem {
   icon: React.ElementType;
@@ -14,12 +16,18 @@ export function MobileBottomNav() {
   const [location] = useLocation();
   const { user } = useAuth();
 
-  if (!user) return null;
+  const isSuperAdmin = user?.role === 'super_admin';
+  const isAdmin = user?.role === 'gestore';
+  const isWarehouse = user?.role === 'warehouse';
+  const isBartender = user?.role === 'bartender';
 
-  const isSuperAdmin = user.role === 'super_admin';
-  const isAdmin = user.role === 'gestore';
-  const isWarehouse = user.role === 'warehouse';
-  const isBartender = user.role === 'bartender';
+  // Fetch user features for navigation filtering
+  const { data: userFeatures } = useQuery<UserFeatures>({
+    queryKey: ['/api/user-features/current/my'],
+    enabled: !!user && isAdmin,
+  });
+
+  if (!user) return null;
 
   let navItems: NavItem[] = [];
 
@@ -32,13 +40,19 @@ export function MobileBottomNav() {
       { icon: User, label: "Profilo", href: "/settings" },
     ];
   } else if (isAdmin) {
+    // Build nav items based on enabled features
     navItems = [
       { icon: Home, label: "Home", href: "/" },
       { icon: Calendar, label: "Eventi", href: "/events" },
       { icon: Plus, label: "Evento", href: "/events/wizard", isFab: true },
-      { icon: Wine, label: "Beverage", href: "/beverage" },
-      { icon: User, label: "Profilo", href: "/settings" },
     ];
+    
+    // Add Beverage if enabled (default true)
+    if (userFeatures?.beverageEnabled !== false) {
+      navItems.push({ icon: Wine, label: "Beverage", href: "/beverage" });
+    }
+    
+    navItems.push({ icon: User, label: "Profilo", href: "/settings" });
   } else if (isWarehouse) {
     navItems = [
       { icon: Home, label: "Home", href: "/beverage" },
@@ -56,13 +70,18 @@ export function MobileBottomNav() {
       { icon: User, label: "Profilo", href: "/settings" },
     ];
   } else {
+    // Default organizer view
     navItems = [
       { icon: Home, label: "Home", href: "/" },
       { icon: Calendar, label: "Eventi", href: "/events" },
       { icon: Plus, label: "Evento", href: "/events/wizard", isFab: true },
-      { icon: Wine, label: "Beverage", href: "/beverage" },
-      { icon: User, label: "Profilo", href: "/settings" },
     ];
+    
+    if (userFeatures?.beverageEnabled !== false) {
+      navItems.push({ icon: Wine, label: "Beverage", href: "/beverage" });
+    }
+    
+    navItems.push({ icon: User, label: "Profilo", href: "/settings" });
   }
 
   return (

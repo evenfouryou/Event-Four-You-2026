@@ -426,28 +426,48 @@ function BeverageSection({ eventId }: { eventId: string }) {
               <span className="text-sm">Vai al Magazzino per trasferire prodotti all'evento.</span>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Prodotto</TableHead>
-                    <TableHead>Codice</TableHead>
-                    <TableHead className="text-right">Quantità</TableHead>
-                    <TableHead>Unità</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {enrichedStocks.map((stock, idx) => (
-                    <TableRow key={idx} data-testid={`row-stock-${idx}`}>
-                      <TableCell className="font-medium">{stock.product?.name || "N/D"}</TableCell>
-                      <TableCell className="text-muted-foreground">{stock.product?.code || "-"}</TableCell>
-                      <TableCell className="text-right font-medium">{parseFloat(stock.quantity).toFixed(2)}</TableCell>
-                      <TableCell className="text-muted-foreground">{stock.product?.unitOfMeasure || "-"}</TableCell>
+            <>
+              {/* Desktop Table */}
+              <div className="hidden md:block overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Prodotto</TableHead>
+                      <TableHead>Codice</TableHead>
+                      <TableHead className="text-right">Quantità</TableHead>
+                      <TableHead>Unità</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                  </TableHeader>
+                  <TableBody>
+                    {enrichedStocks.map((stock, idx) => (
+                      <TableRow key={idx} data-testid={`row-stock-${idx}`}>
+                        <TableCell className="font-medium">{stock.product?.name || "N/D"}</TableCell>
+                        <TableCell className="text-muted-foreground">{stock.product?.code || "-"}</TableCell>
+                        <TableCell className="text-right font-medium">{parseFloat(stock.quantity).toFixed(2)}</TableCell>
+                        <TableCell className="text-muted-foreground">{stock.product?.unitOfMeasure || "-"}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+              {/* Mobile Cards */}
+              <div className="md:hidden space-y-3">
+                {enrichedStocks.map((stock, idx) => (
+                  <div key={idx} className="glass-card p-4" data-testid={`card-stock-${idx}`}>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium truncate">{stock.product?.name || "N/D"}</p>
+                        <p className="text-sm text-muted-foreground">{stock.product?.code || "-"}</p>
+                      </div>
+                      <div className="text-right flex-shrink-0">
+                        <p className="font-bold text-lg">{parseFloat(stock.quantity).toFixed(2)}</p>
+                        <p className="text-xs text-muted-foreground">{stock.product?.unitOfMeasure || "-"}</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
           )}
         </div>
       </motion.div>
@@ -476,7 +496,8 @@ function BeverageSection({ eventId }: { eventId: string }) {
             </div>
           ) : (
             <>
-              <div className="overflow-x-auto">
+              {/* Desktop Table */}
+              <div className="hidden md:block overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -499,6 +520,31 @@ function BeverageSection({ eventId }: { eventId: string }) {
                     ))}
                   </TableBody>
                 </Table>
+              </div>
+              {/* Mobile Cards */}
+              <div className="md:hidden space-y-3">
+                {report.consumption.map((item, idx) => (
+                  <div key={idx} className="glass-card p-4" data-testid={`card-consumption-${idx}`}>
+                    <div className="flex items-start justify-between gap-3 mb-3">
+                      <p className="font-medium">{item.productName}</p>
+                      <p className="font-bold text-rose-400">€{item.totalCost.toFixed(2)}</p>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2 text-sm">
+                      <div className="text-center p-2 rounded-lg bg-white/5">
+                        <p className="text-muted-foreground text-xs mb-1">Consumato</p>
+                        <p className="font-medium">{item.totalConsumed.toFixed(2)}</p>
+                      </div>
+                      <div className="text-center p-2 rounded-lg bg-white/5">
+                        <p className="text-muted-foreground text-xs mb-1">Reso</p>
+                        <p className="font-medium text-teal">{item.totalReturned.toFixed(2)}</p>
+                      </div>
+                      <div className="text-center p-2 rounded-lg bg-white/5">
+                        <p className="text-muted-foreground text-xs mb-1">Netto</p>
+                        <p className="font-bold">{item.netConsumed.toFixed(2)}</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
 
               <div className="mt-4 pt-4 border-t border-white/10 flex justify-between items-center">
@@ -635,7 +681,7 @@ function CashPositionsSection({ eventId, isAdmin }: { eventId: string; isAdmin: 
                   Nuova Postazione
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-md">
+              <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                   <DialogTitle>{editingPosition ? "Modifica Postazione" : "Nuova Postazione"}</DialogTitle>
                 </DialogHeader>
@@ -704,69 +750,132 @@ function CashPositionsSection({ eventId, isAdmin }: { eventId: string; isAdmin: 
             Nessuna postazione cassa per questo evento
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Nome</TableHead>
-                  <TableHead>Settore</TableHead>
-                  <TableHead>Operatore</TableHead>
-                  <TableHead>Note</TableHead>
-                  {isAdmin && <TableHead className="text-right">Azioni</TableHead>}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {eventPositions.map((position) => (
-                  <TableRow key={position.id} data-testid={`row-position-${position.id}`}>
-                    <TableCell className="font-medium">{position.name}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline">{getSectorName(position.sectorId)}</Badge>
-                    </TableCell>
-                    <TableCell>{getStaffName(position.operatorId)}</TableCell>
-                    <TableCell className="text-muted-foreground">{position.notes || "-"}</TableCell>
-                    {isAdmin && (
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-1">
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            onClick={() => {
-                              setEditingPosition(position);
-                              setIsDialogOpen(true);
-                            }}
-                            data-testid={`button-edit-position-${position.id}`}
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button size="icon" variant="ghost" data-testid={`button-delete-position-${position.id}`}>
-                                <Trash2 className="h-4 w-4 text-destructive" />
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Eliminare questa postazione?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Questa azione non può essere annullata.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Annulla</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => deleteMutation.mutate(position.id)}>
-                                  Elimina
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        </div>
-                      </TableCell>
-                    )}
+          <>
+            {/* Desktop Table */}
+            <div className="hidden md:block overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Nome</TableHead>
+                    <TableHead>Settore</TableHead>
+                    <TableHead>Operatore</TableHead>
+                    <TableHead>Note</TableHead>
+                    {isAdmin && <TableHead className="text-right">Azioni</TableHead>}
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+                </TableHeader>
+                <TableBody>
+                  {eventPositions.map((position) => (
+                    <TableRow key={position.id} data-testid={`row-position-${position.id}`}>
+                      <TableCell className="font-medium">{position.name}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline">{getSectorName(position.sectorId)}</Badge>
+                      </TableCell>
+                      <TableCell>{getStaffName(position.operatorId)}</TableCell>
+                      <TableCell className="text-muted-foreground">{position.notes || "-"}</TableCell>
+                      {isAdmin && (
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-1">
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => {
+                                setEditingPosition(position);
+                                setIsDialogOpen(true);
+                              }}
+                              data-testid={`button-edit-position-${position.id}`}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button size="icon" variant="ghost" data-testid={`button-delete-position-${position.id}`}>
+                                  <Trash2 className="h-4 w-4 text-destructive" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Eliminare questa postazione?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Questa azione non può essere annullata.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Annulla</AlertDialogCancel>
+                                  <AlertDialogAction onClick={() => deleteMutation.mutate(position.id)}>
+                                    Elimina
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </div>
+                        </TableCell>
+                      )}
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+            {/* Mobile Cards */}
+            <div className="md:hidden space-y-3">
+              {eventPositions.map((position) => (
+                <div key={position.id} className="glass-card p-4" data-testid={`card-position-${position.id}`}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium">{position.name}</p>
+                      <Badge variant="outline" className="mt-1">{getSectorName(position.sectorId)}</Badge>
+                    </div>
+                    {isAdmin && (
+                      <div className="flex gap-1 flex-shrink-0">
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-10 w-10"
+                          onClick={() => {
+                            setEditingPosition(position);
+                            setIsDialogOpen(true);
+                          }}
+                          data-testid={`button-edit-position-mobile-${position.id}`}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button size="icon" variant="ghost" className="h-10 w-10" data-testid={`button-delete-position-mobile-${position.id}`}>
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Eliminare questa postazione?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Questa azione non può essere annullata.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Annulla</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => deleteMutation.mutate(position.id)}>
+                                Elimina
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
+                    )}
+                  </div>
+                  <div className="mt-3 pt-3 border-t border-white/10 grid grid-cols-2 gap-2 text-sm">
+                    <div>
+                      <p className="text-muted-foreground text-xs">Operatore</p>
+                      <p className="font-medium">{getStaffName(position.operatorId)}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground text-xs">Note</p>
+                      <p className="text-muted-foreground truncate">{position.notes || "-"}</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
         )}
       </div>
     </motion.div>
@@ -891,7 +1000,7 @@ function CashFundsSection({ eventId, isAdmin }: { eventId: string; isAdmin: bool
                   Registra Fondo
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-md">
+              <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                   <DialogTitle>{editingFund ? "Modifica Fondo" : "Registra Fondo"}</DialogTitle>
                 </DialogHeader>
@@ -961,7 +1070,8 @@ function CashFundsSection({ eventId, isAdmin }: { eventId: string; isAdmin: bool
           </div>
         ) : (
           <>
-            <div className="overflow-x-auto">
+            {/* Desktop Table */}
+            <div className="hidden md:block overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -1029,6 +1139,73 @@ function CashFundsSection({ eventId, isAdmin }: { eventId: string; isAdmin: bool
                   ))}
                 </TableBody>
               </Table>
+            </div>
+            {/* Mobile Cards */}
+            <div className="md:hidden space-y-3">
+              {eventFunds.map((fund) => (
+                <div key={fund.id} className="glass-card p-4" data-testid={`card-fund-${fund.id}`}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <p className="font-medium">{getPositionName(fund.positionId)}</p>
+                        <Badge variant={fund.type === 'opening' ? 'outline' : 'secondary'} className="text-xs">
+                          {fund.type === 'opening' ? 'Apertura' : 'Chiusura'}
+                        </Badge>
+                      </div>
+                      <p className="text-2xl font-bold">€{parseFloat(fund.amount).toFixed(2)}</p>
+                    </div>
+                    {isAdmin && (
+                      <div className="flex gap-1 flex-shrink-0">
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-10 w-10"
+                          onClick={() => {
+                            setEditingFund(fund);
+                            setIsDialogOpen(true);
+                          }}
+                          data-testid={`button-edit-fund-mobile-${fund.id}`}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button size="icon" variant="ghost" className="h-10 w-10" data-testid={`button-delete-fund-mobile-${fund.id}`}>
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Eliminare questo fondo?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Questa azione non può essere annullata.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Annulla</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => deleteMutation.mutate(fund.id)}>
+                                Elimina
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
+                    )}
+                  </div>
+                  <div className="mt-3 pt-3 border-t border-white/10 grid grid-cols-2 gap-2 text-sm">
+                    <div>
+                      <p className="text-muted-foreground text-xs">Data</p>
+                      <p className="text-muted-foreground">
+                        {fund.recordedAt && format(new Date(fund.recordedAt), "dd/MM HH:mm", { locale: it })}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground text-xs">Note</p>
+                      <p className="text-muted-foreground truncate">{fund.notes || "-"}</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
 
             <div className="mt-4 pt-4 border-t border-white/10 grid grid-cols-2 gap-4">
@@ -1318,7 +1495,8 @@ function CashEntriesSection({ eventId, isAdmin }: { eventId: string; isAdmin: bo
           </div>
         ) : (
           <>
-            <div className="overflow-x-auto">
+            {/* Desktop Table */}
+            <div className="hidden md:block overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -1388,6 +1566,73 @@ function CashEntriesSection({ eventId, isAdmin }: { eventId: string; isAdmin: bo
                   ))}
                 </TableBody>
               </Table>
+            </div>
+            {/* Mobile Cards */}
+            <div className="md:hidden space-y-3">
+              {eventEntries.map((entry) => (
+                <div key={entry.id} className="glass-card p-4" data-testid={`card-entry-${entry.id}`}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap mb-1">
+                        <p className="font-medium">{getPositionName(entry.positionId)}</p>
+                        <Badge variant="outline" className="text-xs">
+                          {paymentMethodLabels[entry.paymentMethod]?.label || entry.paymentMethod}
+                        </Badge>
+                      </div>
+                      <p className="text-2xl font-bold text-teal">€{parseFloat(entry.totalAmount).toFixed(2)}</p>
+                    </div>
+                    {isAdmin && (
+                      <div className="flex gap-1 flex-shrink-0">
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-10 w-10"
+                          onClick={() => {
+                            setEditingEntry(entry);
+                            setIsDialogOpen(true);
+                          }}
+                          data-testid={`button-edit-entry-mobile-${entry.id}`}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button size="icon" variant="ghost" className="h-10 w-10" data-testid={`button-delete-entry-mobile-${entry.id}`}>
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Eliminare questo incasso?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Questa azione non può essere annullata.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Annulla</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => deleteMutation.mutate(entry.id)}>
+                                Elimina
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
+                    )}
+                  </div>
+                  <div className="mt-3 pt-3 border-t border-white/10 grid grid-cols-2 gap-2 text-sm">
+                    <div>
+                      <p className="text-muted-foreground text-xs">Descrizione</p>
+                      <p className="text-muted-foreground truncate">{entry.description || "-"}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground text-xs">Data</p>
+                      <p className="text-muted-foreground">
+                        {entry.entryTime && format(new Date(entry.entryTime), "dd/MM HH:mm", { locale: it })}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
 
             <div className="mt-4 pt-4 border-t border-white/10 grid grid-cols-3 gap-4">
@@ -1537,7 +1782,7 @@ function PersonnelSection({ eventId, isAdmin }: { eventId: string; isAdmin: bool
                   Aggiungi Staff
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-md max-h-[80vh]">
+              <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                   <DialogTitle>Seleziona Staff</DialogTitle>
                 </DialogHeader>
@@ -1598,7 +1843,8 @@ function PersonnelSection({ eventId, isAdmin }: { eventId: string; isAdmin: bool
           </div>
         ) : (
           <>
-            <div className="overflow-x-auto">
+            {/* Desktop Table */}
+            <div className="hidden md:block overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -1741,6 +1987,149 @@ function PersonnelSection({ eventId, isAdmin }: { eventId: string; isAdmin: bool
                 </TableBody>
               </Table>
             </div>
+            {/* Mobile Cards */}
+            <div className="md:hidden space-y-3">
+              {eventAssignments.map((assignment) => (
+                <div key={assignment.id} className="glass-card p-4" data-testid={`card-assignment-${assignment.id}`}>
+                  <div className="flex items-start justify-between gap-3 mb-3">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium">{getStaffName(assignment.staffId)}</p>
+                      <p className="text-sm text-muted-foreground">{getStaffRole(assignment.staffId)}</p>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      {isAdmin ? (
+                        <Select 
+                          value={assignment.status} 
+                          onValueChange={(value) => {
+                            updateMutation.mutate({ 
+                              id: assignment.id, 
+                              data: { status: value }
+                            });
+                          }}
+                        >
+                          <SelectTrigger className="h-9 w-28" data-testid={`select-assignment-status-mobile-${assignment.id}`}>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="scheduled">Programmato</SelectItem>
+                            <SelectItem value="confirmed">Confermato</SelectItem>
+                            <SelectItem value="present">Presente</SelectItem>
+                            <SelectItem value="absent">Assente</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <Badge variant={
+                          assignment.status === 'present' ? 'default' :
+                          assignment.status === 'confirmed' ? 'secondary' :
+                          assignment.status === 'absent' ? 'destructive' : 'outline'
+                        }>
+                          {assignment.status === 'scheduled' ? 'Programmato' :
+                           assignment.status === 'confirmed' ? 'Confermato' :
+                           assignment.status === 'present' ? 'Presente' : 'Assente'}
+                        </Badge>
+                      )}
+                      {isAdmin && (
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button size="icon" variant="ghost" className="h-10 w-10" data-testid={`button-delete-assignment-mobile-${assignment.id}`}>
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Rimuovere questo staff?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Questa azione rimuoverà l'assegnazione dall'evento.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Annulla</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => deleteMutation.mutate(assignment.id)}>
+                                Rimuovi
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      )}
+                    </div>
+                  </div>
+                  {isAdmin ? (
+                    <div className="space-y-3">
+                      <div>
+                        <p className="text-muted-foreground text-xs mb-1">Mansione Evento</p>
+                        <Input 
+                          defaultValue={assignment.role || ""} 
+                          placeholder="Mansione..."
+                          className="h-10"
+                          onBlur={(e) => {
+                            if (e.target.value !== (assignment.role || "")) {
+                              updateMutation.mutate({ 
+                                id: assignment.id, 
+                                data: { role: e.target.value || null }
+                              });
+                            }
+                          }}
+                          data-testid={`input-assignment-role-mobile-${assignment.id}`}
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <p className="text-muted-foreground text-xs mb-1">Compenso (€)</p>
+                          <Input 
+                            type="number"
+                            step="0.01"
+                            defaultValue={assignment.compensationAmount || "0"} 
+                            className="h-10"
+                            onBlur={(e) => {
+                              if (e.target.value !== (assignment.compensationAmount || "0")) {
+                                updateMutation.mutate({ 
+                                  id: assignment.id, 
+                                  data: { compensationAmount: e.target.value }
+                                });
+                              }
+                            }}
+                            data-testid={`input-assignment-compensation-mobile-${assignment.id}`}
+                          />
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground text-xs mb-1">Bonus (€)</p>
+                          <Input 
+                            type="number"
+                            step="0.01"
+                            defaultValue={assignment.bonus || "0"} 
+                            className="h-10"
+                            onBlur={(e) => {
+                              if (e.target.value !== (assignment.bonus || "0")) {
+                                updateMutation.mutate({ 
+                                  id: assignment.id, 
+                                  data: { bonus: e.target.value }
+                                });
+                              }
+                            }}
+                            data-testid={`input-assignment-bonus-mobile-${assignment.id}`}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-3 gap-2 text-sm mt-3 pt-3 border-t border-white/10">
+                      <div className="text-center p-2 rounded-lg bg-white/5">
+                        <p className="text-muted-foreground text-xs mb-1">Mansione</p>
+                        <p className="font-medium truncate">{assignment.role || "-"}</p>
+                      </div>
+                      <div className="text-center p-2 rounded-lg bg-white/5">
+                        <p className="text-muted-foreground text-xs mb-1">Compenso</p>
+                        <p className="font-medium">€{parseFloat(assignment.compensationAmount || "0").toFixed(0)}</p>
+                      </div>
+                      <div className="text-center p-2 rounded-lg bg-white/5">
+                        <p className="text-muted-foreground text-xs mb-1">Bonus</p>
+                        <p className="font-medium">€{parseFloat(assignment.bonus || "0").toFixed(0)}</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
 
             <div className="mt-4 pt-4 border-t border-white/10 flex justify-between items-center">
               <span className="text-muted-foreground">Costo totale personale:</span>
@@ -1873,7 +2262,7 @@ function CostsSection({ eventId, isAdmin }: { eventId: string; isAdmin: boolean 
                     Aggiungi Costo
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="max-w-md">
+                <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
                   <DialogHeader>
                     <DialogTitle>{editingCost ? "Modifica Costo" : "Nuovo Costo Extra"}</DialogTitle>
                   </DialogHeader>
@@ -1944,7 +2333,8 @@ function CostsSection({ eventId, isAdmin }: { eventId: string; isAdmin: boolean 
             </div>
           ) : (
             <>
-              <div className="overflow-x-auto">
+              {/* Desktop Table */}
+              <div className="hidden md:block overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -2009,6 +2399,66 @@ function CostsSection({ eventId, isAdmin }: { eventId: string; isAdmin: boolean 
                   </TableBody>
                 </Table>
               </div>
+              {/* Mobile Cards */}
+              <div className="md:hidden space-y-3">
+                {eventCosts.map((cost) => (
+                  <div key={cost.id} className="glass-card p-4" data-testid={`card-cost-${cost.id}`}>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium">{cost.name}</p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <Badge variant="outline" className="text-xs">{categoryLabels[cost.category] || cost.category}</Badge>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        <p className="text-xl font-bold text-rose-400">€{parseFloat(cost.amount).toFixed(2)}</p>
+                        {isAdmin && (
+                          <>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-10 w-10"
+                              onClick={() => {
+                                setEditingCost(cost);
+                                setIsDialogOpen(true);
+                              }}
+                              data-testid={`button-edit-cost-mobile-${cost.id}`}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button size="icon" variant="ghost" className="h-10 w-10" data-testid={`button-delete-cost-mobile-${cost.id}`}>
+                                  <Trash2 className="h-4 w-4 text-destructive" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Eliminare questo costo?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Questa azione non può essere annullata.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Annulla</AlertDialogCancel>
+                                  <AlertDialogAction onClick={() => deleteMutation.mutate(cost.id)}>
+                                    Elimina
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                    {cost.notes && (
+                      <div className="mt-3 pt-3 border-t border-white/10">
+                        <p className="text-muted-foreground text-sm">{cost.notes}</p>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
               <div className="mt-4 pt-4 border-t border-white/10 flex justify-between items-center">
                 <span className="text-muted-foreground">Totale costi extra:</span>
                 <span className="text-xl font-bold text-rose-400">€{totalExtraCosts.toFixed(2)}</span>
@@ -2037,7 +2487,8 @@ function CostsSection({ eventId, isAdmin }: { eventId: string; isAdmin: boolean 
             </div>
           </div>
           <div className="p-5">
-            <div className="overflow-x-auto">
+            {/* Desktop Table */}
+            <div className="hidden md:block overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -2060,6 +2511,20 @@ function CostsSection({ eventId, isAdmin }: { eventId: string; isAdmin: boolean 
                   ))}
                 </TableBody>
               </Table>
+            </div>
+            {/* Mobile Cards */}
+            <div className="md:hidden space-y-3">
+              {activeFixedCosts.filter(c => c.frequency === 'per_event').map((cost) => (
+                <div key={cost.id} className="glass-card p-4" data-testid={`card-fixed-cost-${cost.id}`}>
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium">{cost.name}</p>
+                      <Badge variant="outline" className="text-xs mt-1">{categoryLabels[cost.category] || cost.category}</Badge>
+                    </div>
+                    <p className="text-xl font-bold text-rose-400 flex-shrink-0">€{parseFloat(cost.amount).toFixed(2)}</p>
+                  </div>
+                </div>
+              ))}
             </div>
             <div className="mt-4 pt-4 border-t border-white/10 flex justify-between items-center">
               <span className="text-muted-foreground">Totale costi fissi:</span>

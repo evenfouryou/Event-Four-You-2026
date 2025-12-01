@@ -705,13 +705,14 @@ export default function Warehouse() {
               Scarico Multiplo
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-4xl">
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Scarico Multiprodotto</DialogTitle>
             </DialogHeader>
             
             <div className="space-y-4">
-              <div className="border border-white/5 rounded-xl overflow-hidden">
+              {/* Desktop Table */}
+              <div className="hidden md:block border border-white/5 rounded-xl overflow-hidden">
                 <Table>
                   <TableHeader>
                     <TableRow className="border-white/5">
@@ -784,10 +785,70 @@ export default function Warehouse() {
                 </Table>
               </div>
 
+              {/* Mobile Cards */}
+              <div className="md:hidden space-y-3">
+                {multiUnloadItems.length === 0 ? (
+                  <div className="text-center text-muted-foreground py-8 glass-card">
+                    Nessun prodotto aggiunto. Clicca "+ Aggiungi Prodotto" per iniziare.
+                  </div>
+                ) : (
+                  multiUnloadItems.map((item) => (
+                    <div key={item.id} className="glass-card p-4 space-y-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <Select
+                          value={item.productId}
+                          onValueChange={(value) => handleUpdateMultiUnloadItem(item.id, 'productId', value)}
+                        >
+                          <SelectTrigger className="flex-1 min-h-[48px]" data-testid={`select-multi-unload-product-mobile-${item.id}`}>
+                            <SelectValue placeholder="Seleziona prodotto" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {products?.filter(p => p.id).map((product) => (
+                              <SelectItem key={product.id} value={product.id}>
+                                {product.name} ({product.code})
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="min-h-[48px] min-w-[48px]"
+                          onClick={() => handleRemoveMultiUnloadItem(item.id)}
+                          data-testid={`button-remove-multi-unload-mobile-${item.id}`}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <Input
+                          type="number"
+                          step="0.01"
+                          placeholder="Quantità"
+                          value={item.quantity}
+                          className="min-h-[48px]"
+                          onChange={(e) => handleUpdateMultiUnloadItem(item.id, 'quantity', e.target.value)}
+                          data-testid={`input-multi-unload-quantity-mobile-${item.id}`}
+                        />
+                        <Input
+                          placeholder="Motivo"
+                          value={item.reason || ''}
+                          className="min-h-[48px]"
+                          onChange={(e) => handleUpdateMultiUnloadItem(item.id, 'reason', e.target.value)}
+                          data-testid={`input-multi-unload-reason-mobile-${item.id}`}
+                        />
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+
               <Button
                 type="button"
                 variant="outline"
                 onClick={handleAddMultiUnloadItem}
+                className="min-h-[48px]"
                 data-testid="button-add-multi-unload-product"
               >
                 <Plus className="h-4 w-4 mr-2" />
@@ -795,10 +856,11 @@ export default function Warehouse() {
               </Button>
             </div>
 
-            <DialogFooter>
+            <DialogFooter className="flex-col sm:flex-row gap-2">
               <Button
                 type="button"
                 variant="outline"
+                className="min-h-[48px]"
                 onClick={() => {
                   setMultiUnloadDialogOpen(false);
                   setMultiUnloadItems([]);
@@ -810,6 +872,7 @@ export default function Warehouse() {
               <Button
                 onClick={handleSubmitBulkUnload}
                 disabled={bulkUnloadMutation.isPending || multiUnloadItems.length === 0}
+                className="min-h-[48px]"
                 data-testid="button-submit-multi-unload"
               >
                 {bulkUnloadMutation.isPending ? 'Scaricando...' : `Scarica ${multiUnloadItems.length > 0 ? `(${multiUnloadItems.length})` : ''}`}
@@ -820,12 +883,12 @@ export default function Warehouse() {
 
         <Dialog open={unloadDialogOpen} onOpenChange={setUnloadDialogOpen}>
           <DialogTrigger asChild>
-            <Button variant="outline" data-testid="button-unload-stock">
+            <Button variant="outline" className="min-h-[48px]" data-testid="button-unload-stock">
               <TrendingDown className="h-4 w-4 mr-2" />
               Scarico
             </Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Scarico Merce</DialogTitle>
             </DialogHeader>
@@ -884,16 +947,17 @@ export default function Warehouse() {
                   )}
                 />
 
-                <DialogFooter>
+                <DialogFooter className="flex-col sm:flex-row gap-2">
                   <Button
                     type="button"
                     variant="outline"
+                    className="min-h-[48px]"
                     onClick={() => setUnloadDialogOpen(false)}
                     data-testid="button-cancel-unload"
                   >
                     Annulla
                   </Button>
-                  <Button type="submit" disabled={unloadMutation.isPending} data-testid="button-submit-unload">
+                  <Button type="submit" disabled={unloadMutation.isPending} className="min-h-[48px]" data-testid="button-submit-unload">
                     Scarica
                   </Button>
                 </DialogFooter>
@@ -904,12 +968,12 @@ export default function Warehouse() {
 
         <Dialog open={loadDialogOpen} onOpenChange={setLoadDialogOpen}>
           <DialogTrigger asChild>
-            <Button className="gradient-golden text-black font-semibold glow-golden" data-testid="button-load-stock">
+            <Button className="gradient-golden text-black font-semibold glow-golden min-h-[48px]" data-testid="button-load-stock">
               <TrendingUp className="h-4 w-4 mr-2" />
               Carico
             </Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Carico Merce</DialogTitle>
             </DialogHeader>
@@ -982,16 +1046,17 @@ export default function Warehouse() {
                   )}
                 />
 
-                <DialogFooter>
+                <DialogFooter className="flex-col sm:flex-row gap-2">
                   <Button
                     type="button"
                     variant="outline"
+                    className="min-h-[48px]"
                     onClick={() => setLoadDialogOpen(false)}
                     data-testid="button-cancel-load"
                   >
                     Annulla
                   </Button>
-                  <Button type="submit" disabled={loadMutation.isPending} className="gradient-golden text-black font-semibold" data-testid="button-submit-load">
+                  <Button type="submit" disabled={loadMutation.isPending} className="gradient-golden text-black font-semibold min-h-[48px]" data-testid="button-submit-load">
                     Carica
                   </Button>
                 </DialogFooter>
@@ -1002,18 +1067,19 @@ export default function Warehouse() {
 
         <Dialog open={multiLoadDialogOpen} onOpenChange={setMultiLoadDialogOpen}>
           <DialogTrigger asChild>
-            <Button variant="outline" data-testid="button-multi-load">
+            <Button variant="outline" className="min-h-[48px]" data-testid="button-multi-load">
               <ListPlus className="h-4 w-4 mr-2" />
               Carico Multiplo
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-4xl">
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Carico Multiprodotto</DialogTitle>
             </DialogHeader>
             
             <div className="space-y-4">
-              <div className="border border-white/5 rounded-xl overflow-hidden">
+              {/* Desktop Table */}
+              <div className="hidden md:block border border-white/5 rounded-xl overflow-hidden">
                 <Table>
                   <TableHeader>
                     <TableRow className="border-white/5">
@@ -1096,9 +1162,78 @@ export default function Warehouse() {
                 </Table>
               </div>
 
+              {/* Mobile Cards */}
+              <div className="md:hidden space-y-3">
+                {multiLoadItems.length === 0 ? (
+                  <div className="text-center text-muted-foreground py-8 glass-card">
+                    Nessun prodotto aggiunto. Clicca "+ Aggiungi Prodotto" per iniziare.
+                  </div>
+                ) : (
+                  multiLoadItems.map((item) => (
+                    <div key={item.id} className="glass-card p-4 space-y-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <Select
+                          value={item.productId}
+                          onValueChange={(value) => handleUpdateMultiLoadItem(item.id, 'productId', value)}
+                        >
+                          <SelectTrigger className="flex-1 min-h-[48px]" data-testid={`select-multi-product-mobile-${item.id}`}>
+                            <SelectValue placeholder="Seleziona prodotto" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {products?.map((product) => (
+                              <SelectItem key={product.id} value={product.id}>
+                                {product.name} ({product.code})
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="min-h-[48px] min-w-[48px]"
+                          onClick={() => handleRemoveMultiLoadItem(item.id)}
+                          data-testid={`button-remove-mobile-${item.id}`}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <Input
+                          type="number"
+                          step="0.01"
+                          placeholder="Quantità"
+                          value={item.quantity}
+                          className="min-h-[48px]"
+                          onChange={(e) => handleUpdateMultiLoadItem(item.id, 'quantity', e.target.value)}
+                          data-testid={`input-multi-quantity-mobile-${item.id}`}
+                        />
+                        <Select
+                          value={item.supplierId || ''}
+                          onValueChange={(value) => handleUpdateMultiLoadItem(item.id, 'supplierId', value)}
+                        >
+                          <SelectTrigger className="min-h-[48px]" data-testid={`select-multi-supplier-mobile-${item.id}`}>
+                            <SelectValue placeholder="Fornitore" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">Nessuno</SelectItem>
+                            {suppliers?.map((supplier) => (
+                              <SelectItem key={supplier.id} value={supplier.id}>
+                                {supplier.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+
               <Button
                 type="button"
                 variant="outline"
+                className="min-h-[48px]"
                 onClick={handleAddMultiLoadItem}
                 data-testid="button-add-multi-product"
               >
@@ -1107,10 +1242,11 @@ export default function Warehouse() {
               </Button>
             </div>
 
-            <DialogFooter>
+            <DialogFooter className="flex-col sm:flex-row gap-2">
               <Button
                 type="button"
                 variant="outline"
+                className="min-h-[48px]"
                 onClick={() => {
                   setMultiLoadDialogOpen(false);
                   setMultiLoadItems([]);
@@ -1122,7 +1258,7 @@ export default function Warehouse() {
               <Button
                 onClick={handleSubmitBulkLoad}
                 disabled={bulkLoadMutation.isPending || multiLoadItems.length === 0}
-                className="gradient-golden text-black font-semibold"
+                className="gradient-golden text-black font-semibold min-h-[48px]"
                 data-testid="button-submit-multi-load"
               >
                 {bulkLoadMutation.isPending ? 'Caricamento...' : `Carica ${multiLoadItems.length > 0 ? `(${multiLoadItems.length})` : ''}`}
@@ -1151,7 +1287,7 @@ export default function Warehouse() {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 data-testid="input-search-products"
-                className="max-w-md"
+                className="flex-1 md:max-w-md"
               />
             </div>
 
@@ -1161,18 +1297,70 @@ export default function Warehouse() {
                   <Skeleton className="h-96" />
                 </div>
               ) : stocks && stocks.length > 0 ? (
-                <Table>
-                  <TableHeader>
-                    <TableRow className="border-white/5">
-                      <TableHead>Codice</TableHead>
-                      <TableHead>Prodotto</TableHead>
-                      <TableHead className="text-right">Quantità</TableHead>
-                      <TableHead>Unità</TableHead>
-                      <TableHead>Stato</TableHead>
-                      {canAdjustStock && <TableHead className="w-16">Azioni</TableHead>}
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
+                <>
+                  {/* Desktop Table */}
+                  <div className="hidden md:block overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="border-white/5">
+                          <TableHead>Codice</TableHead>
+                          <TableHead>Prodotto</TableHead>
+                          <TableHead className="text-right">Quantità</TableHead>
+                          <TableHead>Unità</TableHead>
+                          <TableHead>Stato</TableHead>
+                          {canAdjustStock && <TableHead className="w-16">Azioni</TableHead>}
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {stocks
+                          .filter(stock => {
+                            if (!searchQuery) return true;
+                            const query = searchQuery.toLowerCase();
+                            return stock.productName.toLowerCase().includes(query) ||
+                                   stock.productCode.toLowerCase().includes(query);
+                          })
+                          .map((stock) => {
+                            const product = products?.find(p => p.id === stock.productId);
+                            const isLowStock = product?.minThreshold && parseFloat(stock.quantity) < parseFloat(product.minThreshold);
+                            return (
+                              <TableRow key={stock.productId} className="border-white/5" data-testid={`stock-row-${stock.productId}`}>
+                                <TableCell className="font-mono text-muted-foreground">{stock.productCode}</TableCell>
+                                <TableCell className="font-medium">{stock.productName}</TableCell>
+                                <TableCell className="text-right font-semibold tabular-nums">
+                                  {parseFloat(stock.quantity).toFixed(2)}
+                                </TableCell>
+                                <TableCell className="text-muted-foreground">{stock.unitOfMeasure}</TableCell>
+                                <TableCell>
+                                  {isLowStock ? (
+                                    <Badge variant="destructive" className="gap-1" data-testid={`badge-low-stock-${stock.productId}`}>
+                                      <AlertTriangle className="h-3 w-3" />
+                                      Stock Basso
+                                    </Badge>
+                                  ) : (
+                                    <span className="text-teal text-sm font-medium">OK</span>
+                                  )}
+                                </TableCell>
+                                {canAdjustStock && (
+                                  <TableCell>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={() => openAdjustDialog(stock.productId, stock.productName, stock.quantity)}
+                                      data-testid={`button-adjust-${stock.productId}`}
+                                    >
+                                      <Pencil className="h-4 w-4" />
+                                    </Button>
+                                  </TableCell>
+                                )}
+                              </TableRow>
+                            );
+                          })}
+                      </TableBody>
+                    </Table>
+                  </div>
+
+                  {/* Mobile Cards */}
+                  <div className="md:hidden space-y-3 p-4">
                     {stocks
                       .filter(stock => {
                         if (!searchQuery) return true;
@@ -1184,40 +1372,49 @@ export default function Warehouse() {
                         const product = products?.find(p => p.id === stock.productId);
                         const isLowStock = product?.minThreshold && parseFloat(stock.quantity) < parseFloat(product.minThreshold);
                         return (
-                          <TableRow key={stock.productId} className="border-white/5" data-testid={`stock-row-${stock.productId}`}>
-                            <TableCell className="font-mono text-muted-foreground">{stock.productCode}</TableCell>
-                            <TableCell className="font-medium">{stock.productName}</TableCell>
-                            <TableCell className="text-right font-semibold tabular-nums">
-                              {parseFloat(stock.quantity).toFixed(2)}
-                            </TableCell>
-                            <TableCell className="text-muted-foreground">{stock.unitOfMeasure}</TableCell>
-                            <TableCell>
+                          <div 
+                            key={stock.productId} 
+                            className="glass-card p-4"
+                            data-testid={`stock-card-${stock.productId}`}
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex-1 min-w-0">
+                                <div className="font-medium truncate">{stock.productName}</div>
+                                <div className="text-xs text-muted-foreground font-mono">{stock.productCode}</div>
+                              </div>
+                              {canAdjustStock && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="min-h-[48px] min-w-[48px]"
+                                  onClick={() => openAdjustDialog(stock.productId, stock.productName, stock.quantity)}
+                                  data-testid={`button-adjust-mobile-${stock.productId}`}
+                                >
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                              )}
+                            </div>
+                            <div className="flex items-center justify-between mt-3 pt-3 border-t border-white/5">
+                              <div className="flex items-center gap-4">
+                                <div>
+                                  <div className="text-xs text-muted-foreground">Quantità</div>
+                                  <div className="font-semibold tabular-nums">{parseFloat(stock.quantity).toFixed(2)} {stock.unitOfMeasure}</div>
+                                </div>
+                              </div>
                               {isLowStock ? (
-                                <Badge variant="destructive" className="gap-1" data-testid={`badge-low-stock-${stock.productId}`}>
+                                <Badge variant="destructive" className="gap-1" data-testid={`badge-low-stock-mobile-${stock.productId}`}>
                                   <AlertTriangle className="h-3 w-3" />
                                   Stock Basso
                                 </Badge>
                               ) : (
                                 <span className="text-teal text-sm font-medium">OK</span>
                               )}
-                            </TableCell>
-                            {canAdjustStock && (
-                              <TableCell>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => openAdjustDialog(stock.productId, stock.productName, stock.quantity)}
-                                  data-testid={`button-adjust-${stock.productId}`}
-                                >
-                                  <Pencil className="h-4 w-4" />
-                                </Button>
-                              </TableCell>
-                            )}
-                          </TableRow>
+                            </div>
+                          </div>
                         );
                       })}
-                  </TableBody>
-                </Table>
+                  </div>
+                </>
               ) : (
                 <div className="p-12 text-center">
                   <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center mx-auto mb-4">
@@ -1430,18 +1627,78 @@ export default function Warehouse() {
                   <Skeleton className="h-96" />
                 </div>
               ) : movements && movements.length > 0 ? (
-                <Table>
-                  <TableHeader>
-                    <TableRow className="border-white/5">
-                      <TableHead>Data</TableHead>
-                      <TableHead>Prodotto</TableHead>
-                      <TableHead>Tipo</TableHead>
-                      <TableHead>Quantità</TableHead>
-                      <TableHead>Fornitore</TableHead>
-                      <TableHead>Motivo</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
+                <>
+                  {/* Desktop Table */}
+                  <div className="hidden md:block overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="border-white/5">
+                          <TableHead>Data</TableHead>
+                          <TableHead>Prodotto</TableHead>
+                          <TableHead>Tipo</TableHead>
+                          <TableHead>Quantità</TableHead>
+                          <TableHead>Fornitore</TableHead>
+                          <TableHead>Motivo</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {movements
+                          .filter(movement => {
+                            if (movementTypeFilter !== 'all' && movement.type !== movementTypeFilter) {
+                              return false;
+                            }
+                            if (movementSearchQuery) {
+                              const query = movementSearchQuery.toLowerCase();
+                              const product = products?.find(p => p.id === movement.productId);
+                              const productName = product?.name?.toLowerCase() || '';
+                              const productCode = product?.code?.toLowerCase() || '';
+                              const supplier = movement.supplier?.toLowerCase() || '';
+                              const reason = movement.reason?.toLowerCase() || '';
+                              return productName.includes(query) || 
+                                     productCode.includes(query) || 
+                                     supplier.includes(query) || 
+                                     reason.includes(query);
+                            }
+                            return true;
+                          })
+                          .slice(0, 50)
+                          .map((movement) => {
+                            const product = products?.find(p => p.id === movement.productId);
+                            return (
+                              <TableRow key={movement.id} className="border-white/5" data-testid={`movement-row-${movement.id}`}>
+                                <TableCell className="text-muted-foreground">
+                                  {movement.createdAt ? new Date(movement.createdAt).toLocaleString('it-IT') : '-'}
+                                </TableCell>
+                                <TableCell>
+                                  <div className="font-medium">{product?.name || 'Sconosciuto'}</div>
+                                  <div className="text-xs text-muted-foreground font-mono">{product?.code || '-'}</div>
+                                </TableCell>
+                                <TableCell>
+                                  <Badge 
+                                    variant={movement.type === 'LOAD' ? 'secondary' : 'outline'}
+                                    className={movement.type === 'LOAD' ? 'bg-teal-500/20 text-teal border-teal-500/30' : ''}
+                                  >
+                                    {movement.type === 'LOAD' ? 'Carico' : 'Scarico'}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell className={`font-semibold tabular-nums ${movement.type === 'LOAD' ? 'text-teal' : 'text-amber-500'}`}>
+                                  {movement.type === 'LOAD' ? '+' : '-'}{parseFloat(movement.quantity).toFixed(2)}
+                                </TableCell>
+                                <TableCell className="text-sm text-muted-foreground">
+                                  {movement.supplier || '-'}
+                                </TableCell>
+                                <TableCell className="text-sm text-muted-foreground">
+                                  {movement.reason || '-'}
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                      </TableBody>
+                    </Table>
+                  </div>
+
+                  {/* Mobile Cards */}
+                  <div className="md:hidden space-y-3 p-4">
                     {movements
                       .filter(movement => {
                         if (movementTypeFilter !== 'all' && movement.type !== movementTypeFilter) {
@@ -1465,36 +1722,42 @@ export default function Warehouse() {
                       .map((movement) => {
                         const product = products?.find(p => p.id === movement.productId);
                         return (
-                          <TableRow key={movement.id} className="border-white/5" data-testid={`movement-row-${movement.id}`}>
-                            <TableCell className="text-muted-foreground">
-                              {movement.createdAt ? new Date(movement.createdAt).toLocaleString('it-IT') : '-'}
-                            </TableCell>
-                            <TableCell>
-                              <div className="font-medium">{product?.name || 'Sconosciuto'}</div>
-                              <div className="text-xs text-muted-foreground font-mono">{product?.code || '-'}</div>
-                            </TableCell>
-                            <TableCell>
+                          <div 
+                            key={movement.id} 
+                            className="glass-card p-4"
+                            data-testid={`movement-card-${movement.id}`}
+                          >
+                            <div className="flex items-start justify-between gap-3 mb-3">
+                              <div className="flex-1 min-w-0">
+                                <div className="font-medium truncate">{product?.name || 'Sconosciuto'}</div>
+                                <div className="text-xs text-muted-foreground font-mono">{product?.code || '-'}</div>
+                              </div>
                               <Badge 
                                 variant={movement.type === 'LOAD' ? 'secondary' : 'outline'}
                                 className={movement.type === 'LOAD' ? 'bg-teal-500/20 text-teal border-teal-500/30' : ''}
                               >
                                 {movement.type === 'LOAD' ? 'Carico' : 'Scarico'}
                               </Badge>
-                            </TableCell>
-                            <TableCell className={`font-semibold tabular-nums ${movement.type === 'LOAD' ? 'text-teal' : 'text-amber-500'}`}>
-                              {movement.type === 'LOAD' ? '+' : '-'}{parseFloat(movement.quantity).toFixed(2)}
-                            </TableCell>
-                            <TableCell className="text-sm text-muted-foreground">
-                              {movement.supplier || '-'}
-                            </TableCell>
-                            <TableCell className="text-sm text-muted-foreground">
-                              {movement.reason || '-'}
-                            </TableCell>
-                          </TableRow>
+                            </div>
+                            <div className="flex items-center justify-between pt-3 border-t border-white/5">
+                              <div className="text-xs text-muted-foreground">
+                                {movement.createdAt ? new Date(movement.createdAt).toLocaleString('it-IT') : '-'}
+                              </div>
+                              <div className={`font-semibold tabular-nums ${movement.type === 'LOAD' ? 'text-teal' : 'text-amber-500'}`}>
+                                {movement.type === 'LOAD' ? '+' : '-'}{parseFloat(movement.quantity).toFixed(2)}
+                              </div>
+                            </div>
+                            {(movement.supplier || movement.reason) && (
+                              <div className="mt-2 pt-2 border-t border-white/5 text-xs text-muted-foreground">
+                                {movement.supplier && <div>Fornitore: {movement.supplier}</div>}
+                                {movement.reason && <div>Motivo: {movement.reason}</div>}
+                              </div>
+                            )}
+                          </div>
                         );
                       })}
-                  </TableBody>
-                </Table>
+                  </div>
+                </>
               ) : (
                 <div className="p-12 text-center">
                   <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center mx-auto mb-4">
@@ -1509,7 +1772,7 @@ export default function Warehouse() {
       </motion.div>
 
       <Dialog open={adjustDialogOpen} onOpenChange={setAdjustDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="sm:max-w-[425px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Correggi Quantità</DialogTitle>
           </DialogHeader>
@@ -1531,6 +1794,7 @@ export default function Warehouse() {
                 value={adjustQuantity}
                 onChange={(e) => setAdjustQuantity(e.target.value)}
                 placeholder="Inserisci nuova quantità"
+                className="min-h-[48px]"
                 data-testid="input-adjust-quantity"
               />
             </div>
@@ -1544,9 +1808,10 @@ export default function Warehouse() {
               />
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="flex-col sm:flex-row gap-2">
             <Button
               variant="outline"
+              className="min-h-[48px]"
               onClick={() => setAdjustDialogOpen(false)}
               data-testid="button-cancel-adjust"
             >
@@ -1555,7 +1820,7 @@ export default function Warehouse() {
             <Button
               onClick={handleAdjustStock}
               disabled={adjustStockMutation.isPending}
-              className="gradient-golden text-black font-semibold"
+              className="gradient-golden text-black font-semibold min-h-[48px]"
               data-testid="button-confirm-adjust"
             >
               {adjustStockMutation.isPending ? 'Salvataggio...' : 'Salva'}

@@ -109,12 +109,12 @@ function StationCard({
           </div>
         </div>
         {canEdit && (
-          <div className="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          <div className="flex flex-col gap-1 md:opacity-0 group-hover:opacity-100 transition-opacity">
             <Button
               variant="ghost"
               size="icon"
               onClick={onEdit}
-              className="h-8 w-8"
+              className="min-h-[48px] min-w-[48px] md:h-8 md:w-8 md:min-h-0 md:min-w-0"
               data-testid={`button-edit-station-${station.id}`}
             >
               <Edit className="h-4 w-4" />
@@ -123,7 +123,7 @@ function StationCard({
               variant="ghost"
               size="icon"
               onClick={onDelete}
-              className="h-8 w-8 text-destructive hover:text-destructive"
+              className="min-h-[48px] min-w-[48px] md:h-8 md:w-8 md:min-h-0 md:min-w-0 text-destructive hover:text-destructive"
               data-testid={`button-delete-station-${station.id}`}
             >
               <Trash2 className="h-4 w-4" />
@@ -391,7 +391,7 @@ export default function StationsPage() {
               Nuova Postazione
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-md glass-card border-white/10">
+          <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto glass-card border-white/10">
             <DialogHeader>
               <DialogTitle className="text-lg font-semibold">
                 {editingStation ? 'Modifica Postazione' : 'Nuova Postazione'}
@@ -517,10 +517,11 @@ export default function StationsPage() {
                     </FormItem>
                   )}
                 />
-                <DialogFooter className="gap-2">
+                <DialogFooter className="flex-col sm:flex-row gap-2">
                   <Button
                     type="button"
                     variant="outline"
+                    className="min-h-[48px]"
                     onClick={() => handleDialogOpenChange(false)}
                     data-testid="button-cancel-station"
                   >
@@ -528,7 +529,7 @@ export default function StationsPage() {
                   </Button>
                   <Button
                     type="submit"
-                    className="gradient-golden text-black font-semibold"
+                    className="gradient-golden text-black font-semibold min-h-[48px]"
                     disabled={createMutation.isPending || updateMutation.isPending}
                     data-testid="button-save-station"
                   >
@@ -586,7 +587,7 @@ export default function StationsPage() {
       )}
 
       <AlertDialog open={!!deleteStationId} onOpenChange={(open) => !open && setDeleteStationId(null)}>
-        <AlertDialogContent className="glass-card border-white/10">
+        <AlertDialogContent className="glass-card border-white/10 max-h-[90vh] overflow-y-auto">
           <AlertDialogHeader>
             <AlertDialogTitle>Conferma Eliminazione</AlertDialogTitle>
             <AlertDialogDescription>
@@ -594,13 +595,13 @@ export default function StationsPage() {
               Questa azione non può essere annullata.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter className="gap-2">
-            <AlertDialogCancel data-testid="button-cancel-delete-station">
+          <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+            <AlertDialogCancel className="min-h-[48px]" data-testid="button-cancel-delete-station">
               Annulla
             </AlertDialogCancel>
             <AlertDialogAction
               onClick={() => deleteStationId && deleteMutation.mutate(deleteStationId)}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90 min-h-[48px]"
               data-testid="button-confirm-delete-station"
             >
               Elimina

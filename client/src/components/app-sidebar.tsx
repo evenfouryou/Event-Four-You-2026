@@ -20,6 +20,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import {
   Sidebar,
   SidebarContent,
@@ -35,17 +36,24 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
+import type { UserFeatures } from "@shared/schema";
 
 export function AppSidebar() {
   const [location] = useLocation();
   const { user } = useAuth();
 
-  if (!user) return null;
+  const isSuperAdmin = user?.role === 'super_admin';
+  const isAdmin = user?.role === 'gestore';
+  const isWarehouse = user?.role === 'warehouse';
+  const isBartender = user?.role === 'bartender';
 
-  const isSuperAdmin = user.role === 'super_admin';
-  const isAdmin = user.role === 'gestore';
-  const isWarehouse = user.role === 'warehouse';
-  const isBartender = user.role === 'bartender';
+  // Fetch user features for menu filtering
+  const { data: userFeatures } = useQuery<UserFeatures>({
+    queryKey: ['/api/user-features/current/my'],
+    enabled: !!user && isAdmin,
+  });
+
+  if (!user) return null;
 
   const menuItems = [];
 
@@ -79,38 +87,65 @@ export function AppSidebar() {
         icon: Home,
         url: "/",
         group: "Bacheca",
-      },
-      {
+      }
+    );
+
+    // Add Eventi (always visible for admins)
+    menuItems.push({
+      title: "Eventi",
+      icon: Calendar,
+      url: "/events",
+      group: "Moduli",
+    });
+
+    // Only show modules that are enabled for this user
+    if (userFeatures?.beverageEnabled !== false) {
+      menuItems.push({
         title: "Beverage",
         icon: Wine,
         url: "/beverage",
         group: "Moduli",
         accent: true,
-      },
-      {
+      });
+    }
+
+    if (userFeatures?.contabilitaEnabled === true) {
+      menuItems.push({
         title: "Contabilità",
         icon: Calculator,
         url: "/accounting",
         group: "Moduli",
-      },
-      {
+      });
+    }
+
+    if (userFeatures?.personaleEnabled === true) {
+      menuItems.push({
         title: "Personale",
         icon: UserCheck,
         url: "/personnel",
         group: "Moduli",
-      },
-      {
+      });
+    }
+
+    if (userFeatures?.cassaEnabled === true) {
+      menuItems.push({
         title: "Cassa",
         icon: Receipt,
         url: "/cash-register",
         group: "Moduli",
-      },
-      {
+      });
+    }
+
+    if (userFeatures?.nightFileEnabled === true) {
+      menuItems.push({
         title: "File Serata",
         icon: FileText,
         url: "/night-file",
         group: "Moduli",
-      },
+      });
+    }
+
+    menuItems.push(
       {
         title: "Location",
         icon: MapPin,

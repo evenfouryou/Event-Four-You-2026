@@ -196,7 +196,7 @@ export default function Settings() {
               <Button
                 type="submit"
                 disabled={updateMutation.isPending}
-                className="gradient-golden text-black font-semibold hover:opacity-90"
+                className="gradient-golden text-black font-semibold hover:opacity-90 min-h-[48px] md:min-h-9"
                 data-testid="button-save-settings"
               >
                 <Save className="h-4 w-4 mr-2" />

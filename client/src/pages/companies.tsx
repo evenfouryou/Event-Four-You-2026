@@ -210,12 +210,12 @@ export default function Companies() {
         </div>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
-            <Button className="gradient-golden text-black font-semibold" data-testid="button-create-company">
-              <Plus className="h-4 w-4 mr-2" />
-              Nuova Azienda
+            <Button className="gradient-golden text-black font-semibold min-h-[48px] md:min-h-9" data-testid="button-create-company">
+              <Plus className="h-4 w-4 md:mr-2" />
+              <span className="hidden md:inline">Nuova Azienda</span>
             </Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>
                 {editingCompany ? 'Modifica Azienda' : 'Nuova Azienda'}
@@ -350,7 +350,7 @@ export default function Companies() {
                     variant="ghost"
                     size="icon"
                     onClick={() => handleEdit(company)}
-                    className="rounded-xl opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="rounded-xl md:opacity-0 md:group-hover:opacity-100 transition-opacity min-w-[44px] min-h-[44px]"
                     data-testid={`button-edit-company-${company.id}`}
                     title="Modifica Azienda"
                   >
@@ -360,7 +360,7 @@ export default function Companies() {
                     variant="ghost"
                     size="icon"
                     onClick={() => handleDeleteClick(company.id)}
-                    className="rounded-xl opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive"
+                    className="rounded-xl md:opacity-0 md:group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive min-w-[44px] min-h-[44px]"
                     data-testid={`button-delete-company-${company.id}`}
                     title="Elimina Azienda"
                   >

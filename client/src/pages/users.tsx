@@ -482,12 +482,12 @@ export default function UsersPage() {
         </div>
         <Dialog open={dialogOpen} onOpenChange={handleDialogOpenChange}>
           <DialogTrigger asChild>
-            <Button className="gradient-golden text-black font-semibold" data-testid="button-create-user">
-              <Plus className="h-4 w-4 mr-2" />
-              Nuovo Utente
+            <Button className="gradient-golden text-black font-semibold min-h-[48px] md:min-h-9" data-testid="button-create-user">
+              <Plus className="h-4 w-4 md:mr-2" />
+              <span className="hidden md:inline">Nuovo Utente</span>
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-md">
+          <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>
                 {editingUser ? 'Modifica Utente' : 'Nuovo Utente'}
@@ -644,7 +644,7 @@ export default function UsersPage() {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
-        className="grid grid-cols-3 gap-3 md:gap-4 mb-6"
+        className="grid grid-cols-2 sm:grid-cols-3 gap-3 md:gap-4 mb-6"
       >
         <div className="glass-card p-4">
           <div className="flex items-center gap-3">
@@ -751,7 +751,7 @@ export default function UsersPage() {
                   </div>
                 )}
 
-                <div className="flex gap-1 pt-2 border-t border-white/5">
+                <div className="flex gap-1 pt-2 border-t border-white/5 flex-wrap">
                   {isSuperAdmin && user.role === 'gestore' && (
                     <Button
                       size="icon"
@@ -759,7 +759,7 @@ export default function UsersPage() {
                       onClick={() => handleOpenFeaturesDialog(user)}
                       data-testid={`button-features-user-${user.id}`}
                       title="Gestisci Moduli"
-                      className="rounded-xl"
+                      className="rounded-xl min-w-[44px] min-h-[44px]"
                     >
                       <Settings2 className="h-4 w-4" />
                     </Button>
@@ -770,7 +770,7 @@ export default function UsersPage() {
                     onClick={() => handleEdit(user)}
                     data-testid={`button-edit-user-${user.id}`}
                     title="Modifica utente"
-                    className="rounded-xl"
+                    className="rounded-xl min-w-[44px] min-h-[44px]"
                   >
                     <Edit className="h-4 w-4" />
                   </Button>
@@ -782,7 +782,7 @@ export default function UsersPage() {
                         onClick={() => toggleActiveMutation.mutate({ id: user.id, isActive: !user.isActive })}
                         data-testid={`button-toggle-active-user-${user.id}`}
                         title={user.isActive ? "Disattiva utente" : "Riattiva utente"}
-                        className="rounded-xl"
+                        className="rounded-xl min-w-[44px] min-h-[44px]"
                       >
                         {user.isActive ? <Ban className="h-4 w-4" /> : <CheckCircle className="h-4 w-4" />}
                       </Button>
@@ -793,7 +793,7 @@ export default function UsersPage() {
                           onClick={() => impersonateMutation.mutate(user.id)}
                           data-testid={`button-impersonate-user-${user.id}`}
                           title="Impersonifica utente"
-                          className="rounded-xl"
+                          className="rounded-xl min-w-[44px] min-h-[44px]"
                         >
                           <LogIn className="h-4 w-4" />
                         </Button>
@@ -804,7 +804,7 @@ export default function UsersPage() {
                         onClick={() => handleDeleteClick(user.id)}
                         data-testid={`button-delete-user-${user.id}`}
                         title="Elimina utente"
-                        className="rounded-xl text-destructive hover:text-destructive"
+                        className="rounded-xl text-destructive hover:text-destructive min-w-[44px] min-h-[44px]"
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -853,7 +853,7 @@ export default function UsersPage() {
       </AlertDialog>
 
       <Dialog open={featuresDialogOpen} onOpenChange={setFeaturesDialogOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Settings2 className="h-5 w-5" />

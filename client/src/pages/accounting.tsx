@@ -30,6 +30,7 @@ import {
   ArrowLeft,
   Calculator,
   TrendingUp,
+  Clock,
 } from "lucide-react";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
@@ -523,91 +524,162 @@ function FixedCostsSection({ isAdmin }: { isAdmin: boolean }) {
             </p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow className="border-white/5">
-                  <TableHead>Nome</TableHead>
-                  <TableHead>Categoria</TableHead>
-                  <TableHead>Location</TableHead>
-                  <TableHead className="text-right">Importo</TableHead>
-                  <TableHead>Frequenza</TableHead>
-                  {isAdmin && <TableHead className="text-right">Azioni</TableHead>}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredCosts.map((cost) => (
-                  <TableRow key={cost.id} className="border-white/5" data-testid={`row-fixed-cost-${cost.id}`}>
-                    <TableCell>
-                      <div>
-                        <div className="font-medium">{cost.name}</div>
-                        {cost.notes && (
-                          <div className="text-sm text-muted-foreground line-clamp-1">{cost.notes}</div>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className="border-white/10">
-                        {categoryLabels[cost.category] || cost.category}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1">
-                        <MapPin className="h-3 w-3 text-muted-foreground" />
-                        {getLocationName(cost.locationId)}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right font-medium text-primary">
-                      €{parseFloat(cost.amount).toFixed(2)}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="secondary">
-                        {frequencyLabels[cost.frequency] || cost.frequency}
-                      </Badge>
-                    </TableCell>
-                    {isAdmin && (
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-1">
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            onClick={() => {
-                              setEditingCost(cost);
-                              setIsDialogOpen(true);
-                            }}
-                            data-testid={`button-edit-fixed-cost-${cost.id}`}
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button size="icon" variant="ghost" data-testid={`button-delete-fixed-cost-${cost.id}`}>
-                                <Trash2 className="h-4 w-4 text-destructive" />
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Eliminare questo costo?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Questa azione non può essere annullata.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Annulla</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => deleteMutation.mutate(cost.id)}>
-                                  Elimina
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
+          <>
+            {/* Desktop Table */}
+            <div className="hidden md:block overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="border-white/5">
+                    <TableHead>Nome</TableHead>
+                    <TableHead>Categoria</TableHead>
+                    <TableHead>Location</TableHead>
+                    <TableHead className="text-right">Importo</TableHead>
+                    <TableHead>Frequenza</TableHead>
+                    {isAdmin && <TableHead className="text-right">Azioni</TableHead>}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredCosts.map((cost) => (
+                    <TableRow key={cost.id} className="border-white/5" data-testid={`row-fixed-cost-${cost.id}`}>
+                      <TableCell>
+                        <div>
+                          <div className="font-medium">{cost.name}</div>
+                          {cost.notes && (
+                            <div className="text-sm text-muted-foreground line-clamp-1">{cost.notes}</div>
+                          )}
                         </div>
                       </TableCell>
-                    )}
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+                      <TableCell>
+                        <Badge variant="outline" className="border-white/10">
+                          {categoryLabels[cost.category] || cost.category}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1">
+                          <MapPin className="h-3 w-3 text-muted-foreground" />
+                          {getLocationName(cost.locationId)}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right font-medium text-primary">
+                        €{parseFloat(cost.amount).toFixed(2)}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="secondary">
+                          {frequencyLabels[cost.frequency] || cost.frequency}
+                        </Badge>
+                      </TableCell>
+                      {isAdmin && (
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-1">
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => {
+                                setEditingCost(cost);
+                                setIsDialogOpen(true);
+                              }}
+                              data-testid={`button-edit-fixed-cost-${cost.id}`}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button size="icon" variant="ghost" data-testid={`button-delete-fixed-cost-${cost.id}`}>
+                                  <Trash2 className="h-4 w-4 text-destructive" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Eliminare questo costo?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Questa azione non può essere annullata.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Annulla</AlertDialogCancel>
+                                  <AlertDialogAction onClick={() => deleteMutation.mutate(cost.id)}>
+                                    Elimina
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </div>
+                        </TableCell>
+                      )}
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+
+            {/* Mobile Cards */}
+            <div className="md:hidden space-y-3">
+              {filteredCosts.map((cost) => (
+                <div key={cost.id} className="glass-card p-4" data-testid={`card-fixed-cost-${cost.id}`}>
+                  <div className="flex justify-between items-start gap-3 mb-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium truncate">{cost.name}</div>
+                      {cost.notes && (
+                        <div className="text-sm text-muted-foreground line-clamp-2 mt-1">{cost.notes}</div>
+                      )}
+                    </div>
+                    <div className="text-right">
+                      <div className="text-lg font-bold text-primary">€{parseFloat(cost.amount).toFixed(2)}</div>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-2 mb-3">
+                    <Badge variant="outline" className="border-white/10">
+                      {categoryLabels[cost.category] || cost.category}
+                    </Badge>
+                    <Badge variant="secondary">
+                      {frequencyLabels[cost.frequency] || cost.frequency}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center gap-1 text-sm text-muted-foreground mb-3">
+                    <MapPin className="h-3 w-3" />
+                    {getLocationName(cost.locationId)}
+                  </div>
+                  {isAdmin && (
+                    <div className="flex justify-end gap-2 pt-3 border-t border-white/5">
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="min-h-[48px] min-w-[48px]"
+                        onClick={() => {
+                          setEditingCost(cost);
+                          setIsDialogOpen(true);
+                        }}
+                        data-testid={`button-edit-fixed-cost-mobile-${cost.id}`}
+                      >
+                        <Pencil className="h-5 w-5" />
+                      </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button size="icon" variant="ghost" className="min-h-[48px] min-w-[48px]" data-testid={`button-delete-fixed-cost-mobile-${cost.id}`}>
+                            <Trash2 className="h-5 w-5 text-destructive" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent className="w-[95vw] max-w-lg">
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Eliminare questo costo?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Questa azione non può essere annullata.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Annulla</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => deleteMutation.mutate(cost.id)}>
+                              Elimina
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </>
         )}
 
         <div className="mt-6 pt-4 border-t border-white/5">
@@ -885,89 +957,165 @@ function ExtraCostsSection({ isAdmin }: { isAdmin: boolean }) {
             </p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow className="border-white/5">
-                  <TableHead>Nome</TableHead>
-                  <TableHead>Categoria</TableHead>
-                  <TableHead>Evento</TableHead>
-                  <TableHead className="text-right">Importo</TableHead>
-                  <TableHead>Fattura</TableHead>
-                  {isAdmin && <TableHead className="text-right">Azioni</TableHead>}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredCosts.map((cost) => (
-                  <TableRow key={cost.id} className="border-white/5" data-testid={`row-extra-cost-${cost.id}`}>
-                    <TableCell>
-                      <div>
-                        <div className="font-medium">{cost.name}</div>
-                        {cost.notes && (
-                          <div className="text-sm text-muted-foreground line-clamp-1">{cost.notes}</div>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className="border-white/10">
-                        {categoryLabels[cost.category] || cost.category}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1">
-                        <Calendar className="h-3 w-3 text-muted-foreground" />
-                        {getEventName(cost.eventId)}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right font-medium text-primary">
-                      €{parseFloat(cost.amount).toFixed(2)}
-                    </TableCell>
-                    <TableCell>
-                      {cost.invoiceNumber || "-"}
-                    </TableCell>
-                    {isAdmin && (
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-1">
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            onClick={() => {
-                              setEditingCost(cost);
-                              setIsDialogOpen(true);
-                            }}
-                            data-testid={`button-edit-extra-cost-${cost.id}`}
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button size="icon" variant="ghost" data-testid={`button-delete-extra-cost-${cost.id}`}>
-                                <Trash2 className="h-4 w-4 text-destructive" />
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Eliminare questo costo?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Questa azione non può essere annullata.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Annulla</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => deleteMutation.mutate(cost.id)}>
-                                  Elimina
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
+          <>
+            {/* Desktop Table */}
+            <div className="hidden md:block overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="border-white/5">
+                    <TableHead>Nome</TableHead>
+                    <TableHead>Categoria</TableHead>
+                    <TableHead>Evento</TableHead>
+                    <TableHead className="text-right">Importo</TableHead>
+                    <TableHead>Fattura</TableHead>
+                    {isAdmin && <TableHead className="text-right">Azioni</TableHead>}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredCosts.map((cost) => (
+                    <TableRow key={cost.id} className="border-white/5" data-testid={`row-extra-cost-${cost.id}`}>
+                      <TableCell>
+                        <div>
+                          <div className="font-medium">{cost.name}</div>
+                          {cost.notes && (
+                            <div className="text-sm text-muted-foreground line-clamp-1">{cost.notes}</div>
+                          )}
                         </div>
                       </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="border-white/10">
+                          {categoryLabels[cost.category] || cost.category}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1">
+                          <Calendar className="h-3 w-3 text-muted-foreground" />
+                          {getEventName(cost.eventId)}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right font-medium text-primary">
+                        €{parseFloat(cost.amount).toFixed(2)}
+                      </TableCell>
+                      <TableCell>
+                        {cost.invoiceNumber || "-"}
+                      </TableCell>
+                      {isAdmin && (
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-1">
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => {
+                                setEditingCost(cost);
+                                setIsDialogOpen(true);
+                              }}
+                              data-testid={`button-edit-extra-cost-${cost.id}`}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button size="icon" variant="ghost" data-testid={`button-delete-extra-cost-${cost.id}`}>
+                                  <Trash2 className="h-4 w-4 text-destructive" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Eliminare questo costo?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Questa azione non può essere annullata.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Annulla</AlertDialogCancel>
+                                  <AlertDialogAction onClick={() => deleteMutation.mutate(cost.id)}>
+                                    Elimina
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </div>
+                        </TableCell>
+                      )}
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+
+            {/* Mobile Cards */}
+            <div className="md:hidden space-y-3">
+              {filteredCosts.map((cost) => (
+                <div key={cost.id} className="glass-card p-4" data-testid={`card-extra-cost-${cost.id}`}>
+                  <div className="flex justify-between items-start gap-3 mb-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium truncate">{cost.name}</div>
+                      {cost.notes && (
+                        <div className="text-sm text-muted-foreground line-clamp-2 mt-1">{cost.notes}</div>
+                      )}
+                    </div>
+                    <div className="text-right">
+                      <div className="text-lg font-bold text-primary">€{parseFloat(cost.amount).toFixed(2)}</div>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-2 mb-3">
+                    <Badge variant="outline" className="border-white/10">
+                      {categoryLabels[cost.category] || cost.category}
+                    </Badge>
+                  </div>
+                  <div className="space-y-1 text-sm text-muted-foreground mb-3">
+                    <div className="flex items-center gap-1">
+                      <Calendar className="h-3 w-3" />
+                      {getEventName(cost.eventId)}
+                    </div>
+                    {cost.invoiceNumber && (
+                      <div className="flex items-center gap-1">
+                        <FileText className="h-3 w-3" />
+                        Fattura: {cost.invoiceNumber}
+                      </div>
                     )}
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+                  </div>
+                  {isAdmin && (
+                    <div className="flex justify-end gap-2 pt-3 border-t border-white/5">
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="min-h-[48px] min-w-[48px]"
+                        onClick={() => {
+                          setEditingCost(cost);
+                          setIsDialogOpen(true);
+                        }}
+                        data-testid={`button-edit-extra-cost-mobile-${cost.id}`}
+                      >
+                        <Pencil className="h-5 w-5" />
+                      </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button size="icon" variant="ghost" className="min-h-[48px] min-w-[48px]" data-testid={`button-delete-extra-cost-mobile-${cost.id}`}>
+                            <Trash2 className="h-5 w-5 text-destructive" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent className="w-[95vw] max-w-lg">
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Eliminare questo costo?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Questa azione non può essere annullata.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Annulla</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => deleteMutation.mutate(cost.id)}>
+                              Elimina
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </>
         )}
 
         <div className="mt-6 pt-4 border-t border-white/5">
@@ -1267,98 +1415,176 @@ function MaintenancesSection({ isAdmin }: { isAdmin: boolean }) {
             </p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow className="border-white/5">
-                  <TableHead>Nome</TableHead>
-                  <TableHead>Location</TableHead>
-                  <TableHead>Tipo</TableHead>
-                  <TableHead>Stato</TableHead>
-                  <TableHead className="text-right">Costo</TableHead>
-                  {isAdmin && <TableHead className="text-right">Azioni</TableHead>}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredMaintenances.map((maintenance) => (
-                  <TableRow key={maintenance.id} className="border-white/5" data-testid={`row-maintenance-${maintenance.id}`}>
-                    <TableCell>
-                      <div>
-                        <div className="font-medium">{maintenance.name}</div>
-                        {maintenance.description && (
-                          <div className="text-sm text-muted-foreground line-clamp-1">{maintenance.description}</div>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1">
-                        <MapPin className="h-3 w-3 text-muted-foreground" />
-                        {getLocationName(maintenance.locationId)}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className="border-white/10">
-                        {typeLabels[maintenance.type] || maintenance.type}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge 
-                        variant={statusLabels[maintenance.status]?.variant || "secondary"}
-                        className={maintenance.status === "completed" ? "bg-teal-500/20 text-teal border-teal-500/30" : ""}
-                      >
-                        {statusLabels[maintenance.status]?.label || maintenance.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {maintenance.amount ? (
-                        <span className="font-medium text-primary">€{parseFloat(maintenance.amount).toFixed(2)}</span>
-                      ) : (
-                        <span className="text-muted-foreground">-</span>
-                      )}
-                    </TableCell>
-                    {isAdmin && (
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-1">
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            onClick={() => {
-                              setEditingMaintenance(maintenance);
-                              setIsDialogOpen(true);
-                            }}
-                            data-testid={`button-edit-maintenance-${maintenance.id}`}
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button size="icon" variant="ghost" data-testid={`button-delete-maintenance-${maintenance.id}`}>
-                                <Trash2 className="h-4 w-4 text-destructive" />
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Eliminare questa manutenzione?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Questa azione non può essere annullata.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Annulla</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => deleteMutation.mutate(maintenance.id)}>
-                                  Elimina
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
+          <>
+            {/* Desktop Table */}
+            <div className="hidden md:block overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="border-white/5">
+                    <TableHead>Nome</TableHead>
+                    <TableHead>Location</TableHead>
+                    <TableHead>Tipo</TableHead>
+                    <TableHead>Stato</TableHead>
+                    <TableHead className="text-right">Costo</TableHead>
+                    {isAdmin && <TableHead className="text-right">Azioni</TableHead>}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredMaintenances.map((maintenance) => (
+                    <TableRow key={maintenance.id} className="border-white/5" data-testid={`row-maintenance-${maintenance.id}`}>
+                      <TableCell>
+                        <div>
+                          <div className="font-medium">{maintenance.name}</div>
+                          {maintenance.description && (
+                            <div className="text-sm text-muted-foreground line-clamp-1">{maintenance.description}</div>
+                          )}
                         </div>
                       </TableCell>
-                    )}
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+                      <TableCell>
+                        <div className="flex items-center gap-1">
+                          <MapPin className="h-3 w-3 text-muted-foreground" />
+                          {getLocationName(maintenance.locationId)}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="border-white/10">
+                          {typeLabels[maintenance.type] || maintenance.type}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge 
+                          variant={statusLabels[maintenance.status]?.variant || "secondary"}
+                          className={maintenance.status === "completed" ? "bg-teal-500/20 text-teal border-teal-500/30" : ""}
+                        >
+                          {statusLabels[maintenance.status]?.label || maintenance.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {maintenance.amount ? (
+                          <span className="font-medium text-primary">€{parseFloat(maintenance.amount).toFixed(2)}</span>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
+                      {isAdmin && (
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-1">
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => {
+                                setEditingMaintenance(maintenance);
+                                setIsDialogOpen(true);
+                              }}
+                              data-testid={`button-edit-maintenance-${maintenance.id}`}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button size="icon" variant="ghost" data-testid={`button-delete-maintenance-${maintenance.id}`}>
+                                  <Trash2 className="h-4 w-4 text-destructive" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Eliminare questa manutenzione?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Questa azione non può essere annullata.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Annulla</AlertDialogCancel>
+                                  <AlertDialogAction onClick={() => deleteMutation.mutate(maintenance.id)}>
+                                    Elimina
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </div>
+                        </TableCell>
+                      )}
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+
+            {/* Mobile Cards */}
+            <div className="md:hidden space-y-3">
+              {filteredMaintenances.map((maintenance) => (
+                <div key={maintenance.id} className="glass-card p-4" data-testid={`card-maintenance-${maintenance.id}`}>
+                  <div className="flex justify-between items-start gap-3 mb-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium truncate">{maintenance.name}</div>
+                      {maintenance.description && (
+                        <div className="text-sm text-muted-foreground line-clamp-2 mt-1">{maintenance.description}</div>
+                      )}
+                    </div>
+                    <div className="text-right">
+                      {maintenance.amount ? (
+                        <div className="text-lg font-bold text-primary">€{parseFloat(maintenance.amount).toFixed(2)}</div>
+                      ) : (
+                        <div className="text-muted-foreground">-</div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-2 mb-3">
+                    <Badge variant="outline" className="border-white/10">
+                      {typeLabels[maintenance.type] || maintenance.type}
+                    </Badge>
+                    <Badge 
+                      variant={statusLabels[maintenance.status]?.variant || "secondary"}
+                      className={maintenance.status === "completed" ? "bg-teal-500/20 text-teal border-teal-500/30" : ""}
+                    >
+                      {statusLabels[maintenance.status]?.label || maintenance.status}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center gap-1 text-sm text-muted-foreground mb-3">
+                    <MapPin className="h-3 w-3" />
+                    {getLocationName(maintenance.locationId)}
+                  </div>
+                  {isAdmin && (
+                    <div className="flex justify-end gap-2 pt-3 border-t border-white/5">
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="min-h-[48px] min-w-[48px]"
+                        onClick={() => {
+                          setEditingMaintenance(maintenance);
+                          setIsDialogOpen(true);
+                        }}
+                        data-testid={`button-edit-maintenance-mobile-${maintenance.id}`}
+                      >
+                        <Pencil className="h-5 w-5" />
+                      </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button size="icon" variant="ghost" className="min-h-[48px] min-w-[48px]" data-testid={`button-delete-maintenance-mobile-${maintenance.id}`}>
+                            <Trash2 className="h-5 w-5 text-destructive" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent className="w-[95vw] max-w-lg">
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Eliminare questa manutenzione?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Questa azione non può essere annullata.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Annulla</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => deleteMutation.mutate(maintenance.id)}>
+                              Elimina
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </>
         )}
       </div>
     </motion.div>
@@ -1637,102 +1863,186 @@ function DocumentsSection({ isAdmin }: { isAdmin: boolean }) {
             </p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow className="border-white/5">
-                  <TableHead>Tipo</TableHead>
-                  <TableHead>Numero</TableHead>
-                  <TableHead>Evento</TableHead>
-                  <TableHead className="text-right">Importo</TableHead>
-                  <TableHead>Stato</TableHead>
-                  <TableHead>Scadenza</TableHead>
-                  {isAdmin && <TableHead className="text-right">Azioni</TableHead>}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredDocs.map((doc) => (
-                  <TableRow key={doc.id} className="border-white/5" data-testid={`row-document-${doc.id}`}>
-                    <TableCell>
-                      <Badge variant="outline" className="border-white/10">
-                        {typeLabels[doc.type] || doc.type}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div>
-                        <div className="font-medium">{doc.documentNumber || "-"}</div>
-                        {doc.notes && (
-                          <div className="text-sm text-muted-foreground line-clamp-1">{doc.notes}</div>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1">
-                        <Calendar className="h-3 w-3 text-muted-foreground" />
-                        {getEventName(doc.eventId)}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right font-medium text-primary">
-                      {doc.amount ? `€${parseFloat(doc.amount).toFixed(2)}` : "-"}
-                    </TableCell>
-                    <TableCell>
-                      <Badge 
-                        variant={statusLabels[doc.status]?.variant || "secondary"}
-                        className={doc.status === "paid" ? "bg-teal-500/20 text-teal border-teal-500/30" : ""}
-                      >
-                        {statusLabels[doc.status]?.label || doc.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      {doc.dueDate && (
-                        <span className={`text-sm ${new Date(doc.dueDate) < new Date() && doc.status !== 'paid' ? 'text-destructive' : ''}`}>
-                          {format(new Date(doc.dueDate), "dd/MM/yyyy", { locale: it })}
-                        </span>
-                      )}
-                    </TableCell>
-                    {isAdmin && (
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-1">
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            onClick={() => {
-                              setEditingDoc(doc);
-                              setIsDialogOpen(true);
-                            }}
-                            data-testid={`button-edit-document-${doc.id}`}
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button size="icon" variant="ghost" data-testid={`button-delete-document-${doc.id}`}>
-                                <Trash2 className="h-4 w-4 text-destructive" />
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Eliminare questo documento?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Questa azione non può essere annullata.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Annulla</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => deleteMutation.mutate(doc.id)}>
-                                  Elimina
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
+          <>
+            {/* Desktop Table */}
+            <div className="hidden md:block overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="border-white/5">
+                    <TableHead>Tipo</TableHead>
+                    <TableHead>Numero</TableHead>
+                    <TableHead>Evento</TableHead>
+                    <TableHead className="text-right">Importo</TableHead>
+                    <TableHead>Stato</TableHead>
+                    <TableHead>Scadenza</TableHead>
+                    {isAdmin && <TableHead className="text-right">Azioni</TableHead>}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredDocs.map((doc) => (
+                    <TableRow key={doc.id} className="border-white/5" data-testid={`row-document-${doc.id}`}>
+                      <TableCell>
+                        <Badge variant="outline" className="border-white/10">
+                          {typeLabels[doc.type] || doc.type}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div>
+                          <div className="font-medium">{doc.documentNumber || "-"}</div>
+                          {doc.notes && (
+                            <div className="text-sm text-muted-foreground line-clamp-1">{doc.notes}</div>
+                          )}
                         </div>
                       </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1">
+                          <Calendar className="h-3 w-3 text-muted-foreground" />
+                          {getEventName(doc.eventId)}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right font-medium text-primary">
+                        {doc.amount ? `€${parseFloat(doc.amount).toFixed(2)}` : "-"}
+                      </TableCell>
+                      <TableCell>
+                        <Badge 
+                          variant={statusLabels[doc.status]?.variant || "secondary"}
+                          className={doc.status === "paid" ? "bg-teal-500/20 text-teal border-teal-500/30" : ""}
+                        >
+                          {statusLabels[doc.status]?.label || doc.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {doc.dueDate && (
+                          <span className={`text-sm ${new Date(doc.dueDate) < new Date() && doc.status !== 'paid' ? 'text-destructive' : ''}`}>
+                            {format(new Date(doc.dueDate), "dd/MM/yyyy", { locale: it })}
+                          </span>
+                        )}
+                      </TableCell>
+                      {isAdmin && (
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-1">
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => {
+                                setEditingDoc(doc);
+                                setIsDialogOpen(true);
+                              }}
+                              data-testid={`button-edit-document-${doc.id}`}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button size="icon" variant="ghost" data-testid={`button-delete-document-${doc.id}`}>
+                                  <Trash2 className="h-4 w-4 text-destructive" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Eliminare questo documento?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Questa azione non può essere annullata.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Annulla</AlertDialogCancel>
+                                  <AlertDialogAction onClick={() => deleteMutation.mutate(doc.id)}>
+                                    Elimina
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </div>
+                        </TableCell>
+                      )}
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+
+            {/* Mobile Cards */}
+            <div className="md:hidden space-y-3">
+              {filteredDocs.map((doc) => (
+                <div key={doc.id} className="glass-card p-4" data-testid={`card-document-${doc.id}`}>
+                  <div className="flex justify-between items-start gap-3 mb-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium truncate">{doc.documentNumber || "-"}</div>
+                      {doc.notes && (
+                        <div className="text-sm text-muted-foreground line-clamp-2 mt-1">{doc.notes}</div>
+                      )}
+                    </div>
+                    <div className="text-right">
+                      <div className="text-lg font-bold text-primary">
+                        {doc.amount ? `€${parseFloat(doc.amount).toFixed(2)}` : "-"}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-2 mb-3">
+                    <Badge variant="outline" className="border-white/10">
+                      {typeLabels[doc.type] || doc.type}
+                    </Badge>
+                    <Badge 
+                      variant={statusLabels[doc.status]?.variant || "secondary"}
+                      className={doc.status === "paid" ? "bg-teal-500/20 text-teal border-teal-500/30" : ""}
+                    >
+                      {statusLabels[doc.status]?.label || doc.status}
+                    </Badge>
+                  </div>
+                  <div className="space-y-1 text-sm text-muted-foreground mb-3">
+                    <div className="flex items-center gap-1">
+                      <Calendar className="h-3 w-3" />
+                      {getEventName(doc.eventId)}
+                    </div>
+                    {doc.dueDate && (
+                      <div className={`flex items-center gap-1 ${new Date(doc.dueDate) < new Date() && doc.status !== 'paid' ? 'text-destructive' : ''}`}>
+                        <Clock className="h-3 w-3" />
+                        Scadenza: {format(new Date(doc.dueDate), "dd/MM/yyyy", { locale: it })}
+                      </div>
                     )}
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+                  </div>
+                  {isAdmin && (
+                    <div className="flex justify-end gap-2 pt-3 border-t border-white/5">
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="min-h-[48px] min-w-[48px]"
+                        onClick={() => {
+                          setEditingDoc(doc);
+                          setIsDialogOpen(true);
+                        }}
+                        data-testid={`button-edit-document-mobile-${doc.id}`}
+                      >
+                        <Pencil className="h-5 w-5" />
+                      </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button size="icon" variant="ghost" className="min-h-[48px] min-w-[48px]" data-testid={`button-delete-document-mobile-${doc.id}`}>
+                            <Trash2 className="h-5 w-5 text-destructive" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent className="w-[95vw] max-w-lg">
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Eliminare questo documento?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Questa azione non può essere annullata.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Annulla</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => deleteMutation.mutate(doc.id)}>
+                              Elimina
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </>
         )}
       </div>
     </motion.div>

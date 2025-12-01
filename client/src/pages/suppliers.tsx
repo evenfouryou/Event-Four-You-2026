@@ -451,7 +451,7 @@ export default function Suppliers() {
       )}
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-2xl glass border-white/10">
+        <DialogContent className="w-full max-w-2xl max-h-[90vh] overflow-y-auto glass border-white/10 md:w-auto">
           <DialogHeader>
             <DialogTitle>
               {editingSupplier ? 'Modifica Fornitore' : 'Nuovo Fornitore'}
@@ -631,7 +631,7 @@ export default function Suppliers() {
       </Dialog>
 
       <AlertDialog open={!!deletingSupplier} onOpenChange={() => setDeletingSupplier(null)}>
-        <AlertDialogContent className="glass border-white/10">
+        <AlertDialogContent className="w-[95vw] max-w-lg max-h-[90vh] overflow-y-auto glass border-white/10">
           <AlertDialogHeader>
             <AlertDialogTitle>Conferma Eliminazione</AlertDialogTitle>
             <AlertDialogDescription>
