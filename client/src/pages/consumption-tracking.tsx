@@ -442,7 +442,7 @@ export default function ConsumptionTracking() {
   }
 
   return (
-    <div>
+    <div className="pb-24 md:pb-8">
       <div className="sticky top-0 z-40 bg-background border-b">
         <div className="p-3 sm:p-4 md:p-6 space-y-3">
           <div className="flex items-center gap-3">
