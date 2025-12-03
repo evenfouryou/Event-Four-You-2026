@@ -61,98 +61,96 @@ export default function SuperAdminDashboard() {
   const totalRevenue = analytics.companyMetrics.reduce((sum, c) => sum + c.totalRevenue, 0);
 
   return (
-    <div className="p-6 space-y-6 overflow-auto h-full">
+    <div className="p-4 md:p-6 space-y-6 overflow-auto h-full pb-24 md:pb-8">
       <div>
-        <h1 className="text-3xl font-semibold mb-2">Dashboard Super Admin</h1>
-        <p className="text-muted-foreground">
+        <h1 className="text-2xl md:text-3xl font-semibold mb-2">Dashboard Super Admin</h1>
+        <p className="text-muted-foreground text-sm md:text-base">
           Panoramica completa delle metriche cross-company
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Aziende Totali</CardTitle>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
+        <Card className="glass-card">
+          <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2 p-3 md:p-4">
+            <CardTitle className="text-xs md:text-sm font-medium">Aziende</CardTitle>
             <Building2 className="w-4 h-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-semibold" data-testid="text-total-companies">
+          <CardContent className="p-3 md:p-4 pt-0">
+            <div className="text-xl md:text-2xl font-semibold" data-testid="text-total-companies">
               {totalCompanies}
             </div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Eventi Totali</CardTitle>
+        <Card className="glass-card">
+          <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2 p-3 md:p-4">
+            <CardTitle className="text-xs md:text-sm font-medium">Eventi</CardTitle>
             <Calendar className="w-4 h-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-semibold" data-testid="text-total-events">
+          <CardContent className="p-3 md:p-4 pt-0">
+            <div className="text-xl md:text-2xl font-semibold" data-testid="text-total-events">
               {analytics.eventStatistics.total}
             </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              {analytics.eventStatistics.active} attivi, {analytics.eventStatistics.completed} completati
+            <p className="text-[10px] md:text-xs text-muted-foreground mt-1">
+              {analytics.eventStatistics.active} attivi
             </p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Ricavi Totali</CardTitle>
+        <Card className="glass-card">
+          <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2 p-3 md:p-4">
+            <CardTitle className="text-xs md:text-sm font-medium">Ricavi</CardTitle>
             <TrendingUp className="w-4 h-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-semibold" data-testid="text-total-revenue">
-              €{totalRevenue.toFixed(2)}
+          <CardContent className="p-3 md:p-4 pt-0">
+            <div className="text-xl md:text-2xl font-semibold" data-testid="text-total-revenue">
+              €{totalRevenue.toFixed(0)}
             </div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Prodotti Top</CardTitle>
+        <Card className="glass-card">
+          <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2 p-3 md:p-4">
+            <CardTitle className="text-xs md:text-sm font-medium">Top Prodotti</CardTitle>
             <Package className="w-4 h-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-semibold" data-testid="text-top-products-count">
+          <CardContent className="p-3 md:p-4 pt-0">
+            <div className="text-xl md:text-2xl font-semibold" data-testid="text-top-products-count">
               {analytics.topProducts.length}
             </div>
           </CardContent>
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Ricavi per Azienda</CardTitle>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
+        <Card className="glass-card">
+          <CardHeader className="p-3 md:p-4">
+            <CardTitle className="text-sm md:text-base">Ricavi per Azienda</CardTitle>
           </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
+          <CardContent className="p-3 md:p-4 pt-0">
+            <ResponsiveContainer width="100%" height={200} className="md:h-[300px]">
               <BarChart data={analytics.companyMetrics}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="companyName" />
-                <YAxis />
+                <XAxis dataKey="companyName" tick={{ fontSize: 10 }} />
+                <YAxis tick={{ fontSize: 10 }} />
                 <Tooltip />
-                <Legend />
                 <Bar dataKey="totalRevenue" fill="hsl(var(--primary))" name="Ricavi (€)" />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Eventi per Azienda</CardTitle>
+        <Card className="glass-card">
+          <CardHeader className="p-3 md:p-4">
+            <CardTitle className="text-sm md:text-base">Eventi per Azienda</CardTitle>
           </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
+          <CardContent className="p-3 md:p-4 pt-0">
+            <ResponsiveContainer width="100%" height={200} className="md:h-[300px]">
               <BarChart data={analytics.companyMetrics}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="companyName" />
-                <YAxis />
+                <XAxis dataKey="companyName" tick={{ fontSize: 10 }} />
+                <YAxis tick={{ fontSize: 10 }} />
                 <Tooltip />
-                <Legend />
                 <Bar dataKey="eventCount" fill="hsl(var(--accent))" name="N° Eventi" />
               </BarChart>
             </ResponsiveContainer>
@@ -160,31 +158,30 @@ export default function SuperAdminDashboard() {
         </Card>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Top 10 Prodotti per Consumo</CardTitle>
+      <Card className="glass-card">
+        <CardHeader className="p-3 md:p-4">
+          <CardTitle className="text-sm md:text-base">Top Prodotti per Consumo</CardTitle>
         </CardHeader>
-        <CardContent>
-          <ResponsiveContainer width="100%" height={400}>
+        <CardContent className="p-3 md:p-4 pt-0">
+          <ResponsiveContainer width="100%" height={250} className="md:h-[400px]">
             <BarChart data={analytics.topProducts} layout="horizontal">
               <CartesianGrid strokeDasharray="3 3" />
-              <XAxis type="number" />
-              <YAxis dataKey="productName" type="category" width={150} />
+              <XAxis type="number" tick={{ fontSize: 10 }} />
+              <YAxis dataKey="productName" type="category" width={80} tick={{ fontSize: 9 }} className="md:w-[150px]" />
               <Tooltip />
-              <Legend />
-              <Bar dataKey="totalConsumed" fill="hsl(var(--chart-2))" name="Quantità Consumata" />
+              <Bar dataKey="totalConsumed" fill="hsl(var(--chart-2))" name="Quantità" />
             </BarChart>
           </ResponsiveContainer>
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Distribuzione Stati Eventi</CardTitle>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
+        <Card className="glass-card">
+          <CardHeader className="p-3 md:p-4">
+            <CardTitle className="text-sm md:text-base">Distribuzione Stati Eventi</CardTitle>
           </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
+          <CardContent className="p-3 md:p-4 pt-0">
+            <ResponsiveContainer width="100%" height={200} className="md:h-[300px]">
               <PieChart>
                 <Pie
                   data={[
@@ -196,7 +193,7 @@ export default function SuperAdminDashboard() {
                   cy="50%"
                   labelLine={false}
                   label={(entry) => `${entry.name}: ${entry.value}`}
-                  outerRadius={80}
+                  outerRadius={60}
                   fill="hsl(var(--primary))"
                   dataKey="value"
                 >
@@ -210,27 +207,27 @@ export default function SuperAdminDashboard() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Metriche Riepilogo</CardTitle>
+        <Card className="glass-card">
+          <CardHeader className="p-3 md:p-4">
+            <CardTitle className="text-sm md:text-base">Metriche Riepilogo</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-3 md:space-y-4 p-3 md:p-4 pt-0">
             <div>
-              <p className="text-sm text-muted-foreground">Media eventi per azienda</p>
-              <p className="text-2xl font-semibold" data-testid="text-avg-events-per-company">
+              <p className="text-xs md:text-sm text-muted-foreground">Media eventi/azienda</p>
+              <p className="text-lg md:text-2xl font-semibold" data-testid="text-avg-events-per-company">
                 {totalCompanies > 0 ? (analytics.eventStatistics.total / totalCompanies).toFixed(1) : '0'}
               </p>
             </div>
             <div>
-              <p className="text-sm text-muted-foreground">Media ricavi per azienda</p>
-              <p className="text-2xl font-semibold" data-testid="text-avg-revenue-per-company">
-                €{totalCompanies > 0 ? (totalRevenue / totalCompanies).toFixed(2) : '0.00'}
+              <p className="text-xs md:text-sm text-muted-foreground">Media ricavi/azienda</p>
+              <p className="text-lg md:text-2xl font-semibold" data-testid="text-avg-revenue-per-company">
+                €{totalCompanies > 0 ? (totalRevenue / totalCompanies).toFixed(0) : '0'}
               </p>
             </div>
             <div>
-              <p className="text-sm text-muted-foreground">Media ricavi per evento</p>
-              <p className="text-2xl font-semibold" data-testid="text-avg-revenue-per-event">
-                €{analytics.eventStatistics.total > 0 ? (totalRevenue / analytics.eventStatistics.total).toFixed(2) : '0.00'}
+              <p className="text-xs md:text-sm text-muted-foreground">Media ricavi/evento</p>
+              <p className="text-lg md:text-2xl font-semibold" data-testid="text-avg-revenue-per-event">
+                €{analytics.eventStatistics.total > 0 ? (totalRevenue / analytics.eventStatistics.total).toFixed(0) : '0'}
               </p>
             </div>
           </CardContent>
