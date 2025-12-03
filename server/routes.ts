@@ -71,6 +71,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     },
   });
 
+  // Verify SMTP connection on startup
+  emailTransporter.verify((error, success) => {
+    if (error) {
+      console.error('[EMAIL] SMTP connection failed:', error.message);
+      console.error('[EMAIL] Check your SMTP_HOST, SMTP_PORT, SMTP_USER, and SMTP_PASS environment variables');
+    } else {
+      console.log('[EMAIL] SMTP server connected successfully');
+    }
+  });
+
   // Registration schema
   const registerSchema = z.object({
     email: z.string().email(),
@@ -1846,6 +1856,87 @@ export async function registerRoutes(app: Express): Promise<Server> {
         companyId: targetCompanyId,
         emailVerified: true, // Admin-created users are auto-verified
       });
+
+      // Get company name for email
+      let companyName = "Event Four You";
+      if (targetCompanyId) {
+        const company = await storage.getCompany(targetCompanyId);
+        if (company) {
+          companyName = company.name;
+        }
+      }
+
+      // Send welcome email with credentials
+      const baseUrl = process.env.PUBLIC_URL 
+        ? process.env.PUBLIC_URL.replace(/\/$/, '')
+        : process.env.REPLIT_DEV_DOMAIN 
+          ? `https://${process.env.REPLIT_DEV_DOMAIN}`
+          : 'http://localhost:5000';
+      const loginLink = `${baseUrl}/login`;
+      const fromEmail = process.env.SMTP_FROM || 'Event4U <noreply@event4u.com>';
+
+      // Get admin name for email
+      const adminName = `${currentUser.firstName} ${currentUser.lastName}`;
+
+      // Role labels in Italian
+      const roleLabels: Record<string, string> = {
+        'gestore': 'Gestore',
+        'organizer': 'Organizzatore',
+        'warehouse': 'Magazziniere',
+        'bartender': 'Bartender',
+      };
+
+      try {
+        await emailTransporter.sendMail({
+          from: fromEmail,
+          to: email,
+          subject: `Benvenuto su Event Four You - Il tuo account è pronto`,
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #f8f9fa; padding: 20px;">
+              <div style="background-color: #151922; padding: 30px; border-radius: 12px; color: white;">
+                <h1 style="color: #FFD700; margin-bottom: 10px;">Event Four You</h1>
+                <h2 style="color: #ffffff; font-weight: normal;">Benvenuto ${firstName}!</h2>
+              </div>
+              
+              <div style="background-color: white; padding: 30px; border-radius: 12px; margin-top: 20px;">
+                <p style="font-size: 16px; color: #333;">
+                  ${adminName} ti ha creato un account per <strong>${companyName}</strong>.
+                </p>
+                
+                <div style="background-color: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                  <h3 style="margin-top: 0; color: #333;">Le tue credenziali di accesso:</h3>
+                  <p style="margin: 5px 0;"><strong>Email:</strong> ${email}</p>
+                  <p style="margin: 5px 0;"><strong>Password:</strong> ${password}</p>
+                  <p style="margin: 5px 0;"><strong>Ruolo:</strong> ${roleLabels[role] || role}</p>
+                </div>
+                
+                <p style="color: #666; font-size: 14px;">
+                  <strong>Importante:</strong> Ti consigliamo di cambiare la password al primo accesso.
+                </p>
+                
+                <div style="text-align: center; margin: 30px 0;">
+                  <a href="${loginLink}" 
+                     style="display: inline-block; background-color: #FFD700; color: #000; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px;">
+                    Accedi a Event Four You
+                  </a>
+                </div>
+                
+                <p style="color: #999; font-size: 12px; text-align: center; margin-top: 30px;">
+                  Se non hai richiesto questo account, contatta il tuo amministratore.
+                </p>
+              </div>
+              
+              <div style="text-align: center; margin-top: 20px; color: #666; font-size: 12px;">
+                <p>© ${new Date().getFullYear()} Event Four You. Tutti i diritti riservati.</p>
+              </div>
+            </div>
+          `,
+        });
+        console.log(`Welcome email sent to ${email}`);
+      } catch (emailError) {
+        console.error("Failed to send welcome email:", emailError);
+        // Don't fail the user creation if email fails, just log the error
+      }
 
       // Remove password from response
       const { passwordHash: _, ...userWithoutPassword } = newUser;
