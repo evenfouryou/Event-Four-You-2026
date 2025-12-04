@@ -76,7 +76,7 @@ export function InstallPrompt() {
             <Download className="w-6 h-6 text-primary" />
           </div>
           <div className="flex-1 min-w-0">
-            <h3 className="font-semibold text-foreground">Installa Event4U</h3>
+            <h3 className="font-semibold text-foreground">Installa Event Four You</h3>
             <p className="text-sm text-muted-foreground mt-1">
               {isIOS 
                 ? "Tocca l'icona Condividi e poi 'Aggiungi alla schermata Home'"

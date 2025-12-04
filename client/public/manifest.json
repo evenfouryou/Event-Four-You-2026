@@ -1,6 +1,6 @@
 {
-  "name": "Event4U - Gestione Eventi",
-  "short_name": "Event4U",
+  "name": "Event Four You Manage",
+  "short_name": "Event4U Manage",
   "description": "Sistema professionale di gestione eventi con inventario multi-ruolo e tracciamento consumi in tempo reale",
   "start_url": "/",
   "display": "standalone",
