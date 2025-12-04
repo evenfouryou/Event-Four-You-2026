@@ -23,6 +23,14 @@ The system's data model links Companies to Users, Locations, Events, Products, a
 ### Import/Export Features
 The system supports CSV import for bulk product and price list item uploads. Reporting capabilities include PDF generation for event reports and Excel export for data analysis, covering revenue and consumption reports.
 
+### Progressive Web App (PWA)
+Event4U is a fully installable PWA with:
+- **manifest.json**: App metadata, icons, and shortcuts for installation
+- **Service Worker (sw.js)**: Caching strategy for offline support
+- **Install Prompt**: Native installation prompt on Android/Chrome, instructions for iOS
+- **Offline Support**: Cached assets and graceful API error handling
+- Users can install the app from browser to home screen for native-like experience
+
 ## External Dependencies
 
 ### Third-Party Services

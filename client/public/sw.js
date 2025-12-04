@@ -1,10 +1,12 @@
 const CACHE_NAME = 'event4u-v1';
 const STATIC_ASSETS = [
   '/',
+  '/index.html',
   '/manifest.json',
   '/icon-192.png',
   '/icon-512.png',
-  '/favicon.png'
+  '/favicon.png',
+  '/apple-touch-icon.png'
 ];
 
 self.addEventListener('install', (event) => {
@@ -42,6 +44,40 @@ self.addEventListener('fetch', (event) => {
           status: 503,
           headers: { 'Content-Type': 'application/json' }
         }))
+    );
+    return;
+  }
+  
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      fetch(event.request)
+        .then((response) => {
+          const responseClone = response.clone();
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(event.request, responseClone);
+          });
+          return response;
+        })
+        .catch(() => caches.match('/') || caches.match('/index.html'))
+    );
+    return;
+  }
+  
+  if (url.pathname.match(/\.(js|css|woff2?|ttf|eot|svg|png|jpg|jpeg|gif|ico)$/)) {
+    event.respondWith(
+      caches.match(event.request).then((cached) => {
+        if (cached) return cached;
+        
+        return fetch(event.request).then((response) => {
+          if (response.ok) {
+            const responseClone = response.clone();
+            caches.open(CACHE_NAME).then((cache) => {
+              cache.put(event.request, responseClone);
+            });
+          }
+          return response;
+        }).catch(() => new Response('', { status: 404 }));
+      })
     );
     return;
   }
