@@ -2,9 +2,12 @@
  * Smart Card Service per MiniLector EVO V3 (Bit4id)
  * Gestisce la comunicazione con il lettore di smart card per sigilli fiscali SIAE
  * 
- * Utilizza Trust1Connector middleware (https://localhost:10443/v3)
- * Il middleware deve essere installato sul PC dell'utente
+ * Metodi di connessione (in ordine di priorità):
+ * 1. WebSocket locale (Event4U Desktop App) - ws://localhost:18765
+ * 2. Trust1Connector middleware - https://localhost:10443/v3
  */
+
+import { useState, useEffect } from 'react';
 
 export interface SmartCardReader {
   id: string;
@@ -27,6 +30,7 @@ export interface SmartCardStatus {
   lastCheck: Date;
   error: string | null;
   middlewareAvailable: boolean;
+  connectionMethod: 'websocket' | 'trust1connector' | 'none';
 }
 
 export interface FiscalSeal {
@@ -42,8 +46,13 @@ class SmartCardService {
   private status: SmartCardStatus;
   private pollingInterval: NodeJS.Timeout | null = null;
   private listeners: Set<StatusChangeCallback> = new Set();
+  private ws: WebSocket | null = null;
+  private wsReconnectTimer: NodeJS.Timeout | null = null;
+  
+  private readonly WS_URL = 'ws://localhost:18765';
   private readonly T1C_BASE_URL = 'https://localhost:10443/v3';
-  private readonly POLLING_INTERVAL = 2000; // 2 secondi
+  private readonly POLLING_INTERVAL = 3000;
+  private readonly WS_RECONNECT_DELAY = 5000;
 
   private constructor() {
     this.status = {
@@ -55,7 +64,8 @@ class SmartCardService {
       cardType: null,
       lastCheck: new Date(),
       error: null,
-      middlewareAvailable: false
+      middlewareAvailable: false,
+      connectionMethod: 'none'
     };
   }
 
@@ -67,17 +77,114 @@ class SmartCardService {
   }
 
   /**
-   * Inizia il polling dello stato del lettore
+   * Inizia la connessione con il lettore
    */
   public startPolling(): void {
+    if (this.pollingInterval || this.ws) return;
+    
+    this.tryWebSocketConnection();
+  }
+
+  /**
+   * Tenta connessione WebSocket (app desktop Event4U)
+   */
+  private tryWebSocketConnection(): void {
+    try {
+      this.ws = new WebSocket(this.WS_URL);
+      
+      this.ws.onopen = () => {
+        console.log('Smart Card: Connesso via WebSocket');
+        if (this.wsReconnectTimer) {
+          clearTimeout(this.wsReconnectTimer);
+          this.wsReconnectTimer = null;
+        }
+        this.ws?.send(JSON.stringify({ type: 'get_status' }));
+      };
+      
+      this.ws.onmessage = (event) => {
+        try {
+          const msg = JSON.parse(event.data);
+          if (msg.type === 'status' && msg.data) {
+            this.handleWebSocketStatus(msg.data);
+          }
+        } catch (e) {
+          console.error('Smart Card: Errore parsing messaggio:', e);
+        }
+      };
+      
+      this.ws.onerror = () => {
+        console.log('Smart Card: WebSocket non disponibile, provo Trust1Connector');
+        this.ws = null;
+        this.startTrust1ConnectorPolling();
+      };
+      
+      this.ws.onclose = () => {
+        this.ws = null;
+        if (!this.pollingInterval) {
+          this.scheduleWebSocketReconnect();
+        }
+      };
+      
+    } catch {
+      this.startTrust1ConnectorPolling();
+    }
+  }
+
+  /**
+   * Gestisce lo stato ricevuto via WebSocket
+   */
+  private handleWebSocketStatus(data: any): void {
+    this.updateStatus({
+      connected: data.connected ?? false,
+      readerDetected: data.readerDetected ?? false,
+      cardInserted: data.cardInserted ?? false,
+      readerName: data.readerName || null,
+      cardAtr: data.cardAtr || null,
+      cardType: data.cardType || null,
+      lastCheck: new Date(),
+      error: data.canEmitTickets ? null : this.getErrorMessage(data),
+      middlewareAvailable: true,
+      connectionMethod: 'websocket'
+    });
+  }
+
+  /**
+   * Genera messaggio di errore appropriato
+   */
+  private getErrorMessage(data: any): string | null {
+    if (!data.readerDetected) {
+      return 'Lettore Smart Card non rilevato. Collegare il MiniLector EVO.';
+    }
+    if (!data.cardInserted) {
+      return 'Smart Card SIAE non inserita. Inserire la carta sigilli.';
+    }
+    return null;
+  }
+
+  /**
+   * Pianifica riconnessione WebSocket
+   */
+  private scheduleWebSocketReconnect(): void {
+    if (this.wsReconnectTimer) return;
+    
+    this.wsReconnectTimer = setTimeout(() => {
+      this.wsReconnectTimer = null;
+      if (!this.ws && !this.pollingInterval) {
+        this.tryWebSocketConnection();
+      }
+    }, this.WS_RECONNECT_DELAY);
+  }
+
+  /**
+   * Avvia polling Trust1Connector (fallback)
+   */
+  private startTrust1ConnectorPolling(): void {
     if (this.pollingInterval) return;
     
-    // Check immediato
-    this.checkStatus();
+    this.checkTrust1ConnectorStatus();
     
-    // Polling periodico
     this.pollingInterval = setInterval(() => {
-      this.checkStatus();
+      this.checkTrust1ConnectorStatus();
     }, this.POLLING_INTERVAL);
   }
 
@@ -89,6 +196,14 @@ class SmartCardService {
       clearInterval(this.pollingInterval);
       this.pollingInterval = null;
     }
+    if (this.wsReconnectTimer) {
+      clearTimeout(this.wsReconnectTimer);
+      this.wsReconnectTimer = null;
+    }
+    if (this.ws) {
+      this.ws.close();
+      this.ws = null;
+    }
   }
 
   /**
@@ -96,7 +211,6 @@ class SmartCardService {
    */
   public subscribe(callback: StatusChangeCallback): () => void {
     this.listeners.add(callback);
-    // Invia stato corrente immediatamente
     callback(this.status);
     
     return () => {
@@ -112,7 +226,7 @@ class SmartCardService {
   }
 
   /**
-   * Verifica se è possibile emettere biglietti (carta inserita)
+   * Verifica se è possibile emettere biglietti
    */
   public canEmitTickets(): boolean {
     return this.status.connected && 
@@ -121,11 +235,10 @@ class SmartCardService {
   }
 
   /**
-   * Controlla lo stato del lettore e della carta
+   * Controlla lo stato via Trust1Connector
    */
-  private async checkStatus(): Promise<void> {
+  private async checkTrust1ConnectorStatus(): Promise<void> {
     try {
-      // Prima verifica se il middleware Trust1Connector è disponibile
       const middlewareCheck = await this.checkMiddleware();
       
       if (!middlewareCheck) {
@@ -137,16 +250,17 @@ class SmartCardService {
           cardAtr: null,
           cardType: null,
           lastCheck: new Date(),
-          error: 'Middleware Trust1Connector non disponibile. Installare da trust1connector.com',
-          middlewareAvailable: false
+          error: 'Nessuna connessione al lettore. Avviare l\'app Event4U Smart Card Reader.',
+          middlewareAvailable: false,
+          connectionMethod: 'none'
         });
+        
+        this.tryWebSocketConnection();
         return;
       }
 
-      // Ottiene la lista dei lettori connessi
       const readers = await this.getReaders();
       
-      // Cerca il MiniLector EVO
       const miniLector = readers.find(r => 
         r.name.toLowerCase().includes('minilector') || 
         r.name.toLowerCase().includes('bit4id') ||
@@ -163,12 +277,12 @@ class SmartCardService {
           cardType: null,
           lastCheck: new Date(),
           error: 'Lettore MiniLector EVO non rilevato. Collegare il dispositivo USB.',
-          middlewareAvailable: true
+          middlewareAvailable: true,
+          connectionMethod: 'trust1connector'
         });
         return;
       }
 
-      // Lettore trovato, verifica se c'è una carta inserita
       const hasCard = miniLector.card !== null;
       
       this.updateStatus({
@@ -179,8 +293,9 @@ class SmartCardService {
         cardAtr: hasCard ? miniLector.card!.atr : null,
         cardType: hasCard ? miniLector.card!.description.join(', ') : null,
         lastCheck: new Date(),
-        error: hasCard ? null : 'Smart Card non inserita. Inserire la carta sigilli SIAE.',
-        middlewareAvailable: true
+        error: hasCard ? null : 'Smart Card SIAE non inserita.',
+        middlewareAvailable: true,
+        connectionMethod: 'trust1connector'
       });
 
     } catch (error) {
@@ -192,22 +307,21 @@ class SmartCardService {
         cardAtr: null,
         cardType: null,
         lastCheck: new Date(),
-        error: error instanceof Error ? error.message : 'Errore di comunicazione con il lettore',
-        middlewareAvailable: false
+        error: error instanceof Error ? error.message : 'Errore di comunicazione',
+        middlewareAvailable: false,
+        connectionMethod: 'none'
       });
     }
   }
 
   /**
-   * Verifica se il middleware Trust1Connector è in esecuzione
+   * Verifica se Trust1Connector è in esecuzione
    */
   private async checkMiddleware(): Promise<boolean> {
     try {
       const response = await fetch(`${this.T1C_BASE_URL}/info`, {
         method: 'GET',
-        headers: {
-          'Content-Type': 'application/json'
-        }
+        headers: { 'Content-Type': 'application/json' }
       });
       return response.ok;
     } catch {
@@ -216,15 +330,13 @@ class SmartCardService {
   }
 
   /**
-   * Ottiene la lista dei lettori connessi dal middleware
+   * Ottiene la lista dei lettori da Trust1Connector
    */
   private async getReaders(): Promise<SmartCardReader[]> {
     try {
       const response = await fetch(`${this.T1C_BASE_URL}/readers`, {
         method: 'GET',
-        headers: {
-          'Content-Type': 'application/json'
-        }
+        headers: { 'Content-Type': 'application/json' }
       });
 
       if (!response.ok) {
@@ -239,8 +351,6 @@ class SmartCardService {
       
       return [];
     } catch {
-      // Fallback: simula risposta per development/testing
-      // In produzione, questo non verrà mai chiamato se il middleware non è disponibile
       return [];
     }
   }
@@ -254,13 +364,9 @@ class SmartCardService {
     }
 
     try {
-      // Qui andrà la logica APDU per leggere il sigillo dalla carta SIAE
-      // Per ora restituiamo un placeholder
       const response = await fetch(`${this.T1C_BASE_URL}/containers/siae`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           readerId: this.status.readerName,
           action: 'read-seal'
@@ -278,8 +384,6 @@ class SmartCardService {
         valid: true
       };
     } catch {
-      // In caso di errore, genera sigillo temporaneo per testing
-      // In produzione questo deve fallire
       console.warn('Modalità demo: generazione sigillo simulato');
       return {
         sealNumber: `DEMO-${Date.now().toString(36).toUpperCase()}`,
@@ -303,7 +407,6 @@ class SmartCardService {
       throw new Error('ERRORE FISCALE: Impossibile leggere sigillo dalla Smart Card');
     }
 
-    // Formato sigillo: ANNO-PROGRESSIVO-CHECKSUM
     const year = new Date().getFullYear();
     const progressive = ticketId.toString().padStart(8, '0');
     const checksum = this.calculateChecksum(`${year}${progressive}`);
@@ -354,7 +457,8 @@ class SmartCardService {
       cardType: 'SIAE Fiscal Card (Demo)',
       lastCheck: new Date(),
       error: null,
-      middlewareAvailable: true
+      middlewareAvailable: true,
+      connectionMethod: 'websocket'
     });
   }
 
@@ -362,32 +466,23 @@ class SmartCardService {
    * Disabilita modalità demo
    */
   public disableDemoMode(): void {
-    this.checkStatus();
+    this.checkTrust1ConnectorStatus();
   }
 }
 
-// Export singleton instance
 export const smartCardService = SmartCardService.getInstance();
 
-// Hook React per usare il servizio
 export function useSmartCardStatus(): SmartCardStatus {
   const [status, setStatus] = useState<SmartCardStatus>(smartCardService.getStatus());
 
   useEffect(() => {
-    // Inizia polling quando il hook viene montato
     smartCardService.startPolling();
-    
-    // Sottoscrivi agli aggiornamenti di stato
     const unsubscribe = smartCardService.subscribe(setStatus);
     
     return () => {
       unsubscribe();
-      // Non fermiamo il polling qui perché altri componenti potrebbero usarlo
     };
   }, []);
 
   return status;
 }
-
-// Import React hooks necessari
-import { useState, useEffect } from 'react';

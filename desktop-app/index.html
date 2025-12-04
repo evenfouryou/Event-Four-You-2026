@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Event4U Smart Card Reader</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <img src="icon.png" alt="Event4U" class="logo" onerror="this.style.display='none'">
+      <h1>Event4U</h1>
+      <p class="subtitle">Lettore Smart Card SIAE</p>
+    </div>
+    
+    <div class="status-card">
+      <div class="status-row">
+        <span class="label">Stato Lettore</span>
+        <span id="reader-status" class="status disconnected">
+          <span class="dot"></span>
+          <span class="text">Non rilevato</span>
+        </span>
+      </div>
+      
+      <div class="status-row">
+        <span class="label">Nome Lettore</span>
+        <span id="reader-name" class="value">-</span>
+      </div>
+      
+      <div class="status-row">
+        <span class="label">Smart Card</span>
+        <span id="card-status" class="status disconnected">
+          <span class="dot"></span>
+          <span class="text">Non inserita</span>
+        </span>
+      </div>
+      
+      <div class="status-row">
+        <span class="label">Tipo Carta</span>
+        <span id="card-type" class="value">-</span>
+      </div>
+    </div>
+    
+    <div class="emission-status" id="emission-status">
+      <div class="emission-icon" id="emission-icon">&#10060;</div>
+      <div class="emission-text" id="emission-text">
+        Non pronto per emissione
+      </div>
+    </div>
+    
+    <div class="connection-info">
+      <div class="info-row">
+        <span class="label">Server WebSocket</span>
+        <span id="ws-status" class="status connected">
+          <span class="dot"></span>
+          <span class="text">Attivo (porta <span id="ws-port">18765</span>)</span>
+        </span>
+      </div>
+      
+      <div class="info-row">
+        <span class="label">Client Connessi</span>
+        <span id="clients-count" class="value">0</span>
+      </div>
+    </div>
+    
+    <div class="instructions">
+      <h3>Istruzioni</h3>
+      <ol>
+        <li>Collega il lettore MiniLector EVO V3 al computer</li>
+        <li>Inserisci la Smart Card SIAE nel lettore</li>
+        <li>Apri l'applicazione Event4U nel browser</li>
+        <li>Il sistema si collegherà automaticamente</li>
+      </ol>
+    </div>
+    
+    <div class="footer">
+      <p>Mantieni questa applicazione aperta per emettere biglietti fiscali</p>
+    </div>
+  </div>
+  
+  <script src="renderer.js"></script>
+</body>
+</html>
