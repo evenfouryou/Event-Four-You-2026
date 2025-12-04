@@ -1,0 +1,179 @@
+Perfetto Jonathan, aggiorno tutto il sistema usando “Gestore” come ruolo principale (al posto di Organizzatore) e integro la nuova logica del QR code personale per ogni cliente, visibile nel loro account personale.
+
+Ecco la versione aggiornata, chiara e pronta per lo sviluppo.
+
+⸻
+
+🟪 RUOLO PRINCIPALE → GESTORE
+
+(Il proprietario del locale o dell’evento)
+
+Il Gestore è il ruolo con controllo totale.
+
+Il Gestore può:
+	•	Creare eventi
+	•	Gestire tavoli, liste e planimetria
+	•	Creare Capo Staff
+	•	Abilitare Capo Staff e PR ai singoli eventi
+	•	Dare covisione a un altro Gestore (secondo gestore dell’evento)
+	•	Vedere statistiche e analitiche
+
+⸻
+
+🟦 GESTORE CON COVISIONE
+
+È un altro Gestore che il Gestore principale abilita all’evento.
+
+Può:
+	•	Gestire tutto l’evento (liste, tavoli, PR)
+	•	Non può creare/eliminare Gestori
+	•	Non può cambiare configurazioni globali della piattaforma
+
+È un “co-manager” dell’evento.
+
+⸻
+
+🟣 CAPO STAFF
+
+Il Capo Staff gestisce il proprio team di PR.
+
+Il Capo Staff può:
+	•	Creare PR sotto di sé
+	•	Gestire i suoi PR
+	•	Vedere performance PR
+	•	Operare solo negli eventi per cui il Gestore lo abilita
+
+⚠️ Non può:
+	•	Creare eventi
+	•	Modificare liste/tavoli a livello globale
+	•	Dare covisione
+
+⸻
+
+🟡 PR (PROMOTER)
+
+Creato dal Capo Staff.
+
+Il PR può:
+	•	Inserire persone in lista
+	•	Prenotare tavoli
+	•	Gestire i propri tavoli
+	•	Gestire i propri clienti
+	•	Vedere planimetria e tavoli disponibili
+	•	Operare solo negli eventi in cui il Gestore lo abilita
+
+Accesso PR:
+Numero di telefono → OTP via SMS
+
+⸻
+
+🟩 CLIENTE (ACCOUNT PERSONALE)
+
+👉 NOVITÀ IMPORTANTE — come richiesto da te
+
+Ogni cliente che si registra sulla piattaforma ottiene:
+
+✔ Un account personale visibile via app
+
+✔ Un QR code personale sempre disponibile
+
+Questo QR:
+	•	Funziona come identificazione univoca del cliente
+	•	Viene collegato agli eventi a cui il cliente è inserito
+	•	Può essere aggiornato dinamicamente con lo stato dell’evento
+
+🔵 Come funziona l’uso del QR personale:
+	1.	Il cliente si registra (email o telefono)
+	2.	Nel suo profilo trova il QR personale statico
+	3.	Quando il PR o Gestore lo mette in lista:
+	•	Quel QR viene “attivato” per l’evento
+	•	All’ingresso viene mostrato lo stesso QR
+	4.	Il QR funziona anche per:
+	•	Tavoli
+	•	Biglietti
+	•	Check-in eventi multipli
+
+✔ Il cliente NON riceve un QR diverso per ogni evento
+
+👉 Ha un QR unico, collegato agli eventi di volta in volta.
+
+Questo semplifica:
+	•	accesso
+	•	gestione
+	•	riconoscimento
+	•	check-in multipli
+	•	riduce errori nei QR
+
+Il QR può contenere:
+	•	ID cliente
+	•	Codice evento
+	•	Tipo di accesso (lista, tavolo, biglietto)
+	•	Sicurezza tramite token dinamico
+
+⸻
+
+🟥 LISTE EVENTO (aggiornate con logica QR personale)
+
+Quando un PR inserisce un cliente in lista:
+	•	Inserisce Nome, Cognome, Telefono
+	•	Se il cliente ha già un account → lista collegata automaticamente
+	•	Se non ha account → riceve invito a registrarsi e visualizza il QR personale
+
+All’ingresso:
+	•	Il cliente mostra il proprio QR unico
+	•	Il sistema verifica l’evento e il tipo di accesso
+
+⸻
+
+🟧 GESTIONE TAVOLI
+
+Permessi:
+
+Gestore:
+	•	crea tavoli
+	•	assegna tavoli
+	•	vede pagamenti (cambusa)
+
+PR:
+	•	prenota tavoli
+	•	gestisce tavoli propri
+	•	aggiunge ospiti (che useranno sempre il loro QR personale)
+
+Cliente:
+	•	vede prenotazione tavolo nel profilo
+	•	mostra il proprio QR personale all’ingresso del tavolo
+
+⸻
+
+🟨 PLANIMETRIA EVENTO
+	•	Caricata dal Gestore
+	•	Tavoli posizionati manualmente
+	•	PR vede solo tavoli disponibili
+	•	Gestore e Gestore con covisione vedono tutto
+
+⸻
+
+🟩 FLUSSO COMPLETO AGGIORNATO
+
+1️⃣ Cliente crea account → riceve QR personale
+2️⃣ Capo Staff crea PR
+3️⃣ Gestore abilita Capo Staff e PR per l’evento
+4️⃣ PR inserisce il cliente in lista → QR personale del cliente si “attiva”
+5️⃣ PR prenota tavoli → clienti aggiunti al tavolo possono usare il loro QR personale
+6️⃣ Cliente arriva all’ingresso → mostra QR personale
+7️⃣ Il sistema controlla:
+	•	evento
+	•	tipo ingresso
+	•	PR associato
+	•	tavolo
+	•	stato pagamento
+
+⸻
+
+🔥 Vuoi che ora ti prepari anche:
+	•	Schema del Database (ER) aggiornato con QR personale
+	•	Wireframe delle schermate Gestore / Capo Staff / PR / Cliente
+	•	Manuale tecnico per gli sviluppatori (Laravel)
+	•	Workflow grafico del sistema
+
+Dimmi cosa scegli e lo preparo immediatamente.
