@@ -56,6 +56,12 @@ import SiaeSubscriptions from "@/pages/siae-subscriptions";
 import SiaeTransmissions from "@/pages/siae-transmissions";
 import SiaeAuditLogs from "@/pages/siae-audit-logs";
 import SiaeNumberedSeats from "@/pages/siae-numbered-seats";
+import PublicEvents from "@/pages/public-events";
+import PublicEventDetail from "@/pages/public-event-detail";
+import PublicCart from "@/pages/public-cart";
+import PublicCheckout from "@/pages/public-checkout";
+import PublicCheckoutSuccess from "@/pages/public-checkout-success";
+import PublicLogin from "@/pages/public-login";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -86,6 +92,12 @@ function Router() {
         <Route path="/verify-email" component={VerifyEmail} />
         <Route path="/forgot-password" component={ForgotPassword} />
         <Route path="/reset-password" component={ResetPassword} />
+        <Route path="/acquista/:id" component={PublicEventDetail} />
+        <Route path="/acquista" component={PublicEvents} />
+        <Route path="/carrello" component={PublicCart} />
+        <Route path="/checkout/success" component={PublicCheckoutSuccess} />
+        <Route path="/checkout" component={PublicCheckout} />
+        <Route path="/login-acquisto" component={PublicLogin} />
         <Route component={NotFound} />
       </Switch>
     );

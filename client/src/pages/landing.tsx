@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { Calendar, Package, BarChart3, Users, Sparkles, ArrowRight, Zap, Shield, Clock } from "lucide-react";
+import { Calendar, Package, BarChart3, Users, Sparkles, ArrowRight, Zap, Shield, Clock, Ticket } from "lucide-react";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
 
@@ -88,6 +88,18 @@ export default function Landing() {
           </div>
           
           <div className="flex items-center gap-3">
+            <Button
+              variant="outline"
+              size="sm"
+              asChild
+              className="border-primary/50 text-primary hover:bg-primary/10"
+              data-testid="button-buy-tickets"
+            >
+              <Link href="/acquista">
+                <Ticket className="w-4 h-4 mr-1" />
+                Biglietti
+              </Link>
+            </Button>
             <Button
               variant="ghost"
               size="sm"
