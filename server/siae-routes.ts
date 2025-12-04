@@ -25,6 +25,8 @@ import {
   insertSiaeTransmissionSchema,
   insertSiaeBoxOfficeSessionSchema,
   insertSiaeSubscriptionSchema,
+  insertSiaeAuditLogSchema,
+  insertSiaeNumberedSeatSchema,
 } from "@shared/schema";
 
 // Helper to create validated partial schemas for PATCH operations
@@ -57,6 +59,7 @@ const patchResaleSchema = makePatchSchema(insertSiaeResaleSchema.omit({ original
 const patchTransmissionSchema = makePatchSchema(insertSiaeTransmissionSchema.omit({ companyId: true }));
 const patchBoxOfficeSessionSchema = makePatchSchema(insertSiaeBoxOfficeSessionSchema.omit({ channelId: true, userId: true }));
 const patchSubscriptionSchema = makePatchSchema(insertSiaeSubscriptionSchema.omit({ customerId: true }));
+const patchNumberedSeatSchema = makePatchSchema(insertSiaeNumberedSeatSchema.omit({ sectorId: true }));
 
 const router = Router();
 
@@ -996,6 +999,99 @@ router.patch("/api/siae/subscriptions/:id", requireAuth, requireOrganizer, async
     res.json(subscription);
   } catch (error: any) {
     res.status(400).json({ message: error.message });
+  }
+});
+
+// ==================== Audit Logs ====================
+
+router.get("/api/siae/companies/:companyId/audit-logs", requireAuth, requireGestore, async (req: Request, res: Response) => {
+  try {
+    const user = req.user as any;
+    // Verify company access for non-super-admin users
+    if (user.role !== 'super_admin' && user.companyId !== req.params.companyId) {
+      return res.status(403).json({ message: "Accesso negato" });
+    }
+    const logs = await siaeStorage.getSiaeAuditLogsByCompany(req.params.companyId);
+    res.json(logs);
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+router.get("/api/siae/audit-logs/entity/:entityType/:entityId", requireAuth, requireOrganizer, async (req: Request, res: Response) => {
+  try {
+    const logs = await siaeStorage.getSiaeAuditLogsByEntity(req.params.entityType, req.params.entityId);
+    res.json(logs);
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+router.post("/api/siae/audit-logs", requireAuth, requireOrganizer, async (req: Request, res: Response) => {
+  try {
+    const data = insertSiaeAuditLogSchema.parse(req.body);
+    const log = await siaeStorage.createSiaeAuditLog(data);
+    res.status(201).json(log);
+  } catch (error: any) {
+    res.status(400).json({ message: error.message });
+  }
+});
+
+// ==================== Numbered Seats ====================
+
+router.get("/api/siae/sectors/:sectorId/numbered-seats", requireAuth, requireOrganizer, async (req: Request, res: Response) => {
+  try {
+    const seats = await siaeStorage.getSiaeNumberedSeatsBySector(req.params.sectorId);
+    res.json(seats);
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+router.get("/api/siae/numbered-seats/:id", requireAuth, requireOrganizer, async (req: Request, res: Response) => {
+  try {
+    const seat = await siaeStorage.getSiaeNumberedSeat(req.params.id);
+    if (!seat) {
+      return res.status(404).json({ message: "Posto non trovato" });
+    }
+    res.json(seat);
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+router.post("/api/siae/numbered-seats", requireAuth, requireOrganizer, async (req: Request, res: Response) => {
+  try {
+    const data = insertSiaeNumberedSeatSchema.parse(req.body);
+    const seat = await siaeStorage.createSiaeNumberedSeat(data);
+    res.status(201).json(seat);
+  } catch (error: any) {
+    res.status(400).json({ message: error.message });
+  }
+});
+
+router.patch("/api/siae/numbered-seats/:id", requireAuth, requireOrganizer, async (req: Request, res: Response) => {
+  try {
+    const data = patchNumberedSeatSchema.parse(req.body);
+    const seat = await siaeStorage.updateSiaeNumberedSeat(req.params.id, data);
+    if (!seat) {
+      return res.status(404).json({ message: "Posto non trovato" });
+    }
+    res.json(seat);
+  } catch (error: any) {
+    res.status(400).json({ message: error.message });
+  }
+});
+
+router.delete("/api/siae/numbered-seats/:id", requireAuth, requireOrganizer, async (req: Request, res: Response) => {
+  try {
+    const deleted = await siaeStorage.deleteSiaeNumberedSeat(req.params.id);
+    if (!deleted) {
+      return res.status(404).json({ message: "Posto non trovato" });
+    }
+    res.status(204).send();
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
   }
 });
 

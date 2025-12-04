@@ -22,6 +22,8 @@ import {
   siaeTransmissions,
   siaeBoxOfficeSessions,
   siaeSubscriptions,
+  siaeAuditLogs,
+  siaeNumberedSeats,
   type SiaeEventGenre,
   type InsertSiaeEventGenre,
   type SiaeSectorCode,
@@ -66,6 +68,10 @@ import {
   type InsertSiaeBoxOfficeSession,
   type SiaeSubscription,
   type InsertSiaeSubscription,
+  type SiaeAuditLog,
+  type InsertSiaeAuditLog,
+  type SiaeNumberedSeat,
+  type InsertSiaeNumberedSeat,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, sql, lt, gt, isNull } from "drizzle-orm";
@@ -238,6 +244,20 @@ export interface ISiaeStorage {
   getSiaeSubscription(id: string): Promise<SiaeSubscription | undefined>;
   createSiaeSubscription(subscription: InsertSiaeSubscription): Promise<SiaeSubscription>;
   updateSiaeSubscription(id: string, subscription: Partial<SiaeSubscription>): Promise<SiaeSubscription | undefined>;
+  
+  // ==================== Audit Logs ====================
+  
+  getSiaeAuditLogsByCompany(companyId: string): Promise<SiaeAuditLog[]>;
+  getSiaeAuditLogsByEntity(entityType: string, entityId: string): Promise<SiaeAuditLog[]>;
+  createSiaeAuditLog(log: InsertSiaeAuditLog): Promise<SiaeAuditLog>;
+  
+  // ==================== Numbered Seats ====================
+  
+  getSiaeNumberedSeatsBySector(sectorId: string): Promise<SiaeNumberedSeat[]>;
+  getSiaeNumberedSeat(id: string): Promise<SiaeNumberedSeat | undefined>;
+  createSiaeNumberedSeat(seat: InsertSiaeNumberedSeat): Promise<SiaeNumberedSeat>;
+  updateSiaeNumberedSeat(id: string, seat: Partial<SiaeNumberedSeat>): Promise<SiaeNumberedSeat | undefined>;
+  deleteSiaeNumberedSeat(id: string): Promise<boolean>;
   
   // ==================== Seed Functions ====================
   
@@ -1019,6 +1039,59 @@ export class SiaeStorage implements ISiaeStorage {
       .where(eq(siaeSubscriptions.id, id))
       .returning();
     return updated;
+  }
+  
+  // ==================== Audit Logs ====================
+  
+  async getSiaeAuditLogsByCompany(companyId: string): Promise<SiaeAuditLog[]> {
+    return await db.select().from(siaeAuditLogs)
+      .where(eq(siaeAuditLogs.companyId, companyId))
+      .orderBy(desc(siaeAuditLogs.createdAt));
+  }
+  
+  async getSiaeAuditLogsByEntity(entityType: string, entityId: string): Promise<SiaeAuditLog[]> {
+    return await db.select().from(siaeAuditLogs)
+      .where(and(
+        eq(siaeAuditLogs.entityType, entityType),
+        eq(siaeAuditLogs.entityId, entityId)
+      ))
+      .orderBy(desc(siaeAuditLogs.createdAt));
+  }
+  
+  async createSiaeAuditLog(log: InsertSiaeAuditLog): Promise<SiaeAuditLog> {
+    const [created] = await db.insert(siaeAuditLogs).values(log).returning();
+    return created;
+  }
+  
+  // ==================== Numbered Seats ====================
+  
+  async getSiaeNumberedSeatsBySector(sectorId: string): Promise<SiaeNumberedSeat[]> {
+    return await db.select().from(siaeNumberedSeats)
+      .where(eq(siaeNumberedSeats.sectorId, sectorId))
+      .orderBy(siaeNumberedSeats.rowNumber, siaeNumberedSeats.seatNumber);
+  }
+  
+  async getSiaeNumberedSeat(id: string): Promise<SiaeNumberedSeat | undefined> {
+    const [seat] = await db.select().from(siaeNumberedSeats).where(eq(siaeNumberedSeats.id, id));
+    return seat;
+  }
+  
+  async createSiaeNumberedSeat(seat: InsertSiaeNumberedSeat): Promise<SiaeNumberedSeat> {
+    const [created] = await db.insert(siaeNumberedSeats).values(seat).returning();
+    return created;
+  }
+  
+  async updateSiaeNumberedSeat(id: string, seat: Partial<SiaeNumberedSeat>): Promise<SiaeNumberedSeat | undefined> {
+    const [updated] = await db.update(siaeNumberedSeats)
+      .set({ ...seat, updatedAt: new Date() })
+      .where(eq(siaeNumberedSeats.id, id))
+      .returning();
+    return updated;
+  }
+  
+  async deleteSiaeNumberedSeat(id: string): Promise<boolean> {
+    const result = await db.delete(siaeNumberedSeats).where(eq(siaeNumberedSeats.id, id));
+    return (result.rowCount ?? 0) > 0;
   }
   
   // ==================== Seed Functions ====================

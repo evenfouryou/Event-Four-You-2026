@@ -25,6 +25,8 @@ import {
   RefreshCcw,
   Store,
   Send,
+  ClipboardList,
+  Grid3X3,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
@@ -154,6 +156,18 @@ export function AppSidebar() {
         title: "Trasmissioni XML",
         icon: Send,
         url: "/siae/transmissions",
+        group: "Biglietteria SIAE",
+      },
+      {
+        title: "Log Audit",
+        icon: ClipboardList,
+        url: "/siae/audit-logs",
+        group: "Biglietteria SIAE",
+      },
+      {
+        title: "Posti Numerati",
+        icon: Grid3X3,
+        url: "/siae/numbered-seats",
         group: "Biglietteria SIAE",
       }
     );

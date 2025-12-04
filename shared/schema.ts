@@ -1568,6 +1568,68 @@ export const siaeSubscriptionsRelations = relations(siaeSubscriptions, ({ one, m
   }),
 }));
 
+// ==================== SIAE Audit Logs ====================
+export const siaeAuditLogs = pgTable("siae_audit_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").notNull().references(() => companies.id),
+  userId: varchar("user_id").references(() => users.id),
+  // Operazione
+  action: varchar("action", { length: 50 }).notNull(), // create, update, delete, cancel, emit, validate, transmit
+  entityType: varchar("entity_type", { length: 50 }).notNull(), // ticket, transaction, customer, event, sector, etc.
+  entityId: varchar("entity_id"), // ID dell'entità modificata
+  // Dettagli
+  description: text("description"),
+  oldData: text("old_data"), // JSON snapshot prima della modifica
+  newData: text("new_data"), // JSON snapshot dopo la modifica
+  // Metadati
+  ipAddress: varchar("ip_address", { length: 45 }),
+  userAgent: text("user_agent"),
+  // Riferimenti fiscali
+  fiscalSealCode: varchar("fiscal_seal_code", { length: 16 }),
+  cardCode: varchar("card_code", { length: 8 }),
+  // Timestamp
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const siaeAuditLogsRelations = relations(siaeAuditLogs, ({ one }) => ({
+  company: one(companies, {
+    fields: [siaeAuditLogs.companyId],
+    references: [companies.id],
+  }),
+  user: one(users, {
+    fields: [siaeAuditLogs.userId],
+    references: [users.id],
+  }),
+}));
+
+// ==================== SIAE Numbered Seats ====================
+export const siaeNumberedSeats = pgTable("siae_numbered_seats", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  sectorId: varchar("sector_id").notNull().references(() => siaeEventSectors.id),
+  // Identificazione posto
+  rowNumber: varchar("row_number", { length: 10 }).notNull(),
+  seatNumber: varchar("seat_number", { length: 10 }).notNull(),
+  // Categoria e prezzo
+  category: varchar("category", { length: 50 }).default('standard'), // standard, vip, premium, accessibility
+  priceMultiplier: decimal("price_multiplier", { precision: 3, scale: 2 }).default('1.00'),
+  // Stato
+  status: varchar("status", { length: 20 }).notNull().default('available'), // available, sold, reserved, blocked
+  // Coordinate per mappa (opzionale)
+  xPosition: decimal("x_position", { precision: 8, scale: 2 }),
+  yPosition: decimal("y_position", { precision: 8, scale: 2 }),
+  // Note
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const siaeNumberedSeatsRelations = relations(siaeNumberedSeats, ({ one }) => ({
+  sector: one(siaeEventSectors, {
+    fields: [siaeNumberedSeats.sectorId],
+    references: [siaeEventSectors.id],
+  }),
+}));
+
 // Zod schemas for validation
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
@@ -2323,6 +2385,20 @@ export const insertSiaeSubscriptionSchema = createInsertSchema(siaeSubscriptions
 });
 export const updateSiaeSubscriptionSchema = insertSiaeSubscriptionSchema.partial().omit({ companyId: true, customerId: true });
 
+// Audit Logs
+export const insertSiaeAuditLogSchema = createInsertSchema(siaeAuditLogs).omit({
+  id: true,
+  createdAt: true,
+});
+
+// Posti Numerati
+export const insertSiaeNumberedSeatSchema = createInsertSchema(siaeNumberedSeats).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export const updateSiaeNumberedSeatSchema = insertSiaeNumberedSeatSchema.partial().omit({ sectorId: true });
+
 // ==================== MODULO BIGLIETTERIA SIAE - Types ====================
 
 // TAB.1-5
@@ -2420,3 +2496,12 @@ export type UpdateSiaeBoxOfficeSession = z.infer<typeof updateSiaeBoxOfficeSessi
 export type SiaeSubscription = typeof siaeSubscriptions.$inferSelect;
 export type InsertSiaeSubscription = z.infer<typeof insertSiaeSubscriptionSchema>;
 export type UpdateSiaeSubscription = z.infer<typeof updateSiaeSubscriptionSchema>;
+
+// Audit Logs
+export type SiaeAuditLog = typeof siaeAuditLogs.$inferSelect;
+export type InsertSiaeAuditLog = z.infer<typeof insertSiaeAuditLogSchema>;
+
+// Posti Numerati
+export type SiaeNumberedSeat = typeof siaeNumberedSeats.$inferSelect;
+export type InsertSiaeNumberedSeat = z.infer<typeof insertSiaeNumberedSeatSchema>;
+export type UpdateSiaeNumberedSeat = z.infer<typeof updateSiaeNumberedSeatSchema>;
