@@ -8,6 +8,7 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { MobileBottomNav } from "@/components/mobile-bottom-nav";
 import { InstallPrompt } from "@/components/install-prompt";
+import { SmartCardStatus } from "@/components/smart-card-status";
 import { useAuth } from "@/hooks/useAuth";
 import { useIsMobile } from "@/hooks/use-mobile";
 import NotFound from "@/pages/not-found";
@@ -117,9 +118,12 @@ function Router() {
       <div className="flex h-screen w-full">
         <AppSidebar />
         <div className="flex flex-col flex-1">
-          <header className="flex items-center justify-between p-4 border-b">
+          <header className="flex items-center justify-between p-4 border-b gap-2">
             <SidebarTrigger data-testid="button-sidebar-toggle" />
-            <ThemeToggle />
+            <div className="flex items-center gap-2">
+              <SmartCardStatus compact data-testid="smart-card-status" />
+              <ThemeToggle />
+            </div>
           </header>
           <main className="flex-1 overflow-auto pb-20 md:pb-0">
             <Switch>

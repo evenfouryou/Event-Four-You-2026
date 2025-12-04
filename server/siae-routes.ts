@@ -27,6 +27,8 @@ import {
   insertSiaeSubscriptionSchema,
   insertSiaeAuditLogSchema,
   insertSiaeNumberedSeatSchema,
+  insertSiaeSmartCardSessionSchema,
+  insertSiaeSmartCardSealLogSchema,
 } from "@shared/schema";
 
 // Helper to create validated partial schemas for PATCH operations
@@ -1435,6 +1437,444 @@ router.get("/api/siae/companies/:companyId/reports/xml/cancellations", requireAu
     res.set('Content-Type', 'application/xml');
     res.set('Content-Disposition', `attachment; filename="SIAE_Cancellations_${formatSiaeDate(startDate)}_${formatSiaeDate(endDate)}.xml"`);
     res.send(xml);
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// ==================== Smart Card Sessions API ====================
+
+// Validation schemas for smart card operations
+const smartCardSessionCreateSchema = z.object({
+  readerId: z.string().min(1, "readerId è obbligatorio"),
+  readerName: z.string().min(1, "readerName è obbligatorio"),
+  readerModel: z.string().optional().default('MiniLector EVO V3'),
+  readerVendor: z.string().optional().default('Bit4id'),
+  cardAtr: z.string().nullable().optional(),
+  cardType: z.string().nullable().optional(),
+  cardSerialNumber: z.string().nullable().optional(),
+  workstationId: z.string().nullable().optional()
+});
+
+const smartCardSessionUpdateSchema = z.object({
+  cardAtr: z.string().nullable().optional(),
+  cardType: z.string().nullable().optional(),
+  cardSerialNumber: z.string().nullable().optional(),
+  status: z.enum(['connected', 'disconnected', 'error', 'card_removed']).optional(),
+  lastError: z.string().nullable().optional()
+}).refine(obj => Object.keys(obj).length > 0, { message: "Payload vuoto non permesso" });
+
+const smartCardSealLogSchema = z.object({
+  sessionId: z.string().min(1, "sessionId è obbligatorio"),
+  fiscalSealId: z.string().nullable().optional(),
+  ticketId: z.string().nullable().optional(),
+  sealCode: z.string().min(1, "sealCode è obbligatorio"),
+  progressiveNumber: z.number().int().min(0).default(0),
+  status: z.enum(['success', 'failed', 'cancelled']).default('success'),
+  errorMessage: z.string().nullable().optional(),
+  durationMs: z.number().int().nullable().optional()
+});
+
+// Get current smart card session status
+router.get('/smart-card/status', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ message: "Non autorizzato" });
+    }
+    
+    // Get the most recent active session for this user
+    const session = await siaeStorage.getActiveSmartCardSession(userId);
+    
+    if (!session) {
+      return res.json({
+        connected: false,
+        readerDetected: false,
+        cardInserted: false,
+        readerName: null,
+        canEmitTickets: false,
+        message: "Nessuna sessione smart card attiva"
+      });
+    }
+    
+    // Verify session is still valid and connected
+    const isConnected = session.status === 'connected';
+    const hasCard = session.cardAtr !== null && session.cardAtr !== '';
+    const canEmit = isConnected && hasCard;
+    
+    res.json({
+      connected: isConnected,
+      readerDetected: isConnected || session.status === 'card_removed',
+      cardInserted: hasCard,
+      readerName: session.readerName,
+      cardType: session.cardType,
+      cardAtr: session.cardAtr,
+      ticketsEmitted: session.ticketsEmittedCount,
+      sealsUsed: session.sealsUsedCount,
+      connectedAt: session.connectedAt,
+      lastActivity: session.lastActivityAt,
+      canEmitTickets: canEmit,
+      sessionId: session.id,
+      status: session.status,
+      errorCount: session.errorCount,
+      lastError: session.lastError
+    });
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Register a new smart card session
+router.post('/smart-card/sessions', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ message: "Non autorizzato" });
+    }
+    
+    // Validate request body
+    const parseResult = smartCardSessionCreateSchema.safeParse(req.body);
+    if (!parseResult.success) {
+      return res.status(400).json({ 
+        message: "Dati non validi", 
+        errors: parseResult.error.errors 
+      });
+    }
+    
+    const { readerId, readerName, readerModel, readerVendor, cardAtr, cardType, cardSerialNumber, workstationId } = parseResult.data;
+    
+    // Close any existing active sessions for this user
+    await siaeStorage.closeActiveSmartCardSessions(userId);
+    
+    // Determine initial status
+    const hasCard = cardAtr !== null && cardAtr !== undefined && cardAtr !== '';
+    const initialStatus = hasCard ? 'connected' : 'card_removed';
+    
+    // Create new session
+    const session = await siaeStorage.createSmartCardSession({
+      readerId,
+      readerName,
+      readerModel: readerModel || 'MiniLector EVO V3',
+      readerVendor: readerVendor || 'Bit4id',
+      cardAtr: cardAtr || null,
+      cardType: cardType || null,
+      cardSerialNumber: cardSerialNumber || null,
+      status: initialStatus,
+      ticketsEmittedCount: 0,
+      sealsUsedCount: 0,
+      userId,
+      workstationId: workstationId || null,
+      ipAddress: (req.ip || '').substring(0, 45), // Normalize IP length
+      userAgent: (req.get('user-agent') || '').substring(0, 500), // Limit user agent
+      lastActivityAt: new Date(),
+      errorCount: 0
+    });
+    
+    // Log audit - reader connection
+    await siaeStorage.createAuditLog({
+      companyId: req.user?.companyId || '',
+      userId,
+      action: 'smart_card_connect',
+      entityType: 'smart_card_session',
+      entityId: session.id,
+      description: `Connesso lettore smart card: ${readerName}`,
+      ipAddress: (req.ip || '').substring(0, 45),
+      userAgent: (req.get('user-agent') || '').substring(0, 500)
+    });
+    
+    // Log audit - card insertion if present
+    if (hasCard) {
+      await siaeStorage.createAuditLog({
+        companyId: req.user?.companyId || '',
+        userId,
+        action: 'smart_card_inserted',
+        entityType: 'smart_card_session',
+        entityId: session.id,
+        description: `Smart Card inserita: ${cardType || 'Tipo sconosciuto'}`,
+        ipAddress: (req.ip || '').substring(0, 45),
+        userAgent: (req.get('user-agent') || '').substring(0, 500)
+      });
+    }
+    
+    res.status(201).json(session);
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Update smart card session (card inserted/removed)
+router.patch('/smart-card/sessions/:id', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user?.id;
+    
+    if (!userId) {
+      return res.status(401).json({ message: "Non autorizzato" });
+    }
+    
+    // Validate request body
+    const parseResult = smartCardSessionUpdateSchema.safeParse(req.body);
+    if (!parseResult.success) {
+      return res.status(400).json({ 
+        message: "Dati non validi", 
+        errors: parseResult.error.errors 
+      });
+    }
+    
+    // Check session ownership
+    const existingSession = await siaeStorage.getSmartCardSessionById(id);
+    if (!existingSession) {
+      return res.status(404).json({ message: "Sessione non trovata" });
+    }
+    
+    if (existingSession.userId !== userId) {
+      return res.status(403).json({ message: "Non autorizzato a modificare questa sessione" });
+    }
+    
+    const updateData = parseResult.data;
+    const previousCardAtr = existingSession.cardAtr;
+    const newCardAtr = updateData.cardAtr;
+    
+    // Determine status based on card presence
+    let newStatus = updateData.status;
+    if (!newStatus) {
+      if (newCardAtr !== undefined) {
+        newStatus = (newCardAtr && newCardAtr !== '') ? 'connected' : 'card_removed';
+      }
+    }
+    
+    // Track errors
+    let errorCount = existingSession.errorCount || 0;
+    if (newStatus === 'error' || updateData.lastError) {
+      errorCount++;
+    }
+    
+    const session = await siaeStorage.updateSmartCardSession(id, {
+      ...updateData,
+      status: newStatus,
+      errorCount,
+      lastActivityAt: new Date()
+    });
+    
+    // Log card insertion/removal
+    const wasCardPresent = previousCardAtr !== null && previousCardAtr !== '';
+    const isCardPresent = newCardAtr !== undefined ? (newCardAtr && newCardAtr !== '') : wasCardPresent;
+    
+    if (!wasCardPresent && isCardPresent) {
+      await siaeStorage.createAuditLog({
+        companyId: req.user?.companyId || '',
+        userId,
+        action: 'smart_card_inserted',
+        entityType: 'smart_card_session',
+        entityId: id,
+        description: `Smart Card inserita: ${updateData.cardType || 'Tipo sconosciuto'}`,
+        ipAddress: (req.ip || '').substring(0, 45),
+        userAgent: (req.get('user-agent') || '').substring(0, 500)
+      });
+    } else if (wasCardPresent && !isCardPresent) {
+      await siaeStorage.createAuditLog({
+        companyId: req.user?.companyId || '',
+        userId,
+        action: 'smart_card_removed',
+        entityType: 'smart_card_session',
+        entityId: id,
+        description: 'Smart Card rimossa',
+        ipAddress: (req.ip || '').substring(0, 45),
+        userAgent: (req.get('user-agent') || '').substring(0, 500)
+      });
+    }
+    
+    // Log errors
+    if (updateData.lastError) {
+      await siaeStorage.createAuditLog({
+        companyId: req.user?.companyId || '',
+        userId,
+        action: 'smart_card_error',
+        entityType: 'smart_card_session',
+        entityId: id,
+        description: `Errore smart card: ${updateData.lastError}`,
+        ipAddress: (req.ip || '').substring(0, 45),
+        userAgent: (req.get('user-agent') || '').substring(0, 500)
+      });
+    }
+    
+    res.json(session);
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Close smart card session
+router.delete('/smart-card/sessions/:id', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user?.id;
+    
+    if (!userId) {
+      return res.status(401).json({ message: "Non autorizzato" });
+    }
+    
+    // Check session ownership
+    const existingSession = await siaeStorage.getSmartCardSessionById(id);
+    if (!existingSession) {
+      return res.status(404).json({ message: "Sessione non trovata" });
+    }
+    
+    if (existingSession.userId !== userId) {
+      return res.status(403).json({ message: "Non autorizzato a chiudere questa sessione" });
+    }
+    
+    await siaeStorage.closeSmartCardSession(id);
+    
+    // Log audit
+    await siaeStorage.createAuditLog({
+      companyId: req.user?.companyId || '',
+      userId,
+      action: 'smart_card_disconnect',
+      entityType: 'smart_card_session',
+      entityId: id,
+      description: 'Disconnesso lettore smart card',
+      ipAddress: (req.ip || '').substring(0, 45),
+      userAgent: (req.get('user-agent') || '').substring(0, 500)
+    });
+    
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Verify smart card is ready for ticket emission - CRITICAL FOR SIAE COMPLIANCE
+router.get('/smart-card/verify-emission', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ message: "Non autorizzato" });
+    }
+    
+    const session = await siaeStorage.getActiveSmartCardSession(userId);
+    
+    if (!session) {
+      return res.status(403).json({
+        canEmit: false,
+        reason: "ERRORE FISCALE: Nessuna sessione smart card attiva. Collegare il lettore MiniLector EVO.",
+        code: "NO_SESSION"
+      });
+    }
+    
+    if (session.status === 'disconnected') {
+      return res.status(403).json({
+        canEmit: false,
+        reason: "ERRORE FISCALE: Lettore smart card disconnesso. Ricollegare il dispositivo.",
+        code: "READER_DISCONNECTED"
+      });
+    }
+    
+    if (session.status === 'error') {
+      return res.status(403).json({
+        canEmit: false,
+        reason: `ERRORE FISCALE: Errore lettore smart card. ${session.lastError || 'Verificare la connessione.'}`,
+        code: "READER_ERROR"
+      });
+    }
+    
+    if (!session.cardAtr || session.cardAtr === '') {
+      return res.status(403).json({
+        canEmit: false,
+        reason: "ERRORE FISCALE: Smart Card SIAE non inserita. Inserire la carta sigilli per emettere biglietti.",
+        code: "NO_CARD"
+      });
+    }
+    
+    if (session.status !== 'connected') {
+      return res.status(403).json({
+        canEmit: false,
+        reason: "ERRORE FISCALE: Stato lettore non valido. Verificare la connessione.",
+        code: "INVALID_STATE"
+      });
+    }
+    
+    res.json({
+      canEmit: true,
+      sessionId: session.id,
+      readerName: session.readerName,
+      cardType: session.cardType,
+      cardAtr: session.cardAtr,
+      ticketsEmitted: session.ticketsEmittedCount,
+      sealsUsed: session.sealsUsedCount
+    });
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Log seal generation
+router.post('/smart-card/seal-log', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ message: "Non autorizzato" });
+    }
+    
+    // Validate request body
+    const parseResult = smartCardSealLogSchema.safeParse(req.body);
+    if (!parseResult.success) {
+      return res.status(400).json({ 
+        message: "Dati non validi", 
+        errors: parseResult.error.errors 
+      });
+    }
+    
+    const { sessionId, fiscalSealId, ticketId, sealCode, progressiveNumber, status, errorMessage, durationMs } = parseResult.data;
+    
+    // Verify session ownership
+    const session = await siaeStorage.getSmartCardSessionById(sessionId);
+    if (!session) {
+      return res.status(404).json({ message: "Sessione non trovata" });
+    }
+    
+    if (session.userId !== userId) {
+      return res.status(403).json({ message: "Non autorizzato a registrare log per questa sessione" });
+    }
+    
+    const log = await siaeStorage.createSmartCardSealLog({
+      sessionId,
+      fiscalSealId: fiscalSealId || null,
+      ticketId: ticketId || null,
+      sealCode,
+      progressiveNumber,
+      status,
+      errorMessage: errorMessage || null,
+      completedAt: new Date(),
+      durationMs: durationMs || null
+    });
+    
+    // Update session counters only on success
+    if (status === 'success') {
+      await siaeStorage.incrementSmartCardSessionCounters(sessionId);
+    } else {
+      // Update error count on failure
+      await siaeStorage.updateSmartCardSession(sessionId, {
+        errorCount: (session.errorCount || 0) + 1,
+        lastError: errorMessage || 'Errore generazione sigillo',
+        lastActivityAt: new Date()
+      });
+      
+      // Log failure
+      await siaeStorage.createAuditLog({
+        companyId: req.user?.companyId || '',
+        userId,
+        action: 'seal_generation_failed',
+        entityType: 'smart_card_seal_log',
+        entityId: log.id,
+        description: `Errore generazione sigillo: ${errorMessage || 'Errore sconosciuto'}`,
+        fiscalSealCode: sealCode,
+        ipAddress: (req.ip || '').substring(0, 45),
+        userAgent: (req.get('user-agent') || '').substring(0, 500)
+      });
+    }
+    
+    res.status(201).json(log);
   } catch (error: any) {
     res.status(500).json({ message: error.message });
   }

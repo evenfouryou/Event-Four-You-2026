@@ -24,6 +24,8 @@ import {
   siaeSubscriptions,
   siaeAuditLogs,
   siaeNumberedSeats,
+  siaeSmartCardSessions,
+  siaeSmartCardSealLogs,
   type SiaeEventGenre,
   type InsertSiaeEventGenre,
   type SiaeSectorCode,
@@ -72,6 +74,10 @@ import {
   type InsertSiaeAuditLog,
   type SiaeNumberedSeat,
   type InsertSiaeNumberedSeat,
+  type SiaeSmartCardSession,
+  type InsertSiaeSmartCardSession,
+  type SiaeSmartCardSealLog,
+  type InsertSiaeSmartCardSealLog,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, sql, lt, gt, isNull } from "drizzle-orm";
@@ -1244,6 +1250,135 @@ export class SiaeStorage implements ISiaeStorage {
     }
     
     console.log('SIAE reference tables seeded successfully!');
+  }
+
+  // ==================== Smart Card Sessions ====================
+  
+  async getActiveSmartCardSession(userId: string): Promise<SiaeSmartCardSession | null> {
+    const [session] = await db
+      .select()
+      .from(siaeSmartCardSessions)
+      .where(
+        and(
+          eq(siaeSmartCardSessions.userId, userId),
+          isNull(siaeSmartCardSessions.disconnectedAt)
+        )
+      )
+      .orderBy(desc(siaeSmartCardSessions.connectedAt))
+      .limit(1);
+    return session || null;
+  }
+
+  async getSmartCardSessionById(id: string): Promise<SiaeSmartCardSession | null> {
+    const [session] = await db
+      .select()
+      .from(siaeSmartCardSessions)
+      .where(eq(siaeSmartCardSessions.id, id))
+      .limit(1);
+    return session || null;
+  }
+
+  async createSmartCardSession(data: InsertSiaeSmartCardSession): Promise<SiaeSmartCardSession> {
+    const [session] = await db
+      .insert(siaeSmartCardSessions)
+      .values(data)
+      .returning();
+    return session;
+  }
+
+  async updateSmartCardSession(id: string, data: Partial<InsertSiaeSmartCardSession>): Promise<SiaeSmartCardSession | null> {
+    const [session] = await db
+      .update(siaeSmartCardSessions)
+      .set(data)
+      .where(eq(siaeSmartCardSessions.id, id))
+      .returning();
+    return session || null;
+  }
+
+  async closeSmartCardSession(id: string): Promise<void> {
+    await db
+      .update(siaeSmartCardSessions)
+      .set({
+        status: 'disconnected',
+        disconnectedAt: new Date()
+      })
+      .where(eq(siaeSmartCardSessions.id, id));
+  }
+
+  async closeActiveSmartCardSessions(userId: string): Promise<void> {
+    await db
+      .update(siaeSmartCardSessions)
+      .set({
+        status: 'disconnected',
+        disconnectedAt: new Date()
+      })
+      .where(
+        and(
+          eq(siaeSmartCardSessions.userId, userId),
+          isNull(siaeSmartCardSessions.disconnectedAt)
+        )
+      );
+  }
+
+  async incrementSmartCardSessionCounters(sessionId: string): Promise<void> {
+    await db
+      .update(siaeSmartCardSessions)
+      .set({
+        ticketsEmittedCount: sql`${siaeSmartCardSessions.ticketsEmittedCount} + 1`,
+        sealsUsedCount: sql`${siaeSmartCardSessions.sealsUsedCount} + 1`,
+        lastActivityAt: new Date()
+      })
+      .where(eq(siaeSmartCardSessions.id, sessionId));
+  }
+
+  // ==================== Smart Card Seal Logs ====================
+
+  async createSmartCardSealLog(data: InsertSiaeSmartCardSealLog): Promise<SiaeSmartCardSealLog> {
+    const [log] = await db
+      .insert(siaeSmartCardSealLogs)
+      .values(data)
+      .returning();
+    return log;
+  }
+
+  async getSmartCardSealLogsBySession(sessionId: string): Promise<SiaeSmartCardSealLog[]> {
+    return await db
+      .select()
+      .from(siaeSmartCardSealLogs)
+      .where(eq(siaeSmartCardSealLogs.sessionId, sessionId))
+      .orderBy(desc(siaeSmartCardSealLogs.requestedAt));
+  }
+
+  // ==================== Audit Log Helper ====================
+
+  async createAuditLog(data: {
+    companyId: string;
+    userId: string;
+    action: string;
+    entityType: string;
+    entityId?: string;
+    description?: string;
+    ipAddress?: string | null;
+    userAgent?: string | null;
+    fiscalSealCode?: string | null;
+    cardCode?: string | null;
+  }): Promise<SiaeAuditLog> {
+    const [log] = await db
+      .insert(siaeAuditLogs)
+      .values({
+        companyId: data.companyId,
+        userId: data.userId,
+        action: data.action,
+        entityType: data.entityType,
+        entityId: data.entityId || null,
+        description: data.description || null,
+        ipAddress: data.ipAddress || null,
+        userAgent: data.userAgent || null,
+        fiscalSealCode: data.fiscalSealCode || null,
+        cardCode: data.cardCode || null
+      })
+      .returning();
+    return log;
   }
 }
 

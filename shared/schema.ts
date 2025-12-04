@@ -1643,6 +1643,79 @@ export const siaeNumberedSeatsRelations = relations(siaeNumberedSeats, ({ one })
   }),
 }));
 
+// ==================== Smart Card Reader Sessions ====================
+// Traccia le sessioni di connessione del lettore MiniLector EVO V3 per sigilli fiscali
+export const siaeSmartCardSessions = pgTable("siae_smart_card_sessions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  // Identificazione lettore
+  readerId: varchar("reader_id", { length: 100 }).notNull(), // ID univoco lettore (es. "Bit4id miniLector")
+  readerName: varchar("reader_name", { length: 255 }).notNull(),
+  readerModel: varchar("reader_model", { length: 100 }).default('MiniLector EVO V3'),
+  readerVendor: varchar("reader_vendor", { length: 100 }).default('Bit4id'),
+  // Carta inserita
+  cardAtr: varchar("card_atr", { length: 100 }), // Answer To Reset della carta
+  cardType: varchar("card_type", { length: 100 }), // Tipo carta (SIAE Fiscal Card)
+  cardSerialNumber: varchar("card_serial_number", { length: 50 }), // Seriale carta
+  // Stato sessione
+  status: varchar("status", { length: 20 }).notNull().default('connected'), // connected, disconnected, error, card_removed
+  // Contatori sessione
+  ticketsEmittedCount: integer("tickets_emitted_count").notNull().default(0),
+  sealsUsedCount: integer("seals_used_count").notNull().default(0),
+  // Utente e postazione
+  userId: varchar("user_id").references(() => users.id),
+  workstationId: varchar("workstation_id", { length: 100 }), // Identificativo postazione
+  ipAddress: varchar("ip_address", { length: 45 }),
+  userAgent: text("user_agent"),
+  // Timestamp
+  connectedAt: timestamp("connected_at").notNull().defaultNow(),
+  lastActivityAt: timestamp("last_activity_at").defaultNow(),
+  disconnectedAt: timestamp("disconnected_at"),
+  // Errori
+  lastError: text("last_error"),
+  errorCount: integer("error_count").notNull().default(0),
+});
+
+export const siaeSmartCardSessionsRelations = relations(siaeSmartCardSessions, ({ one }) => ({
+  user: one(users, {
+    fields: [siaeSmartCardSessions.userId],
+    references: [users.id],
+  }),
+}));
+
+// ==================== Smart Card Seal Generation Log ====================
+// Log dettagliato di ogni sigillo generato dalla smart card
+export const siaeSmartCardSealLogs = pgTable("siae_smart_card_seal_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  sessionId: varchar("session_id").notNull().references(() => siaeSmartCardSessions.id),
+  fiscalSealId: varchar("fiscal_seal_id").references(() => siaeFiscalSeals.id),
+  ticketId: varchar("ticket_id").references(() => siaeTickets.id),
+  // Dettagli generazione
+  sealCode: varchar("seal_code", { length: 16 }).notNull(),
+  progressiveNumber: integer("progressive_number").notNull(),
+  // Stato
+  status: varchar("status", { length: 20 }).notNull().default('success'), // success, failed, cancelled
+  errorMessage: text("error_message"),
+  // Timing
+  requestedAt: timestamp("requested_at").notNull().defaultNow(),
+  completedAt: timestamp("completed_at"),
+  durationMs: integer("duration_ms"), // Tempo di generazione in millisecondi
+});
+
+export const siaeSmartCardSealLogsRelations = relations(siaeSmartCardSealLogs, ({ one }) => ({
+  session: one(siaeSmartCardSessions, {
+    fields: [siaeSmartCardSealLogs.sessionId],
+    references: [siaeSmartCardSessions.id],
+  }),
+  fiscalSeal: one(siaeFiscalSeals, {
+    fields: [siaeSmartCardSealLogs.fiscalSealId],
+    references: [siaeFiscalSeals.id],
+  }),
+  ticket: one(siaeTickets, {
+    fields: [siaeSmartCardSealLogs.ticketId],
+    references: [siaeTickets.id],
+  }),
+}));
+
 // Zod schemas for validation
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
@@ -2412,6 +2485,19 @@ export const insertSiaeNumberedSeatSchema = createInsertSchema(siaeNumberedSeats
 });
 export const updateSiaeNumberedSeatSchema = insertSiaeNumberedSeatSchema.partial().omit({ sectorId: true });
 
+// Smart Card Sessions
+export const insertSiaeSmartCardSessionSchema = createInsertSchema(siaeSmartCardSessions).omit({
+  id: true,
+  connectedAt: true,
+});
+export const updateSiaeSmartCardSessionSchema = insertSiaeSmartCardSessionSchema.partial().omit({ readerId: true, readerName: true });
+
+// Smart Card Seal Logs
+export const insertSiaeSmartCardSealLogSchema = createInsertSchema(siaeSmartCardSealLogs).omit({
+  id: true,
+  requestedAt: true,
+});
+
 // ==================== MODULO BIGLIETTERIA SIAE - Types ====================
 
 // TAB.1-5
@@ -2518,6 +2604,15 @@ export type InsertSiaeAuditLog = z.infer<typeof insertSiaeAuditLogSchema>;
 export type SiaeNumberedSeat = typeof siaeNumberedSeats.$inferSelect;
 export type InsertSiaeNumberedSeat = z.infer<typeof insertSiaeNumberedSeatSchema>;
 export type UpdateSiaeNumberedSeat = z.infer<typeof updateSiaeNumberedSeatSchema>;
+
+// Smart Card Sessions
+export type SiaeSmartCardSession = typeof siaeSmartCardSessions.$inferSelect;
+export type InsertSiaeSmartCardSession = z.infer<typeof insertSiaeSmartCardSessionSchema>;
+export type UpdateSiaeSmartCardSession = z.infer<typeof updateSiaeSmartCardSessionSchema>;
+
+// Smart Card Seal Logs
+export type SiaeSmartCardSealLog = typeof siaeSmartCardSealLogs.$inferSelect;
+export type InsertSiaeSmartCardSealLog = z.infer<typeof insertSiaeSmartCardSealLogSchema>;
 
 // ==================== PORTALE PUBBLICO ACQUISTO BIGLIETTI ====================
 
