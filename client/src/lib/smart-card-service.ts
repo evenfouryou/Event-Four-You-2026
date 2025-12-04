@@ -89,6 +89,8 @@ class SmartCardService {
    * Tenta connessione WebSocket (app desktop Event4U)
    */
   private tryWebSocketConnection(): void {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) return;
+    
     try {
       this.ws = new WebSocket(this.WS_URL);
       
@@ -98,14 +100,22 @@ class SmartCardService {
           clearTimeout(this.wsReconnectTimer);
           this.wsReconnectTimer = null;
         }
+        if (this.pollingInterval) {
+          clearInterval(this.pollingInterval);
+          this.pollingInterval = null;
+        }
         this.ws?.send(JSON.stringify({ type: 'get_status' }));
       };
       
       this.ws.onmessage = (event) => {
         try {
           const msg = JSON.parse(event.data);
-          if (msg.type === 'status' && msg.data) {
-            this.handleWebSocketStatus(msg.data);
+          if (msg && typeof msg.type === 'string') {
+            if (msg.type === 'status' && msg.data) {
+              this.handleWebSocketStatus(msg.data);
+            } else if (msg.type === 'pong') {
+              // Heartbeat response
+            }
           }
         } catch (e) {
           console.error('Smart Card: Errore parsing messaggio:', e);
@@ -113,20 +123,24 @@ class SmartCardService {
       };
       
       this.ws.onerror = () => {
-        console.log('Smart Card: WebSocket non disponibile, provo Trust1Connector');
+        console.log('Smart Card: WebSocket non disponibile');
         this.ws = null;
-        this.startTrust1ConnectorPolling();
+        this.scheduleWebSocketReconnect();
+        if (!this.pollingInterval) {
+          this.startTrust1ConnectorPolling();
+        }
       };
       
       this.ws.onclose = () => {
         this.ws = null;
-        if (!this.pollingInterval) {
-          this.scheduleWebSocketReconnect();
-        }
+        this.scheduleWebSocketReconnect();
       };
       
     } catch {
-      this.startTrust1ConnectorPolling();
+      this.scheduleWebSocketReconnect();
+      if (!this.pollingInterval) {
+        this.startTrust1ConnectorPolling();
+      }
     }
   }
 

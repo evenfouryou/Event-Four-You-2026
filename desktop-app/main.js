@@ -59,12 +59,28 @@ function createTray() {
 }
 
 function startWebSocketServer() {
-  wss = new WebSocket.Server({ port: WS_PORT });
+  wss = new WebSocket.Server({ 
+    port: WS_PORT,
+    host: '127.0.0.1'
+  });
   
-  console.log(`WebSocket server running on port ${WS_PORT}`);
+  console.log(`WebSocket server running on 127.0.0.1:${WS_PORT}`);
   
-  wss.on('connection', (ws) => {
-    console.log('Client connected');
+  wss.on('connection', (ws, req) => {
+    const origin = req.headers.origin || '';
+    const isLocalhost = origin === '' || 
+                        origin.includes('localhost') || 
+                        origin.includes('127.0.0.1') ||
+                        origin.includes('replit');
+    
+    if (!isLocalhost) {
+      console.log('Rejected connection from:', origin);
+      ws.close(1008, 'Origin not allowed');
+      return;
+    }
+    
+    console.log('Client connected from:', origin || 'local');
+    ws.isAlive = true;
     connectedClients.add(ws);
     updateUI();
     
@@ -73,10 +89,16 @@ function startWebSocketServer() {
       data: getStatus()
     }));
     
+    ws.on('pong', () => {
+      ws.isAlive = true;
+    });
+    
     ws.on('message', (message) => {
       try {
         const msg = JSON.parse(message);
-        handleClientMessage(ws, msg);
+        if (msg && typeof msg.type === 'string') {
+          handleClientMessage(ws, msg);
+        }
       } catch (e) {
         console.error('Invalid message:', e);
       }
@@ -87,6 +109,26 @@ function startWebSocketServer() {
       connectedClients.delete(ws);
       updateUI();
     });
+    
+    ws.on('error', (err) => {
+      console.error('WebSocket client error:', err);
+      connectedClients.delete(ws);
+    });
+  });
+  
+  const heartbeatInterval = setInterval(() => {
+    wss.clients.forEach((ws) => {
+      if (ws.isAlive === false) {
+        connectedClients.delete(ws);
+        return ws.terminate();
+      }
+      ws.isAlive = false;
+      ws.ping();
+    });
+  }, 30000);
+  
+  wss.on('close', () => {
+    clearInterval(heartbeatInterval);
   });
 }
 
