@@ -381,9 +381,9 @@ export function AppSidebar() {
         group: "Bacheca",
       },
       {
-        title: "Eventi",
+        title: "I Miei Eventi",
         icon: Calendar,
-        url: "/events",
+        url: "/pr/my-events",
         group: "Gestione",
       },
       {
@@ -402,12 +402,6 @@ export function AppSidebar() {
         title: "Scanner QR",
         icon: ScanLine,
         url: "/pr/scanner",
-        group: "Gestione PR",
-      },
-      {
-        title: "Staff Eventi",
-        icon: UserPlus,
-        url: "/pr/staff",
         group: "Gestione PR",
       }
     );
@@ -438,12 +432,6 @@ export function AppSidebar() {
         title: "Scanner QR",
         icon: ScanLine,
         url: "/pr/scanner",
-        group: "Gestione PR",
-      },
-      {
-        title: "Staff Eventi",
-        icon: UserPlus,
-        url: "/pr/staff",
         group: "Gestione PR",
       }
     );

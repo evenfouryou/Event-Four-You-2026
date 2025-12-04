@@ -67,6 +67,8 @@ import PublicVenueDetail from "@/pages/public-venue-detail";
 import PrGuestLists from "@/pages/pr-guest-lists";
 import PrTables from "@/pages/pr-tables";
 import PrScanner from "@/pages/pr-scanner";
+import PrStaff from "@/pages/pr-staff";
+import PrMyEvents from "@/pages/pr-my-events";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -165,6 +167,8 @@ function Router() {
               <Route path="/pr/guest-lists" component={PrGuestLists} />
               <Route path="/pr/tables" component={PrTables} />
               <Route path="/pr/scanner" component={PrScanner} />
+              <Route path="/pr/staff" component={PrStaff} />
+              <Route path="/pr/my-events" component={PrMyEvents} />
               <Route component={NotFound} />
             </Switch>
           </main>
