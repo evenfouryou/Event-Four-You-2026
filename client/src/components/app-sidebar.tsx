@@ -18,6 +18,9 @@ import {
   Receipt,
   FileText,
   ChevronRight,
+  CreditCard,
+  Table2,
+  Ticket,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
@@ -76,6 +79,18 @@ export function AppSidebar() {
         icon: Users,
         url: "/users",
         group: "Sistema",
+      },
+      {
+        title: "Tabelle SIAE",
+        icon: Table2,
+        url: "/siae/tables",
+        group: "Biglietteria SIAE",
+      },
+      {
+        title: "Carte Attivazione",
+        icon: CreditCard,
+        url: "/siae/activation-cards",
+        group: "Biglietteria SIAE",
       }
     );
   }

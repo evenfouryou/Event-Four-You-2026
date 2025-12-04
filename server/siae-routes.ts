@@ -1270,7 +1270,8 @@ router.get("/api/siae/companies/:companyId/reports/xml/cancellations", requireAu
       
       xml += `
     <Annullamento>
-      <SigilloFiscale>${escapeXml(ticket.fiscalSeal)}</SigilloFiscale>
+      <NumeroProgressivo>${ticket.progressiveNumber || 0}</NumeroProgressivo>
+      <SigilloFiscale>${escapeXml(ticket.fiscalSealCode)}</SigilloFiscale>
       <DataOraEmissione>${formatSiaeDateTime(ticket.emissionDate)}</DataOraEmissione>
       <DataOraAnnullamento>${formatSiaeDateTime(ticket.cancellationDate)}</DataOraAnnullamento>
       <CodiceCausale>${escapeXml(ticket.cancellationReasonCode || '')}</CodiceCausale>

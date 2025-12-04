@@ -42,6 +42,8 @@ import ResetPassword from "@/pages/reset-password";
 import Accounting from "@/pages/accounting";
 import Personnel from "@/pages/personnel";
 import NightFilePage from "@/pages/night-file";
+import SiaeTables from "@/pages/siae-tables";
+import SiaeActivationCards from "@/pages/siae-activation-cards";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -114,6 +116,8 @@ function Router() {
               <Route path="/accounting" component={Accounting} />
               <Route path="/personnel" component={Personnel} />
               <Route path="/night-file" component={NightFilePage} />
+              <Route path="/siae/tables" component={SiaeTables} />
+              <Route path="/siae/activation-cards" component={SiaeActivationCards} />
               <Route component={NotFound} />
             </Switch>
           </main>
