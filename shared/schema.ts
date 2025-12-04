@@ -2648,3 +2648,362 @@ export type InsertPublicCheckoutSession = z.infer<typeof insertPublicCheckoutSes
 
 export type PublicCustomerSession = typeof publicCustomerSessions.$inferSelect;
 export type InsertPublicCustomerSession = z.infer<typeof insertPublicCustomerSessionSchema>;
+
+// ==================== MODULO GESTORE/PR/LISTE ====================
+
+// Abilitazioni Staff per Evento - Chi può operare su quale evento
+export const eventStaffAssignments = pgTable("event_staff_assignments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  eventId: varchar("event_id").notNull().references(() => events.id),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  role: varchar("role", { length: 50 }).notNull(), // gestore_covisione, capo_staff, pr
+  assignedByUserId: varchar("assigned_by_user_id").notNull().references(() => users.id),
+  permissions: text("permissions").array().default(sql`ARRAY[]::text[]`), // gestione_liste, gestione_tavoli, check_in, etc.
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const eventStaffAssignmentsRelations = relations(eventStaffAssignments, ({ one }) => ({
+  event: one(events, {
+    fields: [eventStaffAssignments.eventId],
+    references: [events.id],
+  }),
+  user: one(users, {
+    fields: [eventStaffAssignments.userId],
+    references: [users.id],
+  }),
+  assignedByUser: one(users, {
+    fields: [eventStaffAssignments.assignedByUserId],
+    references: [users.id],
+  }),
+}));
+
+// Planimetrie Evento - Immagine della sala con posizioni tavoli
+export const eventFloorplans = pgTable("event_floorplans", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  eventId: varchar("event_id").notNull().references(() => events.id),
+  companyId: varchar("company_id").notNull().references(() => companies.id),
+  name: varchar("name", { length: 255 }).notNull(),
+  imageUrl: text("image_url").notNull(),
+  width: integer("width"), // Larghezza immagine in pixel
+  height: integer("height"), // Altezza immagine in pixel
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const eventFloorplansRelations = relations(eventFloorplans, ({ one, many }) => ({
+  event: one(events, {
+    fields: [eventFloorplans.eventId],
+    references: [events.id],
+  }),
+  company: one(companies, {
+    fields: [eventFloorplans.companyId],
+    references: [companies.id],
+  }),
+  tables: many(eventTables),
+}));
+
+// Tavoli Evento - Posizionati sulla planimetria
+export const eventTables = pgTable("event_tables", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  eventId: varchar("event_id").notNull().references(() => events.id),
+  floorplanId: varchar("floorplan_id").references(() => eventFloorplans.id),
+  companyId: varchar("company_id").notNull().references(() => companies.id),
+  name: varchar("name", { length: 100 }).notNull(), // Es: "Tavolo 1", "VIP 3"
+  tableType: varchar("table_type", { length: 50 }).notNull().default('standard'), // standard, vip, prive
+  capacity: integer("capacity").notNull().default(4),
+  minSpend: decimal("min_spend", { precision: 10, scale: 2 }), // Spesa minima (cambusa)
+  // Posizione sulla planimetria
+  positionX: integer("position_x"),
+  positionY: integer("position_y"),
+  // Stato
+  status: varchar("status", { length: 20 }).notNull().default('available'), // available, reserved, occupied, blocked
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const eventTablesRelations = relations(eventTables, ({ one, many }) => ({
+  event: one(events, {
+    fields: [eventTables.eventId],
+    references: [events.id],
+  }),
+  floorplan: one(eventFloorplans, {
+    fields: [eventTables.floorplanId],
+    references: [eventFloorplans.id],
+  }),
+  company: one(companies, {
+    fields: [eventTables.companyId],
+    references: [companies.id],
+  }),
+  bookings: many(tableBookings),
+}));
+
+// Prenotazioni Tavoli - Con QR univoco
+export const tableBookings = pgTable("table_bookings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tableId: varchar("table_id").notNull().references(() => eventTables.id),
+  eventId: varchar("event_id").notNull().references(() => events.id),
+  companyId: varchar("company_id").notNull().references(() => companies.id),
+  // Chi ha prenotato
+  bookedByUserId: varchar("booked_by_user_id").references(() => users.id), // PR che ha prenotato
+  customerId: varchar("customer_id").references(() => siaeCustomers.id), // Cliente intestatario
+  // Dati cliente (se non registrato)
+  customerName: varchar("customer_name", { length: 255 }),
+  customerPhone: varchar("customer_phone", { length: 20 }),
+  customerEmail: varchar("customer_email", { length: 255 }),
+  // Ospiti al tavolo
+  guestsCount: integer("guests_count").notNull().default(1),
+  guestNames: text("guest_names").array().default(sql`ARRAY[]::text[]`),
+  // QR Code univoco per questa prenotazione
+  qrCode: varchar("qr_code", { length: 100 }).notNull().unique(),
+  qrScannedAt: timestamp("qr_scanned_at"), // Quando è stato usato all'ingresso
+  qrScannedByUserId: varchar("qr_scanned_by_user_id").references(() => users.id),
+  // Pagamento cambusa
+  depositAmount: decimal("deposit_amount", { precision: 10, scale: 2 }),
+  depositPaid: boolean("deposit_paid").notNull().default(false),
+  totalSpent: decimal("total_spent", { precision: 10, scale: 2 }),
+  paymentStatus: varchar("payment_status", { length: 20 }).notNull().default('pending'), // pending, partial, paid
+  // Stato prenotazione
+  status: varchar("status", { length: 20 }).notNull().default('pending'), // pending, confirmed, arrived, completed, cancelled, no_show
+  confirmedAt: timestamp("confirmed_at"),
+  arrivedAt: timestamp("arrived_at"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const tableBookingsRelations = relations(tableBookings, ({ one }) => ({
+  table: one(eventTables, {
+    fields: [tableBookings.tableId],
+    references: [eventTables.id],
+  }),
+  event: one(events, {
+    fields: [tableBookings.eventId],
+    references: [events.id],
+  }),
+  company: one(companies, {
+    fields: [tableBookings.companyId],
+    references: [companies.id],
+  }),
+  bookedByUser: one(users, {
+    fields: [tableBookings.bookedByUserId],
+    references: [users.id],
+  }),
+  customer: one(siaeCustomers, {
+    fields: [tableBookings.customerId],
+    references: [siaeCustomers.id],
+  }),
+}));
+
+// Liste Ospiti - Con QR univoco per ogni voce
+export const guestLists = pgTable("guest_lists", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  eventId: varchar("event_id").notNull().references(() => events.id),
+  companyId: varchar("company_id").notNull().references(() => companies.id),
+  name: varchar("name", { length: 255 }).notNull(), // Es: "Lista PR Mario", "Lista VIP"
+  listType: varchar("list_type", { length: 50 }).notNull().default('standard'), // standard, vip, staff, press
+  createdByUserId: varchar("created_by_user_id").notNull().references(() => users.id), // Gestore o PR
+  // Limiti
+  maxGuests: integer("max_guests"), // Limite massimo ospiti
+  currentCount: integer("current_count").notNull().default(0),
+  // Stato
+  isActive: boolean("is_active").notNull().default(true),
+  closedAt: timestamp("closed_at"), // Quando la lista è stata chiusa
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const guestListsRelations = relations(guestLists, ({ one, many }) => ({
+  event: one(events, {
+    fields: [guestLists.eventId],
+    references: [events.id],
+  }),
+  company: one(companies, {
+    fields: [guestLists.companyId],
+    references: [companies.id],
+  }),
+  createdByUser: one(users, {
+    fields: [guestLists.createdByUserId],
+    references: [users.id],
+  }),
+  entries: many(guestListEntries),
+}));
+
+// Voci Lista Ospiti - Ogni ospite con QR univoco
+export const guestListEntries = pgTable("guest_list_entries", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  guestListId: varchar("guest_list_id").notNull().references(() => guestLists.id),
+  eventId: varchar("event_id").notNull().references(() => events.id),
+  companyId: varchar("company_id").notNull().references(() => companies.id),
+  // Chi ha inserito
+  addedByUserId: varchar("added_by_user_id").notNull().references(() => users.id), // PR che ha inserito
+  // Cliente (se registrato)
+  customerId: varchar("customer_id").references(() => siaeCustomers.id),
+  // Dati ospite
+  firstName: varchar("first_name", { length: 100 }).notNull(),
+  lastName: varchar("last_name", { length: 100 }).notNull(),
+  phone: varchar("phone", { length: 20 }),
+  email: varchar("email", { length: 255 }),
+  // Accompagnatori
+  plusOnes: integer("plus_ones").notNull().default(0), // Numero accompagnatori
+  plusOnesNames: text("plus_ones_names").array().default(sql`ARRAY[]::text[]`),
+  // QR Code univoco per questa voce lista
+  qrCode: varchar("qr_code", { length: 100 }).notNull().unique(),
+  qrScannedAt: timestamp("qr_scanned_at"), // Quando è stato usato all'ingresso
+  qrScannedByUserId: varchar("qr_scanned_by_user_id").references(() => users.id),
+  // Biglietto SIAE collegato (se acquistato)
+  ticketId: varchar("ticket_id").references(() => siaeTickets.id),
+  // Stato
+  status: varchar("status", { length: 20 }).notNull().default('pending'), // pending, confirmed, arrived, cancelled, no_show
+  confirmedAt: timestamp("confirmed_at"),
+  arrivedAt: timestamp("arrived_at"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const guestListEntriesRelations = relations(guestListEntries, ({ one }) => ({
+  guestList: one(guestLists, {
+    fields: [guestListEntries.guestListId],
+    references: [guestLists.id],
+  }),
+  event: one(events, {
+    fields: [guestListEntries.eventId],
+    references: [events.id],
+  }),
+  company: one(companies, {
+    fields: [guestListEntries.companyId],
+    references: [companies.id],
+  }),
+  addedByUser: one(users, {
+    fields: [guestListEntries.addedByUserId],
+    references: [users.id],
+  }),
+  customer: one(siaeCustomers, {
+    fields: [guestListEntries.customerId],
+    references: [siaeCustomers.id],
+  }),
+  ticket: one(siaeTickets, {
+    fields: [guestListEntries.ticketId],
+    references: [siaeTickets.id],
+  }),
+}));
+
+// OTP per login PR via telefono
+export const prOtpAttempts = pgTable("pr_otp_attempts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id),
+  phone: varchar("phone", { length: 20 }).notNull(),
+  otpCode: varchar("otp_code", { length: 10 }).notNull(),
+  purpose: varchar("purpose", { length: 50 }).notNull(), // login, phone_verify
+  status: varchar("status", { length: 20 }).notNull().default('pending'), // pending, verified, expired, failed
+  attemptsCount: integer("attempts_count").notNull().default(0),
+  expiresAt: timestamp("expires_at").notNull(),
+  verifiedAt: timestamp("verified_at"),
+  ipAddress: varchar("ip_address", { length: 45 }),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const prOtpAttemptsRelations = relations(prOtpAttempts, ({ one }) => ({
+  user: one(users, {
+    fields: [prOtpAttempts.userId],
+    references: [users.id],
+  }),
+}));
+
+// ==================== SCHEMAS MODULO GESTORE/PR/LISTE ====================
+
+export const insertEventStaffAssignmentSchema = createInsertSchema(eventStaffAssignments).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export const updateEventStaffAssignmentSchema = insertEventStaffAssignmentSchema.partial().omit({ eventId: true, userId: true });
+
+export const insertEventFloorplanSchema = createInsertSchema(eventFloorplans).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export const updateEventFloorplanSchema = insertEventFloorplanSchema.partial().omit({ eventId: true, companyId: true });
+
+export const insertEventTableSchema = createInsertSchema(eventTables).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  minSpend: z.union([z.string(), z.coerce.number(), z.null(), z.undefined()]).transform(val => 
+    val === null || val === undefined ? null : typeof val === 'number' ? val.toString() : val
+  ).optional(),
+});
+export const updateEventTableSchema = insertEventTableSchema.partial().omit({ eventId: true, companyId: true });
+
+export const insertTableBookingSchema = createInsertSchema(tableBookings).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  depositAmount: z.union([z.string(), z.coerce.number(), z.null(), z.undefined()]).transform(val => 
+    val === null || val === undefined ? null : typeof val === 'number' ? val.toString() : val
+  ).optional(),
+  totalSpent: z.union([z.string(), z.coerce.number(), z.null(), z.undefined()]).transform(val => 
+    val === null || val === undefined ? null : typeof val === 'number' ? val.toString() : val
+  ).optional(),
+});
+export const updateTableBookingSchema = insertTableBookingSchema.partial().omit({ tableId: true, eventId: true, companyId: true });
+
+export const insertGuestListSchema = createInsertSchema(guestLists).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export const updateGuestListSchema = insertGuestListSchema.partial().omit({ eventId: true, companyId: true });
+
+export const insertGuestListEntrySchema = createInsertSchema(guestListEntries).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export const updateGuestListEntrySchema = insertGuestListEntrySchema.partial().omit({ guestListId: true, eventId: true, companyId: true });
+
+export const insertPrOtpAttemptSchema = createInsertSchema(prOtpAttempts).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  expiresAt: z.union([z.string(), z.date()]).transform(val => 
+    typeof val === 'string' ? new Date(val) : val
+  ),
+});
+
+// ==================== TYPES MODULO GESTORE/PR/LISTE ====================
+
+export type EventStaffAssignment = typeof eventStaffAssignments.$inferSelect;
+export type InsertEventStaffAssignment = z.infer<typeof insertEventStaffAssignmentSchema>;
+export type UpdateEventStaffAssignment = z.infer<typeof updateEventStaffAssignmentSchema>;
+
+export type EventFloorplan = typeof eventFloorplans.$inferSelect;
+export type InsertEventFloorplan = z.infer<typeof insertEventFloorplanSchema>;
+export type UpdateEventFloorplan = z.infer<typeof updateEventFloorplanSchema>;
+
+export type EventTable = typeof eventTables.$inferSelect;
+export type InsertEventTable = z.infer<typeof insertEventTableSchema>;
+export type UpdateEventTable = z.infer<typeof updateEventTableSchema>;
+
+export type TableBooking = typeof tableBookings.$inferSelect;
+export type InsertTableBooking = z.infer<typeof insertTableBookingSchema>;
+export type UpdateTableBooking = z.infer<typeof updateTableBookingSchema>;
+
+export type GuestList = typeof guestLists.$inferSelect;
+export type InsertGuestList = z.infer<typeof insertGuestListSchema>;
+export type UpdateGuestList = z.infer<typeof updateGuestListSchema>;
+
+export type GuestListEntry = typeof guestListEntries.$inferSelect;
+export type InsertGuestListEntry = z.infer<typeof insertGuestListEntrySchema>;
+export type UpdateGuestListEntry = z.infer<typeof updateGuestListEntrySchema>;
+
+export type PrOtpAttempt = typeof prOtpAttempts.$inferSelect;
+export type InsertPrOtpAttempt = z.infer<typeof insertPrOtpAttemptSchema>;
