@@ -838,11 +838,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.put('/api/user-features/:userId', isAuthenticated, async (req: any, res) => {
     try {
-      if (!(await isSuperAdmin(req))) {
-        return res.status(403).json({ message: "Forbidden" });
+      const isSuperAdminUser = await isSuperAdmin(req);
+      const isGestoreUser = await isGestore(req);
+      const targetUserId = req.params.userId;
+      
+      // Super admin can update any user's features
+      if (isSuperAdminUser) {
+        const features = await storage.upsertUserFeatures(targetUserId, req.body);
+        return res.json(features);
       }
-      const features = await storage.upsertUserFeatures(req.params.userId, req.body);
-      res.json(features);
+      
+      // Gestore can only update warehouse users in their company (permissions only)
+      if (isGestoreUser) {
+        const requestingUserCompanyId = await getUserCompanyId(req);
+        const targetUser = await storage.getUser(targetUserId);
+        
+        if (!targetUser || targetUser.companyId !== requestingUserCompanyId) {
+          return res.status(403).json({ message: "Cannot modify users outside your company" });
+        }
+        
+        if (targetUser.role !== 'warehouse') {
+          return res.status(403).json({ message: "Gestori can only modify warehouse user permissions" });
+        }
+        
+        // Only allow updating warehouse-specific permissions (canCreateProducts)
+        const allowedUpdates = {
+          canCreateProducts: req.body.canCreateProducts,
+        };
+        
+        const features = await storage.upsertUserFeatures(targetUserId, allowedUpdates);
+        return res.json(features);
+      }
+      
+      return res.status(403).json({ message: "Forbidden" });
     } catch (error) {
       console.error("Error updating user features:", error);
       res.status(500).json({ message: "Failed to update user features" });
