@@ -6,7 +6,9 @@ import { storage } from "./storage";
 // import { setupAuth, isAuthenticated } from "./replitAuth";
 import { getSession } from "./replitAuth";
 import passport from "passport";
+import cookieParser from "cookie-parser";
 import siaeRoutes from "./siae-routes";
+import publicRoutes from "./public-routes";
 import {
   insertCompanySchema,
   insertLocationSchema,
@@ -53,6 +55,7 @@ import { eq, and } from "drizzle-orm";
 export async function registerRoutes(app: Express): Promise<Server> {
   // Setup passport for classic email/password authentication (no Replit OAuth)
   app.set("trust proxy", 1);
+  app.use(cookieParser());
   app.use(getSession());
   app.use(passport.initialize());
   app.use(passport.session());
@@ -63,6 +66,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Register SIAE module routes
   app.use(siaeRoutes);
+  
+  // Register public portal routes (ticket purchase)
+  app.use(publicRoutes);
 
   // Email transporter setup
   const emailTransporter = nodemailer.createTransport({

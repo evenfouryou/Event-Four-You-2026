@@ -2505,3 +2505,136 @@ export type InsertSiaeAuditLog = z.infer<typeof insertSiaeAuditLogSchema>;
 export type SiaeNumberedSeat = typeof siaeNumberedSeats.$inferSelect;
 export type InsertSiaeNumberedSeat = z.infer<typeof insertSiaeNumberedSeatSchema>;
 export type UpdateSiaeNumberedSeat = z.infer<typeof updateSiaeNumberedSeatSchema>;
+
+// ==================== PORTALE PUBBLICO ACQUISTO BIGLIETTI ====================
+
+// Carrello - memorizza gli articoli selezionati dal cliente
+export const publicCartItems = pgTable("public_cart_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  sessionId: varchar("session_id", { length: 100 }).notNull(), // Browser session ID (cookie)
+  customerId: varchar("customer_id").references(() => siaeCustomers.id), // Optional se già loggato
+  ticketedEventId: varchar("ticketed_event_id").notNull().references(() => siaeTicketedEvents.id),
+  sectorId: varchar("sector_id").notNull().references(() => siaeEventSectors.id),
+  seatId: varchar("seat_id").references(() => siaeSeats.id), // Per posti numerati
+  quantity: integer("quantity").notNull().default(1), // Per posti non numerati
+  ticketType: varchar("ticket_type", { length: 20 }).notNull().default('intero'), // intero, ridotto, omaggio
+  unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).notNull(),
+  participantFirstName: varchar("participant_first_name", { length: 100 }), // Nominatività
+  participantLastName: varchar("participant_last_name", { length: 100 }),
+  reservedUntil: timestamp("reserved_until"), // TTL per blocco posto
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const publicCartItemsRelations = relations(publicCartItems, ({ one }) => ({
+  customer: one(siaeCustomers, {
+    fields: [publicCartItems.customerId],
+    references: [siaeCustomers.id],
+  }),
+  ticketedEvent: one(siaeTicketedEvents, {
+    fields: [publicCartItems.ticketedEventId],
+    references: [siaeTicketedEvents.id],
+  }),
+  sector: one(siaeEventSectors, {
+    fields: [publicCartItems.sectorId],
+    references: [siaeEventSectors.id],
+  }),
+  seat: one(siaeSeats, {
+    fields: [publicCartItems.seatId],
+    references: [siaeSeats.id],
+  }),
+}));
+
+// Sessioni Checkout - per pagamenti Stripe
+export const publicCheckoutSessions = pgTable("public_checkout_sessions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  sessionId: varchar("session_id", { length: 100 }).notNull(),
+  customerId: varchar("customer_id").notNull().references(() => siaeCustomers.id),
+  stripePaymentIntentId: varchar("stripe_payment_intent_id", { length: 255 }),
+  stripeClientSecret: varchar("stripe_client_secret", { length: 500 }),
+  totalAmount: decimal("total_amount", { precision: 12, scale: 2 }).notNull(),
+  currency: varchar("currency", { length: 3 }).notNull().default('EUR'),
+  status: varchar("status", { length: 30 }).notNull().default('pending'), // pending, processing, completed, failed, expired
+  cartSnapshot: jsonb("cart_snapshot"), // Snapshot carrello al momento del checkout
+  transactionId: varchar("transaction_id").references(() => siaeTransactions.id), // Dopo completamento
+  customerIp: varchar("customer_ip", { length: 45 }),
+  customerUserAgent: text("customer_user_agent"),
+  expiresAt: timestamp("expires_at").notNull(),
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const publicCheckoutSessionsRelations = relations(publicCheckoutSessions, ({ one }) => ({
+  customer: one(siaeCustomers, {
+    fields: [publicCheckoutSessions.customerId],
+    references: [siaeCustomers.id],
+  }),
+  transaction: one(siaeTransactions, {
+    fields: [publicCheckoutSessions.transactionId],
+    references: [siaeTransactions.id],
+  }),
+}));
+
+// Sessioni Cliente Pubblico - per autenticazione cliente
+export const publicCustomerSessions = pgTable("public_customer_sessions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  customerId: varchar("customer_id").notNull().references(() => siaeCustomers.id),
+  sessionToken: varchar("session_token", { length: 255 }).notNull().unique(),
+  expiresAt: timestamp("expires_at").notNull(),
+  ipAddress: varchar("ip_address", { length: 45 }),
+  userAgent: text("user_agent"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const publicCustomerSessionsRelations = relations(publicCustomerSessions, ({ one }) => ({
+  customer: one(siaeCustomers, {
+    fields: [publicCustomerSessions.customerId],
+    references: [siaeCustomers.id],
+  }),
+}));
+
+// Schemas per validazione
+export const insertPublicCartItemSchema = createInsertSchema(publicCartItems).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  unitPrice: z.union([z.string(), z.coerce.number()]).transform(val => typeof val === 'number' ? val.toString() : val),
+  reservedUntil: z.union([z.string(), z.date(), z.null(), z.undefined()]).transform(val => 
+    val ? (typeof val === 'string' ? new Date(val) : val) : null
+  ).optional(),
+});
+
+export const insertPublicCheckoutSessionSchema = createInsertSchema(publicCheckoutSessions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  totalAmount: z.union([z.string(), z.coerce.number()]).transform(val => typeof val === 'number' ? val.toString() : val),
+  expiresAt: z.union([z.string(), z.date()]).transform(val => 
+    typeof val === 'string' ? new Date(val) : val
+  ),
+  completedAt: z.union([z.string(), z.date(), z.null(), z.undefined()]).transform(val => 
+    val ? (typeof val === 'string' ? new Date(val) : val) : null
+  ).optional(),
+});
+
+export const insertPublicCustomerSessionSchema = createInsertSchema(publicCustomerSessions).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  expiresAt: z.union([z.string(), z.date()]).transform(val => 
+    typeof val === 'string' ? new Date(val) : val
+  ),
+});
+
+// Types
+export type PublicCartItem = typeof publicCartItems.$inferSelect;
+export type InsertPublicCartItem = z.infer<typeof insertPublicCartItemSchema>;
+
+export type PublicCheckoutSession = typeof publicCheckoutSessions.$inferSelect;
+export type InsertPublicCheckoutSession = z.infer<typeof insertPublicCheckoutSessionSchema>;
+
+export type PublicCustomerSession = typeof publicCustomerSessions.$inferSelect;
+export type InsertPublicCustomerSession = z.infer<typeof insertPublicCustomerSessionSchema>;
