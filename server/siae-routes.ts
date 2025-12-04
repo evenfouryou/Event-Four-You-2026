@@ -993,4 +993,306 @@ router.post("/api/siae/seed-public", async (req: Request, res: Response) => {
   }
 });
 
+// ==================== XML Report Generation (SIAE Transmission) ====================
+
+// Helper to escape XML special characters
+function escapeXml(str: string | null | undefined): string {
+  if (!str) return '';
+  return str.replace(/[<>&'"]/g, (c) => {
+    switch (c) {
+      case '<': return '&lt;';
+      case '>': return '&gt;';
+      case '&': return '&amp;';
+      case "'": return '&apos;';
+      case '"': return '&quot;';
+      default: return c;
+    }
+  });
+}
+
+// Format date for SIAE XML (YYYY-MM-DD)
+function formatSiaeDate(date: Date | null | undefined): string {
+  if (!date) return '';
+  return date.toISOString().split('T')[0];
+}
+
+// Format datetime for SIAE XML (YYYY-MM-DDTHH:MM:SS)
+function formatSiaeDateTime(date: Date | null | undefined): string {
+  if (!date) return '';
+  return date.toISOString().replace('.000Z', '');
+}
+
+// Generate XML for daily ticket report (Provvedimento 356768/2025)
+router.get("/api/siae/companies/:companyId/reports/xml/daily", requireAuth, requireGestore, async (req: Request, res: Response) => {
+  try {
+    const { companyId } = req.params;
+    const { date, eventId } = req.query;
+    
+    if (!date) {
+      return res.status(400).json({ message: "Data obbligatoria (formato: YYYY-MM-DD)" });
+    }
+    
+    const reportDate = new Date(date as string);
+    
+    // Get activation card for company
+    const activationCards = await siaeStorage.getSiaeActivationCardsByCompany(companyId);
+    const activeCard = activationCards.find(c => c.status === 'active');
+    
+    if (!activeCard) {
+      return res.status(400).json({ message: "Nessuna carta di attivazione attiva trovata" });
+    }
+    
+    // Get all tickets for the date range
+    const startOfDay = new Date(reportDate);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(reportDate);
+    endOfDay.setHours(23, 59, 59, 999);
+    
+    // Build XML report
+    let xml = `<?xml version="1.0" encoding="UTF-8"?>
+<ComunicazioneDatiTitoli xmlns="urn:siae:biglietteria:2025">
+  <Intestazione>
+    <CodiceFiscaleEmittente>${escapeXml(activeCard.fiscalCode)}</CodiceFiscaleEmittente>
+    <NumeroCarta>${escapeXml(activeCard.cardNumber)}</NumeroCarta>
+    <DataRiferimento>${formatSiaeDate(reportDate)}</DataRiferimento>
+    <DataOraGenerazione>${formatSiaeDateTime(new Date())}</DataOraGenerazione>
+    <TipoTrasmissione>ORDINARIA</TipoTrasmissione>
+  </Intestazione>
+  <ElencoTitoli>`;
+    
+    // Get tickets issued on this date
+    const allTickets = await siaeStorage.getSiaeTicketsByCompany(companyId);
+    const dayTickets = allTickets.filter(t => {
+      const ticketDate = new Date(t.emissionDate);
+      return ticketDate >= startOfDay && ticketDate <= endOfDay;
+    });
+    
+    for (const ticket of dayTickets) {
+      // Get related data - first try via sector, then fallback to ticketedEventId
+      let ticketedEvent = null;
+      if (ticket.sectorId) {
+        const sector = await siaeStorage.getSiaeEventSector(ticket.sectorId);
+        if (sector?.ticketedEventId) {
+          ticketedEvent = await siaeStorage.getSiaeTicketedEvent(sector.ticketedEventId);
+        }
+      }
+      // Fallback to direct ticketedEventId if sector lookup failed
+      if (!ticketedEvent && ticket.ticketedEventId) {
+        ticketedEvent = await siaeStorage.getSiaeTicketedEvent(ticket.ticketedEventId);
+      }
+      
+      xml += `
+    <Titolo>
+      <NumeroProgressivo>${ticket.progressiveNumber || 0}</NumeroProgressivo>
+      <SigilloFiscale>${escapeXml(ticket.fiscalSealCode)}</SigilloFiscale>
+      <TipologiaTitolo>${escapeXml(ticket.ticketTypeCode)}</TipologiaTitolo>
+      <DataOraEmissione>${formatSiaeDateTime(ticket.emissionDate)}</DataOraEmissione>
+      <CodiceCanale>${escapeXml(ticket.emissionChannelCode)}</CodiceCanale>
+      <ImportoLordo>${(ticket.grossPrice / 100).toFixed(2)}</ImportoLordo>
+      <ImportoNetto>${(ticket.netPrice / 100).toFixed(2)}</ImportoNetto>
+      <Diritti>${(ticket.siaeFee / 100).toFixed(2)}</Diritti>
+      <IVA>${(ticket.vatAmount / 100).toFixed(2)}</IVA>
+      <CodiceGenere>${escapeXml(ticketedEvent?.eventGenreCode || '')}</CodiceGenere>
+      <CodicePrestazione>${escapeXml(ticket.serviceCode)}</CodicePrestazione>
+      <DataEvento>${formatSiaeDate(ticketedEvent?.eventDate || null)}</DataEvento>
+      <NominativoAcquirente>
+        <Nome>${escapeXml(ticket.holderFirstName)}</Nome>
+        <Cognome>${escapeXml(ticket.holderLastName)}</Cognome>
+        <CodiceFiscale>${escapeXml(ticket.holderFiscalCode)}</CodiceFiscale>
+      </NominativoAcquirente>
+      <Stato>${escapeXml(ticket.status)}</Stato>
+    </Titolo>`;
+    }
+    
+    xml += `
+  </ElencoTitoli>
+  <Riepilogo>
+    <TotaleTitoli>${dayTickets.length}</TotaleTitoli>
+    <TotaleImportoLordo>${(dayTickets.reduce((sum, t) => sum + t.grossPrice, 0) / 100).toFixed(2)}</TotaleImportoLordo>
+    <TotaleDiritti>${(dayTickets.reduce((sum, t) => sum + t.siaeFee, 0) / 100).toFixed(2)}</TotaleDiritti>
+    <TotaleIVA>${(dayTickets.reduce((sum, t) => sum + t.vatAmount, 0) / 100).toFixed(2)}</TotaleIVA>
+  </Riepilogo>
+</ComunicazioneDatiTitoli>`;
+    
+    // Create transmission record
+    const transmission = await siaeStorage.createSiaeTransmission({
+      companyId,
+      activationCardId: activeCard.id,
+      transmissionType: 'daily_report',
+      reportDate: reportDate,
+      xmlContent: xml,
+      status: 'pending',
+      totalTickets: dayTickets.length,
+      totalAmount: dayTickets.reduce((sum, t) => sum + t.grossPrice, 0),
+      totalSiaeFee: dayTickets.reduce((sum, t) => sum + t.siaeFee, 0),
+    });
+    
+    res.set('Content-Type', 'application/xml');
+    res.set('Content-Disposition', `attachment; filename="SIAE_${formatSiaeDate(reportDate)}_${transmission.id}.xml"`);
+    res.send(xml);
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Generate XML for event report (all tickets for a specific event)
+router.get("/api/siae/ticketed-events/:eventId/reports/xml", requireAuth, requireOrganizer, async (req: Request, res: Response) => {
+  try {
+    const { eventId } = req.params;
+    
+    // Get ticketed event details
+    const ticketedEvent = await siaeStorage.getSiaeTicketedEvent(eventId);
+    if (!ticketedEvent) {
+      return res.status(404).json({ message: "Evento con biglietteria non trovato" });
+    }
+    
+    // Get activation card
+    const activationCards = await siaeStorage.getSiaeActivationCardsByCompany(ticketedEvent.companyId);
+    const activeCard = activationCards.find(c => c.status === 'active');
+    
+    if (!activeCard) {
+      return res.status(400).json({ message: "Nessuna carta di attivazione attiva trovata" });
+    }
+    
+    // Get all sectors for this event
+    const sectors = await siaeStorage.getSiaeEventSectors(eventId);
+    
+    // Get all tickets for all sectors
+    const allTickets: any[] = [];
+    for (const sector of sectors) {
+      const sectorTickets = await siaeStorage.getSiaeTicketsBySector(sector.id);
+      allTickets.push(...sectorTickets);
+    }
+    
+    // Build XML
+    let xml = `<?xml version="1.0" encoding="UTF-8"?>
+<ReportEvento xmlns="urn:siae:biglietteria:2025">
+  <Intestazione>
+    <CodiceFiscaleEmittente>${escapeXml(activeCard.fiscalCode)}</CodiceFiscaleEmittente>
+    <NumeroCarta>${escapeXml(activeCard.cardNumber)}</NumeroCarta>
+    <DataOraGenerazione>${formatSiaeDateTime(new Date())}</DataOraGenerazione>
+  </Intestazione>
+  <DatiEvento>
+    <CodiceEvento>${escapeXml(ticketedEvent.id)}</CodiceEvento>
+    <Denominazione>${escapeXml(ticketedEvent.eventName)}</Denominazione>
+    <CodiceGenere>${escapeXml(ticketedEvent.eventGenreCode)}</CodiceGenere>
+    <DataEvento>${formatSiaeDate(ticketedEvent.eventDate)}</DataEvento>
+    <OraInizio>${escapeXml(ticketedEvent.startTime || '')}</OraInizio>
+    <Luogo>${escapeXml(ticketedEvent.venueName)}</Luogo>
+    <Indirizzo>${escapeXml(ticketedEvent.venueAddress)}</Indirizzo>
+    <Comune>${escapeXml(ticketedEvent.venueCity)}</Comune>
+    <Provincia>${escapeXml(ticketedEvent.venueProvince)}</Provincia>
+  </DatiEvento>
+  <ElencoSettori>`;
+    
+    for (const sector of sectors) {
+      const sectorTickets = allTickets.filter(t => t.sectorId === sector.id);
+      const soldTickets = sectorTickets.filter(t => t.status !== 'cancelled');
+      
+      xml += `
+    <Settore>
+      <CodiceSettore>${escapeXml(sector.sectorCode)}</CodiceSettore>
+      <Denominazione>${escapeXml(sector.name)}</Denominazione>
+      <CapienzaTotale>${sector.totalCapacity}</CapienzaTotale>
+      <PostiNumerati>${sector.isNumbered ? 'SI' : 'NO'}</PostiNumerati>
+      <BigliettiEmessi>${sectorTickets.length}</BigliettiEmessi>
+      <BigliettiValidi>${soldTickets.length}</BigliettiValidi>
+      <ImportoTotale>${(soldTickets.reduce((sum, t) => sum + t.grossPrice, 0) / 100).toFixed(2)}</ImportoTotale>
+    </Settore>`;
+    }
+    
+    xml += `
+  </ElencoSettori>
+  <Riepilogo>
+    <TotaleBigliettiEmessi>${allTickets.length}</TotaleBigliettiEmessi>
+    <TotaleBigliettiValidi>${allTickets.filter(t => t.status !== 'cancelled').length}</TotaleBigliettiValidi>
+    <TotaleBigliettiAnnullati>${allTickets.filter(t => t.status === 'cancelled').length}</TotaleBigliettiAnnullati>
+    <TotaleIncassoLordo>${(allTickets.reduce((sum, t) => sum + t.grossPrice, 0) / 100).toFixed(2)}</TotaleIncassoLordo>
+    <TotaleDiritti>${(allTickets.reduce((sum, t) => sum + t.siaeFee, 0) / 100).toFixed(2)}</TotaleDiritti>
+    <TotaleIVA>${(allTickets.reduce((sum, t) => sum + t.vatAmount, 0) / 100).toFixed(2)}</TotaleIVA>
+  </Riepilogo>
+</ReportEvento>`;
+    
+    res.set('Content-Type', 'application/xml');
+    res.set('Content-Disposition', `attachment; filename="SIAE_Event_${eventId}.xml"`);
+    res.send(xml);
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Generate XML for cancellations report
+router.get("/api/siae/companies/:companyId/reports/xml/cancellations", requireAuth, requireGestore, async (req: Request, res: Response) => {
+  try {
+    const { companyId } = req.params;
+    const { dateFrom, dateTo } = req.query;
+    
+    if (!dateFrom || !dateTo) {
+      return res.status(400).json({ message: "Date di inizio e fine obbligatorie (formato: YYYY-MM-DD)" });
+    }
+    
+    const startDate = new Date(dateFrom as string);
+    const endDate = new Date(dateTo as string);
+    endDate.setHours(23, 59, 59, 999);
+    
+    // Get activation card
+    const activationCards = await siaeStorage.getSiaeActivationCardsByCompany(companyId);
+    const activeCard = activationCards.find(c => c.status === 'active');
+    
+    if (!activeCard) {
+      return res.status(400).json({ message: "Nessuna carta di attivazione attiva trovata" });
+    }
+    
+    // Get cancelled tickets in date range
+    const allTickets = await siaeStorage.getSiaeTicketsByCompany(companyId);
+    const cancelledTickets = allTickets.filter(t => {
+      if (t.status !== 'cancelled' || !t.cancellationDate) return false;
+      const cancelDate = new Date(t.cancellationDate);
+      return cancelDate >= startDate && cancelDate <= endDate;
+    });
+    
+    // Get cancellation reasons
+    const reasons = await siaeStorage.getSiaeCancellationReasons();
+    
+    let xml = `<?xml version="1.0" encoding="UTF-8"?>
+<ReportAnnullamenti xmlns="urn:siae:biglietteria:2025">
+  <Intestazione>
+    <CodiceFiscaleEmittente>${escapeXml(activeCard.fiscalCode)}</CodiceFiscaleEmittente>
+    <NumeroCarta>${escapeXml(activeCard.cardNumber)}</NumeroCarta>
+    <PeriodoDa>${formatSiaeDate(startDate)}</PeriodoDa>
+    <PeriodoA>${formatSiaeDate(endDate)}</PeriodoA>
+    <DataOraGenerazione>${formatSiaeDateTime(new Date())}</DataOraGenerazione>
+  </Intestazione>
+  <ElencoAnnullamenti>`;
+    
+    for (const ticket of cancelledTickets) {
+      const reason = reasons.find(r => r.code === ticket.cancellationReasonCode);
+      
+      xml += `
+    <Annullamento>
+      <SigilloFiscale>${escapeXml(ticket.fiscalSeal)}</SigilloFiscale>
+      <DataOraEmissione>${formatSiaeDateTime(ticket.emissionDate)}</DataOraEmissione>
+      <DataOraAnnullamento>${formatSiaeDateTime(ticket.cancellationDate)}</DataOraAnnullamento>
+      <CodiceCausale>${escapeXml(ticket.cancellationReasonCode || '')}</CodiceCausale>
+      <DescrizioneCausale>${escapeXml(reason?.name || '')}</DescrizioneCausale>
+      <ImportoRimborsato>${(ticket.refundAmount ? ticket.refundAmount / 100 : 0).toFixed(2)}</ImportoRimborsato>
+    </Annullamento>`;
+    }
+    
+    xml += `
+  </ElencoAnnullamenti>
+  <Riepilogo>
+    <TotaleAnnullamenti>${cancelledTickets.length}</TotaleAnnullamenti>
+    <TotaleRimborsato>${(cancelledTickets.reduce((sum, t) => sum + (t.refundAmount || 0), 0) / 100).toFixed(2)}</TotaleRimborsato>
+  </Riepilogo>
+</ReportAnnullamenti>`;
+    
+    res.set('Content-Type', 'application/xml');
+    res.set('Content-Disposition', `attachment; filename="SIAE_Cancellations_${formatSiaeDate(startDate)}_${formatSiaeDate(endDate)}.xml"`);
+    res.send(xml);
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
 export default router;

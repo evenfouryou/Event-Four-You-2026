@@ -170,6 +170,8 @@ export interface ISiaeStorage {
   
   // ==================== Tickets ====================
   
+  getSiaeTicketsByCompany(companyId: string): Promise<SiaeTicket[]>;
+  getSiaeTicketsBySector(sectorId: string): Promise<SiaeTicket[]>;
   getSiaeTicketsByEvent(ticketedEventId: string): Promise<SiaeTicket[]>;
   getSiaeTicketsByCustomer(customerId: string): Promise<SiaeTicket[]>;
   getSiaeTicketsByTransaction(transactionId: string): Promise<SiaeTicket[]>;
@@ -640,6 +642,61 @@ export class SiaeStorage implements ISiaeStorage {
   }
   
   // ==================== Tickets ====================
+  
+  async getSiaeTicketsByCompany(companyId: string): Promise<SiaeTicket[]> {
+    // Join through ticketed events to get tickets for a company
+    return await db.select({
+      id: siaeTickets.id,
+      ticketedEventId: siaeTickets.ticketedEventId,
+      sectorId: siaeTickets.sectorId,
+      seatId: siaeTickets.seatId,
+      customerId: siaeTickets.customerId,
+      transactionId: siaeTickets.transactionId,
+      fiscalSealId: siaeTickets.fiscalSealId,
+      fiscalSealCode: siaeTickets.fiscalSealCode,
+      fiscalSeal: siaeTickets.fiscalSeal,
+      ticketTypeCode: siaeTickets.ticketTypeCode,
+      serviceCode: siaeTickets.serviceCode,
+      emissionChannelCode: siaeTickets.emissionChannelCode,
+      progressiveNumber: siaeTickets.progressiveNumber,
+      holderFirstName: siaeTickets.holderFirstName,
+      holderLastName: siaeTickets.holderLastName,
+      holderFiscalCode: siaeTickets.holderFiscalCode,
+      holderDocumentType: siaeTickets.holderDocumentType,
+      holderDocumentNumber: siaeTickets.holderDocumentNumber,
+      grossPrice: siaeTickets.grossPrice,
+      netPrice: siaeTickets.netPrice,
+      vatRate: siaeTickets.vatRate,
+      vatAmount: siaeTickets.vatAmount,
+      siaeFee: siaeTickets.siaeFee,
+      emissionDate: siaeTickets.emissionDate,
+      eventDate: siaeTickets.eventDate,
+      qrCode: siaeTickets.qrCode,
+      barcode: siaeTickets.barcode,
+      status: siaeTickets.status,
+      usedAt: siaeTickets.usedAt,
+      usedByScannerId: siaeTickets.usedByScannerId,
+      cancellationReasonCode: siaeTickets.cancellationReasonCode,
+      cancellationDate: siaeTickets.cancellationDate,
+      cancelledByUserId: siaeTickets.cancelledByUserId,
+      refundAmount: siaeTickets.refundAmount,
+      pdfUrl: siaeTickets.pdfUrl,
+      sentToCustomer: siaeTickets.sentToCustomer,
+      sentAt: siaeTickets.sentAt,
+      createdAt: siaeTickets.createdAt,
+      updatedAt: siaeTickets.updatedAt,
+    })
+      .from(siaeTickets)
+      .innerJoin(siaeTicketedEvents, eq(siaeTickets.ticketedEventId, siaeTicketedEvents.id))
+      .where(eq(siaeTicketedEvents.companyId, companyId))
+      .orderBy(desc(siaeTickets.emissionDate));
+  }
+  
+  async getSiaeTicketsBySector(sectorId: string): Promise<SiaeTicket[]> {
+    return await db.select().from(siaeTickets)
+      .where(eq(siaeTickets.sectorId, sectorId))
+      .orderBy(desc(siaeTickets.emissionDate));
+  }
   
   async getSiaeTicketsByEvent(ticketedEventId: string): Promise<SiaeTicket[]> {
     return await db.select().from(siaeTickets)
