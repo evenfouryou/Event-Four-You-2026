@@ -27,7 +27,7 @@ jobs:
           node-version: '20'
           
       - name: Install production dependencies
-        run: npm ci --production
+        run: npm install --omit=dev
         
       - name: Create release package
         run: |
