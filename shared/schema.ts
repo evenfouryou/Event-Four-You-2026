@@ -118,8 +118,14 @@ export const locations = pgTable("locations", {
   companyId: varchar("company_id").notNull().references(() => companies.id),
   name: varchar("name", { length: 255 }).notNull(),
   address: text("address"),
+  city: varchar("city", { length: 100 }),
   capacity: integer("capacity"),
   notes: text("notes"),
+  // Campi per vetrina pubblica
+  heroImageUrl: text("hero_image_url"),
+  shortDescription: text("short_description"),
+  openingHours: text("opening_hours"),
+  isPublic: boolean("is_public").notNull().default(false), // Mostra nella vetrina pubblica
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

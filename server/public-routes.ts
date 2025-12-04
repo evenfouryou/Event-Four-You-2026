@@ -1004,4 +1004,178 @@ router.get("/api/public/tickets", async (req, res) => {
   }
 });
 
+// ==================== VETRINA LOCALI ====================
+
+// Lista locali pubblici con prossimi eventi
+router.get("/api/public/venues", async (req, res) => {
+  try {
+    const { city, limit = 20, offset = 0 } = req.query;
+    const now = new Date();
+
+    // Query base per locali pubblici
+    let query = db
+      .select({
+        id: locations.id,
+        name: locations.name,
+        address: locations.address,
+        city: locations.city,
+        capacity: locations.capacity,
+        heroImageUrl: locations.heroImageUrl,
+        shortDescription: locations.shortDescription,
+        openingHours: locations.openingHours,
+      })
+      .from(locations)
+      .where(eq(locations.isPublic, true))
+      .limit(Number(limit))
+      .offset(Number(offset));
+
+    const venuesList = await query;
+
+    // Per ogni locale, ottieni i prossimi eventi
+    const venuesWithEvents = await Promise.all(
+      venuesList.map(async (venue) => {
+        const upcomingEvents = await db
+          .select({
+            id: siaeTicketedEvents.id,
+            eventId: siaeTicketedEvents.eventId,
+            eventName: events.name,
+            eventStart: events.startDatetime,
+            ticketingStatus: siaeTicketedEvents.ticketingStatus,
+            totalCapacity: siaeTicketedEvents.totalCapacity,
+            ticketsSold: siaeTicketedEvents.ticketsSold,
+          })
+          .from(siaeTicketedEvents)
+          .innerJoin(events, eq(siaeTicketedEvents.eventId, events.id))
+          .where(
+            and(
+              eq(events.locationId, venue.id),
+              eq(siaeTicketedEvents.ticketingStatus, "active"),
+              gt(events.startDatetime, now)
+            )
+          )
+          .orderBy(events.startDatetime)
+          .limit(3);
+
+        // Per ogni evento, ottieni il prezzo minimo dai settori
+        const eventsWithPrices = await Promise.all(
+          upcomingEvents.map(async (event) => {
+            const sectors = await db
+              .select({
+                price: siaeEventSectors.basePrice,
+              })
+              .from(siaeEventSectors)
+              .where(eq(siaeEventSectors.ticketedEventId, event.id));
+
+            const minPrice = sectors.length > 0
+              ? Math.min(...sectors.map(s => parseFloat(s.price || "0")))
+              : null;
+
+            return {
+              ...event,
+              minPrice,
+              availability: event.totalCapacity - event.ticketsSold,
+            };
+          })
+        );
+
+        return {
+          ...venue,
+          upcomingEvents: eventsWithPrices,
+          eventCount: eventsWithPrices.length,
+        };
+      })
+    );
+
+    res.json(venuesWithEvents);
+  } catch (error: any) {
+    console.error("[PUBLIC] Get venues error:", error);
+    res.status(500).json({ message: "Errore nel caricamento locali" });
+  }
+});
+
+// Dettaglio singolo locale
+router.get("/api/public/venues/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const now = new Date();
+
+    const [venue] = await db
+      .select({
+        id: locations.id,
+        name: locations.name,
+        address: locations.address,
+        city: locations.city,
+        capacity: locations.capacity,
+        heroImageUrl: locations.heroImageUrl,
+        shortDescription: locations.shortDescription,
+        openingHours: locations.openingHours,
+      })
+      .from(locations)
+      .where(and(eq(locations.id, id), eq(locations.isPublic, true)));
+
+    if (!venue) {
+      return res.status(404).json({ message: "Locale non trovato" });
+    }
+
+    // Ottieni tutti gli eventi futuri per questo locale
+    const upcomingEvents = await db
+      .select({
+        id: siaeTicketedEvents.id,
+        eventId: siaeTicketedEvents.eventId,
+        eventName: events.name,
+        eventStart: events.startDatetime,
+        eventEnd: events.endDatetime,
+        ticketingStatus: siaeTicketedEvents.ticketingStatus,
+        totalCapacity: siaeTicketedEvents.totalCapacity,
+        ticketsSold: siaeTicketedEvents.ticketsSold,
+        requiresNominative: siaeTicketedEvents.requiresNominative,
+      })
+      .from(siaeTicketedEvents)
+      .innerJoin(events, eq(siaeTicketedEvents.eventId, events.id))
+      .where(
+        and(
+          eq(events.locationId, venue.id),
+          eq(siaeTicketedEvents.ticketingStatus, "active"),
+          gt(events.startDatetime, now)
+        )
+      )
+      .orderBy(events.startDatetime);
+
+    // Per ogni evento, ottieni prezzi e settori
+    const eventsWithDetails = await Promise.all(
+      upcomingEvents.map(async (event) => {
+        const sectors = await db
+          .select({
+            id: siaeEventSectors.id,
+            name: siaeEventSectors.name,
+            price: siaeEventSectors.basePrice,
+            capacity: siaeEventSectors.capacity,
+            soldCount: siaeEventSectors.soldCount,
+          })
+          .from(siaeEventSectors)
+          .where(eq(siaeEventSectors.ticketedEventId, event.id));
+
+        const minPrice = sectors.length > 0
+          ? Math.min(...sectors.map(s => parseFloat(s.price || "0")))
+          : null;
+
+        return {
+          ...event,
+          minPrice,
+          availability: event.totalCapacity - event.ticketsSold,
+          sectors,
+        };
+      })
+    );
+
+    res.json({
+      ...venue,
+      upcomingEvents: eventsWithDetails,
+    });
+  } catch (error: any) {
+    console.error("[PUBLIC] Get venue detail error:", error);
+    res.status(500).json({ message: "Errore nel caricamento dettaglio locale" });
+  }
+});
+
 export default router;
