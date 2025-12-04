@@ -9,6 +9,7 @@ import passport from "passport";
 import cookieParser from "cookie-parser";
 import siaeRoutes from "./siae-routes";
 import publicRoutes from "./public-routes";
+import prRoutes from "./pr-routes";
 import {
   insertCompanySchema,
   insertLocationSchema,
@@ -66,6 +67,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Register SIAE module routes
   app.use(siaeRoutes);
+  
+  // Register PR module routes (liste, tavoli, QR)
+  app.use(prRoutes);
   
   // Register public portal routes (ticket purchase)
   app.use(publicRoutes);
