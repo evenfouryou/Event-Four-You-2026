@@ -122,8 +122,8 @@ function Router() {
         <div className="flex flex-col flex-1">
           <header className="flex items-center justify-between p-4 border-b gap-2">
             <SidebarTrigger data-testid="button-sidebar-toggle" />
-            <div className="flex items-center gap-2">
-              <SmartCardStatus compact data-testid="smart-card-status" />
+            <div className="flex items-center gap-3">
+              <SmartCardStatus data-testid="smart-card-status" />
               <ThemeToggle />
             </div>
           </header>
