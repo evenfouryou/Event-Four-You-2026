@@ -70,6 +70,7 @@ import PrTables from "@/pages/pr-tables";
 import PrScanner from "@/pages/pr-scanner";
 import PrStaff from "@/pages/pr-staff";
 import PrMyEvents from "@/pages/pr-my-events";
+import DownloadSmartCardApp from "@/pages/download-smart-card-app";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -108,6 +109,7 @@ function Router() {
         <Route path="/login-acquisto" component={PublicLogin} />
         <Route path="/locali/:id" component={PublicVenueDetail} />
         <Route path="/locali" component={PublicVenues} />
+        <Route path="/download-smart-card" component={DownloadSmartCardApp} />
         <Route component={NotFound} />
       </Switch>
     );
