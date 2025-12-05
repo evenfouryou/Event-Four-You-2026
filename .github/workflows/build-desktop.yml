@@ -1,24 +1,19 @@
-name: Build Event Four You SIAE Lettore
+name: Build SIAE Lettore
 
 on:
   push:
+    branches: [main]
     paths:
       - 'desktop-app/**'
       - '.github/workflows/build-desktop.yml'
-      - 'attached_assets/libSIAE*.dll'
-    branches:
-      - main
-    tags:
-      - 'v*'
   workflow_dispatch:
 
 jobs:
   build:
-    name: Build Desktop App
     runs-on: windows-latest
     
     steps:
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v4
 
       - name: Setup .NET
@@ -31,98 +26,104 @@ jobs:
         with:
           node-version: '20'
 
+      # Step 1: Build the .NET bridge (32-bit)
       - name: Build SiaeBridge
         working-directory: desktop-app/SiaeBridge
         run: |
+          echo "=== Building SiaeBridge (x86) ==="
           dotnet restore
           dotnet build -c Release
+          echo ""
           echo "=== Build output ==="
           dir bin\Release\net472\
 
-      - name: Prepare SiaeBridge for packaging
+      # Step 2: Copy libSIAE.dll to bridge output folder
+      - name: Copy libSIAE.dll
         shell: pwsh
         run: |
-          $bridgeOutput = "desktop-app/SiaeBridge/bin/Release/net472"
-          $bridgeDest = "desktop-app/SiaeBridge"
+          $bridgeDir = "desktop-app/SiaeBridge/bin/Release/net472"
           
-          # Copy all built files to SiaeBridge root for packaging
-          Write-Host "=== Copying build output to SiaeBridge folder ==="
-          Get-ChildItem "$bridgeOutput" -File | ForEach-Object {
-            Copy-Item $_.FullName -Destination "$bridgeDest" -Force
-            Write-Host "Copied: $($_.Name)"
+          echo "=== Looking for libSIAE.dll ==="
+          
+          # Search in attached_assets
+          $dll = Get-ChildItem "attached_assets" -Filter "libSIAE*.dll" -ErrorAction SilentlyContinue | Select-Object -First 1
+          
+          if ($dll) {
+            Copy-Item $dll.FullName -Destination "$bridgeDir/libSIAE.dll" -Force
+            echo "✓ Copied $($dll.Name) to $bridgeDir"
+          } else {
+            echo "✗ libSIAE.dll not found in attached_assets!"
+            echo "Looking for any DLL..."
+            Get-ChildItem "attached_assets" -Recurse -Filter "*.dll" | ForEach-Object { echo "  Found: $($_.FullName)" }
           }
           
-          # Find and copy libSIAE.dll
-          Write-Host ""
-          Write-Host "=== Looking for libSIAE.dll ==="
-          $dllSources = @(
-            "attached_assets/libSIAE.dll",
-            "attached_assets/libSIAE_1764895795880.dll",
-            "desktop-app/SiaeBridge/libSIAE.dll"
-          )
-          
-          $found = $false
-          foreach ($src in $dllSources) {
-            if (Test-Path $src) {
-              Copy-Item $src -Destination "$bridgeDest/libSIAE.dll" -Force
-              Write-Host "Found and copied libSIAE.dll from: $src"
-              $found = $true
-              break
-            }
-          }
-          
-          # Also search with wildcard
-          if (-not $found) {
-            $wildcardDll = Get-ChildItem "attached_assets" -Filter "libSIAE*.dll" -ErrorAction SilentlyContinue | Select-Object -First 1
-            if ($wildcardDll) {
-              Copy-Item $wildcardDll.FullName -Destination "$bridgeDest/libSIAE.dll" -Force
-              Write-Host "Found and copied: $($wildcardDll.Name)"
-              $found = $true
-            }
-          }
-          
-          if (-not $found) {
-            Write-Host "WARNING: libSIAE.dll not found!"
-          }
-          
-          Write-Host ""
-          Write-Host "=== Final SiaeBridge contents ==="
-          Get-ChildItem "$bridgeDest" -File | Format-Table Name, Length
+          echo ""
+          echo "=== Final bridge folder contents ==="
+          Get-ChildItem $bridgeDir | Format-Table Name, Length
 
-      - name: Install Node dependencies
+      # Step 3: Verify bridge is complete
+      - name: Verify bridge files
+        shell: pwsh
+        run: |
+          $bridgeDir = "desktop-app/SiaeBridge/bin/Release/net472"
+          $requiredFiles = @("SiaeBridge.exe", "libSIAE.dll", "Newtonsoft.Json.dll")
+          
+          echo "=== Checking required files ==="
+          $allFound = $true
+          foreach ($file in $requiredFiles) {
+            $path = Join-Path $bridgeDir $file
+            if (Test-Path $path) {
+              $size = (Get-Item $path).Length
+              echo "✓ $file ($size bytes)"
+            } else {
+              echo "✗ MISSING: $file"
+              $allFound = $false
+            }
+          }
+          
+          if (-not $allFound) {
+            echo ""
+            echo "WARNING: Some required files are missing!"
+          }
+
+      # Step 4: Install Node dependencies
+      - name: Install dependencies
         working-directory: desktop-app
         run: npm install
 
+      # Step 5: Build Electron app
       - name: Build Electron app
         working-directory: desktop-app
-        run: npm run build -- --publish never
+        run: npm run build
 
+      # Step 6: List build output
       - name: List build output
         shell: pwsh
         run: |
-          Write-Host "=== Dist folder contents ==="
-          Get-ChildItem "desktop-app/dist" -Recurse | Where-Object { -not $_.PSIsContainer } | Format-Table FullName, Length
+          echo "=== Dist folder ==="
+          Get-ChildItem "desktop-app/dist" -Recurse | Where-Object { -not $_.PSIsContainer } | Select-Object FullName, Length | Format-Table
+          
+          echo ""
+          echo "=== Resources/SiaeBridge folder (if exists) ==="
+          $resPath = "desktop-app/dist/win-unpacked/resources/SiaeBridge"
+          if (Test-Path $resPath) {
+            Get-ChildItem $resPath | Format-Table Name, Length
+          } else {
+            echo "Not found at $resPath"
+          }
 
+      # Step 7: Upload installer
       - name: Upload installer
         uses: actions/upload-artifact@v4
         with:
-          name: Event-Four-You-SIAE-Lettore-Installer
+          name: SIAE-Lettore-Installer
           path: desktop-app/dist/*.exe
           if-no-files-found: warn
 
-      - name: Upload unpacked app
+      # Step 8: Upload portable version
+      - name: Upload portable
         uses: actions/upload-artifact@v4
         with:
-          name: Event-Four-You-SIAE-Lettore-Unpacked
+          name: SIAE-Lettore-Portable
           path: desktop-app/dist/win-unpacked/
           if-no-files-found: warn
-
-      - name: Create Release
-        if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v1
-        with:
-          files: desktop-app/dist/*.exe
-          draft: false
-          prerelease: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

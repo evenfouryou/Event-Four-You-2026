@@ -1,0 +1,236 @@
+Perfetto, ho aperto il progetto che hai caricato e ti dico cosa ho trovato **nel codice** e cosa molto probabilmente sta succedendo.
+
+---
+
+## 🎯 Problema n.1 – Il *Bridge* in realtà NON parte proprio
+
+Nel tuo progetto, nella cartella:
+
+`desktop-app/SiaeBridge/`
+
+ci sono solo questi file:
+
+* `Program.cs`
+* `LibSiae.cs`
+* `SiaeBridge.csproj`
+
+👉 **NON ci sono:**
+
+* `SiaeBridge.exe`
+* `libSIAE.dll` (nella cartella giusta del bridge)
+
+Per come è scritto `main.js`, l’app Electron prova ad avviare il bridge cercando il file qui:
+
+```js
+const possiblePaths = [
+  path.join(process.resourcesPath, 'SiaeBridge', 'SiaeBridge.exe'),
+  path.join(__dirname, 'SiaeBridge', 'bin', 'Release', 'net472', 'SiaeBridge.exe'),
+  path.join(__dirname, 'SiaeBridge', 'bin', 'Debug', 'net472', 'SiaeBridge.exe'),
+  path.join(__dirname, 'SiaeBridge', 'SiaeBridge.exe'),
+];
+```
+
+Ma nel progetto che hai zippato **questi `.exe` non esistono**, quindi:
+
+* `getBridgePath()` non trova niente
+* il bridge **non parte**
+* la UI ti dà l’idea che “il lettore si disconnette / il bridge non si avvia”.
+
+### ✅ Cosa devi fare
+
+1. Vai nella cartella del bridge (da Windows/PowerShell):
+
+   ```bash
+   cd desktop-app/SiaeBridge
+   dotnet build -c Release
+   ```
+
+2. Dopo il build dovresti avere:
+
+   `desktop-app/SiaeBridge/bin/Release/net472/SiaeBridge.exe`
+
+3. Copia anche **`libSIAE.dll`** nella cartella dell’eseguibile del bridge:
+   Nel progetto la DLL è in:
+
+   `attached_assets/libSIAE.dll`
+
+   Dovrebbe stare in:
+
+   `desktop-app/SiaeBridge/bin/Release/net472/libSIAE.dll`
+
+4. Ora torna nella cartella `desktop-app` e avvia l’app:
+
+   ```bash
+   cd ../
+   npm install
+   npm start
+   ```
+
+A questo punto `main.js` dovrebbe trovare `SiaeBridge.exe`, avviarlo e mostrare il bridge come “connesso”.
+
+---
+
+## 🎯 Problema n.2 – Perché “quando inserisco la card il lettore si disconnette”?
+
+Qui entrano in gioco **driver + DLL SIAE + architettura (32/64 bit)**.
+
+### Come funziona nel tuo codice
+
+Nel bridge C# (`Program.cs`) la funzione `CheckReader()` fa:
+
+```csharp
+for (int slot = 0; slot < 16; slot++)
+{
+    try
+    {
+        int result = LibSiae.isCardIn(slot);
+        Log($"  isCardIn({slot}) = {result}");
+
+        if (result == 1)
+        {
+            cardFound = true;
+            foundSlot = slot;
+            _currentSlot = slot;
+            Log($"  Card found in slot {slot}");
+            break;
+        }
+    }
+    catch (Exception ex)
+    {
+        Log($"  isCardIn({slot}) exception: {ex.Message}");
+        break; // No more readers
+    }
+}
+```
+
+👉 Se la DLL o il driver fanno casino (es. architettura sbagliata, reader non supportato, errore di comunicazione), `isCardIn` lancia un’eccezione → il codice la interpreta come “fine lettori” e smette di cercare → nella UI vedi il lettore come **non rilevato / disconnesso**.
+
+Cosa può causare questo comportamento proprio **quando inserisci la card**:
+
+1. **DLL sbagliata / architettura sbagliata**
+
+   * Il progetto è impostato su:
+
+     ```xml
+     <TargetFramework>net472</TargetFramework>
+     <PlatformTarget>x86</PlatformTarget>
+     <RuntimeIdentifier>win-x86</RuntimeIdentifier>
+     ```
+   * Quindi **serve la versione 32 bit** di `libSIAE.dll` e i driver del lettore funzionanti in quel contesto.
+   * Se usi una `libSIAE.dll` a 64 bit, o driver che si aspettano 64 bit, è tipico che:
+
+     * finché non usi la card “sembra tutto ok”
+     * appena la card viene effettivamente inizializzata → eccezione → il bridge pensa che il lettore sparisca.
+
+2. **`libSIAE.dll` non è nella cartella giusta**
+
+   * Il bridge cerca la DLL **nella stessa cartella dell’eseguibile**:
+
+     ```csharp
+     string logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "siae-bridge.log");
+     // e più sopra controlla se esiste libSIAE.dll in BaseDirectory
+     ```
+   * Se la DLL resta solo in `attached_assets/` e NON viene copiata vicino a `SiaeBridge.exe`, avrai errori tipo `DllNotFoundException`.
+   * Il tuo codice li intercetta e torna JSON con `error = "Errore libreria: ..."`, e nel renderer li vedi come:
+
+     ```js
+     if (result.error && result.error.includes('libSIAE')) {
+       updateStatus(statusReader, 'error', 'DLL mancante');
+       addLog('error', 'libSIAE.dll non trovata!');
+     }
+     ```
+
+3. **Driver del lettore**
+
+   * Nel `package.json` è descritto come:
+
+     > MiniLector EVO V3
+   * Se i driver non sono quelli ufficiali / aggiornati, alla prima transazione con la card può apparire come “disconnesso” a livello di sistema operativo.
+
+---
+
+## 🔍 Come capire esattamente cosa succede (log)
+
+Hai **due log importanti**:
+
+### 1️⃣ Log dell’app Electron
+
+In `main.js`:
+
+```js
+log.transports.file.resolvePathFn = () => 
+  path.join(app.getPath('userData'), 'event4u-siae.log');
+```
+
+Su Windows di solito lo trovi in una cartella tipo:
+
+> `C:\Users\<TUO_UTENTE>\AppData\Roaming\event-four-you-siae-lettore\event4u-siae.log`
+
+Qui vedrai cose del tipo:
+
+* `SiaeBridge.exe non trovato`
+* `Bridge spawn error: ...`
+* `Bridge exited with code ...`
+
+### 2️⃣ Log del bridge C# (`siae-bridge.log`)
+
+In `Program.cs`:
+
+```csharp
+string logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "siae-bridge.log");
+_logWriter = new StreamWriter(logPath, true, Encoding.UTF8) { AutoFlush = true };
+```
+
+Quindi **nella stessa cartella di `SiaeBridge.exe`** troverai:
+
+* `libSIAE.dll found` oppure `ERROR: libSIAE.dll NOT FOUND!`
+* `isCardIn(0) = 1` / `isCardIn(0) exception: ...`
+* `Initialize result: ...`
+* `ReadCard: Starting...`, ecc.
+
+👉 Aprendo questo file capirai subito se:
+
+* la DLL non viene trovata
+* c’è un errore di inizializzazione
+* l’eccezione avviene proprio quando inserisci la card
+
+---
+
+## ✅ Riassunto step pratici
+
+1. **Compila il bridge C#:**
+
+   ```bash
+   cd desktop-app/SiaeBridge
+   dotnet build -c Release
+   ```
+
+2. **Copiati `libSIAE.dll`:**
+
+   Da:
+
+   * `attached_assets/libSIAE.dll`
+
+   A:
+
+   * `desktop-app/SiaeBridge/bin/Release/net472/libSIAE.dll`
+
+3. **Verifica che sia la versione 32 bit** della DLL (coerente con `x86`).
+
+4. **Avvia l’app in dev:**
+
+   ```bash
+   cd desktop-app
+   npm install
+   npm start
+   ```
+
+5. **Se ancora “si disconnette”:**
+
+   * controlla `event4u-siae.log`
+   * controlla `siae-bridge.log` nella cartella del bridge
+   * lì dentro troverai la motivazione precisa (eccezione, DLL mancante, init fallita, ecc.).
+
+---
+
+Se vuoi, nel prossimo messaggio puoi incollarmi **le ultime 20–30 righe di `siae-bridge.log`** dopo aver inserito la card: da lì posso dirti quasi al 100% qual è l’errore preciso (DLL, driver, slot, ecc.) e come correggerlo.
