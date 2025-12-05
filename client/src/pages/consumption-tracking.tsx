@@ -566,20 +566,21 @@ export default function ConsumptionTracking() {
                   </p>
                 </CardHeader>
                 <CardContent className="p-0">
-                  {productsInGeneral.length === 0 ? (
+                  {filteredProducts.length === 0 ? (
                     <div className="p-8 text-center">
                       <Package className="h-10 w-10 text-muted-foreground mx-auto mb-2" />
                       <p className="text-muted-foreground">Nessun prodotto disponibile</p>
                     </div>
                   ) : (
                     <div className="divide-y">
-                      {productsInGeneral.map((product) => {
+                      {filteredProducts.map((product) => {
                         const generalStock = getGeneralStock(product.id);
                         const stationStock = getProductStock(product.id);
+                        const hasStock = generalStock > 0;
                         return (
                           <div 
                             key={product.id} 
-                            className="flex items-center gap-3 p-4 hover:bg-muted/50"
+                            className={`flex items-center gap-3 p-4 ${hasStock ? 'hover:bg-muted/50' : 'opacity-60'}`}
                             data-testid={`load-row-${product.id}`}
                           >
                             <div className="flex-1 min-w-0">
@@ -589,7 +590,9 @@ export default function ConsumptionTracking() {
                             
                             <div className="text-right text-sm shrink-0">
                               <div className="text-muted-foreground">Magazzino</div>
-                              <div className="font-semibold text-green-600">{generalStock.toFixed(1)}</div>
+                              <div className={`font-semibold ${hasStock ? 'text-green-600' : 'text-muted-foreground'}`}>
+                                {generalStock.toFixed(1)}
+                              </div>
                             </div>
                             
                             <div className="text-right text-sm shrink-0">
@@ -606,12 +609,13 @@ export default function ConsumptionTracking() {
                                 value={loadQuantities[product.id] || ""}
                                 onChange={(e) => setLoadQuantities(prev => ({ ...prev, [product.id]: e.target.value }))}
                                 className="w-20 h-9 text-center"
+                                disabled={!hasStock}
                                 data-testid={`input-load-${product.id}`}
                               />
                               <Button
                                 size="sm"
                                 onClick={() => handleLoad(product.id)}
-                                disabled={loadMutation.isPending}
+                                disabled={loadMutation.isPending || !hasStock}
                                 className="bg-green-600 hover:bg-green-700 h-9"
                                 data-testid={`button-load-${product.id}`}
                               >
