@@ -4,6 +4,8 @@ on:
   push:
     paths:
       - 'desktop-app/**'
+      - '.github/workflows/build-desktop.yml'
+      - 'attached_assets/libSIAE*.dll'
     branches:
       - main
     tags:
@@ -28,6 +30,8 @@ jobs:
         run: |
           dotnet restore
           dotnet build -c Release
+          echo "Build completed. Listing output:"
+          dir bin\Release\net472\
 
       - name: Upload Bridge artifact
         uses: actions/upload-artifact@v4
@@ -57,7 +61,25 @@ jobs:
       - name: Copy libSIAE.dll
         shell: bash
         run: |
-          cp attached_assets/libSIAE*.dll desktop-app/SiaeBridge/bin/Release/net472/libSIAE.dll || echo "libSIAE.dll not found in attached_assets"
+          echo "=== Searching for libSIAE.dll ==="
+          echo "Current directory: $(pwd)"
+          echo "Contents of attached_assets:"
+          ls -la attached_assets/ || echo "attached_assets folder not found"
+          
+          # Find and copy the DLL
+          SIAE_DLL=$(find attached_assets -name "libSIAE*.dll" -type f 2>/dev/null | head -1)
+          if [ -n "$SIAE_DLL" ]; then
+            echo "Found libSIAE DLL: $SIAE_DLL"
+            cp "$SIAE_DLL" desktop-app/SiaeBridge/bin/Release/net472/libSIAE.dll
+            echo "Successfully copied to desktop-app/SiaeBridge/bin/Release/net472/libSIAE.dll"
+          else
+            echo "ERROR: libSIAE.dll not found in attached_assets!"
+            echo "Build will continue but the app may not work correctly."
+          fi
+          
+          echo ""
+          echo "=== Final contents of SiaeBridge output ==="
+          ls -la desktop-app/SiaeBridge/bin/Release/net472/ || true
 
       - name: Install dependencies
         working-directory: desktop-app
@@ -66,6 +88,12 @@ jobs:
       - name: Build Electron app
         working-directory: desktop-app
         run: npm run build -- --publish never
+
+      - name: List build output
+        shell: bash
+        run: |
+          echo "=== Build output ==="
+          ls -la desktop-app/dist/ || true
 
       - name: Upload installer
         uses: actions/upload-artifact@v4

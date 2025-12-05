@@ -50,12 +50,8 @@
     "extraResources": [
       {
         "from": "SiaeBridge/bin/Release/net472/",
-        "to": "SiaeBridge/net472",
+        "to": "SiaeBridge",
         "filter": ["**/*"]
-      },
-      {
-        "from": "../attached_assets/libSIAE*.dll",
-        "to": "SiaeBridge/net472/libSIAE.dll"
       }
     ]
   }
