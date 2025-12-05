@@ -3,15 +3,15 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Event4U Smart Card Reader</title>
+  <title>Event Four You SIAE Lettore</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
   <div class="container">
     <div class="header">
-      <div class="logo-placeholder">E4U</div>
-      <h1>Event4U</h1>
-      <p class="subtitle">Lettore Smart Card SIAE</p>
+      <div class="logo-placeholder">E4Y</div>
+      <h1>Event Four You</h1>
+      <p class="subtitle">SIAE Lettore Smart Card</p>
     </div>
     
     <div class="demo-banner" id="demo-banner" style="display: none;">
@@ -42,8 +42,16 @@
       </div>
       
       <div class="status-row">
-        <span class="label">Tipo Carta</span>
-        <span id="card-type" class="value">-</span>
+        <span class="label">Seriale Carta</span>
+        <span id="card-serial" class="value">-</span>
+      </div>
+      
+      <div class="status-row">
+        <span class="label">Bridge .NET</span>
+        <span id="bridge-status" class="status disconnected">
+          <span class="dot"></span>
+          <span class="text">Non connesso</span>
+        </span>
       </div>
     </div>
     
@@ -83,15 +91,15 @@
       <ol>
         <li>Collega il lettore MiniLector EVO V3 al computer</li>
         <li>Inserisci la Smart Card SIAE nel lettore</li>
-        <li>Apri l'applicazione Event4U nel browser</li>
-        <li>Il sistema si collegherà automaticamente</li>
+        <li>Apri l'applicazione Event Four You nel browser</li>
+        <li>Il sistema genererà sigilli fiscali reali</li>
       </ol>
       <p class="note">Per test senza hardware, usa "Attiva Demo"</p>
     </div>
     
     <div class="footer">
       <p>Mantieni questa applicazione aperta per emettere biglietti fiscali</p>
-      <p class="version">Versione 1.0.0</p>
+      <p class="version">Event Four You SIAE Lettore v1.0.0</p>
     </div>
   </div>
   

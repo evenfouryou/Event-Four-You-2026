@@ -1,17 +1,19 @@
 /**
- * Event4U Smart Card Reader - Applicazione Electron
- * Processo principale con interfaccia grafica italiana
- * Rileva il lettore smart card via PowerShell (senza pcsclite)
+ * Event Four You SIAE Lettore - Applicazione Electron
+ * Lettore Smart Card SIAE per MiniLector EVO V3
+ * Integra il bridge .NET per comunicare con libSIAE.dll
  */
 
-const { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain } = require('electron');
+const { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, dialog } = require('electron');
 const path = require('path');
 const WebSocket = require('ws');
 const http = require('http');
-const { exec } = require('child_process');
+const { exec, spawn } = require('child_process');
+const fs = require('fs');
 
 // Configurazione
 const PORT = 18765;
+const BRIDGE_PORT = 18766;
 const POLLING_INTERVAL = 2500;
 
 // Stato globale
@@ -20,15 +22,21 @@ let tray = null;
 let httpServer = null;
 let wss = null;
 let pollingTimer = null;
+let bridgeProcess = null;
+let bridgeWs = null;
+let bridgeConnected = false;
 
 let systemState = {
   readerConnected: false,
   cardInserted: false,
   cardATR: null,
+  cardSerial: null,
   readerName: null,
   lastError: null,
   simulationMode: false,
-  clientsConnected: 0
+  clientsConnected: 0,
+  bridgeConnected: false,
+  canEmitRealSeals: false
 };
 
 // Client WebSocket connessi
@@ -172,10 +180,14 @@ function getStatusForBroadcast() {
     readerName: systemState.readerName,
     cardAtr: systemState.cardATR,
     cardATR: systemState.cardATR,
+    cardSerial: systemState.cardSerial,
     cardType: systemState.cardInserted ? 'Smart Card SIAE' : null,
     canEmitTickets: systemState.readerConnected && systemState.cardInserted,
+    canEmitRealSeals: systemState.canEmitRealSeals,
+    bridgeConnected: systemState.bridgeConnected,
     middlewareAvailable: true,
     simulationMode: systemState.simulationMode,
+    demoMode: systemState.simulationMode,
     lastError: systemState.lastError,
     timestamp: new Date().toISOString()
   };
@@ -208,19 +220,206 @@ function updateTrayTooltip() {
   tray.setToolTip(tooltip);
 }
 
-// Genera sigillo fiscale
-function generateFiscalSeal(data) {
-  const timestamp = new Date().toISOString();
-  const random = Math.random().toString(36).substring(2, 10).toUpperCase();
+// Avvia il bridge .NET per libSIAE.dll
+function startBridge() {
+  const bridgePaths = [
+    // Packaged app paths
+    path.join(process.resourcesPath || '', 'SiaeBridge', 'net472', 'EventFourYouSiaeLettore.exe'),
+    path.join(process.resourcesPath || '', 'SiaeBridge', 'EventFourYouSiaeLettore.exe'),
+    // Development paths
+    path.join(__dirname, 'SiaeBridge', 'bin', 'Release', 'net472', 'EventFourYouSiaeLettore.exe'),
+    path.join(__dirname, 'SiaeBridge', 'bin', 'Debug', 'net472', 'EventFourYouSiaeLettore.exe'),
+    path.join(__dirname, 'SiaeBridge', 'bin', 'Release', 'EventFourYouSiaeLettore.exe'),
+    path.join(__dirname, 'SiaeBridge', 'bin', 'Debug', 'EventFourYouSiaeLettore.exe')
+  ];
   
+  let bridgePath = null;
+  for (const p of bridgePaths) {
+    if (fs.existsSync(p)) {
+      bridgePath = p;
+      break;
+    }
+  }
+  
+  if (!bridgePath) {
+    console.log('Bridge .NET non trovato, funzionalita sigilli SIAE limitata');
+    systemState.bridgeConnected = false;
+    systemState.canEmitRealSeals = false;
+    return;
+  }
+  
+  console.log('Avvio bridge .NET:', bridgePath);
+  
+  try {
+    bridgeProcess = spawn(bridgePath, [], {
+      cwd: path.dirname(bridgePath),
+      stdio: 'ignore',
+      detached: false,
+      windowsHide: true
+    });
+    
+    bridgeProcess.on('error', (err) => {
+      console.error('Errore avvio bridge:', err.message);
+      systemState.bridgeConnected = false;
+    });
+    
+    bridgeProcess.on('exit', (code) => {
+      console.log('Bridge terminato con codice:', code);
+      systemState.bridgeConnected = false;
+      bridgeProcess = null;
+    });
+    
+    // Connetti al bridge dopo un breve delay
+    setTimeout(connectToBridge, 2000);
+    
+  } catch (err) {
+    console.error('Errore spawn bridge:', err.message);
+  }
+}
+
+// Connetti al WebSocket del bridge .NET
+function connectToBridge() {
+  try {
+    bridgeWs = new WebSocket(`ws://127.0.0.1:${BRIDGE_PORT}`);
+    
+    bridgeWs.on('open', () => {
+      console.log('Connesso al bridge .NET');
+      bridgeConnected = true;
+      systemState.bridgeConnected = true;
+      systemState.canEmitRealSeals = true;
+      systemState.readerConnected = true;
+      updateUI();
+      broadcastStatus();
+    });
+    
+    bridgeWs.on('message', (data) => {
+      try {
+        const msg = JSON.parse(data.toString());
+        handleBridgeMessage(msg);
+      } catch (err) {
+        console.error('Errore parsing messaggio bridge:', err.message);
+      }
+    });
+    
+    bridgeWs.on('close', () => {
+      console.log('Disconnesso dal bridge .NET');
+      bridgeConnected = false;
+      systemState.bridgeConnected = false;
+      systemState.canEmitRealSeals = false;
+      bridgeWs = null;
+      updateUI();
+      broadcastStatus();
+      
+      // Riprova a connettersi
+      setTimeout(connectToBridge, 5000);
+    });
+    
+    bridgeWs.on('error', (err) => {
+      console.error('Errore WebSocket bridge:', err.message);
+      bridgeConnected = false;
+      systemState.bridgeConnected = false;
+      systemState.canEmitRealSeals = false;
+      updateUI();
+      broadcastStatus();
+    });
+    
+  } catch (err) {
+    console.error('Errore connessione bridge:', err.message);
+    setTimeout(connectToBridge, 5000);
+  }
+}
+
+// Gestisce messaggi dal bridge .NET
+function handleBridgeMessage(msg) {
+  if (msg.type === 'status' && msg.data) {
+    // Aggiorna stato dal bridge
+    systemState.readerConnected = msg.data.readerConnected || msg.data.initialized;
+    systemState.readerName = msg.data.readerName;
+    systemState.cardInserted = msg.data.cardInserted;
+    systemState.cardSerial = msg.data.cardSerial;
+    systemState.simulationMode = msg.data.demoMode || msg.data.simulationMode;
+    systemState.canEmitRealSeals = msg.data.canEmitTickets;
+    
+    updateUI();
+    broadcastStatus();
+    updateTrayTooltip();
+  }
+}
+
+// Invia comando al bridge .NET
+function sendToBridge(command) {
+  return new Promise((resolve, reject) => {
+    if (!bridgeWs || bridgeWs.readyState !== WebSocket.OPEN) {
+      reject(new Error('Bridge non connesso'));
+      return;
+    }
+    
+    const timeout = setTimeout(() => {
+      reject(new Error('Timeout risposta bridge'));
+    }, 10000);
+    
+    const handler = (data) => {
+      clearTimeout(timeout);
+      bridgeWs.removeListener('message', handler);
+      try {
+        resolve(JSON.parse(data.toString()));
+      } catch (err) {
+        reject(err);
+      }
+    };
+    
+    bridgeWs.on('message', handler);
+    bridgeWs.send(JSON.stringify(command));
+  });
+}
+
+// Genera sigillo fiscale (usa bridge se disponibile)
+async function generateFiscalSeal(data) {
+  const timestamp = new Date().toISOString();
+  
+  // Se bridge connesso, usa sigillo reale
+  if (bridgeConnected && bridgeWs && bridgeWs.readyState === WebSocket.OPEN) {
+    try {
+      const response = await sendToBridge({
+        type: 'computeSigillo',
+        data: {
+          ticketData: JSON.stringify({
+            eventId: data?.eventId,
+            ticketId: data?.ticketId,
+            timestamp: timestamp
+          })
+        }
+      });
+      
+      if (response.success && response.seal) {
+        return {
+          sealNumber: response.seal.sealCode,
+          timestamp: response.seal.timestamp || timestamp,
+          eventId: data?.eventId,
+          ticketId: data?.ticketId,
+          signature: response.seal.sealCode,
+          cardSerial: response.seal.cardSerial || systemState.cardSerial,
+          cardATR: systemState.cardATR,
+          simulationMode: false,
+          realSeal: true
+        };
+      }
+    } catch (err) {
+      console.error('Errore generazione sigillo via bridge:', err.message);
+    }
+  }
+  
+  // Fallback: sigillo demo
+  const random = Math.random().toString(36).substring(2, 10).toUpperCase();
   return {
-    sealNumber: `SEAL-${Date.now()}-${random}`,
+    sealNumber: `DEMO-${Date.now()}-${random}`,
     timestamp: timestamp,
     eventId: data?.eventId,
     ticketId: data?.ticketId,
-    signature: systemState.simulationMode ? 'DEMO_SIGNATURE' : `SIG-${random}`,
+    signature: 'DEMO_SIGNATURE_' + random,
     cardATR: systemState.cardATR,
-    simulationMode: systemState.simulationMode
+    simulationMode: true,
+    realSeal: false
   };
 }
 
@@ -286,6 +485,7 @@ function createServer() {
             break;
             
           case 'requestSeal':
+          case 'computeSigillo':
             if (!systemState.cardInserted && !systemState.simulationMode) {
               ws.send(JSON.stringify({
                 type: 'sealResponse',
@@ -293,12 +493,19 @@ function createServer() {
                 error: 'Smart card non inserita'
               }));
             } else {
-              const seal = generateFiscalSeal(msg.data);
-              ws.send(JSON.stringify({
-                type: 'sealResponse',
-                success: true,
-                seal: seal
-              }));
+              generateFiscalSeal(msg.data).then(seal => {
+                ws.send(JSON.stringify({
+                  type: 'sealResponse',
+                  success: true,
+                  seal: seal
+                }));
+              }).catch(err => {
+                ws.send(JSON.stringify({
+                  type: 'sealResponse',
+                  success: false,
+                  error: err.message
+                }));
+              });
             }
             break;
             
@@ -460,7 +667,10 @@ app.whenReady().then(() => {
   createTray();
   createServer();
   
-  // Inizia polling
+  // Avvia bridge .NET per libSIAE.dll
+  startBridge();
+  
+  // Inizia polling (fallback se bridge non disponibile)
   pollReaderStatus();
   pollingTimer = setInterval(pollReaderStatus, POLLING_INTERVAL);
   
@@ -482,6 +692,16 @@ app.on('before-quit', () => {
   app.isQuitting = true;
   if (pollingTimer) {
     clearInterval(pollingTimer);
+  }
+  if (bridgeWs) {
+    bridgeWs.close();
+  }
+  if (bridgeProcess) {
+    try {
+      bridgeProcess.kill();
+    } catch (err) {
+      console.error('Errore chiusura bridge:', err.message);
+    }
   }
   if (wss) {
     wss.close();

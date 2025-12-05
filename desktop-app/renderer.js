@@ -2,7 +2,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   const readerStatus = document.getElementById('reader-status');
   const readerName = document.getElementById('reader-name');
   const cardStatus = document.getElementById('card-status');
-  const cardType = document.getElementById('card-type');
+  const cardSerial = document.getElementById('card-serial');
+  const bridgeStatus = document.getElementById('bridge-status');
   const emissionStatus = document.getElementById('emission-status');
   const emissionIcon = document.getElementById('emission-icon');
   const emissionText = document.getElementById('emission-text');
@@ -15,8 +16,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   let isDemo = false;
 
   function updateStatus(status) {
-    // Modalita demo
-    isDemo = status.simulationMode;
+    isDemo = status.simulationMode || status.demoMode;
     if (isDemo) {
       demoBanner.style.display = 'flex';
       btnDemo.textContent = 'Disattiva Demo';
@@ -29,7 +29,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       btnDemo.classList.add('btn-primary');
     }
 
-    // Stato lettore
     if (status.readerDetected || status.readerConnected) {
       readerStatus.className = 'status connected';
       readerStatus.querySelector('.text').textContent = 'Connesso';
@@ -40,24 +39,32 @@ document.addEventListener('DOMContentLoaded', async () => {
       readerName.textContent = '-';
     }
 
-    // Stato carta
     if (status.cardInserted) {
       cardStatus.className = 'status connected';
       cardStatus.querySelector('.text').textContent = 'Inserita';
-      cardType.textContent = status.cardType || 'Smart Card SIAE';
+      cardSerial.textContent = status.cardSerial || status.cardATR || '-';
     } else {
       cardStatus.className = 'status disconnected';
       cardStatus.querySelector('.text').textContent = 'Non inserita';
-      cardType.textContent = '-';
+      cardSerial.textContent = '-';
     }
 
-    // Stato emissione
+    if (status.bridgeConnected) {
+      bridgeStatus.className = 'status connected';
+      bridgeStatus.querySelector('.text').textContent = 'Connesso (libSIAE.dll)';
+    } else {
+      bridgeStatus.className = 'status disconnected';
+      bridgeStatus.querySelector('.text').textContent = 'Non connesso';
+    }
+
     const canEmit = (status.readerDetected || status.readerConnected) && status.cardInserted;
     if (canEmit) {
       emissionStatus.className = 'emission-status ready';
       emissionIcon.innerHTML = '&#10004;';
       if (isDemo) {
         emissionText.textContent = 'Pronto per emissione (DEMO)';
+      } else if (status.bridgeConnected) {
+        emissionText.textContent = 'Pronto - Sigilli fiscali reali attivi';
       } else {
         emissionText.textContent = 'Pronto per emissione biglietti SIAE';
       }
@@ -73,7 +80,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
     }
 
-    // Info connessione
     if (status.wsPort) {
       wsPort.textContent = status.wsPort;
     }
@@ -83,7 +89,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
-  // Carica stato iniziale
   try {
     const initialStatus = await window.electronAPI.getStatus();
     updateStatus(initialStatus);
@@ -91,12 +96,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     console.error('Errore caricamento stato:', e);
   }
 
-  // Ascolta aggiornamenti
   window.electronAPI.onUpdateStatus((status) => {
     updateStatus(status);
   });
 
-  // Pulsante Demo
   btnDemo.addEventListener('click', async () => {
     btnDemo.disabled = true;
     try {
@@ -111,7 +114,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     btnDemo.disabled = false;
   });
 
-  // Pulsante Aggiorna
   btnRefresh.addEventListener('click', async () => {
     btnRefresh.disabled = true;
     btnRefresh.textContent = 'Aggiornamento...';

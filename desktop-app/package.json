@@ -1,9 +1,9 @@
 {
-  "name": "event4u-smart-card-reader",
+  "name": "event-four-you-siae-lettore",
   "version": "1.0.0",
-  "description": "Event4U - Lettore Smart Card SIAE per MiniLector EVO V3",
+  "description": "Event Four You SIAE Lettore - Smart Card Reader per MiniLector EVO V3",
   "main": "main.js",
-  "author": "Event4U",
+  "author": "Event Four You",
   "license": "MIT",
   "scripts": {
     "start": "electron .",
@@ -18,9 +18,9 @@
     "electron-builder": "^24.9.1"
   },
   "build": {
-    "appId": "com.event4u.smartcard",
-    "productName": "Event4U Smart Card Reader",
-    "copyright": "Copyright © 2024 Event4U",
+    "appId": "com.eventfouryou.siae.lettore",
+    "productName": "Event Four You SIAE Lettore",
+    "copyright": "Copyright © 2024 Event Four You",
     "win": {
       "target": [
         {
@@ -34,7 +34,7 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "Event4U Smart Card",
+      "shortcutName": "Event Four You SIAE Lettore",
       "language": "1040"
     },
     "directories": {
@@ -46,6 +46,17 @@
       "index.html",
       "styles.css",
       "renderer.js"
+    ],
+    "extraResources": [
+      {
+        "from": "SiaeBridge/bin/Release/net472/",
+        "to": "SiaeBridge/net472",
+        "filter": ["**/*"]
+      },
+      {
+        "from": "../attached_assets/libSIAE*.dll",
+        "to": "SiaeBridge/net472/libSIAE.dll"
+      }
     ]
   }
 }
