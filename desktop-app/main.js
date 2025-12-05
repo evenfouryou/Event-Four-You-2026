@@ -53,7 +53,7 @@ function isAllowedOrigin(origin) {
 // Rileva lettore smart card tramite WinSCard API (come fa EventForYou)
 function detectSmartCardReader() {
   return new Promise((resolve) => {
-    // Usa SCardListReaders API nativa di Windows (stesso metodo di EventForYou.exe)
+    // Usa SCardListReaders API nativa di Windows con encoding ASCII
     const psScript = `
 Add-Type -TypeDefinition @"
 using System;
@@ -62,11 +62,11 @@ using System.Text;
 using System.Collections.Generic;
 
 public class WinSCard {
-    [DllImport("winscard.dll", CharSet = CharSet.Unicode)]
+    [DllImport("winscard.dll", CharSet = CharSet.Ansi)]
     public static extern int SCardEstablishContext(uint dwScope, IntPtr pvReserved1, IntPtr pvReserved2, out IntPtr phContext);
     
-    [DllImport("winscard.dll", CharSet = CharSet.Unicode)]
-    public static extern int SCardListReaders(IntPtr hContext, string mszGroups, byte[] mszReaders, ref int pcchReaders);
+    [DllImport("winscard.dll", CharSet = CharSet.Ansi)]
+    public static extern int SCardListReadersA(IntPtr hContext, string mszGroups, byte[] mszReaders, ref uint pcchReaders);
     
     [DllImport("winscard.dll")]
     public static extern int SCardReleaseContext(IntPtr hContext);
@@ -74,17 +74,19 @@ public class WinSCard {
     public static List<string> GetReaders() {
         List<string> readers = new List<string>();
         IntPtr hContext = IntPtr.Zero;
-        int result = SCardEstablishContext(2, IntPtr.Zero, IntPtr.Zero, out hContext);
+        
+        int result = SCardEstablishContext(0, IntPtr.Zero, IntPtr.Zero, out hContext);
         if (result != 0) return readers;
         
-        int size = 0;
-        result = SCardListReaders(hContext, null, null, ref size);
+        uint size = 0;
+        result = SCardListReadersA(hContext, null, null, ref size);
         if (result == 0 && size > 0) {
-            byte[] buffer = new byte[size * 2];
-            result = SCardListReaders(hContext, null, buffer, ref size);
+            byte[] buffer = new byte[size];
+            result = SCardListReadersA(hContext, null, buffer, ref size);
             if (result == 0) {
-                string allReaders = Encoding.Unicode.GetString(buffer);
-                foreach (string r in allReaders.Split(new char[] { '\\0' }, StringSplitOptions.RemoveEmptyEntries)) {
+                string allReaders = Encoding.ASCII.GetString(buffer);
+                string[] parts = allReaders.Split(new char[] { (char)0 }, StringSplitOptions.RemoveEmptyEntries);
+                foreach (string r in parts) {
                     if (!string.IsNullOrWhiteSpace(r)) readers.Add(r.Trim());
                 }
             }
@@ -96,26 +98,14 @@ public class WinSCard {
 "@
 
 try {
-    $readers = [WinSCard]::GetReaders()
-    if ($readers.Count -gt 0) {
-        Write-Output "FOUND:$($readers[0])"
-    } else {
-        # Fallback a WMI
-        $reader = Get-CimInstance Win32_PnPEntity -ErrorAction SilentlyContinue | Where-Object { $_.Name -like '*MiniLector*' -or $_.Name -like '*BIT4ID*' -or $_.Name -like '*Smart Card Reader*' } | Select-Object -First 1
-        if ($reader) {
-            Write-Output "FOUND:$($reader.Name)"
-        } else {
-            Write-Output "NOTFOUND"
-        }
-    }
-} catch {
-    # Fallback a WMI
-    $reader = Get-CimInstance Win32_PnPEntity -ErrorAction SilentlyContinue | Where-Object { $_.Name -like '*MiniLector*' -or $_.Name -like '*BIT4ID*' -or $_.Name -like '*Smart Card Reader*' } | Select-Object -First 1
-    if ($reader) {
-        Write-Output "FOUND:$($reader.Name)"
+    $$readers = [WinSCard]::GetReaders()
+    if ($$readers.Count -gt 0) {
+        Write-Output "FOUND:$$($$readers[0])"
     } else {
         Write-Output "NOTFOUND"
     }
+} catch {
+    Write-Output "ERROR:$$_"
 }
     `;
     
