@@ -1,0 +1,154 @@
+Ti rispondo in modo diretto:
+**questo software la legge perché è stato scritto apposta per le smart card SIAE e usa una DLL nativa dedicata, `libSIAE.dll`, che fa tutto il “lavoro sporco” al posto tuo.**
+
+Ti spiego cosa ho visto analizzando i file che hai caricato.
+
+---
+
+## 1️⃣ `libSIAE.dll` è una libreria nativa specifica per SIAE
+
+Dalla scansione della DLL si vede che:
+
+* È una **DLL 32 bit (PE32)** per Windows
+* Importa **WinSCard.dll**, quindi usa direttamente l’API PC/SC di Windows (SCardConnect, SCardTransmit, ecc.) per parlare con il lettore smart card
+* Esporta un sacco di funzioni già “parlanti”, per esempio:
+
+```text
+Initialize / Finalize
+BeginTransaction / EndTransaction
+VerifyPIN / UnblockPIN / ChangePIN
+GetSIAECertificate / GetCACertificate / GetCertificate
+GetSN / GetKeyID / ReadBinary / ReadRecord
+Sign / ComputeSigillo / SendAPDU / isCardIn
+... e le varianti ML di quasi tutte (BeginTransactionML, VerifyPINML, ecc.)
+```
+
+Quindi **dentro `libSIAE.dll` c’è già tutta la logica per:**
+
+* inizializzare il lettore e la card
+* gestire PIN, sblocco, cambio PIN
+* leggere i certificati specifici SIAE (funzioni `GetSIAECertificate*`)
+* fare firme (`Sign`, `ComputeSigillo*`)
+* inviare APDU a basso livello (`SendAPDU*`) ma con un’API già pronta
+
+In pratica:
+👉 **questa DLL conosce “come si parla” con la card SIAE.**
+
+---
+
+## 2️⃣ `EventForYou.exe` è un programma .NET che usa `libSIAE.dll`
+
+Analizzando `EventForYou.exe` si vede che:
+
+* È un eseguibile **.NET** (importa solo `mscoree.dll` → `_CorExeMain`)
+* Accanto ad esso ci sono:
+
+  * `libSIAE.dll` (la libreria nativa per le card SIAE)
+  * `Newtonsoft.Json.dll` (per serializzare dati in JSON, gestire strutture, ecc.) 
+
+Questo significa che il flusso è più o meno così:
+
+1. `EventForYou.exe` (C#) tramite **P/Invoke** chiama le funzioni esportate da `libSIAE.dll`:
+
+   * `Initialize`
+   * `BeginTransaction`
+   * `VerifyPIN`
+   * `GetSIAECertificate` / `GetCertificate`
+   * `Sign` ecc.
+2. `libSIAE.dll` usa **WinSCard.dll** e comanda direttamente il chip SIAE
+3. `EventForYou.exe` prende i dati restituiti (certificati, seriali, stringhe…) e li elabora/mostra, probabilmente usando anche JSON.
+
+Per questo **“funziona subito” con la tua card SIAE solo chip**, anche se non hai installato middleware tipo Dike:
+👉 perché la parte di “middleware SIAE” è di fatto **integrata in libSIAE.dll**.
+
+---
+
+## 3️⃣ Perché invece il tuo altro software NON la legge
+
+Il setup **“Event4U Smart Card Reader Setup 1.0.0.exe”** che avevi nominato prima:
+
+* installa i driver del lettore
+* ma **non include `libSIAE.dll`**,
+* né un’altra libreria equivalente per SIAE.
+
+Quindi quello scenario è così:
+
+* Windows vede il lettore ✔
+* la card viene inserita ✔
+* ma il tuo programma **non ha nessun modulo che sappia “parlare SIAE”** ❌
+
+Mentre:
+
+* `EventForYou.exe` + `libSIAE.dll`
+  → **ha già dentro il cervello SIAE**
+  → quindi la card viene letta correttamente.
+
+---
+
+## 4️⃣ Come puoi sfruttare questa cosa per Event4U
+
+Hai due strade pratiche:
+
+### 🅰 Integrare direttamente `libSIAE.dll` nella tua app
+
+* metti `libSIAE.dll` accanto al tuo eseguibile
+* in C# usi P/Invoke per importare le funzioni esportate, tipo:
+
+```csharp
+[DllImport("libSIAE.dll")]
+static extern int Initialize();
+
+[DllImport("libSIAE.dll")]
+static extern int GetSIAECertificate(/* parametri */);
+
+[DllImport("libSIAE.dll")]
+static extern int VerifyPIN(/* parametri */);
+
+// etc.
+```
+
+> Le firme esatte dei metodi (tipi dei parametri) le puoi ricostruire guardando il sorgente di EventForYou (con ILSpy/dotPeek) o la sua P/Invoke.
+
+In questo modo **Event4U parlerebbe con la smart card SIAE esattamente come fa EventForYou**.
+
+---
+
+### 🅱 Usare `EventForYou.exe` come “bridge”
+
+Se non vuoi (o non puoi) toccare subito il codice di Event4U:
+
+* lasci `EventForYou.exe` + `libSIAE.dll` come “lettore SIAE esterno”
+* lo lanci da Event4U con argomenti (per es. `EventForYou.exe --leggi-siae`)
+* ti fai restituire i dati (CF, seriale, certificato) via:
+
+  * file temporaneo JSON
+  * oppure stdout (standard output)
+
+È una soluzione un po’ “artigianale”, ma molto rapida da mettere in piedi.
+
+---
+
+## 🔚 Riassunto secco
+
+**Questo software legge la card SIAE perché:**
+
+1. Accanto all’eseguibile c’è una DLL nativa dedicata: **`libSIAE.dll`**
+2. `libSIAE.dll`:
+
+   * usa **WinSCard.dll** (PC/SC),
+   * manda APDU SIAE,
+   * espone funzioni di alto livello tipo `GetSIAECertificate`, `Sign`, `VerifyPIN`, ecc.
+3. `EventForYou.exe` chiama queste funzioni, quindi **non ha bisogno del middleware generale (Dike, InfoCert ecc.)** per lavorare con quella card.
+
+Il tuo altro software **non la legge** semplicemente perché **gli manca questa DLL (o una equivalente)**.
+
+---
+
+Se vuoi, nel prossimo passo posso:
+
+* Proporti un **schema di interfaccia** (metodi e flusso) che Event4U dovrebbe usare con `libSIAE.dll`
+* Suggerirti come **impacchettare tutto in un nuovo installer** che:
+
+  * installa driver lettore
+  * copia `libSIAE.dll`
+  * e rende “plug & play” le card SIAE per i tuoi utenti.
