@@ -26,10 +26,14 @@ export interface SmartCardStatus {
   cardInserted: boolean;
   readerName: string | null;
   cardAtr: string | null;
+  cardSerial: string | null;
   cardType: string | null;
   lastCheck: Date;
   error: string | null;
   middlewareAvailable: boolean;
+  bridgeConnected: boolean;
+  canEmitRealSeals: boolean;
+  demoMode: boolean;
   connectionMethod: 'websocket' | 'trust1connector' | 'none';
 }
 
@@ -61,10 +65,14 @@ class SmartCardService {
       cardInserted: false,
       readerName: null,
       cardAtr: null,
+      cardSerial: null,
       cardType: null,
       lastCheck: new Date(),
       error: null,
       middlewareAvailable: false,
+      bridgeConnected: false,
+      canEmitRealSeals: false,
+      demoMode: false,
       connectionMethod: 'none'
     };
   }
@@ -153,11 +161,15 @@ class SmartCardService {
       readerDetected: data.readerDetected ?? false,
       cardInserted: data.cardInserted ?? false,
       readerName: data.readerName || null,
-      cardAtr: data.cardAtr || null,
+      cardAtr: data.cardAtr || data.cardATR || null,
+      cardSerial: data.cardSerial || null,
       cardType: data.cardType || null,
       lastCheck: new Date(),
       error: data.canEmitTickets ? null : this.getErrorMessage(data),
       middlewareAvailable: true,
+      bridgeConnected: data.bridgeConnected ?? false,
+      canEmitRealSeals: data.canEmitRealSeals ?? false,
+      demoMode: data.demoMode ?? data.simulationMode ?? false,
       connectionMethod: 'websocket'
     });
   }
