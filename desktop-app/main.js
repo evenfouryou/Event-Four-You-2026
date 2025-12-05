@@ -9,6 +9,24 @@ log.transports.file.resolvePathFn = () => path.join(app.getPath('userData'), 'ev
 log.transports.file.level = 'debug';
 log.transports.console.level = 'debug';
 
+// ============================================
+// SINGLE INSTANCE LOCK - Prevent multiple windows
+// ============================================
+const gotTheLock = app.requestSingleInstanceLock();
+
+if (!gotTheLock) {
+  log.info('Another instance is already running. Quitting...');
+  app.quit();
+} else {
+  app.on('second-instance', (event, commandLine, workingDirectory) => {
+    // Someone tried to run a second instance, focus our window
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.focus();
+    }
+  });
+}
+
 log.info('='.repeat(60));
 log.info('App starting at', new Date().toISOString());
 log.info('App version:', app.getVersion());
@@ -18,15 +36,48 @@ log.info('Platform:', process.platform, process.arch);
 log.info('User data path:', app.getPath('userData'));
 log.info('='.repeat(60));
 
-let mainWindow;
+let mainWindow = null;
 let bridgeProcess = null;
 let bridgePath = null;
 
+// Log buffer for live updates
+let logBuffer = [];
+const MAX_LOG_BUFFER = 500;
+
+function addToLogBuffer(level, message) {
+  const timestamp = new Date().toISOString();
+  const entry = { timestamp, level, message };
+  logBuffer.push(entry);
+  if (logBuffer.length > MAX_LOG_BUFFER) {
+    logBuffer.shift();
+  }
+  // Send to renderer if window exists
+  if (mainWindow && mainWindow.webContents) {
+    mainWindow.webContents.send('log:entry', entry);
+  }
+}
+
+// Override log to capture entries
+const originalInfo = log.info.bind(log);
+const originalWarn = log.warn.bind(log);
+const originalError = log.error.bind(log);
+
+log.info = (...args) => {
+  originalInfo(...args);
+  addToLogBuffer('info', args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' '));
+};
+log.warn = (...args) => {
+  originalWarn(...args);
+  addToLogBuffer('warn', args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' '));
+};
+log.error = (...args) => {
+  originalError(...args);
+  addToLogBuffer('error', args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' '));
+};
+
 function getBridgePath() {
   const possiblePaths = [
-    // Production: inside resources
     path.join(process.resourcesPath, 'SiaeBridge', 'SiaeBridge.exe'),
-    // Development: alongside app
     path.join(__dirname, 'SiaeBridge', 'bin', 'Release', 'net472', 'SiaeBridge.exe'),
     path.join(__dirname, 'SiaeBridge', 'bin', 'Debug', 'net472', 'SiaeBridge.exe'),
     path.join(__dirname, 'SiaeBridge', 'SiaeBridge.exe'),
@@ -34,7 +85,6 @@ function getBridgePath() {
 
   log.info('Searching for SiaeBridge.exe...');
   log.info('Resource path:', process.resourcesPath);
-  log.info('__dirname:', __dirname);
 
   for (const p of possiblePaths) {
     log.info(`  Checking: ${p}`);
@@ -42,17 +92,16 @@ function getBridgePath() {
       log.info(`  ✓ FOUND: ${p}`);
       return p;
     }
-    log.info(`  ✗ Not found`);
   }
 
-  log.error('SiaeBridge.exe not found in any location!');
+  log.error('SiaeBridge.exe not found!');
   return null;
 }
 
 function listDirectory(dirPath, prefix = '') {
   try {
     if (!fs.existsSync(dirPath)) {
-      log.info(`${prefix}Directory does not exist: ${dirPath}`);
+      log.info(`${prefix}Directory not found: ${dirPath}`);
       return;
     }
     const items = fs.readdirSync(dirPath);
@@ -60,11 +109,7 @@ function listDirectory(dirPath, prefix = '') {
     items.forEach(item => {
       const fullPath = path.join(dirPath, item);
       const stat = fs.statSync(fullPath);
-      if (stat.isDirectory()) {
-        log.info(`${prefix}  [DIR] ${item}`);
-      } else {
-        log.info(`${prefix}  [FILE] ${item} (${stat.size} bytes)`);
-      }
+      log.info(`${prefix}  ${stat.isDirectory() ? '[DIR]' : '[FILE]'} ${item} ${stat.isDirectory() ? '' : `(${stat.size} bytes)`}`);
     });
   } catch (err) {
     log.error(`${prefix}Error listing ${dirPath}:`, err.message);
@@ -75,10 +120,10 @@ function createWindow() {
   log.info('Creating main window...');
   
   mainWindow = new BrowserWindow({
-    width: 900,
-    height: 700,
-    minWidth: 800,
-    minHeight: 600,
+    width: 1000,
+    height: 750,
+    minWidth: 900,
+    minHeight: 650,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -86,34 +131,36 @@ function createWindow() {
     },
     icon: path.join(__dirname, 'icon.ico'),
     title: 'Event Four You - SIAE Lettore',
-    backgroundColor: '#1a1a2e'
+    backgroundColor: '#1a1a2e',
+    show: false
   });
 
   mainWindow.loadFile('index.html');
   
+  mainWindow.once('ready-to-show', () => {
+    mainWindow.show();
+    log.info('Window shown');
+  });
+
   mainWindow.on('closed', () => {
     log.info('Main window closed');
     mainWindow = null;
   });
 
-  // Log directory structure for debugging
-  log.info('--- Directory Structure Debug ---');
+  // Debug directory structure
+  log.info('--- Directory Structure ---');
   listDirectory(process.resourcesPath);
   listDirectory(path.join(process.resourcesPath, 'SiaeBridge'));
-  listDirectory(__dirname);
   log.info('--- End Directory Structure ---');
 
-  // Find bridge path
   bridgePath = getBridgePath();
   if (bridgePath) {
-    // Check for libSIAE.dll
     const bridgeDir = path.dirname(bridgePath);
     const dllPath = path.join(bridgeDir, 'libSIAE.dll');
-    log.info(`Checking for libSIAE.dll at: ${dllPath}`);
     if (fs.existsSync(dllPath)) {
-      log.info('✓ libSIAE.dll found');
+      log.info('✓ libSIAE.dll found at', dllPath);
     } else {
-      log.warn('✗ libSIAE.dll NOT found - bridge will not work!');
+      log.error('✗ libSIAE.dll NOT found at', dllPath);
     }
   }
 }
@@ -138,9 +185,7 @@ function startBridge() {
     }
 
     log.info(`Starting bridge: ${bridgePath}`);
-    
     const bridgeDir = path.dirname(bridgePath);
-    log.info(`Bridge working directory: ${bridgeDir}`);
 
     try {
       bridgeProcess = spawn(bridgePath, [], {
@@ -149,26 +194,21 @@ function startBridge() {
         windowsHide: true
       });
 
-      let startupOutput = '';
-      let startupError = '';
       let resolved = false;
 
       bridgeProcess.stdout.on('data', (data) => {
         const text = data.toString().trim();
-        log.info(`[Bridge STDOUT] ${text}`);
-        startupOutput += text + '\n';
+        log.info(`[Bridge] ${text}`);
         
         if (!resolved && text.includes('READY')) {
           resolved = true;
-          log.info('Bridge reported READY');
-          resolve({ success: true, message: 'Bridge avviato con successo' });
+          log.info('Bridge READY');
+          resolve({ success: true, message: 'Bridge avviato' });
         }
       });
 
       bridgeProcess.stderr.on('data', (data) => {
-        const text = data.toString().trim();
-        log.error(`[Bridge STDERR] ${text}`);
-        startupError += text + '\n';
+        log.error(`[Bridge ERROR] ${data.toString().trim()}`);
       });
 
       bridgeProcess.on('error', (err) => {
@@ -180,21 +220,19 @@ function startBridge() {
         }
       });
 
-      bridgeProcess.on('exit', (code, signal) => {
-        log.info(`Bridge exited with code ${code}, signal ${signal}`);
+      bridgeProcess.on('exit', (code) => {
+        log.info(`Bridge exited with code ${code}`);
         bridgeProcess = null;
         if (!resolved) {
           resolved = true;
-          reject(new Error(`Bridge terminato con codice ${code}`));
+          reject(new Error(`Bridge exit code ${code}`));
         }
       });
 
-      // Timeout for startup
       setTimeout(() => {
         if (!resolved) {
           resolved = true;
           if (bridgeProcess) {
-            log.warn('Bridge startup timeout, but process is running');
             resolve({ success: true, message: 'Bridge avviato (timeout)' });
           } else {
             reject(new Error('Timeout avvio bridge'));
@@ -213,10 +251,17 @@ function stopBridge() {
   return new Promise((resolve) => {
     if (bridgeProcess) {
       log.info('Stopping bridge...');
-      bridgeProcess.kill();
-      bridgeProcess = null;
+      bridgeProcess.stdin.write('EXIT\n');
+      setTimeout(() => {
+        if (bridgeProcess) {
+          bridgeProcess.kill();
+        }
+        bridgeProcess = null;
+        resolve({ success: true });
+      }, 500);
+    } else {
+      resolve({ success: true });
     }
-    resolve({ success: true });
   });
 }
 
@@ -227,22 +272,31 @@ function sendBridgeCommand(command) {
       return;
     }
 
-    log.info(`Sending command: ${command}`);
+    log.info(`>> Command: ${command}`);
     
     let response = '';
     let timeout;
     
     const onData = (data) => {
-      response += data.toString();
-      // Check if we have a complete JSON response
-      try {
-        const parsed = JSON.parse(response.trim());
-        clearTimeout(timeout);
-        bridgeProcess.stdout.removeListener('data', onData);
-        log.info(`Command response:`, parsed);
-        resolve(parsed);
-      } catch (e) {
-        // Not complete yet, wait for more data
+      const text = data.toString();
+      response += text;
+      
+      // Check for complete JSON
+      const lines = response.split('\n');
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+          try {
+            const parsed = JSON.parse(trimmed);
+            clearTimeout(timeout);
+            bridgeProcess.stdout.removeListener('data', onData);
+            log.info(`<< Response:`, parsed);
+            resolve(parsed);
+            return;
+          } catch (e) {
+            // Not valid JSON yet
+          }
+        }
       }
     };
 
@@ -251,9 +305,9 @@ function sendBridgeCommand(command) {
 
     timeout = setTimeout(() => {
       bridgeProcess.stdout.removeListener('data', onData);
-      log.warn(`Command timeout, partial response: ${response}`);
-      reject(new Error('Timeout risposta bridge'));
-    }, 10000);
+      log.warn(`Timeout, partial: ${response}`);
+      reject(new Error('Timeout risposta'));
+    }, 15000);
   });
 }
 
@@ -261,10 +315,8 @@ function sendBridgeCommand(command) {
 ipcMain.handle('bridge:start', async () => {
   log.info('IPC: bridge:start');
   try {
-    const result = await startBridge();
-    return result;
+    return await startBridge();
   } catch (err) {
-    log.error('bridge:start error:', err);
     return { success: false, error: err.message };
   }
 });
@@ -280,40 +332,33 @@ ipcMain.handle('bridge:status', async () => {
     bridgePath: bridgePath,
     bridgeFound: bridgePath !== null
   };
-  log.info('IPC: bridge:status', status);
   return status;
 });
 
 ipcMain.handle('bridge:checkReader', async () => {
-  log.info('IPC: bridge:checkReader');
+  log.info('IPC: checkReader');
   try {
-    const result = await sendBridgeCommand('CHECK_READER');
-    return result;
+    return await sendBridgeCommand('CHECK_READER');
   } catch (err) {
-    log.error('checkReader error:', err);
     return { success: false, error: err.message };
   }
 });
 
 ipcMain.handle('bridge:readCard', async () => {
-  log.info('IPC: bridge:readCard');
+  log.info('IPC: readCard');
   try {
-    const result = await sendBridgeCommand('READ_CARD');
-    return result;
+    return await sendBridgeCommand('READ_CARD');
   } catch (err) {
-    log.error('readCard error:', err);
     return { success: false, error: err.message };
   }
 });
 
 ipcMain.handle('bridge:computeSigillo', async (event, data) => {
-  log.info('IPC: bridge:computeSigillo', data);
+  log.info('IPC: computeSigillo', data);
   try {
     const command = `COMPUTE_SIGILLO:${JSON.stringify(data)}`;
-    const result = await sendBridgeCommand(command);
-    return result;
+    return await sendBridgeCommand(command);
   } catch (err) {
-    log.error('computeSigillo error:', err);
     return { success: false, error: err.message };
   }
 });
@@ -323,23 +368,26 @@ ipcMain.handle('app:getLogPath', () => {
 });
 
 ipcMain.handle('app:getLogs', async () => {
+  return logBuffer;
+});
+
+ipcMain.handle('app:getFullLogs', async () => {
   try {
     const logPath = log.transports.file.getFile().path;
     if (fs.existsSync(logPath)) {
       const content = fs.readFileSync(logPath, 'utf8');
-      // Return last 200 lines
       const lines = content.split('\n');
-      return lines.slice(-200).join('\n');
+      return lines.slice(-300).join('\n');
     }
     return 'Log file non trovato';
   } catch (err) {
-    return `Errore lettura log: ${err.message}`;
+    return `Errore: ${err.message}`;
   }
 });
 
 // App lifecycle
 app.whenReady().then(() => {
-  log.info('App ready, creating window...');
+  log.info('App ready');
   createWindow();
 
   app.on('activate', () => {
@@ -358,7 +406,7 @@ app.on('window-all-closed', () => {
 });
 
 app.on('before-quit', () => {
-  log.info('App quitting...');
+  log.info('Quitting...');
   stopBridge();
 });
 

@@ -13,9 +13,15 @@ contextBridge.exposeInMainWorld('siaeAPI', {
   // SIAE operations
   computeSigillo: (data) => ipcRenderer.invoke('bridge:computeSigillo', data),
   
-  // App utilities
+  // Logging
   getLogPath: () => ipcRenderer.invoke('app:getLogPath'),
   getLogs: () => ipcRenderer.invoke('app:getLogs'),
+  getFullLogs: () => ipcRenderer.invoke('app:getFullLogs'),
+  
+  // Live log updates
+  onLogEntry: (callback) => {
+    ipcRenderer.on('log:entry', (event, entry) => callback(entry));
+  },
   
   // Platform info
   platform: process.platform,
