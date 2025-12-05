@@ -12,6 +12,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   const demoBanner = document.getElementById('demo-banner');
   const btnDemo = document.getElementById('btn-demo');
   const btnRefresh = document.getElementById('btn-refresh');
+  const btnOpenLog = document.getElementById('btn-open-log');
+  const logContent = document.getElementById('log-content');
+  const logContainer = document.getElementById('log-container');
 
   let isDemo = false;
 
