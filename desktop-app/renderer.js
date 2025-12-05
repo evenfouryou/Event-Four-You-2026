@@ -129,4 +129,41 @@ document.addEventListener('DOMContentLoaded', async () => {
     btnRefresh.textContent = 'Aggiorna Stato';
     btnRefresh.disabled = false;
   });
+
+  // Gestione log
+  async function loadLogs() {
+    try {
+      const logs = await window.electronAPI.getLogs();
+      if (logs && logs.length > 0) {
+        const formattedLogs = logs.map(line => {
+          if (!line) return '';
+          let cssClass = 'log-debug';
+          if (line.includes('[INFO]')) cssClass = 'log-info';
+          else if (line.includes('[ERROR]')) cssClass = 'log-error';
+          else if (line.includes('[WARN]')) cssClass = 'log-warn';
+          return `<span class="${cssClass}">${escapeHtml(line)}</span>`;
+        }).join('\n');
+        logContent.innerHTML = formattedLogs;
+        logContainer.scrollTop = logContainer.scrollHeight;
+      }
+    } catch (e) {
+      console.error('Errore caricamento log:', e);
+    }
+  }
+
+  function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
+
+  if (btnOpenLog) {
+    btnOpenLog.addEventListener('click', () => {
+      window.electronAPI.openLogFile();
+    });
+  }
+
+  // Carica log iniziali e aggiorna ogni 3 secondi
+  loadLogs();
+  setInterval(loadLogs, 3000);
 });
