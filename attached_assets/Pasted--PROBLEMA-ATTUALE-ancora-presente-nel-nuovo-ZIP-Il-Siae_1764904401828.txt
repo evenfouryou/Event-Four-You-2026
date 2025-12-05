@@ -1,0 +1,110 @@
+❌ PROBLEMA ATTUALE (ancora presente nel nuovo ZIP)
+👉 Il SiaeBridge.exe NON esiste / non viene compilato → quindi il lettore non può avviarsi.
+
+Ho verificato la cartella:
+
+event-four-you-siae-lettore-main/
+  desktop-app/
+     SiaeBridge/
+        Program.cs
+        LibSiae.cs
+        SiaeBridge.csproj
+
+
+Ma NON esiste la cartella:
+
+desktop-app/SiaeBridge/bin/Release/net472/
+
+
+E quindi NON esistono:
+
+SiaeBridge.exe
+
+libSIAE.dll nella cartella dell'eseguibile
+
+⚠️ Senza l'eseguibile del bridge, l'app non può comunicare con il lettore NFC.
+
+❌ PROBLEMA 2 — la DLL SIAE è ancora nella cartella sbagliata
+
+La tua struttura attuale contiene libSIAE.dll in:
+
+attached_assets/libSIAE.dll
+
+
+Ma il tuo bridge in C# cerca la DLL nella stessa cartella dell’eseguibile, cioè qui:
+
+desktop-app/SiaeBridge/bin/Release/net472/libSIAE.dll
+
+
+Poiché la DLL non è lì → quando Electron tenta di aprire il bridge → il bridge non parte → il lettore appare come "disconnesso".
+
+❌ PROBLEMA 3 — l’app Electron continua a cercare un eseguibile inesistente
+
+In main.js:
+
+const possiblePaths = [
+  path.join(process.resourcesPath, 'SiaeBridge', 'SiaeBridge.exe'),
+  path.join(__dirname, 'SiaeBridge', 'bin', 'Release', 'net472', 'SiaeBridge.exe'),
+  path.join(__dirname, 'SiaeBridge', 'bin', 'Debug', 'net472', 'SiaeBridge.exe'),
+  path.join(__dirname, 'SiaeBridge', 'SiaeBridge.exe'),
+];
+
+
+👉 Nessuno di questi percorsi contiene SiaeBridge.exe, quindi Electron non troverà mai il bridge, né in dev né in build.
+
+🔥 Quindi: perché il lettore “si disconnette” quando metti la card?
+
+Perché in realtà non si disconnette.
+
+Semplicemente il bridge NON è in esecuzione, quindi:
+
+Il lettore non viene inizializzato
+
+L'app non riceve segnali
+
+L'interfaccia mostra "disconnesso"
+
+Quando inserisci la card non succede nulla → la UI interpreta il tutto come errore del lettore
+
+✅ COME RISOLVERE ORA (passo per passo)
+1. Compila il bridge
+
+Da terminale:
+
+cd desktop-app/SiaeBridge
+dotnet build -c Release
+
+
+Dopo la compilazione avrai:
+
+desktop-app/SiaeBridge/bin/Release/net472/SiaeBridge.exe
+
+2. Copia la DLL nella cartella corretta
+
+Da:
+
+attached_assets/libSIAE.dll
+
+
+A:
+
+desktop-app/SiaeBridge/bin/Release/net472/libSIAE.dll
+
+
+⚠ La DLL deve essere versione 32 bit, perché il bridge è compilato per x86.
+
+3. Avvia l’app in sviluppo
+cd desktop-app
+npm install
+npm start
+
+
+Ora il bridge dovrebbe:
+
+avviarsi
+
+comparire nella console
+
+rilevare il lettore
+
+rilevare la card
