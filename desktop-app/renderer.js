@@ -9,6 +9,14 @@ document.addEventListener('DOMContentLoaded', () => {
   const btnClearLogs = document.getElementById('btn-clear-logs');
   const btnExportLogs = document.getElementById('btn-export-logs');
   
+  // Relay elements
+  const btnRelayConnect = document.getElementById('btn-relay-connect');
+  const btnRelayDisconnect = document.getElementById('btn-relay-disconnect');
+  const inputServerUrl = document.getElementById('input-server-url');
+  const inputBridgeToken = document.getElementById('input-bridge-token');
+  const inputCompanyId = document.getElementById('input-company-id');
+  const statusRelay = document.getElementById('status-relay');
+  
   const statusBridge = document.getElementById('status-bridge');
   const statusReader = document.getElementById('status-reader');
   const statusCard = document.getElementById('status-card');
@@ -25,6 +33,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let bridgeConnected = false;
   let readerConnected = false;
   let cardPresent = false;
+  let relayConnected = false;
   let checkInterval = null;
 
   // Initialize
@@ -42,11 +51,111 @@ document.addEventListener('DOMContentLoaded', () => {
     const status = await window.siaeAPI.getBridgeStatus();
     addLog('info', `Bridge path: ${status.bridgePath || 'Non trovato'}`);
     
+    // Load relay config
+    await loadRelayConfig();
+    
     // Setup live log listener
     window.siaeAPI.onLogEntry((entry) => {
       addLogEntry(entry);
     });
+    
+    // Setup status update listener
+    window.siaeAPI.onStatusUpdate((status) => {
+      updateRelayStatusUI(status.relayConnected);
+    });
   }
+  
+  // Relay functions
+  async function loadRelayConfig() {
+    try {
+      const config = await window.siaeAPI.getRelayConfig();
+      if (config) {
+        if (config.serverUrl) inputServerUrl.value = config.serverUrl;
+        if (config.companyId) inputCompanyId.value = config.companyId;
+        updateRelayStatusUI(config.connected);
+        
+        if (config.connected) {
+          addLog('info', 'Relay già connesso');
+        } else if (config.enabled && config.hasToken) {
+          addLog('info', 'Relay configurato, tentativo di connessione...');
+        }
+      }
+    } catch (e) {
+      addLog('error', `Errore caricamento config relay: ${e.message}`);
+    }
+  }
+  
+  function updateRelayStatusUI(connected) {
+    relayConnected = connected;
+    if (connected) {
+      updateStatus(statusRelay, 'connected', 'Connesso');
+      btnRelayConnect.style.display = 'none';
+      btnRelayDisconnect.style.display = 'inline-flex';
+      inputBridgeToken.disabled = true;
+      inputCompanyId.disabled = true;
+    } else {
+      updateStatus(statusRelay, '', 'Non connesso');
+      btnRelayConnect.style.display = 'inline-flex';
+      btnRelayDisconnect.style.display = 'none';
+      inputBridgeToken.disabled = false;
+      inputCompanyId.disabled = false;
+    }
+  }
+  
+  btnRelayConnect.addEventListener('click', async () => {
+    const token = inputBridgeToken.value.trim();
+    const companyId = inputCompanyId.value.trim();
+    
+    if (!token) {
+      addLog('error', 'Inserisci il token bridge');
+      return;
+    }
+    if (!companyId) {
+      addLog('error', 'Inserisci l\'ID azienda');
+      return;
+    }
+    
+    btnRelayConnect.disabled = true;
+    btnRelayConnect.innerHTML = '<span class="btn-icon">⏳</span> Connessione...';
+    addLog('info', 'Connessione al server relay...');
+    
+    try {
+      await window.siaeAPI.setRelayConfig({
+        serverUrl: inputServerUrl.value,
+        token: token,
+        companyId: companyId,
+        enabled: true
+      });
+      
+      // Wait a bit for connection to establish
+      setTimeout(async () => {
+        const status = await window.siaeAPI.getRelayStatus();
+        if (status.connected) {
+          addLog('info', '✓ Connesso al server relay');
+          updateRelayStatusUI(true);
+        } else {
+          addLog('warn', 'Connessione in corso...');
+        }
+        btnRelayConnect.disabled = false;
+        btnRelayConnect.innerHTML = '<span class="btn-icon">🌐</span> Connetti al Server';
+      }, 2000);
+      
+    } catch (e) {
+      addLog('error', `Errore connessione relay: ${e.message}`);
+      btnRelayConnect.disabled = false;
+      btnRelayConnect.innerHTML = '<span class="btn-icon">🌐</span> Connetti al Server';
+    }
+  });
+  
+  btnRelayDisconnect.addEventListener('click', async () => {
+    try {
+      await window.siaeAPI.disconnectRelay();
+      updateRelayStatusUI(false);
+      addLog('info', 'Disconnesso dal server relay');
+    } catch (e) {
+      addLog('error', `Errore disconnessione: ${e.message}`);
+    }
+  });
 
   // Event Handlers
   btnConnect.addEventListener('click', async () => {

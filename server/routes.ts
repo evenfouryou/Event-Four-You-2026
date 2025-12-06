@@ -52,6 +52,9 @@ import { z } from "zod";
 import nodemailer from "nodemailer";
 import { db } from "./db";
 import { eq, and } from "drizzle-orm";
+import crypto from "crypto";
+import { companies } from "@shared/schema";
+import { setupBridgeRelay, isBridgeConnected } from "./bridge-relay";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Setup passport for classic email/password authentication (no Replit OAuth)
@@ -4503,6 +4506,67 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ===== BRIDGE RELAY API =====
+  
+  // Generate a bridge token for the current user's company
+  app.get('/api/bridge/token', isAuthenticated, async (req: any, res) => {
+    try {
+      const companyId = await getUserCompanyId(req);
+      if (!companyId) {
+        return res.status(403).json({ message: "No company associated with your account" });
+      }
+      
+      // Check if user is admin or super admin
+      const userRole = req.user?.role;
+      if (userRole !== 'super_admin' && userRole !== 'gestore') {
+        return res.status(403).json({ message: "Only administrators can generate bridge tokens" });
+      }
+      
+      // Generate a new token
+      const token = crypto.randomBytes(32).toString('hex');
+      
+      // Update the company with the new bridge token
+      await db
+        .update(companies)
+        .set({ bridgeToken: token, updatedAt: new Date() })
+        .where(eq(companies.id, companyId));
+      
+      res.json({ 
+        token, 
+        companyId,
+        message: "Bridge token generated successfully. Use this token to connect the desktop bridge application." 
+      });
+    } catch (error: any) {
+      console.error('[Bridge] Error generating token:', error);
+      res.status(500).json({ message: "Failed to generate bridge token" });
+    }
+  });
+  
+  // Check if a bridge is connected for the current user's company
+  app.get('/api/bridge/status', isAuthenticated, async (req: any, res) => {
+    try {
+      const companyId = await getUserCompanyId(req);
+      if (!companyId) {
+        return res.status(403).json({ message: "No company associated with your account" });
+      }
+      
+      const connected = isBridgeConnected(companyId);
+      
+      res.json({ 
+        connected,
+        companyId,
+        message: connected ? "Bridge desktop app is connected" : "Bridge desktop app is not connected"
+      });
+    } catch (error: any) {
+      console.error('[Bridge] Error checking status:', error);
+      res.status(500).json({ message: "Failed to check bridge status" });
+    }
+  });
+
   const httpServer = createServer(app);
+  
+  // Setup WebSocket bridge relay
+  setupBridgeRelay(httpServer);
+  
   return httpServer;
 }

@@ -43,6 +43,19 @@ let bridgePath = null;
 let wsServer = null;
 let wsClients = new Set();
 
+// Remote relay connection
+let relayWs = null;
+let relayReconnectTimer = null;
+let relayConfig = {
+  serverUrl: 'wss://manage.eventfouryou.com',
+  token: null,
+  companyId: null,
+  enabled: false
+};
+const RELAY_RECONNECT_DELAY = 5000;
+const RELAY_HEARTBEAT_INTERVAL = 30000;
+let relayHeartbeatTimer = null;
+
 // Current status for WebSocket clients
 let currentStatus = {
   bridgeConnected: false,
@@ -52,7 +65,8 @@ let currentStatus = {
   cardSerial: null,
   cardAtr: null,
   demoMode: false,
-  canEmitTickets: false
+  canEmitTickets: false,
+  relayConnected: false
 };
 
 // Log buffer for live updates
@@ -497,6 +511,8 @@ function updateStatus(newData) {
 
 function broadcastStatus() {
   const message = JSON.stringify({ type: 'status', data: currentStatus });
+  
+  // Broadcast to local WebSocket clients
   wsClients.forEach(client => {
     if (client.readyState === WebSocket.OPEN) {
       try {
@@ -506,6 +522,282 @@ function broadcastStatus() {
       }
     }
   });
+  
+  // Broadcast to remote relay
+  if (relayWs && relayWs.readyState === WebSocket.OPEN) {
+    try {
+      relayWs.send(message);
+    } catch (e) {
+      log.error('Error broadcasting to relay:', e.message);
+    }
+  }
+}
+
+// ============================================
+// Remote Relay Connection to manage.eventfouryou.com
+// ============================================
+
+function connectToRelay() {
+  if (!relayConfig.enabled || !relayConfig.token || !relayConfig.companyId) {
+    log.info('Relay not configured, skipping connection');
+    return;
+  }
+  
+  if (relayWs && relayWs.readyState === WebSocket.OPEN) {
+    log.info('Relay already connected');
+    return;
+  }
+  
+  const relayUrl = `${relayConfig.serverUrl}/ws/bridge`;
+  log.info(`Connecting to relay: ${relayUrl}`);
+  
+  try {
+    relayWs = new WebSocket(relayUrl);
+    
+    relayWs.on('open', () => {
+      log.info('Relay WebSocket connected');
+      
+      // Clear reconnect timer
+      if (relayReconnectTimer) {
+        clearTimeout(relayReconnectTimer);
+        relayReconnectTimer = null;
+      }
+      
+      // Register as bridge
+      const registerMsg = {
+        type: 'bridge_register',
+        token: relayConfig.token,
+        companyId: relayConfig.companyId
+      };
+      relayWs.send(JSON.stringify(registerMsg));
+      log.info('Sent bridge_register to relay');
+      
+      // Start heartbeat
+      startRelayHeartbeat();
+    });
+    
+    relayWs.on('message', async (data) => {
+      try {
+        const msg = JSON.parse(data.toString());
+        log.info('Relay message received:', msg.type);
+        
+        if (msg.type === 'bridge_register_response') {
+          if (msg.success) {
+            log.info('✓ Registered with relay successfully');
+            updateStatus({ relayConnected: true });
+            
+            // Send current status to relay
+            broadcastStatus();
+          } else {
+            log.error('Relay registration failed:', msg.error);
+            updateStatus({ relayConnected: false });
+          }
+        } else if (msg.type === 'ping') {
+          relayWs.send(JSON.stringify({ type: 'pong' }));
+        } else if (msg.type === 'pong') {
+          // Heartbeat response, connection is alive
+        } else {
+          // Handle commands from web clients via relay
+          await handleRelayCommand(msg);
+        }
+      } catch (e) {
+        log.error('Relay message parse error:', e.message);
+      }
+    });
+    
+    relayWs.on('close', () => {
+      log.info('Relay WebSocket disconnected');
+      relayWs = null;
+      updateStatus({ relayConnected: false });
+      stopRelayHeartbeat();
+      scheduleRelayReconnect();
+    });
+    
+    relayWs.on('error', (err) => {
+      log.error('Relay WebSocket error:', err.message);
+      relayWs = null;
+      updateStatus({ relayConnected: false });
+      stopRelayHeartbeat();
+      scheduleRelayReconnect();
+    });
+    
+  } catch (err) {
+    log.error('Failed to connect to relay:', err.message);
+    scheduleRelayReconnect();
+  }
+}
+
+function scheduleRelayReconnect() {
+  if (relayReconnectTimer) return;
+  if (!relayConfig.enabled) return;
+  
+  log.info(`Scheduling relay reconnect in ${RELAY_RECONNECT_DELAY}ms`);
+  relayReconnectTimer = setTimeout(() => {
+    relayReconnectTimer = null;
+    connectToRelay();
+  }, RELAY_RECONNECT_DELAY);
+}
+
+function startRelayHeartbeat() {
+  stopRelayHeartbeat();
+  relayHeartbeatTimer = setInterval(() => {
+    if (relayWs && relayWs.readyState === WebSocket.OPEN) {
+      try {
+        relayWs.send(JSON.stringify({ type: 'ping' }));
+      } catch (e) {
+        log.error('Relay heartbeat error:', e.message);
+      }
+    }
+  }, RELAY_HEARTBEAT_INTERVAL);
+}
+
+function stopRelayHeartbeat() {
+  if (relayHeartbeatTimer) {
+    clearInterval(relayHeartbeatTimer);
+    relayHeartbeatTimer = null;
+  }
+}
+
+function disconnectRelay() {
+  stopRelayHeartbeat();
+  if (relayReconnectTimer) {
+    clearTimeout(relayReconnectTimer);
+    relayReconnectTimer = null;
+  }
+  if (relayWs) {
+    relayWs.close();
+    relayWs = null;
+  }
+  updateStatus({ relayConnected: false });
+}
+
+async function handleRelayCommand(msg) {
+  // Commands from web clients via relay
+  const sendRelayResponse = (type, data) => {
+    if (relayWs && relayWs.readyState === WebSocket.OPEN) {
+      relayWs.send(JSON.stringify({ type, ...data }));
+    }
+  };
+  
+  switch (msg.type) {
+    case 'get_status':
+      sendRelayResponse('status', { data: currentStatus });
+      break;
+      
+    case 'connect':
+      try {
+        await startBridge();
+        const result = await sendBridgeCommand('CHECK_READER');
+        updateStatus({
+          bridgeConnected: true,
+          readerConnected: result.readerConnected || false,
+          cardInserted: result.cardPresent || false,
+          readerName: result.readerName || 'BIT4ID miniLector EVO',
+          cardSerial: result.cardSerial || null
+        });
+        sendRelayResponse('status', { data: currentStatus });
+      } catch (err) {
+        sendRelayResponse('error', { error: err.message });
+      }
+      break;
+      
+    case 'checkReader':
+      try {
+        const result = await sendBridgeCommand('CHECK_READER');
+        updateStatus({
+          readerConnected: result.readerConnected || false,
+          cardInserted: result.cardPresent || false,
+          readerName: result.readerName || null
+        });
+        sendRelayResponse('status', { data: currentStatus });
+      } catch (err) {
+        sendRelayResponse('error', { error: err.message });
+      }
+      break;
+      
+    case 'readCard':
+      try {
+        const result = await sendBridgeCommand('READ_CARD');
+        if (result.success) {
+          updateStatus({
+            cardSerial: result.serialNumber,
+            cardInserted: true
+          });
+        }
+        sendRelayResponse('cardData', { success: true, data: result });
+      } catch (err) {
+        sendRelayResponse('error', { error: err.message });
+      }
+      break;
+      
+    case 'requestSeal':
+      try {
+        const sealData = msg.data || {};
+        const price = sealData.price || 0;
+        const result = await sendBridgeCommand(`COMPUTE_SIGILLO:${JSON.stringify({ price })}`);
+        if (result.success && result.sigillo) {
+          sendRelayResponse('sealResponse', {
+            success: true,
+            seal: {
+              sealCode: result.sigillo.mac,
+              sealNumber: `${result.sigillo.serialNumber}-${result.sigillo.counter}`,
+              serialNumber: result.sigillo.serialNumber,
+              counter: result.sigillo.counter,
+              mac: result.sigillo.mac,
+              dateTime: result.sigillo.dateTime
+            }
+          });
+        } else {
+          sendRelayResponse('sealResponse', { success: false, error: result.error || 'Sigillo fallito' });
+        }
+      } catch (err) {
+        sendRelayResponse('sealResponse', { success: false, error: err.message });
+      }
+      break;
+      
+    case 'enableDemo':
+      updateStatus({ demoMode: true, cardInserted: true, readerConnected: true });
+      sendRelayResponse('status', { data: currentStatus });
+      break;
+      
+    case 'disableDemo':
+      updateStatus({ demoMode: false });
+      sendRelayResponse('status', { data: currentStatus });
+      break;
+      
+    default:
+      log.warn('Unknown relay command:', msg.type);
+  }
+}
+
+// Load relay config from file
+function loadRelayConfig() {
+  try {
+    const configPath = path.join(app.getPath('userData'), 'relay-config.json');
+    if (fs.existsSync(configPath)) {
+      const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+      relayConfig = { ...relayConfig, ...config };
+      log.info('Relay config loaded:', { 
+        serverUrl: relayConfig.serverUrl, 
+        companyId: relayConfig.companyId,
+        enabled: relayConfig.enabled,
+        hasToken: !!relayConfig.token
+      });
+    }
+  } catch (e) {
+    log.error('Failed to load relay config:', e.message);
+  }
+}
+
+// Save relay config to file
+function saveRelayConfig() {
+  try {
+    const configPath = path.join(app.getPath('userData'), 'relay-config.json');
+    fs.writeFileSync(configPath, JSON.stringify(relayConfig, null, 2));
+    log.info('Relay config saved');
+  } catch (e) {
+    log.error('Failed to save relay config:', e.message);
+  }
 }
 
 // Periodic status check
@@ -612,11 +904,89 @@ ipcMain.handle('app:getFullLogs', async () => {
   }
 });
 
+// Relay configuration IPC handlers
+ipcMain.handle('relay:getConfig', () => {
+  return {
+    serverUrl: relayConfig.serverUrl,
+    companyId: relayConfig.companyId,
+    enabled: relayConfig.enabled,
+    hasToken: !!relayConfig.token,
+    connected: currentStatus.relayConnected
+  };
+});
+
+ipcMain.handle('relay:setConfig', (event, config) => {
+  log.info('IPC: relay:setConfig', { 
+    serverUrl: config.serverUrl, 
+    companyId: config.companyId,
+    enabled: config.enabled,
+    hasToken: !!config.token
+  });
+  
+  // Disconnect existing connection if config changes
+  if (relayConfig.enabled && relayWs) {
+    disconnectRelay();
+  }
+  
+  relayConfig = {
+    serverUrl: config.serverUrl || relayConfig.serverUrl,
+    token: config.token || relayConfig.token,
+    companyId: config.companyId || relayConfig.companyId,
+    enabled: config.enabled !== undefined ? config.enabled : relayConfig.enabled
+  };
+  
+  saveRelayConfig();
+  
+  // Connect if enabled
+  if (relayConfig.enabled) {
+    connectToRelay();
+  }
+  
+  return { success: true };
+});
+
+ipcMain.handle('relay:connect', () => {
+  log.info('IPC: relay:connect');
+  if (!relayConfig.token || !relayConfig.companyId) {
+    return { success: false, error: 'Token e Company ID richiesti' };
+  }
+  relayConfig.enabled = true;
+  saveRelayConfig();
+  connectToRelay();
+  return { success: true };
+});
+
+ipcMain.handle('relay:disconnect', () => {
+  log.info('IPC: relay:disconnect');
+  relayConfig.enabled = false;
+  saveRelayConfig();
+  disconnectRelay();
+  return { success: true };
+});
+
+ipcMain.handle('relay:status', () => {
+  return {
+    connected: currentStatus.relayConnected,
+    enabled: relayConfig.enabled,
+    serverUrl: relayConfig.serverUrl
+  };
+});
+
 // App lifecycle
 app.whenReady().then(() => {
   log.info('App ready');
+  
+  // Load relay config before creating window
+  loadRelayConfig();
+  
   createWindow();
   startWebSocketServer();
+  
+  // Connect to relay if configured
+  if (relayConfig.enabled) {
+    log.info('Auto-connecting to relay...');
+    connectToRelay();
+  }
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
@@ -628,6 +998,7 @@ app.whenReady().then(() => {
 app.on('window-all-closed', () => {
   log.info('All windows closed');
   stopStatusPolling();
+  disconnectRelay();
   stopBridge();
   if (wsServer) {
     wsServer.close();
@@ -640,6 +1011,7 @@ app.on('window-all-closed', () => {
 
 app.on('before-quit', () => {
   log.info('Quitting...');
+  disconnectRelay();
   stopBridge();
 });
 

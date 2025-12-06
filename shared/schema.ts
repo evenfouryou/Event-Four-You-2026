@@ -62,6 +62,7 @@ export const companies = pgTable("companies", {
   taxId: varchar("tax_id", { length: 100 }),
   address: text("address"),
   active: boolean("active").notNull().default(true),
+  bridgeToken: varchar("bridge_token", { length: 64 }),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

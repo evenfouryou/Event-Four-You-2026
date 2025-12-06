@@ -27,9 +27,47 @@
 
     <!-- Main Content -->
     <main class="main-content">
+      <!-- Remote Relay Panel -->
+      <section class="panel relay-panel">
+        <h2>Connessione Remota</h2>
+        <div class="status-grid">
+          <div class="status-item" id="status-relay">
+            <div class="status-indicator"></div>
+            <div class="status-info">
+              <span class="status-label">Server Relay</span>
+              <span class="status-value">Non connesso</span>
+            </div>
+          </div>
+        </div>
+        <div class="relay-config" id="relay-config">
+          <div class="form-group">
+            <label for="input-server-url">Server URL</label>
+            <input type="text" id="input-server-url" value="wss://manage.eventfouryou.com" readonly>
+          </div>
+          <div class="form-group">
+            <label for="input-bridge-token">Token Bridge</label>
+            <input type="password" id="input-bridge-token" placeholder="Incolla il token dalla dashboard web">
+          </div>
+          <div class="form-group">
+            <label for="input-company-id">ID Azienda</label>
+            <input type="text" id="input-company-id" placeholder="Es: 1">
+          </div>
+        </div>
+        <div class="status-actions">
+          <button id="btn-relay-connect" class="btn btn-success">
+            <span class="btn-icon">🌐</span>
+            Connetti al Server
+          </button>
+          <button id="btn-relay-disconnect" class="btn btn-secondary" style="display: none;">
+            <span class="btn-icon">❌</span>
+            Disconnetti
+          </button>
+        </div>
+      </section>
+
       <!-- Status Panel -->
       <section class="panel status-panel">
-        <h2>Stato Connessione</h2>
+        <h2>Stato Connessione Locale</h2>
         <div class="status-grid">
           <div class="status-item" id="status-bridge">
             <div class="status-indicator"></div>

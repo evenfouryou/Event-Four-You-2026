@@ -446,3 +446,29 @@ body {
 .loading {
   animation: pulse 1.5s infinite;
 }
+
+/* Relay Panel */
+.relay-panel {
+  border: 2px solid var(--accent-primary);
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.05), var(--bg-secondary));
+}
+
+.relay-panel h2 {
+  color: var(--accent-primary);
+}
+
+.relay-config {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.relay-config .form-group input[readonly] {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.relay-config .form-group input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

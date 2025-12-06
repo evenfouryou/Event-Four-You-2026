@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -15,12 +16,13 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Building2, Save, User, Mail, Shield } from "lucide-react";
+import { Building2, Save, User, Mail, Shield, Monitor, Key, Copy, RefreshCw, CheckCircle2, XCircle, Wifi } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { motion } from "framer-motion";
 import type { Company } from "@shared/schema";
+import { useSmartCardStatus } from "@/lib/smart-card-service";
 
 const settingsSchema = z.object({
   name: z.string().min(1, "Il nome è obbligatorio"),
@@ -33,10 +35,56 @@ type SettingsForm = z.infer<typeof settingsSchema>;
 export default function Settings() {
   const { toast } = useToast();
   const { user } = useAuth();
+  const smartCardStatus = useSmartCardStatus();
+  const [bridgeToken, setBridgeToken] = useState<string | null>(null);
+  const [tokenCopied, setTokenCopied] = useState(false);
 
   const { data: company, isLoading } = useQuery<Company>({
     queryKey: ['/api/companies/current'],
   });
+  
+  const [tokenCompanyId, setTokenCompanyId] = useState<string | null>(null);
+  
+  const generateTokenMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest('GET', `/api/bridge/token`);
+      return res.json();
+    },
+    onSuccess: (data: { token: string; companyId: string }) => {
+      setBridgeToken(data.token);
+      setTokenCompanyId(data.companyId);
+      queryClient.invalidateQueries({ queryKey: ['/api/companies/current'] });
+      toast({
+        title: "Token Generato",
+        description: "Copia il token e incollalo nell'app desktop Event4U",
+      });
+    },
+    onError: (error: Error) => {
+      if (isUnauthorizedError(error)) {
+        toast({
+          title: "Non autorizzato",
+          description: "Effettua nuovamente il login...",
+          variant: "destructive",
+        });
+        setTimeout(() => window.location.href = '/login', 500);
+        return;
+      }
+      toast({
+        title: "Errore",
+        description: "Impossibile generare il token",
+        variant: "destructive",
+      });
+    },
+  });
+  
+  const copyToken = () => {
+    if (bridgeToken) {
+      navigator.clipboard.writeText(bridgeToken);
+      setTokenCopied(true);
+      toast({ title: "Copiato!", description: "Token copiato negli appunti" });
+      setTimeout(() => setTokenCopied(false), 2000);
+    }
+  };
 
   const form = useForm<SettingsForm>({
     resolver: zodResolver(settingsSchema),
@@ -256,6 +304,128 @@ export default function Settings() {
                 </p>
               </div>
             </div>
+          )}
+        </div>
+      </motion.div>
+
+      {/* Bridge Lettore Smart Card Section */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.3 }}
+        className="glass-card p-6 mt-6"
+        data-testid="card-bridge-config"
+      >
+        <div className="flex items-center gap-3 mb-6">
+          <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center">
+            <Monitor className="h-5 w-5 text-white" />
+          </div>
+          <div>
+            <h2 className="text-lg font-semibold">Bridge Lettore Smart Card</h2>
+            <p className="text-sm text-muted-foreground">Collega l'app desktop per emissione biglietti SIAE</p>
+          </div>
+        </div>
+
+        {/* Connection Status */}
+        <div className="rounded-xl bg-muted/30 p-4 mb-6">
+          <div className="flex items-center gap-3 mb-4">
+            <div className={`w-3 h-3 rounded-full ${smartCardStatus.connected ? 'bg-green-500' : 'bg-red-500'}`} />
+            <span className="font-medium">
+              {smartCardStatus.connected ? 'Desktop collegato' : 'Desktop non collegato'}
+            </span>
+          </div>
+          
+          <div className="grid gap-3 sm:grid-cols-3 text-sm">
+            <div className="flex items-center gap-2">
+              <Wifi className={`h-4 w-4 ${smartCardStatus.relayConnected ? 'text-green-500' : 'text-muted-foreground'}`} />
+              <span className="text-muted-foreground">Server:</span>
+              <span className={smartCardStatus.relayConnected ? 'text-green-600' : 'text-red-500'}>
+                {smartCardStatus.relayConnected ? 'Connesso' : 'Non connesso'}
+              </span>
+            </div>
+            
+            <div className="flex items-center gap-2">
+              <Monitor className={`h-4 w-4 ${smartCardStatus.bridgeConnected ? 'text-green-500' : 'text-muted-foreground'}`} />
+              <span className="text-muted-foreground">Bridge .NET:</span>
+              <span className={smartCardStatus.bridgeConnected ? 'text-green-600' : 'text-muted-foreground'}>
+                {smartCardStatus.bridgeConnected ? 'Attivo' : 'Non attivo'}
+              </span>
+            </div>
+            
+            <div className="flex items-center gap-2">
+              {smartCardStatus.readerDetected ? (
+                <CheckCircle2 className="h-4 w-4 text-green-500" />
+              ) : (
+                <XCircle className="h-4 w-4 text-muted-foreground" />
+              )}
+              <span className="text-muted-foreground">Lettore:</span>
+              <span className={smartCardStatus.readerDetected ? 'text-green-600' : 'text-muted-foreground'}>
+                {smartCardStatus.readerDetected ? (smartCardStatus.readerName || 'Rilevato') : 'Non rilevato'}
+              </span>
+            </div>
+          </div>
+          
+          {smartCardStatus.error && !smartCardStatus.demoMode && (
+            <div className="mt-3 text-sm text-amber-600 dark:text-amber-400">
+              {smartCardStatus.error}
+            </div>
+          )}
+        </div>
+
+        {/* Bridge Token Section */}
+        <div className="border-t border-border/50 pt-6">
+          <div className="flex items-center gap-2 mb-3">
+            <Key className="h-4 w-4 text-muted-foreground" />
+            <h3 className="font-medium">Token di Connessione</h3>
+          </div>
+          
+          <p className="text-sm text-muted-foreground mb-4">
+            Genera un token univoco per collegare l'app desktop Event4U. 
+            Copia il token e incollalo nella sezione "Connessione Remota" dell'applicazione desktop.
+          </p>
+          
+          {bridgeToken ? (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <Input 
+                  value={bridgeToken} 
+                  readOnly 
+                  className="font-mono text-sm"
+                  data-testid="input-bridge-token"
+                />
+                <Button
+                  size="icon"
+                  variant="outline"
+                  onClick={copyToken}
+                  data-testid="button-copy-token"
+                >
+                  {tokenCopied ? <CheckCircle2 className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                ID Azienda: <span className="font-mono font-medium" data-testid="text-company-id-for-bridge">{tokenCompanyId || company?.id}</span>
+              </p>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => generateTokenMutation.mutate()}
+                disabled={generateTokenMutation.isPending}
+                data-testid="button-regenerate-token"
+              >
+                <RefreshCw className={`h-4 w-4 mr-2 ${generateTokenMutation.isPending ? 'animate-spin' : ''}`} />
+                Rigenera Token
+              </Button>
+            </div>
+          ) : (
+            <Button
+              onClick={() => generateTokenMutation.mutate()}
+              disabled={generateTokenMutation.isPending}
+              className="gradient-golden text-black font-semibold hover:opacity-90"
+              data-testid="button-generate-token"
+            >
+              <Key className="h-4 w-4 mr-2" />
+              {generateTokenMutation.isPending ? 'Generazione...' : 'Genera Token Bridge'}
+            </Button>
           )}
         </div>
       </motion.div>

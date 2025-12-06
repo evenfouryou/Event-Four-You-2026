@@ -23,6 +23,18 @@ contextBridge.exposeInMainWorld('siaeAPI', {
     ipcRenderer.on('log:entry', (event, entry) => callback(entry));
   },
   
+  // Status updates from main process
+  onStatusUpdate: (callback) => {
+    ipcRenderer.on('status:update', (event, status) => callback(status));
+  },
+  
+  // Remote Relay control
+  getRelayConfig: () => ipcRenderer.invoke('relay:getConfig'),
+  setRelayConfig: (config) => ipcRenderer.invoke('relay:setConfig', config),
+  connectRelay: () => ipcRenderer.invoke('relay:connect'),
+  disconnectRelay: () => ipcRenderer.invoke('relay:disconnect'),
+  getRelayStatus: () => ipcRenderer.invoke('relay:status'),
+  
   // Platform info
   platform: process.platform,
   arch: process.arch
