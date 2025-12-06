@@ -220,13 +220,18 @@ async function handleBridgeRegistration(
   }
 
   try {
+    console.log(`[Bridge] Registration attempt: companyId=${companyId}, token=${token?.substring(0, 8)}...`);
+    
     const company = await db
       .select()
       .from(companies)
       .where(eq(companies.id, companyId))
       .limit(1);
 
+    console.log(`[Bridge] Company query result: found=${company.length > 0}`);
+
     if (company.length === 0) {
+      console.log(`[Bridge] Registration failed: Company not found for id=${companyId}`);
       ws.send(JSON.stringify({
         type: 'bridge_register_response',
         success: false,
@@ -235,7 +240,11 @@ async function handleBridgeRegistration(
       return { success: false, error: 'Company not found' };
     }
 
-    if (company[0].bridgeToken !== token) {
+    const storedToken = company[0].bridgeToken;
+    console.log(`[Bridge] Token check: stored=${storedToken?.substring(0, 8)}..., provided=${token?.substring(0, 8)}...`);
+    
+    if (storedToken !== token) {
+      console.log(`[Bridge] Registration failed: Invalid token`);
       ws.send(JSON.stringify({
         type: 'bridge_register_response',
         success: false,
@@ -264,12 +273,13 @@ async function handleBridgeRegistration(
     }));
 
     return { success: true, companyId };
-  } catch (error) {
-    console.error('[Bridge] Error during bridge registration:', error);
+  } catch (error: any) {
+    console.error('[Bridge] Error during bridge registration:', error?.message || error);
+    console.error('[Bridge] Stack trace:', error?.stack);
     ws.send(JSON.stringify({
       type: 'bridge_register_response',
       success: false,
-      error: 'Internal server error',
+      error: `Internal server error: ${error?.message || 'Unknown error'}`,
     }));
     return { success: false, error: 'Internal server error' };
   }
