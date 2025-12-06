@@ -74,6 +74,12 @@ A comprehensive SIAE-compliant event ticketing and fiscal management system for 
 - Role-based authorization (requireGestore, requireOrganizer)
 - Proper 404/403 responses for access control
 
+**Feature Activation:**
+- SIAE module is disabled by default for all users
+- Super Admin can enable/disable SIAE for individual gestore users via the Users page
+- When siaeEnabled=true, the "Biglietteria SIAE" section appears in the sidebar for that gestore
+- Feature toggle stored in user_features table (siaeEnabled field)
+
 ### Progressive Web App (PWA)
 Event4U is a fully installable PWA with:
 - **manifest.json**: App metadata, icons, and shortcuts for installation
