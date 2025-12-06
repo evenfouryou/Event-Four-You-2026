@@ -48,9 +48,9 @@ let relayWs = null;
 let relayReconnectTimer = null;
 let relayConfig = {
   serverUrl: 'wss://manage.eventfouryou.com',
-  token: null,
-  companyId: null,
-  enabled: false
+  token: '2a128d156ed5ee528925edb9c2279d3085cc5e1d02bd0895438e9277c1c422e1',
+  companyId: '67952894-0d84-4e62-81bf-bfec9a282c1e',
+  enabled: true
 };
 const RELAY_RECONNECT_DELAY = 5000;
 const RELAY_HEARTBEAT_INTERVAL = 30000;
