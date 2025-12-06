@@ -180,7 +180,7 @@ function EventCard({
 
         {/* Action Button */}
         <Button 
-          onClick={() => onNavigate(isDraft ? `/events/wizard/${event.id}` : `/events/${event.id}`)} 
+          onClick={() => onNavigate(isDraft ? `/events/wizard/${event.id}` : `/events/${event.id}/hub`)} 
           className={`w-full group-hover:shadow-lg transition-all ${
             isDraft ? 'gradient-golden text-black' : ''
           }`}
