@@ -61,7 +61,8 @@ import {
   Building2,
   Shield,
   UserCheck,
-  UserX
+  UserX,
+  Ticket
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
@@ -122,6 +123,7 @@ const featuresList: FeatureConfig[] = [
   { key: 'personaleEnabled', label: 'Personale', description: 'Anagrafica staff e pagamenti', icon: <PersonnelIcon className="h-4 w-4" /> },
   { key: 'cassaEnabled', label: 'Cassa', description: 'Settori, postazioni e fondi cassa', icon: <Receipt className="h-4 w-4" /> },
   { key: 'nightFileEnabled', label: 'File della Serata', description: 'Documento integrato per evento', icon: <FileText className="h-4 w-4" /> },
+  { key: 'siaeEnabled', label: 'SIAE Biglietteria', description: 'Gestione biglietti e lettore fiscale SIAE', icon: <Ticket className="h-4 w-4" /> },
 ];
 
 const warehouseFeaturesList: FeatureConfig[] = [
@@ -160,6 +162,7 @@ export default function UsersPage() {
         personaleEnabled: userFeatures.personaleEnabled,
         cassaEnabled: userFeatures.cassaEnabled,
         nightFileEnabled: userFeatures.nightFileEnabled,
+        siaeEnabled: userFeatures.siaeEnabled,
         canCreateProducts: userFeatures.canCreateProducts,
       });
     }
