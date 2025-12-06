@@ -1,0 +1,299 @@
+  initResult: 3,
+  message: 'Carta SIAE rilevata e pronta!'
+}
+[2025-12-06 13:27:00.876] [info]  IPC: checkReader
+[2025-12-06 13:27:00.878] [info]  >> Command: CHECK_READER
+[2025-12-06 13:27:00.891] [info]  [Bridge] {"success":true,"readerConnected":true,"cardPresent":true,"slot":0,"cardState":"PRESENT","initResult":3,"message":"Carta SIAE rilevata e pronta!"}
+[2025-12-06 13:27:00.892] [info]  << Response: {
+  success: true,
+  readerConnected: true,
+  cardPresent: true,
+  slot: 0,
+  cardState: 'PRESENT',
+  initResult: 3,
+  message: 'Carta SIAE rilevata e pronta!'
+}
+[2025-12-06 13:27:03.868] [info]  IPC: checkReader
+[2025-12-06 13:27:03.870] [info]  >> Command: CHECK_READER
+[2025-12-06 13:27:03.879] [info]  [Bridge] {"success":true,"readerConnected":true,"cardPresent":true,"slot":0,"cardState":"PRESENT","initResult":3,"message":"Carta SIAE rilevata e pronta!"}
+[2025-12-06 13:27:03.880] [info]  << Response: {
+  success: true,
+  readerConnected: true,
+  cardPresent: true,
+  slot: 0,
+  cardState: 'PRESENT',
+  initResult: 3,
+  message: 'Carta SIAE rilevata e pronta!'
+}
+[2025-12-06 13:27:06.867] [info]  IPC: checkReader
+[2025-12-06 13:27:06.869] [info]  >> Command: CHECK_READER
+[2025-12-06 13:27:06.880] [info]  [Bridge] {"success":true,"readerConnected":true,"cardPresent":true,"slot":0,"cardState":"PRESENT","initResult":3,"message":"Carta SIAE rilevata e pronta!"}
+[2025-12-06 13:27:06.881] [info]  << Response: {
+  success: true,
+  readerConnected: true,
+  cardPresent: true,
+  slot: 0,
+  cardState: 'PRESENT',
+  initResult: 3,
+  message: 'Carta SIAE rilevata e pronta!'
+}
+[2025-12-06 13:27:09.874] [info]  IPC: checkReader
+[2025-12-06 13:27:09.875] [info]  >> Command: CHECK_READER
+[2025-12-06 13:27:09.884] [info]  [Bridge] {"success":true,"readerConnected":true,"cardPresent":true,"slot":0,"cardState":"PRESENT","initResult":3,"message":"Carta SIAE rilevata e pronta!"}
+[2025-12-06 13:27:09.886] [info]  << Response: {
+  success: true,
+  readerConnected: true,
+  cardPresent: true,
+  slot: 0,
+  cardState: 'PRESENT',
+  initResult: 3,
+  message: 'Carta SIAE rilevata e pronta!'
+}
+[2025-12-06 13:27:12.878] [info]  IPC: checkReader
+[2025-12-06 13:27:12.879] [info]  >> Command: CHECK_READER
+[2025-12-06 13:27:12.890] [info]  [Bridge] {"success":true,"readerConnected":true,"cardPresent":true,"slot":0,"cardState":"PRESENT","initResult":3,"message":"Carta SIAE rilevata e pronta!"}
+[2025-12-06 13:27:12.891] [info]  << Response: {
+  success: true,
+  readerConnected: true,
+  cardPresent: true,
+  slot: 0,
+  cardState: 'PRESENT',
+  initResult: 3,
+  message: 'Carta SIAE rilevata e pronta!'
+}
+[2025-12-06 13:27:15.876] [info]  IPC: checkReader
+[2025-12-06 13:27:15.880] [info]  >> Command: CHECK_READER
+[2025-12-06 13:27:15.902] [info]  [Bridge] {"success":true,"readerConnected":true,"cardPresent":true,"slot":0,"cardState":"PRESENT","initResult":3,"message":"Carta SIAE rilevata e pronta!"}
+[2025-12-06 13:27:15.904] [info]  << Response: {
+  success: true,
+  readerConnected: true,
+  cardPresent: true,
+  slot: 0,
+  cardState: 'PRESENT',
+  initResult: 3,
+  message: 'Carta SIAE rilevata e pronta!'
+}
+[2025-12-06 13:27:18.872] [info]  IPC: checkReader
+[2025-12-06 13:27:18.875] [info]  >> Command: CHECK_READER
+[2025-12-06 13:27:18.897] [info]  [Bridge] {"success":true,"readerConnected":true,"cardPresent":true,"slot":0,"cardState":"PRESENT","initResult":3,"message":"Carta SIAE rilevata e pronta!"}
+[2025-12-06 13:27:18.898] [info]  << Response: {
+  success: true,
+  readerConnected: true,
+  cardPresent: true,
+  slot: 0,
+  cardState: 'PRESENT',
+  initResult: 3,
+  message: 'Carta SIAE rilevata e pronta!'
+}
+[2025-12-06 13:27:21.874] [info]  IPC: checkReader
+[2025-12-06 13:27:21.875] [info]  >> Command: CHECK_READER
+[2025-12-06 13:27:21.881] [info]  [Bridge] {"success":true,"readerConnected":true,"cardPresent":true,"slot":0,"cardState":"PRESENT","initResult":3,"message":"Carta SIAE rilevata e pronta!"}
+[2025-12-06 13:27:21.882] [info]  << Response: {
+  success: true,
+  readerConnected: true,
+  cardPresent: true,
+  slot: 0,
+  cardState: 'PRESENT',
+  initResult: 3,
+  message: 'Carta SIAE rilevata e pronta!'
+}
+[2025-12-06 13:27:24.878] [info]  IPC: checkReader
+[2025-12-06 13:27:24.879] [info]  >> Command: CHECK_READER
+[2025-12-06 13:27:24.888] [info]  [Bridge] {"success":true,"readerConnected":true,"cardPresent":true,"slot":0,"cardState":"PRESENT","initResult":3,"message":"Carta SIAE rilevata e pronta!"}
+[2025-12-06 13:27:24.889] [info]  << Response: {
+  success: true,
+  readerConnected: true,
+  cardPresent: true,
+  slot: 0,
+  cardState: 'PRESENT',
+  initResult: 3,
+  message: 'Carta SIAE rilevata e pronta!'
+}
+[2025-12-06 13:27:27.862] [info]  IPC: checkReader
+[2025-12-06 13:27:27.863] [info]  >> Command: CHECK_READER
+[2025-12-06 13:27:27.869] [info]  [Bridge] {"success":true,"readerConnected":true,"cardPresent":true,"slot":0,"cardState":"PRESENT","initResult":3,"message":"Carta SIAE rilevata e pronta!"}
+[2025-12-06 13:27:27.870] [info]  << Response: {
+  success: true,
+  readerConnected: true,
+  cardPresent: true,
+  slot: 0,
+  cardState: 'PRESENT',
+  initResult: 3,
+  message: 'Carta SIAE rilevata e pronta!'
+}
+[2025-12-06 13:27:30.878] [info]  IPC: checkReader
+[2025-12-06 13:27:30.880] [info]  >> Command: CHECK_READER
+[2025-12-06 13:27:30.893] [info]  [Bridge] {"success":true,"readerConnected":true,"cardPresent":true,"slot":0,"cardState":"PRESENT","initResult":3,"message":"Carta SIAE rilevata e pronta!"}
+[2025-12-06 13:27:30.894] [info]  << Response: {
+  success: true,
+  readerConnected: true,
+  cardPresent: true,
+  slot: 0,
+  cardState: 'PRESENT',
+  initResult: 3,
+  message: 'Carta SIAE rilevata e pronta!'
+}
+[2025-12-06 13:27:33.876] [info]  IPC: checkReader
+[2025-12-06 13:27:33.879] [info]  >> Command: CHECK_READER
+[2025-12-06 13:27:33.895] [info]  [Bridge] {"success":true,"readerConnected":true,"cardPresent":true,"slot":0,"cardState":"PRESENT","initResult":3,"message":"Carta SIAE rilevata e pronta!"}
+[2025-12-06 13:27:33.896] [info]  << Response: {
+  success: true,
+  readerConnected: true,
+  cardPresent: true,
+  slot: 0,
+  cardState: 'PRESENT',
+  initResult: 3,
+  message: 'Carta SIAE rilevata e pronta!'
+}
+[2025-12-06 13:27:36.865] [info]  IPC: checkReader
+[2025-12-06 13:27:36.865] [info]  >> Command: CHECK_READER
+[2025-12-06 13:27:36.873] [info]  [Bridge] {"success":true,"readerConnected":true,"cardPresent":true,"slot":0,"cardState":"PRESENT","initResult":3,"message":"Carta SIAE rilevata e pronta!"}
+[2025-12-06 13:27:36.874] [info]  << Response: {
+  success: true,
+  readerConnected: true,
+  cardPresent: true,
+  slot: 0,
+  cardState: 'PRESENT',
+  initResult: 3,
+  message: 'Carta SIAE rilevata e pronta!'
+}
+[2025-12-06 13:27:39.878] [info]  IPC: checkReader
+[2025-12-06 13:27:39.879] [info]  >> Command: CHECK_READER
+[2025-12-06 13:27:39.891] [info]  [Bridge] {"success":true,"readerConnected":true,"cardPresent":true,"slot":0,"cardState":"PRESENT","initResult":3,"message":"Carta SIAE rilevata e pronta!"}
+[2025-12-06 13:27:39.892] [info]  << Response: {
+  success: true,
+  readerConnected: true,
+  cardPresent: true,
+  slot: 0,
+  cardState: 'PRESENT',
+  initResult: 3,
+  message: 'Carta SIAE rilevata e pronta!'
+}
+[2025-12-06 13:27:42.869] [info]  IPC: checkReader
+[2025-12-06 13:27:42.871] [info]  >> Command: CHECK_READER
+[2025-12-06 13:27:42.884] [info]  [Bridge] {"success":true,"readerConnected":true,"cardPresent":true,"slot":0,"cardState":"PRESENT","initResult":3,"message":"Carta SIAE rilevata e pronta!"}
+[2025-12-06 13:27:42.885] [info]  << Response: {
+  success: true,
+  readerConnected: true,
+  cardPresent: true,
+  slot: 0,
+  cardState: 'PRESENT',
+  initResult: 3,
+  message: 'Carta SIAE rilevata e pronta!'
+}
+[2025-12-06 13:27:45.875] [info]  IPC: checkReader
+[2025-12-06 13:27:45.876] [info]  >> Command: CHECK_READER
+[2025-12-06 13:27:45.888] [info]  [Bridge] {"success":true,"readerConnected":true,"cardPresent":true,"slot":0,"cardState":"PRESENT","initResult":3,"message":"Carta SIAE rilevata e pronta!"}
+[2025-12-06 13:27:45.889] [info]  << Response: {
+  success: true,
+  readerConnected: true,
+  cardPresent: true,
+  slot: 0,
+  cardState: 'PRESENT',
+  initResult: 3,
+  message: 'Carta SIAE rilevata e pronta!'
+}
+[2025-12-06 13:27:48.866] [info]  IPC: checkReader
+[2025-12-06 13:27:48.868] [info]  >> Command: CHECK_READER
+[2025-12-06 13:27:48.877] [info]  [Bridge] {"success":true,"readerConnected":true,"cardPresent":true,"slot":0,"cardState":"PRESENT","initResult":3,"message":"Carta SIAE rilevata e pronta!"}
+[2025-12-06 13:27:48.878] [info]  << Response: {
+  success: true,
+  readerConnected: true,
+  cardPresent: true,
+  slot: 0,
+  cardState: 'PRESENT',
+  initResult: 3,
+  message: 'Carta SIAE rilevata e pronta!'
+}
+[2025-12-06 13:28:01.862] [info]  IPC: checkReader
+[2025-12-06 13:28:01.864] [info]  >> Command: CHECK_READER
+[2025-12-06 13:28:01.871] [info]  [Bridge] {"success":true,"readerConnected":true,"cardPresent":true,"slot":0,"cardState":"PRESENT","initResult":3,"message":"Carta SIAE rilevata e pronta!"}
+[2025-12-06 13:28:01.872] [info]  << Response: {
+  success: true,
+  readerConnected: true,
+  cardPresent: true,
+  slot: 0,
+  cardState: 'PRESENT',
+  initResult: 3,
+  message: 'Carta SIAE rilevata e pronta!'
+}
+[2025-12-06 13:29:01.872] [info]  IPC: checkReader
+[2025-12-06 13:29:01.873] [info]  >> Command: CHECK_READER
+[2025-12-06 13:29:01.882] [info]  [Bridge] {"success":true,"readerConnected":true,"cardPresent":true,"slot":0,"cardState":"PRESENT","initResult":3,"message":"Carta SIAE rilevata e pronta!"}
+[2025-12-06 13:29:01.883] [info]  << Response: {
+  success: true,
+  readerConnected: true,
+  cardPresent: true,
+  slot: 0,
+  cardState: 'PRESENT',
+  initResult: 3,
+  message: 'Carta SIAE rilevata e pronta!'
+}
+[2025-12-06 13:29:19.100] [info]  IPC: checkReader
+[2025-12-06 13:29:19.101] [info]  >> Command: CHECK_READER
+[2025-12-06 13:29:19.109] [info]  [Bridge] {"success":true,"readerConnected":true,"cardPresent":true,"slot":0,"cardState":"PRESENT","initResult":3,"message":"Carta SIAE rilevata e pronta!"}
+[2025-12-06 13:29:19.110] [info]  << Response: {
+  success: true,
+  readerConnected: true,
+  cardPresent: true,
+  slot: 0,
+  cardState: 'PRESENT',
+  initResult: 3,
+  message: 'Carta SIAE rilevata e pronta!'
+}
+[2025-12-06 13:29:21.232] [info]  Main window closed
+[2025-12-06 13:29:21.234] [error] Uncaught exception: TypeError: Object has been destroyed
+    at addToLogBuffer (C:\Users\Pc\AppData\Local\Programs\Event Four You SIAE Lettore\resources\app\main.js:55:32)
+    at log.info (C:\Users\Pc\AppData\Local\Programs\Event Four You SIAE Lettore\resources\app\main.js:67:3)
+    at BrowserWindow.<anonymous> (C:\Users\Pc\AppData\Local\Programs\Event Four You SIAE Lettore\resources\app\main.js:146:9)
+    at BrowserWindow.emit (node:events:517:28)
+[2025-12-06 13:38:20.455] [info]  ============================================================
+[2025-12-06 13:38:20.460] [info]  App starting at 2025-12-06T12:38:20.460Z
+[2025-12-06 13:38:20.461] [info]  App version: 1.0.2
+[2025-12-06 13:38:20.462] [info]  Electron version: 28.3.3
+[2025-12-06 13:38:20.462] [info]  Node version: 18.18.2
+[2025-12-06 13:38:20.463] [info]  Platform: win32 x64
+[2025-12-06 13:38:20.463] [info]  User data path: C:\Users\Pc\AppData\Roaming\event-four-you-siae-lettore
+[2025-12-06 13:38:20.464] [info]  ============================================================
+[2025-12-06 13:38:20.543] [info]  App ready
+[2025-12-06 13:38:20.544] [info]  Creating main window...
+[2025-12-06 13:38:20.586] [info]  --- Directory Structure ---
+[2025-12-06 13:38:20.587] [info]  Contents of C:\Users\Pc\AppData\Local\Programs\Event Four You SIAE Lettore\resources:
+[2025-12-06 13:38:20.588] [info]    [DIR] app 
+[2025-12-06 13:38:20.588] [info]    [FILE] app-update.yml (161 bytes)
+[2025-12-06 13:38:20.589] [info]    [FILE] elevate.exe (107520 bytes)
+[2025-12-06 13:38:20.590] [info]  Directory not found: C:\Users\Pc\AppData\Local\Programs\Event Four You SIAE Lettore\resources\SiaeBridge
+[2025-12-06 13:38:20.590] [info]  --- End Directory Structure ---
+[2025-12-06 13:38:20.591] [info]  Searching for SiaeBridge.exe...
+[2025-12-06 13:38:20.591] [info]  Resource path: C:\Users\Pc\AppData\Local\Programs\Event Four You SIAE Lettore\resources
+[2025-12-06 13:38:20.591] [info]    Checking: C:\Users\Pc\AppData\Local\Programs\Event Four You SIAE Lettore\resources\SiaeBridge\SiaeBridge.exe
+[2025-12-06 13:38:20.592] [info]    Checking: C:\Users\Pc\AppData\Local\Programs\Event Four You SIAE Lettore\resources\app\SiaeBridge\bin\Release\net472\SiaeBridge.exe
+[2025-12-06 13:38:20.592] [info]    Checking: C:\Users\Pc\AppData\Local\Programs\Event Four You SIAE Lettore\resources\app\SiaeBridge\bin\Debug\net472\SiaeBridge.exe
+[2025-12-06 13:38:20.593] [info]    Checking: C:\Users\Pc\AppData\Local\Programs\Event Four You SIAE Lettore\resources\app\SiaeBridge\SiaeBridge.exe
+[2025-12-06 13:38:20.593] [error] SiaeBridge.exe not found!
+[2025-12-06 13:38:20.610] [info]  WebSocket server started on port 18765
+[2025-12-06 13:38:20.610] [info]  Auto-connecting to relay...
+[2025-12-06 13:38:20.611] [info]  Connecting to relay: wss://manage.eventfouryou.com/ws/bridge
+[2025-12-06 13:38:21.039] [info]  Relay WebSocket connected
+[2025-12-06 13:38:21.040] [info]  Sent bridge_register to relay
+[2025-12-06 13:38:21.105] [info]  Window shown
+[2025-12-06 13:38:21.352] [info]  Relay message received: bridge_register_response
+[2025-12-06 13:38:21.353] [error] Relay registration failed: Internal server error
+[2025-12-06 13:38:33.411] [info]  IPC: bridge:start
+[2025-12-06 13:38:33.413] [info]  Searching for SiaeBridge.exe...
+[2025-12-06 13:38:33.414] [info]  Resource path: C:\Users\Pc\AppData\Local\Programs\Event Four You SIAE Lettore\resources
+[2025-12-06 13:38:33.415] [info]    Checking: C:\Users\Pc\AppData\Local\Programs\Event Four You SIAE Lettore\resources\SiaeBridge\SiaeBridge.exe
+[2025-12-06 13:38:33.416] [info]    Checking: C:\Users\Pc\AppData\Local\Programs\Event Four You SIAE Lettore\resources\app\SiaeBridge\bin\Release\net472\SiaeBridge.exe
+[2025-12-06 13:38:33.416] [info]    Checking: C:\Users\Pc\AppData\Local\Programs\Event Four You SIAE Lettore\resources\app\SiaeBridge\bin\Debug\net472\SiaeBridge.exe
+[2025-12-06 13:38:33.417] [info]    Checking: C:\Users\Pc\AppData\Local\Programs\Event Four You SIAE Lettore\resources\app\SiaeBridge\SiaeBridge.exe
+[2025-12-06 13:38:33.418] [error] SiaeBridge.exe not found!
+[2025-12-06 13:38:33.419] [error] SiaeBridge.exe non trovato
+[2025-12-06 13:38:47.025] [info]  IPC: bridge:start
+[2025-12-06 13:38:47.027] [info]  Searching for SiaeBridge.exe...
+[2025-12-06 13:38:47.028] [info]  Resource path: C:\Users\Pc\AppData\Local\Programs\Event Four You SIAE Lettore\resources
+[2025-12-06 13:38:47.029] [info]    Checking: C:\Users\Pc\AppData\Local\Programs\Event Four You SIAE Lettore\resources\SiaeBridge\SiaeBridge.exe
+[2025-12-06 13:38:47.030] [info]    Checking: C:\Users\Pc\AppData\Local\Programs\Event Four You SIAE Lettore\resources\app\SiaeBridge\bin\Release\net472\SiaeBridge.exe
+[2025-12-06 13:38:47.031] [info]    Checking: C:\Users\Pc\AppData\Local\Programs\Event Four You SIAE Lettore\resources\app\SiaeBridge\bin\Debug\net472\SiaeBridge.exe
+[2025-12-06 13:38:47.032] [info]    Checking: C:\Users\Pc\AppData\Local\Programs\Event Four You SIAE Lettore\resources\app\SiaeBridge\SiaeBridge.exe
+[2025-12-06 13:38:47.033] [error] SiaeBridge.exe not found!
+[2025-12-06 13:38:47.034] [error] SiaeBridge.exe non trovato

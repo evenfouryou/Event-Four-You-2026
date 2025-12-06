@@ -67,7 +67,10 @@ function getFilesToUpload(): Record<string, string> {
     'renderer.js': readDesktopFile('renderer.js'),
     'package.json': readDesktopFile('package.json'),
     'README.md': readDesktopFile('README.md'),
-    '.github/workflows/build.yml': readDesktopFile('.github/workflows/build.yml')
+    '.github/workflows/build.yml': readDesktopFile('.github/workflows/build.yml'),
+    'SiaeBridge/SiaeBridge.csproj': readDesktopFile('SiaeBridge/SiaeBridge.csproj'),
+    'SiaeBridge/Program.cs': readDesktopFile('SiaeBridge/Program.cs'),
+    'SiaeBridge/LibSiae.cs': readDesktopFile('SiaeBridge/LibSiae.cs')
   };
 }
 
