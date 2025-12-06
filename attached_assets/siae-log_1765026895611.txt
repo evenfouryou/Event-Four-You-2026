@@ -1,0 +1,299 @@
+  cardPresent: false,
+  message: 'Inserire carta SIAE'
+}
+[2025-12-06 14:13:57.006] [info]  << Response: {
+  success: true,
+  readerConnected: true,
+  cardPresent: false,
+  message: 'Inserire carta SIAE'
+}
+[2025-12-06 14:13:57.010] [info]  [Bridge] {"success":true,"readerConnected":true,"cardPresent":false,"message":"Inserire carta SIAE"}
+[2025-12-06 14:13:59.995] [info]  >> Command: CHECK_READER
+[2025-12-06 14:14:00.002] [info]  [Bridge] {"success":true,"readerConnected":true,"cardPresent":false,"message":"Inserire carta SIAE"}
+[2025-12-06 14:14:00.003] [info]  << Response: {
+  success: true,
+  readerConnected: true,
+  cardPresent: false,
+  message: 'Inserire carta SIAE'
+}
+[2025-12-06 14:14:00.864] [info]  IPC: checkReader
+[2025-12-06 14:14:00.865] [info]  >> Command: CHECK_READER
+[2025-12-06 14:14:00.870] [info]  [Bridge] {"success":true,"readerConnected":true,"cardPresent":false,"message":"Inserire carta SIAE"}
+[2025-12-06 14:14:00.872] [info]  << Response: {
+  success: true,
+  readerConnected: true,
+  cardPresent: false,
+  message: 'Inserire carta SIAE'
+}
+[2025-12-06 14:14:03.002] [info]  >> Command: CHECK_READER
+[2025-12-06 14:14:03.009] [info]  [Bridge] {"success":true,"readerConnected":true,"cardPresent":false,"message":"Inserire carta SIAE"}
+[2025-12-06 14:14:03.010] [info]  << Response: {
+  success: true,
+  readerConnected: true,
+  cardPresent: false,
+  message: 'Inserire carta SIAE'
+}
+[2025-12-06 14:14:03.507] [info]  IPC: checkReader
+[2025-12-06 14:14:03.508] [info]  >> Command: CHECK_READER
+[2025-12-06 14:14:03.516] [info]  [Bridge] {"success":true,"readerConnected":true,"cardPresent":false,"message":"Inserire carta SIAE"}
+[2025-12-06 14:14:03.517] [info]  << Response: {
+  success: true,
+  readerConnected: true,
+  cardPresent: false,
+  message: 'Inserire carta SIAE'
+}
+[2025-12-06 14:14:05.970] [info]  IPC: checkReader
+[2025-12-06 14:14:05.973] [info]  >> Command: CHECK_READER
+[2025-12-06 14:14:05.985] [info]  [Bridge] {"success":true,"readerConnected":true,"cardPresent":false,"message":"Inserire carta SIAE"}
+[2025-12-06 14:14:05.986] [info]  << Response: {
+  success: true,
+  readerConnected: true,
+  cardPresent: false,
+  message: 'Inserire carta SIAE'
+}
+[2025-12-06 14:14:06.017] [info]  >> Command: CHECK_READER
+[2025-12-06 14:14:06.022] [info]  [Bridge] {"success":true,"readerConnected":true,"cardPresent":false,"message":"Inserire carta SIAE"}
+[2025-12-06 14:14:06.022] [info]  << Response: {
+  success: true,
+  readerConnected: true,
+  cardPresent: false,
+  message: 'Inserire carta SIAE'
+}
+[2025-12-06 14:14:08.973] [info]  IPC: checkReader
+[2025-12-06 14:14:08.975] [info]  >> Command: CHECK_READER
+[2025-12-06 14:14:08.988] [info]  [Bridge] {"success":true,"readerConnected":true,"cardPresent":false,"message":"Inserire carta SIAE"}
+[2025-12-06 14:14:08.989] [info]  << Response: {
+  success: true,
+  readerConnected: true,
+  cardPresent: false,
+  message: 'Inserire carta SIAE'
+}
+[2025-12-06 14:14:09.018] [info]  >> Command: CHECK_READER
+[2025-12-06 14:14:09.023] [info]  [Bridge] {"success":true,"readerConnected":true,"cardPresent":false,"message":"Inserire carta SIAE"}
+[2025-12-06 14:14:09.023] [info]  << Response: {
+  success: true,
+  readerConnected: true,
+  cardPresent: false,
+  message: 'Inserire carta SIAE'
+}
+[2025-12-06 14:14:11.978] [info]  IPC: checkReader
+[2025-12-06 14:14:11.978] [info]  >> Command: CHECK_READER
+[2025-12-06 14:14:11.983] [info]  [Bridge] {"success":true,"readerConnected":true,"cardPresent":false,"message":"Inserire carta SIAE"}
+[2025-12-06 14:14:11.983] [info]  << Response: {
+  success: true,
+  readerConnected: true,
+  cardPresent: false,
+  message: 'Inserire carta SIAE'
+}
+[2025-12-06 14:14:12.025] [info]  >> Command: CHECK_READER
+[2025-12-06 14:14:12.031] [info]  [Bridge] {"success":true,"readerConnected":true,"cardPresent":false,"message":"Inserire carta SIAE"}
+[2025-12-06 14:14:12.032] [info]  << Response: {
+  success: true,
+  readerConnected: true,
+  cardPresent: false,
+  message: 'Inserire carta SIAE'
+}
+[2025-12-06 14:14:14.976] [info]  IPC: checkReader
+[2025-12-06 14:14:14.976] [info]  >> Command: CHECK_READER
+[2025-12-06 14:14:14.980] [info]  [Bridge] {"success":true,"readerConnected":true,"cardPresent":false,"message":"Inserire carta SIAE"}
+[2025-12-06 14:14:14.981] [info]  << Response: {
+  success: true,
+  readerConnected: true,
+  cardPresent: false,
+  message: 'Inserire carta SIAE'
+}
+[2025-12-06 14:14:15.039] [info]  >> Command: CHECK_READER
+[2025-12-06 14:14:15.043] [info]  [Bridge] {"success":true,"readerConnected":true,"cardPresent":false,"message":"Inserire carta SIAE"}
+[2025-12-06 14:14:15.044] [info]  << Response: {
+  success: true,
+  readerConnected: true,
+  cardPresent: false,
+  message: 'Inserire carta SIAE'
+}
+[2025-12-06 14:14:18.049] [info]  >> Command: CHECK_READER
+[2025-12-06 14:14:18.059] [info]  [Bridge] {"success":true,"readerConnected":true,"cardPresent":false,"message":"Inserire carta SIAE"}
+[2025-12-06 14:14:18.060] [info]  << Response: {
+  success: true,
+  readerConnected: true,
+  cardPresent: false,
+  message: 'Inserire carta SIAE'
+}
+[2025-12-06 14:14:18.872] [info]  IPC: checkReader
+[2025-12-06 14:14:18.873] [info]  >> Command: CHECK_READER
+[2025-12-06 14:14:18.878] [info]  [Bridge] {"success":true,"readerConnected":true,"cardPresent":false,"message":"Inserire carta SIAE"}
+[2025-12-06 14:14:18.879] [info]  << Response: {
+  success: true,
+  readerConnected: true,
+  cardPresent: false,
+  message: 'Inserire carta SIAE'
+}
+[2025-12-06 14:14:21.052] [info]  >> Command: CHECK_READER
+[2025-12-06 14:14:21.056] [info]  [Bridge] {"success":true,"readerConnected":true,"cardPresent":false,"message":"Inserire carta SIAE"}
+[2025-12-06 14:14:21.057] [info]  << Response: {
+  success: true,
+  readerConnected: true,
+  cardPresent: false,
+  message: 'Inserire carta SIAE'
+}
+[2025-12-06 14:14:21.868] [info]  IPC: checkReader
+[2025-12-06 14:14:21.870] [info]  >> Command: CHECK_READER
+[2025-12-06 14:14:21.880] [info]  [Bridge] {"success":true,"readerConnected":true,"cardPresent":false,"message":"Inserire carta SIAE"}
+[2025-12-06 14:14:21.881] [info]  << Response: {
+  success: true,
+  readerConnected: true,
+  cardPresent: false,
+  message: 'Inserire carta SIAE'
+}
+[2025-12-06 14:14:23.972] [info]  IPC: checkReader
+[2025-12-06 14:14:23.973] [info]  >> Command: CHECK_READER
+[2025-12-06 14:14:23.982] [info]  [Bridge] {"success":true,"readerConnected":true,"cardPresent":false,"message":"Inserire carta SIAE"}
+[2025-12-06 14:14:23.982] [info]  << Response: {
+  success: true,
+  readerConnected: true,
+  cardPresent: false,
+  message: 'Inserire carta SIAE'
+}
+[2025-12-06 14:14:24.064] [info]  >> Command: CHECK_READER
+[2025-12-06 14:14:24.069] [info]  [Bridge] {"success":true,"readerConnected":true,"cardPresent":false,"message":"Inserire carta SIAE"}
+[2025-12-06 14:14:24.070] [info]  << Response: {
+  success: true,
+  readerConnected: true,
+  cardPresent: false,
+  message: 'Inserire carta SIAE'
+}
+[2025-12-06 14:14:26.981] [info]  IPC: checkReader
+[2025-12-06 14:14:26.982] [info]  >> Command: CHECK_READER
+[2025-12-06 14:14:26.989] [info]  [Bridge] {"success":true,"readerConnected":true,"cardPresent":false,"message":"Inserire carta SIAE"}
+[2025-12-06 14:14:26.990] [info]  << Response: {
+  success: true,
+  readerConnected: true,
+  cardPresent: false,
+  message: 'Inserire carta SIAE'
+}
+[2025-12-06 14:14:27.073] [info]  >> Command: CHECK_READER
+[2025-12-06 14:14:27.082] [info]  [Bridge] {"success":true,"readerConnected":true,"cardPresent":false,"message":"Inserire carta SIAE"}
+[2025-12-06 14:14:27.083] [info]  << Response: {
+  success: true,
+  readerConnected: true,
+  cardPresent: false,
+  message: 'Inserire carta SIAE'
+}
+[2025-12-06 14:14:29.975] [info]  IPC: checkReader
+[2025-12-06 14:14:29.976] [info]  >> Command: CHECK_READER
+[2025-12-06 14:14:29.983] [info]  [Bridge] {"success":true,"readerConnected":true,"cardPresent":false,"message":"Inserire carta SIAE"}
+[2025-12-06 14:14:29.984] [info]  << Response: {
+  success: true,
+  readerConnected: true,
+  cardPresent: false,
+  message: 'Inserire carta SIAE'
+}
+[2025-12-06 14:14:30.082] [info]  >> Command: CHECK_READER
+[2025-12-06 14:14:30.088] [info]  [Bridge] {"success":true,"readerConnected":true,"cardPresent":false,"message":"Inserire carta SIAE"}
+[2025-12-06 14:14:30.088] [info]  << Response: {
+  success: true,
+  readerConnected: true,
+  cardPresent: false,
+  message: 'Inserire carta SIAE'
+}
+[2025-12-06 14:14:32.976] [info]  IPC: checkReader
+[2025-12-06 14:14:32.977] [info]  >> Command: CHECK_READER
+[2025-12-06 14:14:32.983] [info]  [Bridge] {"success":true,"readerConnected":true,"cardPresent":false,"message":"Inserire carta SIAE"}
+[2025-12-06 14:14:32.984] [info]  << Response: {
+  success: true,
+  readerConnected: true,
+  cardPresent: false,
+  message: 'Inserire carta SIAE'
+}
+[2025-12-06 14:14:33.092] [info]  >> Command: CHECK_READER
+[2025-12-06 14:14:33.098] [info]  [Bridge] {"success":true,"readerConnected":true,"cardPresent":false,"message":"Inserire carta SIAE"}
+[2025-12-06 14:14:33.099] [info]  << Response: {
+  success: true,
+  readerConnected: true,
+  cardPresent: false,
+  message: 'Inserire carta SIAE'
+}
+[2025-12-06 14:14:35.979] [info]  IPC: checkReader
+[2025-12-06 14:14:35.981] [info]  >> Command: CHECK_READER
+[2025-12-06 14:14:35.994] [info]  [Bridge] {"success":true,"readerConnected":true,"cardPresent":false,"message":"Inserire carta SIAE"}
+[2025-12-06 14:14:35.996] [info]  << Response: {
+  success: true,
+  readerConnected: true,
+  cardPresent: false,
+  message: 'Inserire carta SIAE'
+}
+[2025-12-06 14:14:36.102] [info]  >> Command: CHECK_READER
+[2025-12-06 14:14:36.113] [info]  [Bridge] {"success":true,"readerConnected":true,"cardPresent":false,"message":"Inserire carta SIAE"}
+[2025-12-06 14:14:36.115] [info]  << Response: {
+  success: true,
+  readerConnected: true,
+  cardPresent: false,
+  message: 'Inserire carta SIAE'
+}
+[2025-12-06 14:14:38.975] [info]  IPC: checkReader
+[2025-12-06 14:14:38.976] [info]  >> Command: CHECK_READER
+[2025-12-06 14:14:38.986] [info]  [Bridge] {"success":true,"readerConnected":true,"cardPresent":false,"message":"Inserire carta SIAE"}
+[2025-12-06 14:14:38.987] [info]  << Response: {
+  success: true,
+  readerConnected: true,
+  cardPresent: false,
+  message: 'Inserire carta SIAE'
+}
+[2025-12-06 14:14:39.118] [info]  >> Command: CHECK_READER
+[2025-12-06 14:14:39.122] [info]  [Bridge] {"success":true,"readerConnected":true,"cardPresent":false,"message":"Inserire carta SIAE"}
+[2025-12-06 14:14:39.123] [info]  << Response: {
+  success: true,
+  readerConnected: true,
+  cardPresent: false,
+  message: 'Inserire carta SIAE'
+}
+[2025-12-06 14:14:42.127] [info]  >> Command: CHECK_READER
+[2025-12-06 14:14:42.139] [info]  [Bridge] {"success":true,"readerConnected":true,"cardPresent":false,"message":"Inserire carta SIAE"}
+[2025-12-06 14:14:42.141] [info]  << Response: {
+  success: true,
+  readerConnected: true,
+  cardPresent: false,
+  message: 'Inserire carta SIAE'
+}
+[2025-12-06 14:14:42.882] [info]  IPC: checkReader
+[2025-12-06 14:14:42.883] [info]  >> Command: CHECK_READER
+[2025-12-06 14:14:42.889] [info]  [Bridge] {"success":true,"readerConnected":true,"cardPresent":false,"message":"Inserire carta SIAE"}
+[2025-12-06 14:14:42.890] [info]  << Response: {
+  success: true,
+  readerConnected: true,
+  cardPresent: false,
+  message: 'Inserire carta SIAE'
+}
+[2025-12-06 14:14:45.135] [info]  >> Command: CHECK_READER
+[2025-12-06 14:14:45.146] [info]  [Bridge] {"success":true,"readerConnected":true,"cardPresent":false,"message":"Inserire carta SIAE"}
+[2025-12-06 14:14:45.147] [info]  << Response: {
+  success: true,
+  readerConnected: true,
+  cardPresent: false,
+  message: 'Inserire carta SIAE'
+}
+[2025-12-06 14:14:45.870] [info]  IPC: checkReader
+[2025-12-06 14:14:45.871] [info]  >> Command: CHECK_READER
+[2025-12-06 14:14:45.877] [info]  [Bridge] {"success":true,"readerConnected":true,"cardPresent":false,"message":"Inserire carta SIAE"}
+[2025-12-06 14:14:45.877] [info]  << Response: {
+  success: true,
+  readerConnected: true,
+  cardPresent: false,
+  message: 'Inserire carta SIAE'
+}
+[2025-12-06 14:14:47.977] [info]  IPC: checkReader
+[2025-12-06 14:14:47.978] [info]  >> Command: CHECK_READER
+[2025-12-06 14:14:47.982] [info]  [Bridge] {"success":true,"readerConnected":true,"cardPresent":false,"message":"Inserire carta SIAE"}
+[2025-12-06 14:14:47.982] [info]  << Response: {
+  success: true,
+  readerConnected: true,
+  cardPresent: false,
+  message: 'Inserire carta SIAE'
+}
+[2025-12-06 14:14:48.148] [info]  >> Command: CHECK_READER
+[2025-12-06 14:14:48.155] [info]  [Bridge] {"success":true,"readerConnected":true,"cardPresent":false,"message":"Inserire carta SIAE"}
+[2025-12-06 14:14:48.156] [info]  << Response: {
+  success: true,
+  readerConnected: true,
+  cardPresent: false,
+  message: 'Inserire carta SIAE'
+}

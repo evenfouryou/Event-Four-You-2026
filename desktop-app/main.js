@@ -772,20 +772,39 @@ async function handleRelayCommand(msg) {
 
 // Load relay config from file
 function loadRelayConfig() {
+  // Default config is hardcoded - only override with saved values if they are valid
+  const defaultConfig = {
+    serverUrl: 'wss://manage.eventfouryou.com',
+    token: '2a128d156ed5ee528925edb9c2279d3085cc5e1d02bd0895438e9277c1c422e1',
+    companyId: '67952894-0d84-4e62-81bf-bfec9a282c1e',
+    enabled: true
+  };
+  
   try {
     const configPath = path.join(app.getPath('userData'), 'relay-config.json');
     if (fs.existsSync(configPath)) {
-      const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-      relayConfig = { ...relayConfig, ...config };
-      log.info('Relay config loaded:', { 
+      const savedConfig = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+      // Only use saved values if they are non-empty, otherwise keep defaults
+      relayConfig = {
+        serverUrl: savedConfig.serverUrl || defaultConfig.serverUrl,
+        token: savedConfig.token || defaultConfig.token,
+        companyId: savedConfig.companyId || defaultConfig.companyId,
+        enabled: savedConfig.enabled !== undefined ? savedConfig.enabled : defaultConfig.enabled
+      };
+      log.info('Relay config loaded (merged with defaults):', { 
         serverUrl: relayConfig.serverUrl, 
         companyId: relayConfig.companyId,
         enabled: relayConfig.enabled,
         hasToken: !!relayConfig.token
       });
+    } else {
+      // No saved config, use defaults
+      relayConfig = { ...defaultConfig };
+      log.info('Using default relay config (no saved config found)');
     }
   } catch (e) {
-    log.error('Failed to load relay config:', e.message);
+    log.error('Failed to load relay config, using defaults:', e.message);
+    relayConfig = { ...defaultConfig };
   }
 }
 
