@@ -121,6 +121,39 @@ A unified real-time dashboard for managing events during operation, replacing sc
 - Events list (`/events`) now routes to Event Hub (`/events/:id/hub`) for non-draft events
 - Draft events route to wizard (`/events/wizard/:id`)
 
+### Desktop Bridge Relay System
+A WebSocket relay system enabling remote smart card reader access from the desktop Electron app to the web application.
+
+**Architecture:**
+- **Server Relay** (`server/bridge-relay.ts`): WebSocket endpoint at `/ws/bridge` handling bidirectional message routing
+- **Desktop App** (`desktop-app/`): Electron application with local PC/SC bridge and remote relay connection
+- **SmartCardService** (`client/src/lib/smart-card-service.ts`): Frontend service connecting to relay for card operations
+
+**Authentication Flow:**
+1. Admin/Gestore generates bridge token via Settings page (GET `/api/bridge/token`)
+2. Token + Company ID copied to desktop app relay configuration
+3. Desktop app connects to `wss://manage.eventfouryou.com/ws/bridge` with token
+4. Web clients connect via session cookies, routed to matching company bridge
+
+**Message Types:**
+- `bridge_registration`: Desktop app registers with token/companyId
+- `client_request`: Web client request to read card
+- `bridge_response`: Desktop bridge response with card data
+- `bridge_status`: Connection status updates (connected/disconnected)
+- `ping/pong`: Heartbeat for connection keepalive (30s interval)
+
+**Key Files:**
+- `server/bridge-relay.ts`: WebSocket relay implementation with company-scoped routing
+- `desktop-app/main.js`: Electron main process with dual WebSocket (local + relay)
+- `desktop-app/renderer.js`: Desktop UI with relay configuration panel
+- `client/src/lib/smart-card-service.ts`: Frontend WebSocket client with heartbeat management
+
+**Security:**
+- Token-based authentication for desktop bridges (stored in `companies.bridgeToken`)
+- Session-based authentication for web clients
+- Company-scoped message routing (bridges only receive messages from their company)
+- HTTPS/WSS required for production connections
+
 ### Progressive Web App (PWA)
 Event4U is a fully installable PWA with:
 - **manifest.json**: App metadata, icons, and shortcuts for installation
