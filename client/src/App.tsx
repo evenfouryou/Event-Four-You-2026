@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { ThemeProvider } from "@/hooks/use-theme";
 import { MobileBottomNav } from "@/components/mobile-bottom-nav";
 import { InstallPrompt } from "@/components/install-prompt";
 import { SmartCardStatus } from "@/components/smart-card-status";
@@ -190,11 +191,13 @@ function Router() {
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <Router />
-        <Toaster />
-        <InstallPrompt />
-      </TooltipProvider>
+      <ThemeProvider>
+        <TooltipProvider>
+          <Router />
+          <Toaster />
+          <InstallPrompt />
+        </TooltipProvider>
+      </ThemeProvider>
     </QueryClientProvider>
   );
 }

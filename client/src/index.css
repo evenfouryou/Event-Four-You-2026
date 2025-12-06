@@ -103,51 +103,146 @@
   --destructive-border: hsl(from hsl(var(--destructive)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
 }
 
-/* Light mode override (optional - keeping dark as default) */
+/* Explicit dark class for theme toggling */
+.dark {
+  --button-outline: rgba(255,215,0, .20);
+  --badge-outline: rgba(255,215,0, .10);
+  --opaque-button-border-intensity: 8;
+  --elevate-1: rgba(255,255,255, .04);
+  --elevate-2: rgba(255,255,255, .08);
+  
+  --background: 222 47% 4%;
+  --foreground: 210 40% 98%;
+  --border: 222 30% 14%;
+  --card: 222 40% 8%;
+  --card-foreground: 210 40% 98%;
+  --card-border: 222 30% 12%;
+  
+  --sidebar: 222 47% 6%;
+  --sidebar-foreground: 210 40% 98%;
+  --sidebar-border: 222 30% 12%;
+  --sidebar-primary: 45 100% 50%;
+  --sidebar-primary-foreground: 0 0% 0%;
+  --sidebar-accent: 222 40% 12%;
+  --sidebar-accent-foreground: 210 40% 98%;
+  --sidebar-ring: 45 100% 50%;
+  
+  --popover: 222 47% 8%;
+  --popover-foreground: 210 40% 98%;
+  --popover-border: 222 30% 14%;
+  
+  --primary: 45 100% 50%;
+  --primary-foreground: 0 0% 0%;
+  
+  --secondary: 222 40% 12%;
+  --secondary-foreground: 210 40% 98%;
+  
+  --muted: 222 30% 14%;
+  --muted-foreground: 215 20% 60%;
+  
+  --accent: 222 40% 12%;
+  --accent-foreground: 210 40% 98%;
+  
+  --destructive: 0 72% 51%;
+  --destructive-foreground: 0 0% 100%;
+  
+  --success: 174 100% 41%;
+  --success-foreground: 0 0% 0%;
+  
+  --warning: 38 92% 50%;
+  --warning-foreground: 0 0% 0%;
+  
+  --input: 222 30% 14%;
+  --ring: 45 100% 50%;
+  
+  --chart-1: 45 100% 50%;
+  --chart-2: 174 100% 41%;
+  --chart-3: 280 85% 65%;
+  --chart-4: 38 92% 50%;
+  --chart-5: 345 82% 55%;
+  
+  --shadow-2xs: 0 1px 2px 0 rgb(0 0 0 / 0.3);
+  --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.4);
+  --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.5), 0 1px 2px -1px rgb(0 0 0 / 0.4);
+  --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.5), 0 2px 4px -2px rgb(0 0 0 / 0.4);
+  --shadow-md: 0 6px 12px -2px rgb(0 0 0 / 0.5), 0 3px 6px -3px rgb(0 0 0 / 0.4);
+  --shadow-lg: 0 10px 20px -3px rgb(0 0 0 / 0.5), 0 4px 8px -4px rgb(0 0 0 / 0.4);
+  --shadow-xl: 0 20px 30px -5px rgb(0 0 0 / 0.6), 0 8px 16px -6px rgb(0 0 0 / 0.5);
+  --shadow-2xl: 0 25px 50px -12px rgb(0 0 0 / 0.7);
+}
+
+/* Light mode override with improved shadows and refined palette */
 .light {
   --button-outline: rgba(0,0,0, .10);
   --badge-outline: rgba(0,0,0, .05);
   --opaque-button-border-intensity: -8;
   --elevate-1: rgba(0,0,0, .03);
   --elevate-2: rgba(0,0,0, .08);
-  --background: 0 0% 99%;
+  
+  /* Refined light mode background - warm white */
+  --background: 40 20% 98%;
   --foreground: 222 47% 11%;
-  --border: 220 13% 90%;
+  --border: 220 13% 88%;
+  
+  /* Card with subtle shadow-ready background */
   --card: 0 0% 100%;
   --card-foreground: 222 47% 11%;
-  --card-border: 220 13% 92%;
-  --sidebar: 220 14% 96%;
+  --card-border: 220 13% 90%;
+  
+  /* Sidebar - slightly warmer grey */
+  --sidebar: 220 14% 97%;
   --sidebar-foreground: 222 47% 11%;
   --sidebar-border: 220 13% 90%;
-  --sidebar-primary: 45 100% 45%;
+  --sidebar-primary: 45 100% 42%;
   --sidebar-primary-foreground: 0 0% 0%;
-  --sidebar-accent: 220 14% 92%;
+  --sidebar-accent: 220 14% 94%;
   --sidebar-accent-foreground: 222 47% 11%;
-  --sidebar-ring: 45 100% 45%;
+  --sidebar-ring: 45 100% 42%;
+  
   --popover: 0 0% 100%;
   --popover-foreground: 222 47% 11%;
   --popover-border: 220 13% 90%;
-  --primary: 45 100% 45%;
+  
+  /* Golden accent - slightly darker for better contrast */
+  --primary: 45 100% 42%;
   --primary-foreground: 0 0% 0%;
+  
   --secondary: 220 14% 96%;
   --secondary-foreground: 222 47% 11%;
+  
   --muted: 220 14% 96%;
-  --muted-foreground: 220 9% 46%;
+  --muted-foreground: 220 9% 42%;
+  
   --accent: 220 14% 96%;
   --accent-foreground: 222 47% 11%;
-  --destructive: 0 84% 60%;
+  
+  --destructive: 0 84% 55%;
   --destructive-foreground: 0 0% 100%;
-  --success: 174 100% 35%;
+  
+  --success: 174 100% 32%;
   --success-foreground: 0 0% 100%;
-  --warning: 38 92% 50%;
+  
+  --warning: 38 92% 48%;
   --warning-foreground: 0 0% 0%;
-  --input: 220 13% 82%;
-  --ring: 45 100% 45%;
-  --chart-1: 45 100% 45%;
-  --chart-2: 174 100% 35%;
-  --chart-3: 280 85% 65%;
-  --chart-4: 38 92% 50%;
-  --chart-5: 345 82% 55%;
+  
+  --input: 220 13% 85%;
+  --ring: 45 100% 42%;
+  
+  --chart-1: 45 100% 42%;
+  --chart-2: 174 100% 32%;
+  --chart-3: 280 75% 55%;
+  --chart-4: 38 92% 48%;
+  --chart-5: 345 75% 50%;
+  
+  /* Lighter shadows for light mode */
+  --shadow-2xs: 0 1px 2px 0 rgb(0 0 0 / 0.04);
+  --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.06);
+  --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.08), 0 1px 2px -1px rgb(0 0 0 / 0.06);
+  --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.08), 0 2px 4px -2px rgb(0 0 0 / 0.06);
+  --shadow-md: 0 6px 12px -2px rgb(0 0 0 / 0.1), 0 3px 6px -3px rgb(0 0 0 / 0.08);
+  --shadow-lg: 0 10px 20px -3px rgb(0 0 0 / 0.1), 0 4px 8px -4px rgb(0 0 0 / 0.08);
+  --shadow-xl: 0 20px 30px -5px rgb(0 0 0 / 0.12), 0 8px 16px -6px rgb(0 0 0 / 0.1);
+  --shadow-2xl: 0 25px 50px -12px rgb(0 0 0 / 0.2);
 }
 
 @layer base {
@@ -215,16 +310,40 @@
     }
   }
   
+  /* Light mode glass effects */
+  .light .glass {
+    @apply backdrop-blur-xl;
+    border-color: rgba(0, 0, 0, 0.08);
+    background: rgba(255, 255, 255, 0.85);
+    box-shadow: var(--shadow-sm);
+  }
+  
   .glass-card {
-    @apply rounded-2xl border border-white/20;
-    background: hsl(222 40% 10%);
+    @apply rounded-2xl border;
+    border-color: rgba(255, 255, 255, 0.2);
+    background: hsl(var(--card));
   }
   
   @supports (backdrop-filter: blur(1px)) {
     .glass-card {
-      @apply backdrop-blur-xl border-white/10;
-      background: rgba(21, 25, 34, 0.8);
+      @apply backdrop-blur-xl;
+      border-color: rgba(255, 255, 255, 0.1);
+      background: hsl(var(--card) / 0.8);
     }
+  }
+  
+  /* Dark mode glass-card with dark tint */
+  .dark .glass-card {
+    border-color: rgba(255, 255, 255, 0.1);
+    background: rgba(21, 25, 34, 0.8);
+  }
+  
+  /* Light mode glass-card with light background */
+  .light .glass-card {
+    @apply backdrop-blur-xl;
+    border-color: rgba(0, 0, 0, 0.08);
+    background: rgba(255, 255, 255, 0.95);
+    box-shadow: var(--shadow-md);
   }
   
   .glass-subtle {
@@ -237,6 +356,13 @@
       @apply backdrop-blur-md border-white/5;
       background: rgba(21, 25, 34, 0.5);
     }
+  }
+  
+  /* Light mode glass-subtle */
+  .light .glass-subtle {
+    @apply backdrop-blur-md;
+    border-color: rgba(0, 0, 0, 0.05);
+    background: rgba(255, 255, 255, 0.6);
   }
   
   /* Golden gradient for CTAs - ensures black text in all states */

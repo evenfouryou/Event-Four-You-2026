@@ -238,7 +238,7 @@ function QuickActionButton({
     <button
       onClick={onClick}
       disabled={disabled}
-      className={`flex flex-col items-center gap-2 p-4 rounded-xl transition-all ${variantStyles[variant]} ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+      className={`flex flex-col items-center justify-center gap-2 p-4 min-h-11 rounded-xl transition-all ${variantStyles[variant]} ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
       data-testid={testId}
     >
       <Icon className="h-6 w-6" />
@@ -328,7 +328,7 @@ function EntranceChart({ data }: { data: Array<{ time: string; entries: number; 
         <CardDescription>Ingressi per fascia oraria</CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="h-[200px]">
+        <div className="h-[160px] md:h-[200px]">
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
               <defs>
@@ -456,7 +456,7 @@ function VenueMap({
               <h4 className="text-sm font-medium mb-2 capitalize text-muted-foreground">
                 {type === 'standard' ? 'Standard' : type === 'vip' ? 'VIP' : type === 'prive' ? 'Privé' : type}
               </h4>
-              <div className="grid grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2">
+              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2">
                 {typeTables.map(table => {
                   const status = getTableStatus(table.id);
                   const booking = bookings.find(b => b.tableId === table.id && b.status !== 'cancelled');
@@ -732,7 +732,7 @@ export default function EventHub() {
     return (
       <div className="p-4 md:p-6 max-w-7xl mx-auto">
         <Skeleton className="h-20 w-full mb-6" />
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-6">
           {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-32" />)}
         </div>
         <Skeleton className="h-96" />
@@ -996,7 +996,7 @@ export default function EventHub() {
       </div>
 
       <div className="p-4 md:p-6 max-w-7xl mx-auto">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-6">
           <KPICard
             title="Biglietti"
             value={ticketedEvent?.ticketsSold || 0}
@@ -1053,7 +1053,7 @@ export default function EventHub() {
               <TabsTrigger
                 key={tab.id}
                 value={tab.id}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+                className="flex items-center gap-2 px-4 py-2 min-h-11 rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
                 data-testid={`tab-${tab.id}`}
               >
                 <tab.icon className="h-4 w-4" />
@@ -1063,8 +1063,8 @@ export default function EventHub() {
           </TabsList>
 
           <TabsContent value="overview" className="space-y-6">
-            <div className="grid md:grid-cols-3 gap-6">
-              <div className="md:col-span-2 space-y-6">
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="md:col-span-1 lg:col-span-2 space-y-6">
                 <Card className="glass-card">
                   <CardHeader className="pb-3">
                     <div className="flex items-center justify-between">
@@ -1119,7 +1119,7 @@ export default function EventHub() {
                     </div>
                   </CardHeader>
                   <CardContent>
-                    <div className="grid grid-cols-4 md:grid-cols-6 gap-3">
+                    <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
                       <QuickActionButton
                         icon={QrCode}
                         label="Scansiona"
@@ -1284,7 +1284,7 @@ export default function EventHub() {
               <CardContent>
                 {ticketedEvent ? (
                   <div className="space-y-6">
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                       <div className="p-4 rounded-lg bg-background/50 border">
                         <div className="text-2xl font-bold text-blue-400">{ticketedEvent.ticketsSold}</div>
                         <div className="text-xs text-muted-foreground">Venduti</div>
@@ -1392,7 +1392,7 @@ export default function EventHub() {
               </CardHeader>
               <CardContent>
                 {tables.length > 0 ? (
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                     {tables.map(table => {
                       const booking = bookings.find(b => b.tableId === table.id && b.status !== 'cancelled');
                       const isBooked = !!booking;
@@ -1524,7 +1524,7 @@ export default function EventHub() {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
                   <div className="p-4 rounded-lg bg-background/50 border text-center">
                     <div className="text-3xl font-bold text-indigo-400">{eventStocks.length}</div>
                     <div className="text-sm text-muted-foreground">Prodotti</div>
@@ -1576,7 +1576,7 @@ export default function EventHub() {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
                   <div className="p-4 rounded-lg bg-gradient-to-br from-amber-500/20 to-orange-500/20 border border-amber-500/30">
                     <div className="text-3xl font-bold text-amber-400">€{totalRevenue.toFixed(0)}</div>
                     <div className="text-sm text-muted-foreground">Incasso Totale</div>
