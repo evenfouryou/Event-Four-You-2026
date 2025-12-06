@@ -748,6 +748,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           personaleEnabled: false,
           cassaEnabled: false,
           nightFileEnabled: false,
+          siaeEnabled: false,
         });
       }
       res.json(features);
@@ -773,6 +774,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           personaleEnabled: false,
           cassaEnabled: false,
           nightFileEnabled: false,
+          siaeEnabled: false,
         });
       }
       res.json(features);
@@ -826,6 +828,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           personaleEnabled: false,
           cassaEnabled: false,
           nightFileEnabled: false,
+          siaeEnabled: false,
         });
       }
       res.json(features);
@@ -847,6 +850,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           personaleEnabled: false,
           cassaEnabled: false,
           nightFileEnabled: false,
+          siaeEnabled: false,
         });
       }
       res.json(features);
