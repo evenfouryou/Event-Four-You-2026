@@ -66,9 +66,14 @@ export function setupBridgeRelay(server: Server): void {
 
     const cookies = request.headers.cookie ? parseCookie(request.headers.cookie) : {};
     const sessionId = cookies['connect.sid'];
+    
+    console.log(`[Bridge] Cookie received: ${sessionId ? 'yes (connect.sid present)' : 'no cookie'}`);
 
     if (sessionId) {
       const session = await getSessionData(sessionId);
+      console.log(`[Bridge] Session lookup result: ${session ? 'found' : 'not found'}`);
+      console.log(`[Bridge] Session passport.user: ${session?.passport?.user ? 'present' : 'missing'}`);
+      
       if (session?.passport?.user) {
         connectionType = 'client';
         connectionInfo = {
