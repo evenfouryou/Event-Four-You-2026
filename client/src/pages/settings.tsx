@@ -365,6 +365,46 @@ export default function Settings() {
             </div>
           </div>
           
+          {/* Smart Card Details - shown when card is inserted */}
+          {smartCardStatus.cardInserted && (
+            <div className="mt-4 p-4 rounded-xl bg-green-500/10 border border-green-500/30">
+              <div className="flex items-center gap-2 mb-3">
+                <Shield className="h-5 w-5 text-green-500" />
+                <span className="font-semibold text-green-600">Smart Card SIAE Inserita</span>
+              </div>
+              <div className="grid gap-2 text-sm">
+                {smartCardStatus.cardSerial && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-muted-foreground">Seriale:</span>
+                    <span className="font-mono text-foreground" data-testid="text-card-serial">
+                      {smartCardStatus.cardSerial}
+                    </span>
+                  </div>
+                )}
+                {smartCardStatus.cardAtr && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-muted-foreground">ATR:</span>
+                    <span className="font-mono text-xs text-foreground" data-testid="text-card-atr">
+                      {smartCardStatus.cardAtr}
+                    </span>
+                  </div>
+                )}
+                {smartCardStatus.cardType && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-muted-foreground">Tipo:</span>
+                    <span className="text-foreground" data-testid="text-card-type">
+                      {smartCardStatus.cardType}
+                    </span>
+                  </div>
+                )}
+                <div className="flex items-center gap-2 mt-2">
+                  <CheckCircle2 className="h-4 w-4 text-green-500" />
+                  <span className="text-green-600 font-medium">Pronta per emissione biglietti</span>
+                </div>
+              </div>
+            </div>
+          )}
+          
           {smartCardStatus.error && !smartCardStatus.demoMode && (
             <div className="mt-3 text-sm text-amber-600 dark:text-amber-400">
               {smartCardStatus.error}

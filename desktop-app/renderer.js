@@ -30,9 +30,15 @@ document.addEventListener('DOMContentLoaded', () => {
   let cardPresent = false;
   let relayConnected = false;
   let checkInterval = null;
+  let pinDialogVisible = false;
 
   // Initialize
   init();
+  
+  // Listen for PIN required event (SIAE compliance)
+  window.siaeAPI.onPinRequired((data) => {
+    showPinDialog(data.reason);
+  });
 
   async function init() {
     addLog('info', 'Applicazione avviata');
@@ -354,5 +360,117 @@ document.addEventListener('DOMContentLoaded', () => {
     a.download = filename;
     a.click();
     URL.revokeObjectURL(url);
+  }
+  
+  // ============================================
+  // PIN Dialog (SIAE Compliance)
+  // ============================================
+  
+  function showPinDialog(reason) {
+    if (pinDialogVisible) return;
+    pinDialogVisible = true;
+    
+    addLog('warn', '⚠️ SIAE: Richiesta verifica PIN');
+    
+    // Create overlay
+    const overlay = document.createElement('div');
+    overlay.id = 'pin-overlay';
+    overlay.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.8);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 10000;
+    `;
+    
+    // Create dialog
+    const dialog = document.createElement('div');
+    dialog.style.cssText = `
+      background: linear-gradient(145deg, #2d2d3a, #1e1e28);
+      border-radius: 16px;
+      padding: 32px;
+      width: 400px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+      border: 1px solid rgba(255,255,255,0.1);
+    `;
+    
+    dialog.innerHTML = `
+      <div style="text-align: center; margin-bottom: 24px;">
+        <div style="font-size: 48px; margin-bottom: 16px;">🔐</div>
+        <h2 style="color: #ff9800; margin: 0 0 8px 0; font-size: 20px;">Verifica PIN SIAE</h2>
+        <p style="color: #999; margin: 0; font-size: 14px;">${reason || 'Inserire il PIN per continuare'}</p>
+      </div>
+      <div style="margin-bottom: 24px;">
+        <input type="password" id="pin-input" maxlength="6" 
+          style="width: 100%; padding: 16px; font-size: 24px; text-align: center; 
+          letter-spacing: 8px; background: #1a1a24; border: 2px solid #444;
+          border-radius: 8px; color: white; box-sizing: border-box;"
+          placeholder="••••" autofocus>
+        <p id="pin-error" style="color: #f44336; margin: 8px 0 0 0; font-size: 13px; display: none;">
+          PIN errato. Riprova.
+        </p>
+      </div>
+      <div style="display: flex; gap: 12px;">
+        <button id="pin-cancel" style="flex: 1; padding: 14px; background: #444; 
+          border: none; border-radius: 8px; color: white; font-size: 15px; cursor: pointer;">
+          Annulla
+        </button>
+        <button id="pin-submit" style="flex: 1; padding: 14px; 
+          background: linear-gradient(135deg, #4caf50, #388e3c);
+          border: none; border-radius: 8px; color: white; font-size: 15px; 
+          cursor: pointer; font-weight: 600;">
+          Conferma
+        </button>
+      </div>
+      <p style="text-align: center; color: #666; font-size: 12px; margin-top: 16px;">
+        PIN predefinito: 1234
+      </p>
+    `;
+    
+    overlay.appendChild(dialog);
+    document.body.appendChild(overlay);
+    
+    const pinInput = document.getElementById('pin-input');
+    const pinError = document.getElementById('pin-error');
+    const pinSubmit = document.getElementById('pin-submit');
+    const pinCancel = document.getElementById('pin-cancel');
+    
+    pinInput.focus();
+    
+    async function verifyPin() {
+      const pin = pinInput.value;
+      if (!pin) return;
+      
+      const result = await window.siaeAPI.verifyPin(pin);
+      
+      if (result.success) {
+        addLog('info', '✓ PIN verificato correttamente');
+        closePinDialog();
+      } else {
+        pinError.style.display = 'block';
+        pinInput.value = '';
+        pinInput.focus();
+        addLog('error', 'PIN errato');
+      }
+    }
+    
+    function closePinDialog() {
+      overlay.remove();
+      pinDialogVisible = false;
+    }
+    
+    pinSubmit.addEventListener('click', verifyPin);
+    pinInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') verifyPin();
+    });
+    pinCancel.addEventListener('click', () => {
+      addLog('warn', 'Verifica PIN annullata - operazioni bloccate');
+      closePinDialog();
+    });
   }
 });

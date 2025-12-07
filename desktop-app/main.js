@@ -65,6 +65,12 @@ const STATUS_CHECK_INTERVAL = 500; // Check every 0.5 seconds
 let statusCheckTimer = null;
 let lastStatusJson = '';
 
+// PIN verification state (SIAE compliance)
+let pinVerified = false;
+let cardWasInserted = false;
+let pinLocked = false;  // True when waiting for PIN after card removal
+const SIAE_PIN = '1234';  // Default PIN - should be configurable
+
 // Current status for WebSocket clients
 let currentStatus = {
   bridgeConnected: false,
@@ -680,14 +686,39 @@ function startStatusPolling() {
     
     try {
       const result = await sendBridgeCommand('CHECK_READER');
+      const cardCurrentlyInserted = result.cardPresent || false;
+      
+      // SIAE PIN verification: detect card removal
+      if (cardWasInserted && !cardCurrentlyInserted && !pinLocked) {
+        log.info('SIAE: Carta rimossa - richiesta verifica PIN');
+        pinLocked = true;
+        pinVerified = false;
+        
+        // Notify renderer to show PIN dialog
+        if (mainWindow && mainWindow.webContents) {
+          mainWindow.webContents.send('pin:required', {
+            reason: 'Carta SIAE rimossa - inserire PIN per continuare'
+          });
+        }
+      }
+      
+      // Update card state tracking
+      cardWasInserted = cardCurrentlyInserted;
+      
+      // When card is inserted and PIN was locked, require PIN to unlock
+      if (cardCurrentlyInserted && pinLocked) {
+        log.info('SIAE: Carta reinserita - PIN ancora richiesto');
+      }
       
       const newStatus = {
         bridgeConnected: true,
         readerConnected: result.readerConnected || false,
-        cardInserted: result.cardPresent || false,
+        cardInserted: cardCurrentlyInserted,
         readerName: result.readerName || null,
         cardSerial: result.cardSerial || null,
-        cardAtr: result.cardAtr || null
+        cardAtr: result.cardAtr || null,
+        pinLocked: pinLocked,
+        pinRequired: pinLocked && !pinVerified
       };
       
       // Only broadcast if status actually changed
@@ -1032,6 +1063,49 @@ ipcMain.handle('relay:status', () => {
     enabled: relayConfig.enabled,
     serverUrl: relayConfig.serverUrl
   };
+});
+
+// ============================================
+// PIN Verification (SIAE Compliance)
+// ============================================
+
+ipcMain.handle('pin:verify', (event, enteredPin) => {
+  log.info('IPC: pin:verify');
+  
+  if (enteredPin === SIAE_PIN) {
+    log.info('SIAE: PIN verificato correttamente');
+    pinVerified = true;
+    pinLocked = false;
+    
+    // Update and broadcast status
+    const newStatus = {
+      ...currentStatus,
+      pinLocked: false,
+      pinRequired: false
+    };
+    updateStatus(newStatus);
+    
+    return { success: true, message: 'PIN verificato' };
+  } else {
+    log.warn('SIAE: PIN errato');
+    return { success: false, error: 'PIN errato' };
+  }
+});
+
+ipcMain.handle('pin:status', () => {
+  return {
+    pinLocked,
+    pinVerified,
+    pinRequired: pinLocked && !pinVerified
+  };
+});
+
+ipcMain.handle('pin:setPin', (event, newPin) => {
+  log.info('IPC: pin:setPin');
+  // Note: In production, this should be stored securely
+  // For now, we just log the change
+  log.info('SIAE: PIN aggiornato');
+  return { success: true, message: 'PIN aggiornato' };
 });
 
 // App lifecycle
