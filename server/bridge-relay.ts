@@ -447,6 +447,35 @@ export function isBridgeConnected(): boolean {
   return globalBridge !== null && globalBridge.ws.readyState === WebSocket.OPEN;
 }
 
+export function getCachedBridgeStatus(): any {
+  const connected = isBridgeConnected();
+  if (!connected) {
+    return {
+      bridgeConnected: false,
+      readerConnected: false,
+      cardInserted: false,
+      readerName: null,
+      cardSerial: null
+    };
+  }
+  
+  // Return cached status or default if no status received yet
+  if (cachedBridgeStatus) {
+    return {
+      bridgeConnected: true,
+      ...cachedBridgeStatus.payload
+    };
+  }
+  
+  return {
+    bridgeConnected: true,
+    readerConnected: false,
+    cardInserted: false,
+    readerName: null,
+    cardSerial: null
+  };
+}
+
 export function getActiveBridgesCount(): number {
   return globalBridge ? 1 : 0;
 }

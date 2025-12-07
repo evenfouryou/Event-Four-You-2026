@@ -74,7 +74,57 @@ class SmartCardService {
 
   public startPolling(): void {
     if (this.ws) return;
+    
+    // Fetch status immediately via HTTP (instant, no waiting for WebSocket)
+    this.fetchInitialStatusViaHttp();
+    
+    // Then establish WebSocket for real-time updates
     this.tryWebSocketConnection();
+  }
+  
+  private async fetchInitialStatusViaHttp(): Promise<void> {
+    try {
+      console.log('[DEBUG SC] Fetching initial status via HTTP...');
+      const response = await fetch('/api/bridge/status', { credentials: 'include' });
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('[DEBUG SC] HTTP status received:', JSON.stringify(data));
+        
+        // Update status immediately with cached data from server
+        this.updateStatus({
+          connected: data.bridgeConnected || false,
+          relayConnected: true,
+          readerDetected: data.readerConnected || false,
+          cardInserted: data.cardInserted || false,
+          readerName: data.readerName || null,
+          cardAtr: data.cardAtr || null,
+          cardSerial: data.cardSerial || null,
+          cardType: data.cardInserted ? 'Smart Card SIAE' : null,
+          lastCheck: new Date(),
+          error: this.getErrorFromData(data),
+          bridgeConnected: data.bridgeConnected || false,
+          canEmitRealSeals: data.bridgeConnected && data.readerConnected && data.cardInserted,
+          demoMode: false
+        });
+      }
+    } catch (err) {
+      console.error('[DEBUG SC] HTTP fetch failed:', err);
+      // Continue anyway - WebSocket will provide updates
+    }
+  }
+  
+  private getErrorFromData(data: any): string | null {
+    if (!data.bridgeConnected) {
+      return 'App desktop Event4U non connessa. Avviare l\'applicazione sul PC.';
+    }
+    if (!data.readerConnected) {
+      return 'Lettore Smart Card non rilevato. Collegare il MiniLector EVO.';
+    }
+    if (!data.cardInserted) {
+      return 'Smart Card SIAE non inserita. Inserire la carta sigilli.';
+    }
+    return null;
   }
 
   private tryWebSocketConnection(): void {

@@ -54,7 +54,7 @@ import { db } from "./db";
 import { eq, and } from "drizzle-orm";
 import crypto from "crypto";
 import { companies } from "@shared/schema";
-import { setupBridgeRelay, isBridgeConnected } from "./bridge-relay";
+import { setupBridgeRelay, isBridgeConnected, getCachedBridgeStatus } from "./bridge-relay";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Setup passport for classic email/password authentication (no Replit OAuth)
@@ -4588,21 +4588,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  // Check if a bridge is connected for the current user's company
+  // Check bridge status with full reader/card info (instant - uses cached data)
   app.get('/api/bridge/status', isAuthenticated, async (req: any, res) => {
     try {
-      const companyId = await getUserCompanyId(req);
-      if (!companyId) {
-        return res.status(403).json({ message: "No company associated with your account" });
-      }
+      // Get complete cached status (bridge + reader + card)
+      const status = getCachedBridgeStatus();
       
-      const connected = isBridgeConnected(companyId);
-      
-      res.json({ 
-        connected,
-        companyId,
-        message: connected ? "Bridge desktop app is connected" : "Bridge desktop app is not connected"
-      });
+      res.json(status);
     } catch (error: any) {
       console.error('[Bridge] Error checking status:', error);
       res.status(500).json({ message: "Failed to check bridge status" });
