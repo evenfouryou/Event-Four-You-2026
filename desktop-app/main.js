@@ -46,10 +46,14 @@ let wsClients = new Set();
 // Remote relay connection
 let relayWs = null;
 let relayReconnectTimer = null;
+
+// MASTER TOKEN - embedded in the app for Event Four You platform
+// This authenticates the official desktop app - not individual companies
+const MASTER_TOKEN = '61f12bc11ad07f8042ac953211cefe4127c900070cf51f66903988f90a31dfe4';
+
 let relayConfig = {
   serverUrl: 'wss://manage.eventfouryou.com',
-  token: '',
-  companyId: '',
+  token: MASTER_TOKEN,
   enabled: true
 };
 const RELAY_RECONNECT_DELAY = 5000;
@@ -538,7 +542,7 @@ function broadcastStatus() {
 // ============================================
 
 function connectToRelay() {
-  if (!relayConfig.enabled || !relayConfig.token || !relayConfig.companyId) {
+  if (!relayConfig.enabled || !relayConfig.token) {
     log.info('Relay not configured, skipping connection');
     return;
   }
@@ -563,11 +567,10 @@ function connectToRelay() {
         relayReconnectTimer = null;
       }
       
-      // Register as bridge
+      // Register as global bridge with master token only
       const registerMsg = {
         type: 'bridge_register',
-        token: relayConfig.token,
-        companyId: relayConfig.companyId
+        token: relayConfig.token
       };
       relayWs.send(JSON.stringify(registerMsg));
       log.info('Sent bridge_register to relay');
@@ -673,9 +676,19 @@ function disconnectRelay() {
 
 async function handleRelayCommand(msg) {
   // Commands from web clients via relay
+  // msg.fromCompanyId tells us which company sent the request
+  const fromCompanyId = msg.fromCompanyId;
+  const fromUserId = msg.fromUserId;
+  
   const sendRelayResponse = (type, data) => {
     if (relayWs && relayWs.readyState === WebSocket.OPEN) {
-      relayWs.send(JSON.stringify({ type, ...data }));
+      // Include toCompanyId so server routes response to correct client
+      relayWs.send(JSON.stringify({ 
+        type, 
+        toCompanyId: fromCompanyId,
+        toUserId: fromUserId,
+        ...data 
+      }));
     }
   };
   
@@ -770,42 +783,16 @@ async function handleRelayCommand(msg) {
   }
 }
 
-// Load relay config from file
+// Load relay config - token is embedded, config is minimal
 function loadRelayConfig() {
-  // Default config for Event4U production server
-  const defaultConfig = {
+  // Config is fixed - master token is embedded
+  relayConfig = {
     serverUrl: 'wss://manage.eventfouryou.com',
-    token: '',
-    companyId: '',
+    token: MASTER_TOKEN,
     enabled: true
   };
   
-  try {
-    const configPath = path.join(app.getPath('userData'), 'relay-config.json');
-    if (fs.existsSync(configPath)) {
-      const savedConfig = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-      // Only use saved values if they are non-empty, otherwise keep defaults
-      relayConfig = {
-        serverUrl: savedConfig.serverUrl || defaultConfig.serverUrl,
-        token: savedConfig.token || defaultConfig.token,
-        companyId: savedConfig.companyId || defaultConfig.companyId,
-        enabled: savedConfig.enabled !== undefined ? savedConfig.enabled : defaultConfig.enabled
-      };
-      log.info('Relay config loaded (merged with defaults):', { 
-        serverUrl: relayConfig.serverUrl, 
-        companyId: relayConfig.companyId,
-        enabled: relayConfig.enabled,
-        hasToken: !!relayConfig.token
-      });
-    } else {
-      // No saved config, use defaults
-      relayConfig = { ...defaultConfig };
-      log.info('Using default relay config (no saved config found)');
-    }
-  } catch (e) {
-    log.error('Failed to load relay config, using defaults:', e.message);
-    relayConfig = { ...defaultConfig };
-  }
+  log.info('Relay config initialized with embedded master token');
 }
 
 // Save relay config to file

@@ -9,12 +9,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const btnClearLogs = document.getElementById('btn-clear-logs');
   const btnExportLogs = document.getElementById('btn-export-logs');
   
-  // Relay elements
-  const btnRelayConnect = document.getElementById('btn-relay-connect');
-  const btnRelayDisconnect = document.getElementById('btn-relay-disconnect');
-  const inputServerUrl = document.getElementById('input-server-url');
-  const inputBridgeToken = document.getElementById('input-bridge-token');
-  const inputCompanyId = document.getElementById('input-company-id');
+  // Relay elements (auto-connect - no user input needed)
   const statusRelay = document.getElementById('status-relay');
   
   const statusBridge = document.getElementById('status-bridge');
@@ -65,36 +60,22 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
   
-  // Relay configuration panel reference
-  const relayConfig = document.getElementById('relay-config');
-  const relayPanel = document.querySelector('.relay-panel');
-  
-  // Relay functions - with configuration UI
+  // Relay functions - auto-connect (no user input needed)
   async function loadRelayConfig() {
     try {
       const config = await window.siaeAPI.getRelayConfig();
       if (config) {
-        // Fill in saved credentials if available
-        if (config.companyId && inputCompanyId) {
-          inputCompanyId.value = config.companyId;
-        }
-        if (config.token && inputBridgeToken) {
-          inputBridgeToken.value = config.token;
-        }
-        
-        updateRelayStatusUI(config.connected, config.companyId && config.token);
+        updateRelayStatusUI(config.connected);
         
         if (config.connected) {
-          addLog('info', 'Connesso al server Event4U');
-        } else if (config.companyId && config.token) {
-          addLog('info', 'Connessione in corso...');
+          addLog('info', '✓ Connesso al server Event4U');
+        } else {
+          addLog('info', 'Connessione automatica in corso...');
           // Wait for auto-connect
           setTimeout(async () => {
             const newConfig = await window.siaeAPI.getRelayConfig();
-            updateRelayStatusUI(newConfig?.connected || false, true);
+            updateRelayStatusUI(newConfig?.connected || false);
           }, 3000);
-        } else {
-          addLog('info', 'Inserisci le credenziali per connetterti');
         }
       }
     } catch (e) {
@@ -102,81 +83,14 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
   
-  function updateRelayStatusUI(connected, hasCredentials = false) {
+  function updateRelayStatusUI(connected) {
     relayConnected = connected;
     if (connected) {
-      updateStatus(statusRelay, 'connected', 'Connesso al server');
-      // Hide config, show disconnect button
-      if (relayConfig) relayConfig.classList.add('hidden');
-      if (btnRelayConnect) btnRelayConnect.style.display = 'none';
-      if (btnRelayDisconnect) btnRelayDisconnect.style.display = 'inline-flex';
-      if (relayPanel) relayPanel.classList.add('relay-connected');
-    } else if (hasCredentials) {
-      updateStatus(statusRelay, 'warning', 'Connessione in corso...');
+      updateStatus(statusRelay, 'connected', 'Connesso a manage.eventfouryou.com');
     } else {
-      updateStatus(statusRelay, 'disconnected', 'Non configurato');
-      // Show config panel
-      if (relayConfig) relayConfig.classList.remove('hidden');
-      if (btnRelayConnect) btnRelayConnect.style.display = 'inline-flex';
-      if (btnRelayDisconnect) btnRelayDisconnect.style.display = 'none';
-      if (relayPanel) relayPanel.classList.remove('relay-connected');
+      updateStatus(statusRelay, 'warning', 'Connessione in corso...');
     }
   }
-  
-  // Connect button handler - saves credentials and connects
-  btnRelayConnect?.addEventListener('click', async () => {
-    const token = inputBridgeToken?.value?.trim();
-    const companyId = inputCompanyId?.value?.trim();
-    
-    if (!token || !companyId) {
-      addLog('error', 'Inserisci Company ID e Token');
-      return;
-    }
-    
-    addLog('info', 'Salvataggio configurazione...');
-    btnRelayConnect.disabled = true;
-    btnRelayConnect.innerHTML = '<span class="btn-icon">⏳</span> Connessione...';
-    
-    try {
-      await window.siaeAPI.setRelayConfig({
-        serverUrl: inputServerUrl?.value || 'wss://manage.eventfouryou.com',
-        token: token,
-        companyId: companyId,
-        enabled: true
-      });
-      
-      // Wait a bit for connection to establish
-      setTimeout(async () => {
-        const status = await window.siaeAPI.getRelayStatus();
-        if (status.connected) {
-          addLog('info', '✓ Connesso al server Event4U');
-          updateRelayStatusUI(true, true);
-        } else {
-          addLog('warn', 'Connessione in corso...');
-          updateRelayStatusUI(false, true);
-        }
-        btnRelayConnect.disabled = false;
-        btnRelayConnect.innerHTML = '<span class="btn-icon">🔗</span> Salva e Connetti';
-      }, 3000);
-      
-    } catch (e) {
-      addLog('error', `Errore connessione: ${e.message}`);
-      btnRelayConnect.disabled = false;
-      btnRelayConnect.innerHTML = '<span class="btn-icon">🔗</span> Salva e Connetti';
-    }
-  });
-  
-  btnRelayDisconnect?.addEventListener('click', async () => {
-    try {
-      await window.siaeAPI.disconnectRelay();
-      updateRelayStatusUI(false, false);
-      addLog('info', 'Disconnesso dal server');
-      // Show config panel again
-      if (relayConfig) relayConfig.classList.remove('hidden');
-    } catch (e) {
-      addLog('error', `Errore disconnessione: ${e.message}`);
-    }
-  });
 
   // Event Handlers
   btnConnect.addEventListener('click', async () => {

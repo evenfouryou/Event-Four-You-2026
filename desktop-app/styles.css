@@ -457,6 +457,16 @@ body {
   color: var(--accent-primary);
 }
 
+.relay-info {
+  margin-top: 12px;
+  padding: 10px;
+  background: var(--bg-panel);
+  border-radius: 8px;
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
 .relay-config {
   display: grid;
   gap: 12px;

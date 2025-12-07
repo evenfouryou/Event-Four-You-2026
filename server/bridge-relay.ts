@@ -8,10 +8,15 @@ import { eq } from 'drizzle-orm';
 
 interface BridgeConnection {
   ws: WebSocket;
-  companyId: string;
   connectedAt: Date;
   lastPing: Date;
 }
+
+// Master token from environment - used by the single Event Four You desktop app
+const MASTER_TOKEN = process.env.SIAE_MASTER_TOKEN || '';
+
+// Single global bridge (Event Four You's desktop app)
+let globalBridge: BridgeConnection | null = null;
 
 interface ClientConnection {
   ws: WebSocket;
@@ -25,11 +30,14 @@ interface BridgeMessage {
   type: string;
   token?: string;
   companyId?: string;
+  toCompanyId?: string;
+  fromCompanyId?: string;
+  fromUserId?: string;
   payload?: any;
   requestId?: string;
 }
 
-const activeBridges = new Map<string, BridgeConnection>();
+// Keep track of clients by company for routing responses
 const activeClients = new Map<string, ClientConnection[]>();
 
 const HEARTBEAT_INTERVAL = 30000;
@@ -72,7 +80,8 @@ export function setupBridgeRelay(server: Server): void {
         if (connectionInfo.companyId && connectionInfo.userId) {
           addClient(connectionInfo.companyId, connectionInfo.userId, ws);
           
-          const bridgeConnected = activeBridges.has(connectionInfo.companyId);
+          // Check if global bridge is connected (single Event Four You app)
+          const bridgeConnected = globalBridge !== null && globalBridge.ws.readyState === WebSocket.OPEN;
           ws.send(JSON.stringify({
             type: 'connection_status',
             bridgeConnected,
@@ -91,20 +100,14 @@ export function setupBridgeRelay(server: Server): void {
           const result = await handleBridgeRegistration(ws, message);
           if (result.success) {
             connectionType = 'bridge';
-            connectionInfo = { companyId: result.companyId };
-            console.log(`[Bridge] Bridge registered for company: ${result.companyId}`);
-            
-            notifyClientsOfBridgeStatus(result.companyId!, true);
+            console.log(`[Bridge] Global bridge registered successfully`);
           }
           return;
         }
 
         if (message.type === 'pong') {
-          if (connectionType === 'bridge' && connectionInfo.companyId) {
-            const bridge = activeBridges.get(connectionInfo.companyId);
-            if (bridge) {
-              bridge.lastPing = new Date();
-            }
+          if (connectionType === 'bridge' && globalBridge) {
+            globalBridge.lastPing = new Date();
           } else if (connectionType === 'client' && connectionInfo.companyId && connectionInfo.userId) {
             const clients = activeClients.get(connectionInfo.companyId);
             if (clients) {
@@ -118,9 +121,13 @@ export function setupBridgeRelay(server: Server): void {
         }
 
         if (connectionType === 'client' && connectionInfo.companyId) {
+          // Forward to global bridge with company info for routing response
           forwardToBridge(connectionInfo.companyId, message, connectionInfo.userId);
-        } else if (connectionType === 'bridge' && connectionInfo.companyId) {
-          forwardToClients(connectionInfo.companyId, message);
+        } else if (connectionType === 'bridge') {
+          // Bridge response - route to the client that made the request
+          if (message.toCompanyId) {
+            forwardToClients(message.toCompanyId as string, message);
+          }
         }
 
       } catch (error) {
@@ -135,10 +142,11 @@ export function setupBridgeRelay(server: Server): void {
     ws.on('close', () => {
       console.log(`[Bridge] Connection closed: type=${connectionType}`);
       
-      if (connectionType === 'bridge' && connectionInfo.companyId) {
-        activeBridges.delete(connectionInfo.companyId);
-        notifyClientsOfBridgeStatus(connectionInfo.companyId, false);
-        console.log(`[Bridge] Bridge disconnected for company: ${connectionInfo.companyId}`);
+      if (connectionType === 'bridge') {
+        globalBridge = null;
+        // Notify ALL clients that bridge disconnected
+        notifyAllClientsOfBridgeStatus(false);
+        console.log(`[Bridge] Global bridge disconnected`);
       } else if (connectionType === 'client' && connectionInfo.companyId && connectionInfo.userId) {
         removeClient(connectionInfo.companyId, connectionInfo.userId);
         console.log(`[Bridge] Client disconnected: userId=${connectionInfo.userId}`);
@@ -153,16 +161,17 @@ export function setupBridgeRelay(server: Server): void {
   setInterval(() => {
     const now = new Date();
 
-    activeBridges.forEach((bridge, companyId) => {
-      if (now.getTime() - bridge.lastPing.getTime() > CONNECTION_TIMEOUT) {
-        console.log(`[Bridge] Bridge timeout for company: ${companyId}`);
-        bridge.ws.terminate();
-        activeBridges.delete(companyId);
-        notifyClientsOfBridgeStatus(companyId, false);
+    // Check global bridge timeout
+    if (globalBridge) {
+      if (now.getTime() - globalBridge.lastPing.getTime() > CONNECTION_TIMEOUT) {
+        console.log(`[Bridge] Global bridge timeout`);
+        globalBridge.ws.terminate();
+        globalBridge = null;
+        notifyAllClientsOfBridgeStatus(false);
       } else {
-        bridge.ws.send(JSON.stringify({ type: 'ping' }));
+        globalBridge.ws.send(JSON.stringify({ type: 'ping' }));
       }
-    });
+    }
 
     activeClients.forEach((clients, companyId) => {
       clients.forEach((client, index) => {
@@ -207,82 +216,65 @@ async function getSessionData(sessionId: string): Promise<any | null> {
 async function handleBridgeRegistration(
   ws: WebSocket,
   message: BridgeMessage
-): Promise<{ success: boolean; companyId?: string; error?: string }> {
-  const { token, companyId } = message;
+): Promise<{ success: boolean; error?: string }> {
+  const { token } = message;
 
-  if (!token || !companyId) {
+  if (!token) {
     ws.send(JSON.stringify({
       type: 'bridge_register_response',
       success: false,
-      error: 'Token and companyId are required',
+      error: 'Token is required',
     }));
-    return { success: false, error: 'Token and companyId are required' };
+    return { success: false, error: 'Token is required' };
   }
 
-  try {
-    console.log(`[Bridge] Registration attempt: companyId=${companyId}, token=${token?.substring(0, 8)}...`);
-    
-    const company = await db
-      .select()
-      .from(companies)
-      .where(eq(companies.id, companyId))
-      .limit(1);
-
-    console.log(`[Bridge] Company query result: found=${company.length > 0}`);
-
-    if (company.length === 0) {
-      console.log(`[Bridge] Registration failed: Company not found for id=${companyId}`);
-      ws.send(JSON.stringify({
-        type: 'bridge_register_response',
-        success: false,
-        error: 'Company not found',
-      }));
-      return { success: false, error: 'Company not found' };
-    }
-
-    const storedToken = company[0].bridgeToken;
-    console.log(`[Bridge] Token check: stored=${storedToken?.substring(0, 8)}..., provided=${token?.substring(0, 8)}...`);
-    
-    if (storedToken !== token) {
-      console.log(`[Bridge] Registration failed: Invalid token`);
-      ws.send(JSON.stringify({
-        type: 'bridge_register_response',
-        success: false,
-        error: 'Invalid token',
-      }));
-      return { success: false, error: 'Invalid token' };
-    }
-
-    const existingBridge = activeBridges.get(companyId);
-    if (existingBridge) {
-      console.log(`[Bridge] Replacing existing bridge for company: ${companyId}`);
-      existingBridge.ws.terminate();
-    }
-
-    activeBridges.set(companyId, {
-      ws,
-      companyId,
-      connectedAt: new Date(),
-      lastPing: new Date(),
-    });
-
-    ws.send(JSON.stringify({
-      type: 'bridge_register_response',
-      success: true,
-      message: 'Bridge registered successfully',
-    }));
-
-    return { success: true, companyId };
-  } catch (error: any) {
-    console.error('[Bridge] Error during bridge registration:', error?.message || error);
-    console.error('[Bridge] Stack trace:', error?.stack);
+  // Validate against master token from environment
+  if (!MASTER_TOKEN) {
+    console.error('[Bridge] SIAE_MASTER_TOKEN not configured on server');
     ws.send(JSON.stringify({
       type: 'bridge_register_response',
       success: false,
-      error: `Internal server error: ${error?.message || 'Unknown error'}`,
+      error: 'Server not configured',
     }));
-    return { success: false, error: 'Internal server error' };
+    return { success: false, error: 'Server not configured' };
   }
+
+  console.log(`[Bridge] Registration attempt with master token: ${token?.substring(0, 8)}...`);
+  
+  if (token !== MASTER_TOKEN) {
+    console.log(`[Bridge] Registration failed: Invalid master token`);
+    ws.send(JSON.stringify({
+      type: 'bridge_register_response',
+      success: false,
+      error: 'Invalid token',
+    }));
+    return { success: false, error: 'Invalid token' };
+  }
+
+  // Close existing bridge if any
+  if (globalBridge) {
+    console.log(`[Bridge] Replacing existing global bridge`);
+    globalBridge.ws.terminate();
+  }
+
+  // Set as global bridge
+  globalBridge = {
+    ws,
+    connectedAt: new Date(),
+    lastPing: new Date(),
+  };
+
+  ws.send(JSON.stringify({
+    type: 'bridge_register_response',
+    success: true,
+    message: 'Bridge registered successfully',
+  }));
+
+  // Notify all clients that bridge is now connected
+  notifyAllClientsOfBridgeStatus(true);
+
+  console.log(`[Bridge] Global bridge registered successfully`);
+  return { success: true };
 }
 
 function addClient(companyId: string, userId: string, ws: WebSocket): void {
@@ -320,32 +312,33 @@ function removeClient(companyId: string, userId: string): void {
   }
 }
 
-function notifyClientsOfBridgeStatus(companyId: string, connected: boolean): void {
-  const clients = activeClients.get(companyId);
-  if (clients) {
-    const message = JSON.stringify({
-      type: 'bridge_status',
-      connected,
-      message: connected ? 'Bridge desktop app connected' : 'Bridge desktop app disconnected',
-    });
-    
+function notifyAllClientsOfBridgeStatus(connected: boolean): void {
+  const message = JSON.stringify({
+    type: 'bridge_status',
+    connected,
+    message: connected ? 'Bridge desktop app connected' : 'Bridge desktop app disconnected',
+  });
+  
+  // Notify ALL clients across all companies
+  activeClients.forEach((clients) => {
     clients.forEach(client => {
       if (client.ws.readyState === WebSocket.OPEN) {
         client.ws.send(message);
       }
     });
-  }
+  });
 }
 
 function forwardToBridge(companyId: string, message: BridgeMessage, userId?: string): void {
-  const bridge = activeBridges.get(companyId);
-  if (bridge && bridge.ws.readyState === WebSocket.OPEN) {
-    bridge.ws.send(JSON.stringify({
+  if (globalBridge && globalBridge.ws.readyState === WebSocket.OPEN) {
+    // Include company info so bridge knows where to route response
+    globalBridge.ws.send(JSON.stringify({
       ...message,
       fromUserId: userId,
+      fromCompanyId: companyId,
     }));
   } else {
-    console.log(`[Bridge] No active bridge for company: ${companyId}`);
+    console.log(`[Bridge] Global bridge not connected`);
   }
 }
 
@@ -361,13 +354,12 @@ function forwardToClients(companyId: string, message: BridgeMessage): void {
   }
 }
 
-export function isBridgeConnected(companyId: string): boolean {
-  const bridge = activeBridges.get(companyId);
-  return bridge !== undefined && bridge.ws.readyState === WebSocket.OPEN;
+export function isBridgeConnected(): boolean {
+  return globalBridge !== null && globalBridge.ws.readyState === WebSocket.OPEN;
 }
 
 export function getActiveBridgesCount(): number {
-  return activeBridges.size;
+  return globalBridge ? 1 : 0;
 }
 
 export function getActiveClientsCount(): number {
