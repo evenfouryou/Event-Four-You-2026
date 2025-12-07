@@ -197,7 +197,9 @@ export function setupBridgeRelay(server: Server): void {
 
 async function getSessionData(sessionId: string): Promise<any | null> {
   try {
-    const cleanSessionId = sessionId.replace(/^s:/, '').split('.')[0];
+    // URL-decode the session ID first (browser sends it URL-encoded)
+    const decodedSessionId = decodeURIComponent(sessionId);
+    const cleanSessionId = decodedSessionId.replace(/^s:/, '').split('.')[0];
     
     const result = await db
       .select()
