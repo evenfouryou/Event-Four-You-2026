@@ -82,9 +82,11 @@ export function setupBridgeRelay(server: Server): void {
           
           // Check if global bridge is connected (single Event Four You app)
           const bridgeConnected = globalBridge !== null && globalBridge.ws.readyState === WebSocket.OPEN;
+          console.log(`[Bridge] Sending connection_status to client: bridgeConnected=${bridgeConnected}`);
           ws.send(JSON.stringify({
             type: 'connection_status',
             bridgeConnected,
+            connected: bridgeConnected, // Also send as 'connected' for compatibility
             message: bridgeConnected ? 'Bridge desktop app is connected' : 'Bridge desktop app is not connected',
           }));
         }
