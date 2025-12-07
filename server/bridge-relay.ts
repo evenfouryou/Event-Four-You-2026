@@ -62,7 +62,7 @@ export function setupBridgeRelay(server: Server): void {
     console.log('[Bridge] New WebSocket connection');
     
     let connectionType: 'bridge' | 'client' | null = null;
-    let connectionInfo: { userId?: string; companyId?: string } = {};
+    let connectionInfo: { userId?: string; companyId?: string; effectiveCompanyId?: string } = {};
 
     const cookies = request.headers.cookie ? parseCookie(request.headers.cookie) : {};
     const sessionId = cookies['connect.sid'];
@@ -93,11 +93,12 @@ export function setupBridgeRelay(server: Server): void {
           userId,
           companyId,
         };
-        console.log(`[Bridge] Client connected: userId=${connectionInfo.userId}, companyId=${connectionInfo.companyId}, role=${user.role}`);
-        
         // Super admin doesn't have companyId, but should still receive bridge status
         // Use a special "super_admin" company key for routing
         const effectiveCompanyId = connectionInfo.companyId || (user.role === 'super_admin' ? 'super_admin' : null);
+        connectionInfo.effectiveCompanyId = effectiveCompanyId || undefined;
+        
+        console.log(`[Bridge] Client connected: userId=${connectionInfo.userId}, companyId=${connectionInfo.companyId}, effectiveCompanyId=${effectiveCompanyId}, role=${user.role}`);
         
         if (effectiveCompanyId && connectionInfo.userId) {
           addClient(effectiveCompanyId, connectionInfo.userId, ws);
@@ -142,21 +143,23 @@ export function setupBridgeRelay(server: Server): void {
         if (message.type === 'pong') {
           if (connectionType === 'bridge' && globalBridge) {
             globalBridge.lastPing = new Date();
-          } else if (connectionType === 'client' && connectionInfo.companyId && connectionInfo.userId) {
-            const clients = activeClients.get(connectionInfo.companyId);
+          } else if (connectionType === 'client' && connectionInfo.effectiveCompanyId && connectionInfo.userId) {
+            // Use effectiveCompanyId (handles super_admin case)
+            const clients = activeClients.get(connectionInfo.effectiveCompanyId);
             if (clients) {
               const client = clients.find(c => c.userId === connectionInfo.userId);
               if (client) {
                 client.lastPing = new Date();
+                console.log(`[Bridge] Pong received from userId=${connectionInfo.userId}, lastPing updated`);
               }
             }
           }
           return;
         }
 
-        if (connectionType === 'client' && connectionInfo.companyId) {
+        if (connectionType === 'client' && connectionInfo.effectiveCompanyId) {
           // Forward to global bridge with company info for routing response
-          forwardToBridge(connectionInfo.companyId, message, connectionInfo.userId);
+          forwardToBridge(connectionInfo.effectiveCompanyId, message, connectionInfo.userId);
         } else if (connectionType === 'bridge') {
           // Bridge response - route to the client that made the request
           if (message.toCompanyId) {
@@ -181,8 +184,9 @@ export function setupBridgeRelay(server: Server): void {
         // Notify ALL clients that bridge disconnected
         notifyAllClientsOfBridgeStatus(false);
         console.log(`[Bridge] Global bridge disconnected`);
-      } else if (connectionType === 'client' && connectionInfo.companyId && connectionInfo.userId) {
-        removeClient(connectionInfo.companyId, connectionInfo.userId);
+      } else if (connectionType === 'client' && connectionInfo.effectiveCompanyId && connectionInfo.userId) {
+        // Use effectiveCompanyId for cleanup (handles super_admin case)
+        removeClient(connectionInfo.effectiveCompanyId, connectionInfo.userId);
         console.log(`[Bridge] Client disconnected: userId=${connectionInfo.userId}`);
       }
     });
