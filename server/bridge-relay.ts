@@ -161,8 +161,13 @@ export function setupBridgeRelay(server: Server): void {
           // Forward to global bridge with company info for routing response
           forwardToBridge(connectionInfo.effectiveCompanyId, message, connectionInfo.userId);
         } else if (connectionType === 'bridge') {
-          // Bridge response - route to the client that made the request
-          if (message.toCompanyId) {
+          // Messages from the bridge
+          if (message.type === 'status') {
+            // Bridge status update - broadcast to ALL clients
+            console.log(`[Bridge] Broadcasting status update to all clients:`, JSON.stringify(message).substring(0, 100));
+            broadcastToAllClients(message);
+          } else if (message.toCompanyId) {
+            // Response to specific client request
             forwardToClients(message.toCompanyId as string, message);
           }
         }
@@ -378,6 +383,27 @@ function notifyAllClientsOfBridgeStatus(connected: boolean): void {
       }
     });
   });
+}
+
+function broadcastToAllClients(message: BridgeMessage): void {
+  const messageStr = JSON.stringify(message);
+  let clientCount = 0;
+  
+  // Broadcast to ALL clients across all companies
+  activeClients.forEach((clients) => {
+    clients.forEach(client => {
+      if (client.ws.readyState === WebSocket.OPEN) {
+        try {
+          client.ws.send(messageStr);
+          clientCount++;
+        } catch (e) {
+          console.error('[Bridge] Error broadcasting to client:', e);
+        }
+      }
+    });
+  });
+  
+  console.log(`[Bridge] Broadcasted message type=${message.type} to ${clientCount} clients`);
 }
 
 function forwardToBridge(companyId: string, message: BridgeMessage, userId?: string): void {
