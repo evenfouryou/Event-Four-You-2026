@@ -18,6 +18,9 @@ const MASTER_TOKEN = process.env.SIAE_MASTER_TOKEN || '';
 // Single global bridge (Event Four You's desktop app)
 let globalBridge: BridgeConnection | null = null;
 
+// Cached status from bridge - sent immediately to new clients
+let cachedBridgeStatus: any = null;
+
 interface ClientConnection {
   ws: WebSocket;
   userId: string;
@@ -112,6 +115,12 @@ export function setupBridgeRelay(server: Server): void {
             connected: bridgeConnected, // Also send as 'connected' for compatibility
             message: bridgeConnected ? 'Bridge desktop app is connected' : 'Bridge desktop app is not connected',
           }));
+          
+          // Send cached status immediately if available (no waiting for polling)
+          if (cachedBridgeStatus && bridgeConnected) {
+            console.log(`[Bridge] Sending cached status to new client immediately`);
+            ws.send(JSON.stringify(cachedBridgeStatus));
+          }
         } else {
           console.log(`[Bridge] WARNING: Cannot add client - missing effectiveCompanyId or userId`);
           // Still send connection status even if we can't track the client
@@ -163,6 +172,8 @@ export function setupBridgeRelay(server: Server): void {
         } else if (connectionType === 'bridge') {
           // Messages from the bridge
           if (message.type === 'status') {
+            // Cache the status for new clients
+            cachedBridgeStatus = message;
             // Bridge status update - broadcast to ALL clients
             console.log(`[Bridge] Broadcasting status update to all clients:`, JSON.stringify(message).substring(0, 100));
             broadcastToAllClients(message);
@@ -186,6 +197,7 @@ export function setupBridgeRelay(server: Server): void {
       
       if (connectionType === 'bridge') {
         globalBridge = null;
+        cachedBridgeStatus = null; // Clear cached status when bridge disconnects
         // Notify ALL clients that bridge disconnected
         notifyAllClientsOfBridgeStatus(false);
         console.log(`[Bridge] Global bridge disconnected`);
