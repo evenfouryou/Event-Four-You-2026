@@ -76,9 +76,16 @@ export function setupBridgeRelay(server: Server): void {
       
       if (session?.passport?.user) {
         connectionType = 'client';
+        // User ID can be in different locations depending on auth method:
+        // - Classic login: session.passport.user.id
+        // - Replit OAuth: session.passport.user.claims.sub
+        const user = session.passport.user;
+        const userId = user.id || user.claims?.sub || 'unknown';
+        const companyId = user.companyId;
+        
         connectionInfo = {
-          userId: session.passport.user.id,
-          companyId: session.passport.user.companyId,
+          userId,
+          companyId,
         };
         console.log(`[Bridge] Client connected: userId=${connectionInfo.userId}, companyId=${connectionInfo.companyId}`);
         
