@@ -81,13 +81,17 @@ class SmartCardService {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) return;
     
     const wsUrl = this.getRelayUrl();
-    console.log('Smart Card: Connessione a relay:', wsUrl);
+    console.log('[DEBUG SC] ====== SMART CARD CONNECTION START ======');
+    console.log('[DEBUG SC] URL:', wsUrl);
+    console.log('[DEBUG SC] Cookies present:', document.cookie ? 'YES' : 'NO');
+    console.log('[DEBUG SC] Cookie value:', document.cookie.substring(0, 50) + '...');
     
     try {
       this.ws = new WebSocket(wsUrl);
+      console.log('[DEBUG SC] WebSocket created, state:', this.ws.readyState);
       
       this.ws.onopen = () => {
-        console.log('Smart Card: Connesso al relay');
+        console.log('[DEBUG SC] WebSocket OPEN! State:', this.ws?.readyState);
         if (this.wsReconnectTimer) {
           clearTimeout(this.wsReconnectTimer);
           this.wsReconnectTimer = null;
@@ -100,36 +104,46 @@ class SmartCardService {
           lastCheck: new Date()
         });
         
+        console.log('[DEBUG SC] Sending get_status request...');
         this.ws?.send(JSON.stringify({ type: 'get_status' }));
         this.startHeartbeat();
       };
       
       this.ws.onmessage = (event) => {
+        console.log('[DEBUG SC] MESSAGE RECEIVED:', event.data.substring(0, 200));
         try {
           const msg = JSON.parse(event.data);
+          console.log('[DEBUG SC] Parsed message type:', msg.type);
+          
           if (msg && typeof msg.type === 'string') {
             if (msg.type === 'status' && msg.data) {
+              console.log('[DEBUG SC] Handling status message');
               this.handleWebSocketStatus(msg.data);
             } else if (msg.type === 'bridge_status' || msg.type === 'connection_status') {
-              // Handle both bridge_status (updates) and connection_status (initial state)
+              console.log('[DEBUG SC] Handling bridge/connection status:', msg.type, msg);
               this.handleBridgeStatus(msg);
             } else if (msg.type === 'pong') {
-              // Heartbeat response
+              console.log('[DEBUG SC] Pong received');
+            } else if (msg.type === 'ping') {
+              console.log('[DEBUG SC] Ping received, sending pong');
+              this.ws?.send(JSON.stringify({ type: 'pong' }));
             } else if (msg.type === 'sealResponse') {
-              // Handled by generateSealForTicket promise
+              console.log('[DEBUG SC] Seal response received');
             } else if (msg.type === 'cardData') {
-              // Card data response
+              console.log('[DEBUG SC] Card data received');
             } else if (msg.type === 'error') {
-              console.error('Smart Card: Errore dal server:', msg.error);
+              console.error('[DEBUG SC] ERROR from server:', msg.error || msg.message);
+            } else {
+              console.log('[DEBUG SC] Unknown message type:', msg.type);
             }
           }
         } catch (e) {
-          console.error('Smart Card: Errore parsing messaggio:', e);
+          console.error('[DEBUG SC] Parse error:', e, 'Raw:', event.data);
         }
       };
       
-      this.ws.onerror = () => {
-        console.log('Smart Card: Errore connessione relay');
+      this.ws.onerror = (error) => {
+        console.error('[DEBUG SC] WebSocket ERROR:', error);
         this.stopHeartbeat();
         this.ws = null;
         this.updateStatus({
@@ -144,7 +158,8 @@ class SmartCardService {
         this.scheduleWebSocketReconnect();
       };
       
-      this.ws.onclose = () => {
+      this.ws.onclose = (event) => {
+        console.log('[DEBUG SC] WebSocket CLOSED:', event.code, event.reason);
         this.stopHeartbeat();
         this.ws = null;
         this.updateStatus({
@@ -157,7 +172,8 @@ class SmartCardService {
         this.scheduleWebSocketReconnect();
       };
       
-    } catch {
+    } catch (err) {
+      console.error('[DEBUG SC] Exception creating WebSocket:', err);
       this.stopHeartbeat();
       this.scheduleWebSocketReconnect();
     }
@@ -167,9 +183,15 @@ class SmartCardService {
     // Handle both 'connected' (from bridge_status) and 'bridgeConnected' (from connection_status)
     const isConnected = msg.connected ?? msg.bridgeConnected ?? false;
     
-    console.log('Smart Card: Bridge status update:', { type: msg.type, isConnected });
+    console.log('[DEBUG SC] ====== BRIDGE STATUS UPDATE ======');
+    console.log('[DEBUG SC] Message type:', msg.type);
+    console.log('[DEBUG SC] msg.connected:', msg.connected);
+    console.log('[DEBUG SC] msg.bridgeConnected:', msg.bridgeConnected);
+    console.log('[DEBUG SC] isConnected (final):', isConnected);
+    console.log('[DEBUG SC] Full message:', JSON.stringify(msg));
     
     if (isConnected) {
+      console.log('[DEBUG SC] Bridge IS connected - updating status to CONNECTED');
       this.updateStatus({
         ...this.status,
         connected: true,
@@ -178,6 +200,7 @@ class SmartCardService {
         lastCheck: new Date()
       });
     } else {
+      console.log('[DEBUG SC] Bridge NOT connected - updating status to DISCONNECTED');
       this.updateStatus({
         ...this.status,
         connected: false,
@@ -188,6 +211,7 @@ class SmartCardService {
         lastCheck: new Date()
       });
     }
+    console.log('[DEBUG SC] Status after update:', JSON.stringify(this.status));
   }
 
   private handleWebSocketStatus(data: any): void {
