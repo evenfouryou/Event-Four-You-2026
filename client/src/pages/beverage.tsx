@@ -1,7 +1,20 @@
 import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import { isUnauthorizedError } from "@/lib/authUtils";
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Link, useLocation } from "wouter";
@@ -22,6 +35,7 @@ import {
   ShoppingCart,
   ArrowRight,
   ChevronRight,
+  RotateCcw,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import type { Event, Product, Station } from "@shared/schema";
@@ -103,9 +117,11 @@ function QuickActionCard({
 export default function Beverage() {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
+  const { toast } = useToast();
   const isBartender = user?.role === 'bartender';
   const isWarehouse = user?.role === 'warehouse';
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
+  const [resetWarehouseDialogOpen, setResetWarehouseDialogOpen] = useState(false);
 
   const { data: events, isLoading: eventsLoading } = useQuery<Event[]>({
     queryKey: ['/api/events'],
@@ -139,6 +155,37 @@ export default function Beverage() {
   ) || [];
 
   const selectedEvent = events?.find(e => e.id === selectedEventId);
+
+  const resetWarehouseMutation = useMutation({
+    mutationFn: async () => {
+      await apiRequest('POST', '/api/stock/reset-warehouse');
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/stock/general'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/stock'] });
+      setResetWarehouseDialogOpen(false);
+      toast({
+        title: "Successo",
+        description: "Quantità magazzino azzerate con successo",
+      });
+    },
+    onError: (error: Error) => {
+      if (isUnauthorizedError(error)) {
+        toast({
+          title: "Non autorizzato",
+          description: "Effettua nuovamente il login...",
+          variant: "destructive",
+        });
+        setTimeout(() => window.location.href = '/api/login', 500);
+        return;
+      }
+      toast({
+        title: "Errore",
+        description: error.message || "Impossibile azzerare il magazzino",
+        variant: "destructive",
+      });
+    },
+  });
 
   // Bartender View - Station Selection
   if (isBartender) {
@@ -344,7 +391,7 @@ export default function Beverage() {
             <ArrowLeft className="h-5 w-5" />
           </Button>
         </Link>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-1">
           <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center glow-golden">
             <Wine className="h-6 w-6 text-black" />
           </div>
@@ -353,7 +400,38 @@ export default function Beverage() {
             <p className="text-muted-foreground text-sm">Gestione magazzino e consumi</p>
           </div>
         </div>
+        {user && (user.role === 'admin' || user.role === 'super_admin' || user.role === 'gestore') && (
+          <Button 
+            variant="outline"
+            onClick={() => setResetWarehouseDialogOpen(true)}
+            data-testid="button-reset-warehouse"
+          >
+            <RotateCcw className="h-4 w-4 mr-2" />
+            Reset Magazzino
+          </Button>
+        )}
       </motion.div>
+
+      <AlertDialog open={resetWarehouseDialogOpen} onOpenChange={setResetWarehouseDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Reset Magazzino</AlertDialogTitle>
+            <AlertDialogDescription>
+              Questa azione azzererà tutte le quantità del magazzino generale. I record non verranno eliminati.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annulla</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => resetWarehouseMutation.mutate()}
+              disabled={resetWarehouseMutation.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {resetWarehouseMutation.isPending ? "Azzeramento..." : "Azzera Quantità"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-8">

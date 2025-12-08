@@ -58,7 +58,8 @@ import {
   FilePenLine, 
   CalendarCheck,
   MapPin,
-  Pencil
+  Pencil,
+  Trash2
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { useForm } from "react-hook-form";
@@ -123,6 +124,7 @@ export default function EventDetail() {
   const [stationDialogOpen, setStationDialogOpen] = useState(false);
   const [transferDialogOpen, setTransferDialogOpen] = useState(false);
   const [statusChangeDialogOpen, setStatusChangeDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedProducts, setSelectedProducts] = useState<Map<string, string>>(new Map());
   const [destinationStationId, setDestinationStationId] = useState<string>('general');
   const [selectedBartenderIds, setSelectedBartenderIds] = useState<string[]>([]);
@@ -413,6 +415,37 @@ export default function EventDetail() {
     },
   });
 
+  const deleteEventMutation = useMutation({
+    mutationFn: async () => {
+      await apiRequest('DELETE', `/api/events/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/events'] });
+      setDeleteDialogOpen(false);
+      toast({
+        title: "Successo",
+        description: "Evento eliminato con successo",
+      });
+      setLocation('/events');
+    },
+    onError: (error: Error) => {
+      if (isUnauthorizedError(error)) {
+        toast({
+          title: "Non autorizzato",
+          description: "Effettua nuovamente il login...",
+          variant: "destructive",
+        });
+        setTimeout(() => window.location.href = '/api/login', 500);
+        return;
+      }
+      toast({
+        title: "Errore",
+        description: error.message || "Impossibile eliminare l'evento",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleEditStock = (stock: { id: string; productId: string; stationId: string | null; quantity: string }) => {
     const product = products?.find(p => p.id === stock.productId);
     setEditingStock({
@@ -593,12 +626,45 @@ export default function EventDetail() {
             </span>
           </div>
         </div>
-        <Button asChild variant="outline" data-testid="button-view-report">
-          <Link href={`/reports?eventId=${id}`}>
-            Report
-          </Link>
-        </Button>
+        <div className="flex items-center gap-2">
+          {user && (user.role === 'admin' || user.role === 'super_admin' || user.role === 'gestore') && (
+            <Button 
+              variant="destructive" 
+              size="icon"
+              onClick={() => setDeleteDialogOpen(true)}
+              data-testid="button-delete-event"
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          )}
+          <Button asChild variant="outline" data-testid="button-view-report">
+            <Link href={`/reports?eventId=${id}`}>
+              Report
+            </Link>
+          </Button>
+        </div>
       </motion.div>
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Elimina Evento</AlertDialogTitle>
+            <AlertDialogDescription>
+              Questa azione eliminerà l'evento e tutti i dati correlati (postazioni, scorte, prenotazioni, liste ospiti, ecc.)
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annulla</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteEventMutation.mutate()}
+              disabled={deleteEventMutation.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteEventMutation.isPending ? "Eliminazione..." : "Elimina"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         <StatsCard
