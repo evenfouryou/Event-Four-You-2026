@@ -1238,23 +1238,35 @@ export default function EventDetail() {
                       </div>
                     </div>
                     {!isEditing && (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => {
-                          setEditingStationIds(prev => new Set(prev).add(station.id));
-                          setEditingBartenderIds(prev => {
-                            const newMap = new Map(prev);
-                            if (!newMap.has(station.id)) {
-                              newMap.set(station.id, station.bartenderIds || []);
-                            }
-                            return newMap;
-                          });
-                        }}
-                        data-testid={`button-edit-bartenders-${station.id}`}
-                      >
-                        Modifica
-                      </Button>
+                      <div className="flex items-center gap-1">
+                        <Link href={`/events/${id}/stations/${station.id}`}>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            data-testid={`button-view-station-${station.id}`}
+                          >
+                            <Package className="h-4 w-4 mr-1" />
+                            Stock
+                          </Button>
+                        </Link>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => {
+                            setEditingStationIds(prev => new Set(prev).add(station.id));
+                            setEditingBartenderIds(prev => {
+                              const newMap = new Map(prev);
+                              if (!newMap.has(station.id)) {
+                                newMap.set(station.id, station.bartenderIds || []);
+                              }
+                              return newMap;
+                            });
+                          }}
+                          data-testid={`button-edit-bartenders-${station.id}`}
+                        >
+                          Modifica
+                        </Button>
+                      </div>
                     )}
                   </div>
                   {!isEditing ? (

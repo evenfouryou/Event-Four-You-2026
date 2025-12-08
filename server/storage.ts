@@ -147,6 +147,7 @@ export interface IStorage {
   createRecurringEvents(events: InsertEvent[]): Promise<Event[]>;
   
   // Station operations
+  getStation(id: string): Promise<Station | undefined>;
   getStationsByEvent(eventId: string): Promise<Station[]>;
   getStationsByCompany(companyId: string): Promise<Station[]>;
   getGeneralStationsByCompany(companyId: string): Promise<Station[]>;
@@ -594,6 +595,12 @@ export class DatabaseStorage implements IStorage {
   }
   
   // Station operations
+  async getStation(id: string): Promise<Station | undefined> {
+    const [station] = await db.select().from(stations)
+      .where(and(eq(stations.id, id), isNull(stations.deletedAt)));
+    return station;
+  }
+
   async getStationsByEvent(eventId: string): Promise<Station[]> {
     return await db.select().from(stations)
       .where(and(eq(stations.eventId, eventId), isNull(stations.deletedAt)));

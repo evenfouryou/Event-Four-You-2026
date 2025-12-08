@@ -1364,6 +1364,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get a single station by ID
+  app.get('/api/stations/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const companyId = await getUserCompanyId(req);
+      if (!companyId) {
+        return res.status(403).json({ message: "No company associated" });
+      }
+      const station = await storage.getStation(req.params.id);
+      if (!station) {
+        return res.status(404).json({ message: "Station not found" });
+      }
+      // Verify station belongs to user's company
+      if (station.companyId !== companyId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      res.json(station);
+    } catch (error) {
+      console.error("Error fetching station:", error);
+      res.status(500).json({ message: "Failed to fetch station" });
+    }
+  });
+
   // Create general station (not tied to specific event)
   app.post('/api/stations', isAdminOrSuperAdmin, async (req: any, res) => {
     try {
