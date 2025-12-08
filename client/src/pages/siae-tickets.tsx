@@ -196,27 +196,14 @@ export default function SiaeTicketsPage() {
       const sector = formSectors?.find(s => s.id === data.sectorId);
       if (!sector) throw new Error("Settore non trovato");
 
-      const grossAmount = data.ticketTypeCode === "INT" ? sector.priceIntero : 
-                         data.ticketTypeCode === "RID" ? (sector.priceRidotto || sector.priceIntero) : "0";
-      
-      const priceInCents = Math.round(parseFloat(grossAmount) * 100);
-      
       setIsGeneratingSeal(true);
-      
-      let fiscalSeal;
-      try {
-        fiscalSeal = await smartCardService.requestFiscalSeal(priceInCents);
-      } catch (sealError: any) {
-        setIsGeneratingSeal(false);
-        throw new Error(`Sigillo fiscale obbligatorio: ${sealError.message}`);
-      }
-      
-      setIsGeneratingSeal(false);
 
       const now = new Date();
       const emissionDateStr = now.toISOString().slice(0, 10).replace(/-/g, '');
       const emissionTimeStr = now.toTimeString().slice(0, 5).replace(':', '');
 
+      // Il sigillo viene generato SERVER-SIDE per garantire conformità SIAE
+      // Il server richiederà il sigillo dalla smart card tramite il bridge relay
       const ticketData = {
         ticketedEventId: data.ticketedEventId,
         sectorId: data.sectorId,
@@ -228,14 +215,14 @@ export default function SiaeTicketsPage() {
         emissionDate: now.toISOString(),
         emissionDateStr,
         emissionTimeStr,
-        grossAmount,
-        fiscalSealCode: fiscalSeal.sealCode,
-        progressiveNumber: fiscalSeal.counter,
-        cardCode: fiscalSeal.serialNumber,
       };
 
-      const response = await apiRequest("POST", `/api/siae/tickets`, ticketData);
-      return response.json();
+      try {
+        const response = await apiRequest("POST", `/api/siae/tickets`, ticketData);
+        return response.json();
+      } finally {
+        setIsGeneratingSeal(false);
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ predicate: (q) => q.queryKey[0] === '/api/siae/ticketed-events' });

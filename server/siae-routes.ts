@@ -2,6 +2,7 @@
 import { Router, Request, Response, NextFunction } from "express";
 import { siaeStorage } from "./siae-storage";
 import { z } from "zod";
+import { requestFiscalSeal, isCardReadyForSeals, isBridgeConnected } from "./bridge-relay";
 import {
   insertSiaeEventGenreSchema,
   insertSiaeSectorCodeSchema,
@@ -690,6 +691,21 @@ router.post("/api/siae/seats/bulk", requireAuth, requireOrganizer, async (req: R
 
 // ==================== Tickets (Organizer / Box Office) ====================
 
+// Schema minimo per emissione manuale - sigillo generato server-side
+// .strict() rifiuta qualsiasi campo non definito nello schema (inclusi tentativi di iniezione sigillo)
+const manualTicketEmissionSchema = z.object({
+  ticketedEventId: z.string().min(1, "ID evento richiesto"),
+  sectorId: z.string().min(1, "ID settore richiesto"),
+  ticketTypeCode: z.string().min(1, "Tipo biglietto richiesto"),
+  sectorCode: z.string().optional(),
+  customerId: z.string().nullable().optional(),
+  participantFirstName: z.string().nullable().optional(),
+  participantLastName: z.string().nullable().optional(),
+  emissionDate: z.string().optional(),
+  emissionDateStr: z.string().optional(),
+  emissionTimeStr: z.string().optional(),
+}).strict();
+
 router.get("/api/siae/ticketed-events/:eventId/tickets", requireAuth, requireOrganizer, async (req: Request, res: Response) => {
   try {
     const tickets = await siaeStorage.getSiaeTicketsByEvent(req.params.eventId);
@@ -713,10 +729,86 @@ router.get("/api/siae/tickets/:id", requireAuth, async (req: Request, res: Respo
 
 router.post("/api/siae/tickets", requireAuth, requireOrganizer, async (req: Request, res: Response) => {
   try {
-    const data = insertSiaeTicketSchema.parse(req.body);
-    const ticket = await siaeStorage.createSiaeTicket(data);
+    // Verifica connessione bridge e stato carta SIAE
+    if (!isBridgeConnected()) {
+      return res.status(503).json({ 
+        message: "Lettore SIAE non connesso. Avviare l'app desktop Event Four You.",
+        code: "SEAL_BRIDGE_OFFLINE"
+      });
+    }
+    
+    const cardStatus = isCardReadyForSeals();
+    if (!cardStatus.ready) {
+      return res.status(503).json({ 
+        message: cardStatus.error || "Carta SIAE non pronta",
+        code: "SEAL_CARD_NOT_READY"
+      });
+    }
+    
+    // Parse dati richiesta con schema minimo (NO campi sigillo dal client)
+    const data = manualTicketEmissionSchema.parse(req.body);
+    
+    // Ottieni settore per calcolare il prezzo
+    const sector = await siaeStorage.getSiaeEventSector(data.sectorId);
+    if (!sector) {
+      return res.status(400).json({ message: "Settore non trovato" });
+    }
+    
+    // Ottieni evento per il canale di emissione
+    const ticketedEvent = await siaeStorage.getSiaeTicketedEvent(data.ticketedEventId);
+    if (!ticketedEvent) {
+      return res.status(400).json({ message: "Evento non trovato" });
+    }
+    
+    // Calcola prezzo in centesimi
+    const grossAmount = data.ticketTypeCode === "INT" ? sector.priceIntero : 
+                       data.ticketTypeCode === "RID" ? (sector.priceRidotto || sector.priceIntero) : "0";
+    const priceInCents = Math.round(parseFloat(grossAmount) * 100);
+    
+    // RICHIESTA SIGILLO FISCALE SERVER-SIDE (OBBLIGATORIO PER SIAE)
+    // Questo è il cuore del sistema: senza sigillo, niente biglietto
+    let sealData;
+    try {
+      console.log(`[SIAE-ROUTES] Requesting fiscal seal for manual emission, price: ${priceInCents} cents`);
+      sealData = await requestFiscalSeal(priceInCents);
+      console.log(`[SIAE-ROUTES] Seal received: ${sealData.sealCode}, counter: ${sealData.counter}`);
+    } catch (sealError: any) {
+      console.error(`[SIAE-ROUTES] Failed to get fiscal seal:`, sealError.message);
+      return res.status(503).json({
+        message: `Impossibile generare sigillo fiscale: ${sealError.message.replace(/^[A-Z_]+:\s*/, '')}`,
+        code: sealError.message.split(':')[0] || 'SEAL_ERROR'
+      });
+    }
+    
+    const now = new Date();
+    const emissionDateStr = data.emissionDateStr || now.toISOString().slice(0, 10).replace(/-/g, '');
+    const emissionTimeStr = data.emissionTimeStr || now.toTimeString().slice(0, 5).replace(':', '');
+    
+    // Crea biglietto con sigillo REALE generato server-side
+    // I campi sigillo sono SEMPRE generati dal server - mai accettati dal client
+    const ticketData = {
+      ticketedEventId: data.ticketedEventId,
+      sectorId: data.sectorId,
+      ticketTypeCode: data.ticketTypeCode,
+      sectorCode: data.sectorCode || sector.sectorCode,
+      customerId: data.customerId || null,
+      participantFirstName: data.participantFirstName || null,
+      participantLastName: data.participantLastName || null,
+      emissionDate: data.emissionDate ? new Date(data.emissionDate) : now,
+      emissionDateStr,
+      emissionTimeStr,
+      grossAmount: grossAmount,
+      // SIGILLO GENERATO SERVER-SIDE - OBBLIGATORIO SIAE
+      fiscalSealCode: sealData.sealCode,
+      progressiveNumber: sealData.counter,
+      cardCode: sealData.serialNumber,
+      emissionChannelCode: "BOX", // Box Office per emissione manuale
+    };
+    
+    const ticket = await siaeStorage.createSiaeTicket(ticketData as any);
     res.status(201).json(ticket);
   } catch (error: any) {
+    console.error(`[SIAE-ROUTES] Ticket creation error:`, error.message);
     res.status(400).json({ message: error.message });
   }
 });
