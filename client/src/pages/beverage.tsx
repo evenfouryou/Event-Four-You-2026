@@ -400,7 +400,7 @@ export default function Beverage() {
             <p className="text-muted-foreground text-sm">Gestione magazzino e consumi</p>
           </div>
         </div>
-        {user && (user.role === 'admin' || user.role === 'super_admin' || user.role === 'gestore') && (
+        {user && (user.role === 'admin' || user.role === 'super_admin') && (
           <Button 
             variant="outline"
             onClick={() => setResetWarehouseDialogOpen(true)}
