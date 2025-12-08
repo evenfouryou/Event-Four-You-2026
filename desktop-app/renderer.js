@@ -406,11 +406,12 @@ document.addEventListener('DOMContentLoaded', () => {
         <p style="color: #999; margin: 0; font-size: 14px;">${reason || 'Inserire il PIN per continuare'}</p>
       </div>
       <div style="margin-bottom: 24px;">
-        <input type="password" id="pin-input" maxlength="6" 
+        <input type="password" id="pin-input" maxlength="12" 
           style="width: 100%; padding: 16px; font-size: 24px; text-align: center; 
-          letter-spacing: 8px; background: #1a1a24; border: 2px solid #444;
+          letter-spacing: 6px; background: #1a1a24; border: 2px solid #444;
           border-radius: 8px; color: white; box-sizing: border-box;"
-          placeholder="••••" autofocus>
+          placeholder="••••••" autofocus
+          pattern="[0-9]*" inputmode="numeric">
         <p id="pin-error" style="color: #f44336; margin: 8px 0 0 0; font-size: 13px; display: none;">
           PIN errato. Riprova.
         </p>
@@ -443,8 +444,12 @@ document.addEventListener('DOMContentLoaded', () => {
     pinInput.focus();
     
     async function verifyPin() {
-      const pin = pinInput.value;
-      if (!pin) return;
+      const pin = pinInput.value.replace(/\D/g, ''); // Solo numeri
+      if (!pin || pin.length < 4) {
+        pinError.textContent = 'PIN deve essere di almeno 4 cifre';
+        pinError.style.display = 'block';
+        return;
+      }
       
       const result = await window.siaeAPI.verifyPin(pin);
       
