@@ -22,6 +22,7 @@ import {
   insertEventFormatSchema,
   stockMovements,
   priceListItems,
+  type Stock,
   // New module schemas
   insertFixedCostSchema,
   updateFixedCostSchema,
@@ -2370,14 +2371,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (eventId) {
         // Adjust event stock
-        const eventStocks = await storage.getStocksByEvent(eventId);
-        const existingStock = eventStocks.find(s => 
+        const eventStocks = await storage.getEventStocks(eventId);
+        const existingStock = eventStocks.find((s: Stock) => 
           s.productId === productId && 
           (stationId === null ? s.stationId === null : s.stationId === stationId)
         );
         oldQuantity = existingStock ? parseFloat(existingStock.quantity) : 0;
 
-        await storage.upsertEventStock({
+        await storage.upsertStock({
+          companyId,
           eventId,
           stationId: stationId || null,
           productId,
