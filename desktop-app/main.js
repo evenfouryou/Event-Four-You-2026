@@ -888,6 +888,97 @@ async function handleRelayCommand(msg) {
       sendRelayResponse('status', { data: currentStatus });
       break;
       
+    case 'REQUEST_FISCAL_SEAL':
+      // Server-side seal request for self-service online purchases
+      // This is critical - without seal, no ticket can be created
+      try {
+        const requestId = msg.requestId;
+        const payload = msg.payload || {};
+        const price = payload.price || 0;
+        
+        log.info(`[SEAL] Server seal request: requestId=${requestId}, price=${price}`);
+        
+        // Check if bridge is ready
+        if (!bridgeProcess || !currentStatus.readerConnected) {
+          log.error(`[SEAL] Bridge not ready for seal: bridge=${!!bridgeProcess}, reader=${currentStatus.readerConnected}`);
+          if (relayWs && relayWs.readyState === WebSocket.OPEN) {
+            relayWs.send(JSON.stringify({
+              type: 'SEAL_RESPONSE',
+              requestId,
+              payload: { 
+                success: false, 
+                error: 'Lettore Smart Card non disponibile' 
+              }
+            }));
+          }
+          return;
+        }
+        
+        if (!currentStatus.cardInserted) {
+          log.error(`[SEAL] No card inserted for seal request`);
+          if (relayWs && relayWs.readyState === WebSocket.OPEN) {
+            relayWs.send(JSON.stringify({
+              type: 'SEAL_RESPONSE',
+              requestId,
+              payload: { 
+                success: false, 
+                error: 'Smart Card SIAE non inserita' 
+              }
+            }));
+          }
+          return;
+        }
+        
+        // Execute seal command
+        const result = await sendBridgeCommand(`COMPUTE_SIGILLO:${JSON.stringify({ price })}`);
+        
+        if (result.success && result.sigillo) {
+          log.info(`[SEAL] Seal generated successfully: counter=${result.sigillo.counter}`);
+          if (relayWs && relayWs.readyState === WebSocket.OPEN) {
+            relayWs.send(JSON.stringify({
+              type: 'SEAL_RESPONSE',
+              requestId,
+              payload: {
+                success: true,
+                seal: {
+                  sealCode: result.sigillo.mac,
+                  sealNumber: `${result.sigillo.serialNumber}-${result.sigillo.counter}`,
+                  serialNumber: result.sigillo.serialNumber,
+                  counter: result.sigillo.counter,
+                  mac: result.sigillo.mac,
+                  dateTime: result.sigillo.dateTime
+                }
+              }
+            }));
+          }
+        } else {
+          log.error(`[SEAL] Seal generation failed: ${result.error || 'Unknown error'}`);
+          if (relayWs && relayWs.readyState === WebSocket.OPEN) {
+            relayWs.send(JSON.stringify({
+              type: 'SEAL_RESPONSE',
+              requestId,
+              payload: { 
+                success: false, 
+                error: result.error || 'Errore generazione sigillo' 
+              }
+            }));
+          }
+        }
+      } catch (err) {
+        log.error(`[SEAL] Exception in seal request: ${err.message}`);
+        if (relayWs && relayWs.readyState === WebSocket.OPEN) {
+          relayWs.send(JSON.stringify({
+            type: 'SEAL_RESPONSE',
+            requestId: msg.requestId,
+            payload: { 
+              success: false, 
+              error: err.message 
+            }
+          }));
+        }
+      }
+      break;
+      
     default:
       log.warn('Unknown relay command:', msg.type);
   }

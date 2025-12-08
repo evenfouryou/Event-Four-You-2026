@@ -417,6 +417,85 @@ class SmartCardService {
     });
   }
 
+  public async requestFiscalSeal(priceInCents: number): Promise<{
+    sealCode: string;
+    sealNumber: string;
+    serialNumber: string;
+    counter: number;
+    mac: string;
+    dateTime: string;
+  }> {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+      throw new Error('Connessione al server non disponibile. Verificare la connessione.');
+    }
+
+    if (!this.status.connected || !this.status.bridgeConnected) {
+      throw new Error('App desktop Event4U non connessa. Avviare l\'applicazione sul PC.');
+    }
+
+    if (!this.status.readerDetected) {
+      throw new Error('Lettore Smart Card non rilevato. Collegare il MiniLector EVO.');
+    }
+
+    if (!this.status.cardInserted) {
+      throw new Error('Smart Card SIAE non inserita. Inserire la carta sigilli.');
+    }
+
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        this.ws?.removeEventListener('message', handler);
+        reject(new Error('Timeout generazione sigillo fiscale (15s). Riprovare.'));
+      }, 15000);
+
+      const handler = (event: MessageEvent) => {
+        try {
+          const msg = JSON.parse(event.data);
+          if (msg.type === 'sealResponse') {
+            clearTimeout(timeout);
+            this.ws?.removeEventListener('message', handler);
+            
+            if (msg.success && msg.seal) {
+              resolve({
+                sealCode: msg.seal.sealCode || msg.seal.mac,
+                sealNumber: msg.seal.sealNumber,
+                serialNumber: msg.seal.serialNumber,
+                counter: msg.seal.counter,
+                mac: msg.seal.mac,
+                dateTime: msg.seal.dateTime
+              });
+            } else {
+              reject(new Error(msg.error || 'Errore generazione sigillo fiscale'));
+            }
+          }
+        } catch (e) {
+          console.error('Error parsing seal response:', e);
+        }
+      };
+
+      this.ws!.addEventListener('message', handler);
+      this.ws!.send(JSON.stringify({
+        type: 'requestSeal',
+        data: { 
+          price: priceInCents / 100,
+          timestamp: new Date().toISOString() 
+        }
+      }));
+    });
+  }
+
+  public isReadyForEmission(): { ready: boolean; error: string | null } {
+    if (!this.status.connected || !this.status.bridgeConnected) {
+      return { ready: false, error: 'App desktop Event4U non connessa' };
+    }
+    if (!this.status.readerDetected) {
+      return { ready: false, error: 'Lettore Smart Card non rilevato' };
+    }
+    if (!this.status.cardInserted) {
+      return { ready: false, error: 'Smart Card SIAE non inserita' };
+    }
+    return { ready: true, error: null };
+  }
+
   public sendCommand(type: string, data?: any): void {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify({ type, data }));

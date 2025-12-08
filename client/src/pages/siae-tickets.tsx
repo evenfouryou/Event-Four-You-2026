@@ -92,6 +92,9 @@ import {
   Clock,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { smartCardService, useSmartCardStatus } from "@/lib/smart-card-service";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { CreditCard, AlertTriangle } from "lucide-react";
 
 const emissionFormSchema = z.object({
   ticketedEventId: z.string().min(1, "Seleziona un evento"),
@@ -108,6 +111,7 @@ type EmissionFormData = z.infer<typeof emissionFormSchema>;
 export default function SiaeTicketsPage() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const smartCardStatus = useSmartCardStatus();
   const [isEmissionDialogOpen, setIsEmissionDialogOpen] = useState(false);
   const [isCancelDialogOpen, setIsCancelDialogOpen] = useState(false);
   const [isValidateDialogOpen, setIsValidateDialogOpen] = useState(false);
@@ -116,8 +120,11 @@ export default function SiaeTicketsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [cancelReasonCode, setCancelReasonCode] = useState("");
+  const [isGeneratingSeal, setIsGeneratingSeal] = useState(false);
 
   const companyId = user?.companyId;
+  
+  const cardReadiness = smartCardService.isReadyForEmission();
 
   const { data: ticketedEvents } = useQuery<SiaeTicketedEvent[]>({
     queryKey: ['/api/siae/companies', companyId, 'ticketed-events'],
@@ -189,6 +196,27 @@ export default function SiaeTicketsPage() {
       const sector = formSectors?.find(s => s.id === data.sectorId);
       if (!sector) throw new Error("Settore non trovato");
 
+      const grossAmount = data.ticketTypeCode === "INT" ? sector.priceIntero : 
+                         data.ticketTypeCode === "RID" ? (sector.priceRidotto || sector.priceIntero) : "0";
+      
+      const priceInCents = Math.round(parseFloat(grossAmount) * 100);
+      
+      setIsGeneratingSeal(true);
+      
+      let fiscalSeal;
+      try {
+        fiscalSeal = await smartCardService.requestFiscalSeal(priceInCents);
+      } catch (sealError: any) {
+        setIsGeneratingSeal(false);
+        throw new Error(`Sigillo fiscale obbligatorio: ${sealError.message}`);
+      }
+      
+      setIsGeneratingSeal(false);
+
+      const now = new Date();
+      const emissionDateStr = now.toISOString().slice(0, 10).replace(/-/g, '');
+      const emissionTimeStr = now.toTimeString().slice(0, 5).replace(':', '');
+
       const ticketData = {
         ticketedEventId: data.ticketedEventId,
         sectorId: data.sectorId,
@@ -197,10 +225,13 @@ export default function SiaeTicketsPage() {
         customerId: data.customerId || null,
         participantFirstName: data.participantFirstName || null,
         participantLastName: data.participantLastName || null,
-        emissionDate: new Date().toISOString(),
-        grossAmount: data.ticketTypeCode === "INT" ? sector.priceIntero : 
-                     data.ticketTypeCode === "RID" ? (sector.priceRidotto || sector.priceIntero) : "0",
-        progressiveNumber: Date.now(),
+        emissionDate: now.toISOString(),
+        emissionDateStr,
+        emissionTimeStr,
+        grossAmount,
+        fiscalSealCode: fiscalSeal.sealCode,
+        progressiveNumber: fiscalSeal.counter,
+        cardCode: fiscalSeal.serialNumber,
       };
 
       const response = await apiRequest("POST", `/api/siae/tickets`, ticketData);
@@ -210,13 +241,14 @@ export default function SiaeTicketsPage() {
       queryClient.invalidateQueries({ predicate: (q) => q.queryKey[0] === '/api/siae/ticketed-events' });
       setIsEmissionDialogOpen(false);
       toast({
-        title: "Biglietto Emesso",
-        description: "Il biglietto è stato emesso con successo.",
+        title: "Biglietto Emesso con Sigillo Fiscale",
+        description: "Il biglietto è stato emesso con successo e sigillato.",
       });
     },
     onError: (error: Error) => {
+      setIsGeneratingSeal(false);
       toast({
-        title: "Errore",
+        title: "Errore Emissione",
         description: error.message,
         variant: "destructive",
       });
@@ -319,15 +351,36 @@ export default function SiaeTicketsPage() {
             Emetti, valida e gestisci i biglietti per i tuoi eventi
           </p>
         </div>
-        <Button
-          onClick={() => setIsEmissionDialogOpen(true)}
-          disabled={!ticketedEvents?.some(e => e.ticketingStatus === "active")}
-          data-testid="button-emit-ticket"
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          Emetti Biglietto
-        </Button>
+        <div className="flex items-center gap-3">
+          <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium ${
+            cardReadiness.ready 
+              ? 'bg-green-500/20 text-green-400 border border-green-500/30' 
+              : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+          }`} data-testid="smart-card-status">
+            <CreditCard className="w-3.5 h-3.5" />
+            {cardReadiness.ready ? 'Carta Pronta' : 'Carta Non Pronta'}
+          </div>
+          <Button
+            onClick={() => setIsEmissionDialogOpen(true)}
+            disabled={!ticketedEvents?.some(e => e.ticketingStatus === "active") || !cardReadiness.ready}
+            data-testid="button-emit-ticket"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Emetti Biglietto
+          </Button>
+        </div>
       </div>
+
+      {!cardReadiness.ready && (
+        <Alert variant="destructive" className="border-amber-500/50 bg-amber-500/10">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Smart Card SIAE Non Disponibile</AlertTitle>
+          <AlertDescription>
+            {cardReadiness.error || 'Smart Card non pronta'}. 
+            L'emissione biglietti richiede la Smart Card SIAE collegata.
+          </AlertDescription>
+        </Alert>
+      )}
 
       <Card className="glass-card" data-testid="card-event-selector">
         <CardContent className="p-4">
@@ -705,16 +758,25 @@ export default function SiaeTicketsPage() {
                 <Button type="button" variant="outline" onClick={() => setIsEmissionDialogOpen(false)}>
                   Annulla
                 </Button>
-                <Button type="submit" disabled={emitTicketMutation.isPending} data-testid="button-submit">
-                  {emitTicketMutation.isPending ? (
+                <Button 
+                  type="submit" 
+                  disabled={emitTicketMutation.isPending || isGeneratingSeal || !cardReadiness.ready} 
+                  data-testid="button-submit"
+                >
+                  {isGeneratingSeal ? (
                     <>
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Emissione...
+                      Generazione Sigillo...
+                    </>
+                  ) : emitTicketMutation.isPending ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Creazione Biglietto...
                     </>
                   ) : (
                     <>
-                      <Ticket className="w-4 h-4 mr-2" />
-                      Emetti Biglietto
+                      <CreditCard className="w-4 h-4 mr-2" />
+                      Emetti con Sigillo Fiscale
                     </>
                   )}
                 </Button>

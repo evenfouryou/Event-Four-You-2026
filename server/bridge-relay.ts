@@ -177,6 +177,19 @@ export function setupBridgeRelay(server: Server): void {
             // Bridge status update - broadcast to ALL clients
             console.log(`[Bridge] Broadcasting status update to all clients:`, JSON.stringify(message).substring(0, 100));
             broadcastToAllClients(message);
+          } else if (message.type === 'SEAL_RESPONSE') {
+            // Handle seal response from desktop app (for server-side seal requests)
+            console.log(`[Bridge] Seal response received: requestId=${message.requestId}`);
+            handleSealResponse(
+              message.requestId || '',
+              message.payload?.success ?? false,
+              message.payload?.seal,
+              message.payload?.error
+            );
+            // Also forward to clients if there's a toCompanyId
+            if (message.toCompanyId) {
+              forwardToClients(message.toCompanyId as string, message);
+            }
           } else if (message.toCompanyId) {
             // Response to specific client request
             forwardToClients(message.toCompanyId as string, message);
@@ -486,4 +499,137 @@ export function getActiveClientsCount(): number {
     count += clients.length;
   });
   return count;
+}
+
+// ==================== SEAL REQUEST BROKER ====================
+// Pending seal requests waiting for response from desktop bridge
+interface PendingSealRequest {
+  resolve: (seal: FiscalSealData) => void;
+  reject: (error: Error) => void;
+  timeout: NodeJS.Timeout;
+  createdAt: Date;
+}
+
+export interface FiscalSealData {
+  sealCode: string;
+  sealNumber: string;
+  serialNumber: string;
+  counter: number;
+  mac: string;
+  dateTime: string;
+}
+
+const pendingSealRequests = new Map<string, PendingSealRequest>();
+
+const SEAL_REQUEST_TIMEOUT = 15000; // 15 seconds
+
+// Generate UUID for request tracking
+function generateRequestId(): string {
+  return `seal_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+}
+
+// Check if card is ready for seal emission
+export function isCardReadyForSeals(): { ready: boolean; error: string | null } {
+  if (!globalBridge || globalBridge.ws.readyState !== WebSocket.OPEN) {
+    return { ready: false, error: 'App desktop Event4U non connessa' };
+  }
+  
+  const status = cachedBridgeStatus?.payload || cachedBridgeStatus;
+  if (!status) {
+    return { ready: false, error: 'Stato lettore sconosciuto' };
+  }
+  
+  if (!status.readerConnected && !status.readerDetected) {
+    return { ready: false, error: 'Lettore Smart Card non rilevato' };
+  }
+  
+  if (!status.cardInserted) {
+    return { ready: false, error: 'Smart Card SIAE non inserita' };
+  }
+  
+  return { ready: true, error: null };
+}
+
+// Request a fiscal seal from the desktop bridge
+export async function requestFiscalSeal(priceInCents: number): Promise<FiscalSealData> {
+  // Check if bridge is connected
+  if (!globalBridge || globalBridge.ws.readyState !== WebSocket.OPEN) {
+    throw new Error('SEAL_BRIDGE_OFFLINE: App desktop Event4U non connessa. Impossibile generare sigillo fiscale.');
+  }
+  
+  // Check if card is ready
+  const cardReady = isCardReadyForSeals();
+  if (!cardReady.ready) {
+    throw new Error(`SEAL_CARD_NOT_READY: ${cardReady.error}`);
+  }
+  
+  const requestId = generateRequestId();
+  const price = priceInCents / 100;
+  
+  console.log(`[Bridge] Requesting fiscal seal: requestId=${requestId}, price=${price}`);
+  
+  return new Promise<FiscalSealData>((resolve, reject) => {
+    // Set timeout
+    const timeout = setTimeout(() => {
+      pendingSealRequests.delete(requestId);
+      console.log(`[Bridge] Seal request timeout: requestId=${requestId}`);
+      reject(new Error('SEAL_TIMEOUT: Timeout generazione sigillo fiscale. Riprovare.'));
+    }, SEAL_REQUEST_TIMEOUT);
+    
+    // Store pending request
+    pendingSealRequests.set(requestId, {
+      resolve,
+      reject,
+      timeout,
+      createdAt: new Date()
+    });
+    
+    // Send request to bridge
+    try {
+      globalBridge!.ws.send(JSON.stringify({
+        type: 'REQUEST_FISCAL_SEAL',
+        requestId,
+        payload: {
+          price,
+          timestamp: new Date().toISOString()
+        }
+      }));
+    } catch (sendError) {
+      clearTimeout(timeout);
+      pendingSealRequests.delete(requestId);
+      reject(new Error('SEAL_SEND_ERROR: Errore invio richiesta sigillo'));
+    }
+  });
+}
+
+// Handle seal response from bridge (called when bridge sends SEAL_RESPONSE)
+export function handleSealResponse(requestId: string, success: boolean, seal?: any, error?: string): void {
+  const pending = pendingSealRequests.get(requestId);
+  if (!pending) {
+    console.log(`[Bridge] No pending request for seal response: requestId=${requestId}`);
+    return;
+  }
+  
+  clearTimeout(pending.timeout);
+  pendingSealRequests.delete(requestId);
+  
+  if (success && seal) {
+    console.log(`[Bridge] Seal request completed: requestId=${requestId}, counter=${seal.counter}`);
+    pending.resolve({
+      sealCode: seal.sealCode || seal.mac,
+      sealNumber: seal.sealNumber || `${seal.serialNumber}-${seal.counter}`,
+      serialNumber: seal.serialNumber,
+      counter: seal.counter,
+      mac: seal.mac,
+      dateTime: seal.dateTime
+    });
+  } else {
+    console.log(`[Bridge] Seal request failed: requestId=${requestId}, error=${error}`);
+    pending.reject(new Error(`SEAL_ERROR: ${error || 'Errore generazione sigillo'}`));
+  }
+}
+
+// Get pending seal requests count (for monitoring)
+export function getPendingSealRequestsCount(): number {
+  return pendingSealRequests.size;
 }

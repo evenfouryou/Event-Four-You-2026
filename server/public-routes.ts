@@ -5,6 +5,12 @@ import { db } from "./db";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
+import { 
+  requestFiscalSeal, 
+  isCardReadyForSeals, 
+  isBridgeConnected,
+  type FiscalSealData 
+} from "./bridge-relay";
 import {
   siaeTicketedEvents,
   siaeEventSectors,
@@ -682,6 +688,33 @@ router.delete("/api/public/cart", async (req, res) => {
 
 // ==================== CHECKOUT ====================
 
+// Verifica disponibilità sigilli fiscali (da chiamare prima del checkout)
+router.get("/api/public/checkout/seal-status", async (req, res) => {
+  try {
+    const bridgeConnected = isBridgeConnected();
+    const cardReadiness = isCardReadyForSeals();
+    
+    res.json({
+      available: bridgeConnected && cardReadiness.ready,
+      bridgeConnected,
+      cardReady: cardReadiness.ready,
+      error: !bridgeConnected 
+        ? "Sistema sigilli fiscali offline. L'app desktop Event4U deve essere connessa."
+        : !cardReadiness.ready 
+          ? cardReadiness.error 
+          : null
+    });
+  } catch (error: any) {
+    console.error("[PUBLIC] Seal status check error:", error);
+    res.json({
+      available: false,
+      bridgeConnected: false,
+      cardReady: false,
+      error: "Errore verifica disponibilità sigilli"
+    });
+  }
+});
+
 // Ottieni Stripe publishable key
 router.get("/api/public/stripe-key", async (req, res) => {
   try {
@@ -770,6 +803,25 @@ router.post("/api/public/checkout/confirm", async (req, res) => {
       return res.status(401).json({ message: "Non autenticato" });
     }
 
+    // CRITICAL: Verifica che la smart card SIAE sia disponibile PRIMA di tutto
+    // Senza sigillo fiscale, non possiamo emettere biglietti
+    if (!isBridgeConnected()) {
+      console.log("[PUBLIC] Checkout failed: Desktop bridge not connected");
+      return res.status(503).json({ 
+        message: "Sistema sigilli fiscali non disponibile. L'app desktop Event4U deve essere connessa con la smart card SIAE inserita. Riprova tra qualche minuto.",
+        code: "SEAL_BRIDGE_OFFLINE"
+      });
+    }
+
+    const cardReadiness = isCardReadyForSeals();
+    if (!cardReadiness.ready) {
+      console.log(`[PUBLIC] Checkout failed: Card not ready - ${cardReadiness.error}`);
+      return res.status(503).json({ 
+        message: `Smart card SIAE non pronta: ${cardReadiness.error}. Riprova tra qualche minuto.`,
+        code: "SEAL_CARD_NOT_READY"
+      });
+    }
+
     // Verifica checkout session
     const [checkoutSession] = await db
       .select()
@@ -853,32 +905,63 @@ router.post("/api/public/checkout/confirm", async (req, res) => {
         .limit(1);
 
       for (let i = 0; i < item.quantity; i++) {
-        // Genera sigillo fiscale
+        // RICHIEDI SIGILLO FISCALE REALE DALLA SMART CARD SIAE
+        // Questo è il cuore del sistema - senza sigillo, niente biglietto
+        const priceInCents = Math.round(parseFloat(item.unitPrice) * 100);
+        
+        let sealData: FiscalSealData;
+        try {
+          console.log(`[PUBLIC] Requesting fiscal seal for ticket ${i + 1}/${item.quantity}, price: ${priceInCents} cents`);
+          sealData = await requestFiscalSeal(priceInCents);
+          console.log(`[PUBLIC] Seal received: ${sealData.sealCode}, counter: ${sealData.counter}`);
+        } catch (sealError: any) {
+          console.error(`[PUBLIC] Failed to get fiscal seal:`, sealError.message);
+          // Se fallisce la generazione sigillo, NON possiamo creare il biglietto
+          // Aggiorna checkout session come in attesa
+          await db
+            .update(publicCheckoutSessions)
+            .set({
+              status: "waiting_for_seal",
+            })
+            .where(eq(publicCheckoutSessions.id, checkoutSessionId));
+          
+          return res.status(503).json({
+            message: `Impossibile generare sigillo fiscale: ${sealError.message.replace(/^[A-Z_]+:\s*/, '')}`,
+            code: sealError.message.split(':')[0] || 'SEAL_ERROR',
+            ticketsCreated: tickets.length,
+            ticketsRemaining: cartItems.reduce((sum: number, it: any) => sum + it.quantity, 0) - tickets.length
+          });
+        }
+
         const now = new Date();
         const emissionDateStr = now.toISOString().slice(0, 10).replace(/-/g, "");
         const emissionTimeStr = now.toTimeString().slice(0, 5).replace(":", "");
-        const sealCode = `${card?.cardCode || "00000000"}${Date.now().toString(36).toUpperCase().slice(-8)}`;
 
+        // Salva sigillo fiscale reale nel database
         const [fiscalSeal] = await db
           .insert(siaeFiscalSeals)
           .values({
             cardId: card?.id || "",
-            sealCode,
-            progressiveNumber: Date.now(),
+            sealCode: sealData.sealCode,
+            progressiveNumber: sealData.counter,
             emissionDate: now.toISOString().slice(5, 10).replace("-", ""),
             emissionTime: emissionTimeStr,
             amount: item.unitPrice.toString().padStart(8, "0"),
           })
           .returning();
 
-        // Genera QR code (semplificato)
+        // Genera QR code con dati sigillo reale
         const qrData = JSON.stringify({
-          seal: sealCode,
+          seal: sealData.sealCode,
+          sealNumber: sealData.sealNumber,
+          serialNumber: sealData.serialNumber,
+          counter: sealData.counter,
           event: ticketedEvent.siaeEventCode,
           sector: sector.sectorCode,
+          mac: sealData.mac,
         });
 
-        // Crea biglietto
+        // Crea biglietto con sigillo fiscale REALE
         const [ticket] = await db
           .insert(siaeTickets)
           .values({
@@ -887,9 +970,9 @@ router.post("/api/public/checkout/confirm", async (req, res) => {
             transactionId: transaction.id,
             customerId: customer.id,
             fiscalSealId: fiscalSeal.id,
-            fiscalSealCode: sealCode,
-            progressiveNumber: Date.now(),
-            cardCode: card?.cardCode,
+            fiscalSealCode: sealData.sealCode,
+            progressiveNumber: sealData.counter,
+            cardCode: sealData.serialNumber,
             emissionChannelCode: emissionChannel?.channelCode || "WEB",
             emissionDateStr,
             emissionTimeStr,
