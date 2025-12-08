@@ -392,7 +392,7 @@ namespace SiaeBridge
             bool tx = false;
             try
             {
-                Log($"VerifyPin: slot={_slot}, pin={new string('*', pin.Length)}");
+                Log($"VerifyPin: slot={_slot}, pin={new string('*', pin.Length)} (length={pin.Length})");
 
                 int state = isCardIn(_slot);
                 Log($"  isCardIn({_slot}) = {state} ({DecodeCardState(state)})");
@@ -409,9 +409,10 @@ namespace SiaeBridge
                 Log($"  BeginTransactionML = {txResult}");
                 tx = (txResult == 0);
 
-                // nPIN = 1 per PIN utente SIAE (0 = PIN admin, 1 = PIN utente)
-                int pinResult = VerifyPINML(1, pin, _slot);
-                Log($"  VerifyPINML = {pinResult} (0x{pinResult:X4})");
+                // nPIN = lunghezza del PIN (4-12 caratteri per SIAE)
+                int pinLength = pin.Length;
+                int pinResult = VerifyPINML(pinLength, pin, _slot);
+                Log($"  VerifyPINML(nPIN={pinLength}, pin=***, slot={_slot}) = {pinResult} (0x{pinResult:X4})");
 
                 if (pinResult == 0)
                 {
