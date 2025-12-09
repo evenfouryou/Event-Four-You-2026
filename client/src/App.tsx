@@ -190,6 +190,9 @@ function Router() {
               <Route path="/pr/staff" component={PrStaff} />
               <Route path="/pr/my-events" component={PrMyEvents} />
               <Route path="/school-badges" component={SchoolBadgeManager} />
+              <Route path="/badge/verify" component={SchoolBadgeVerify} />
+              <Route path="/badge/view/:code" component={SchoolBadgeView} />
+              <Route path="/badge/:slug" component={SchoolBadgeLanding} />
               <Route component={NotFound} />
             </Switch>
           </main>
