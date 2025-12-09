@@ -75,6 +75,10 @@ import PrScanner from "@/pages/pr-scanner";
 import PrStaff from "@/pages/pr-staff";
 import PrMyEvents from "@/pages/pr-my-events";
 import DownloadSmartCardApp from "@/pages/download-smart-card-app";
+import SchoolBadgeManager from "@/pages/school-badge-manager";
+import SchoolBadgeLanding from "@/pages/school-badge-landing";
+import SchoolBadgeVerify from "@/pages/school-badge-verify";
+import SchoolBadgeView from "@/pages/school-badge-view";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -114,6 +118,9 @@ function Router() {
         <Route path="/locali/:id" component={PublicVenueDetail} />
         <Route path="/locali" component={PublicVenues} />
         <Route path="/download-smart-card" component={DownloadSmartCardApp} />
+        <Route path="/badge/verify" component={SchoolBadgeVerify} />
+        <Route path="/badge/view/:code" component={SchoolBadgeView} />
+        <Route path="/badge/:slug" component={SchoolBadgeLanding} />
         <Route component={NotFound} />
       </Switch>
     );
@@ -182,6 +189,7 @@ function Router() {
               <Route path="/pr/scanner" component={PrScanner} />
               <Route path="/pr/staff" component={PrStaff} />
               <Route path="/pr/my-events" component={PrMyEvents} />
+              <Route path="/school-badges" component={SchoolBadgeManager} />
               <Route component={NotFound} />
             </Switch>
           </main>
