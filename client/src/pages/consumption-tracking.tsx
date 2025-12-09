@@ -566,21 +566,20 @@ export default function ConsumptionTracking() {
                   </p>
                 </CardHeader>
                 <CardContent className="p-0">
-                  {filteredProducts.length === 0 ? (
+                  {filteredProducts.filter(p => getGeneralStock(p.id) > 0).length === 0 ? (
                     <div className="p-8 text-center">
                       <Package className="h-10 w-10 text-muted-foreground mx-auto mb-2" />
-                      <p className="text-muted-foreground">Nessun prodotto disponibile</p>
+                      <p className="text-muted-foreground">Nessun prodotto disponibile nel magazzino</p>
                     </div>
                   ) : (
                     <div className="divide-y">
-                      {filteredProducts.map((product) => {
+                      {filteredProducts.filter(p => getGeneralStock(p.id) > 0).map((product) => {
                         const generalStock = getGeneralStock(product.id);
                         const stationStock = getProductStock(product.id);
-                        const hasStock = generalStock > 0;
                         return (
                           <div 
                             key={product.id} 
-                            className={`p-3 sm:p-4 ${hasStock ? 'hover:bg-muted/50' : 'opacity-60'}`}
+                            className="p-3 sm:p-4 hover:bg-muted/50"
                             data-testid={`load-row-${product.id}`}
                           >
                             <div className="flex items-start justify-between gap-2 mb-2 sm:mb-0 sm:items-center">
@@ -592,7 +591,7 @@ export default function ConsumptionTracking() {
                               <div className="flex gap-3 sm:gap-4 text-right shrink-0">
                                 <div className="text-center">
                                   <div className="text-[10px] sm:text-xs text-muted-foreground">Magaz.</div>
-                                  <div className={`text-sm sm:text-base font-bold ${hasStock ? 'text-green-600' : 'text-muted-foreground'}`}>
+                                  <div className="text-sm sm:text-base font-bold text-green-600">
                                     {generalStock.toFixed(1)}
                                   </div>
                                 </div>
@@ -613,12 +612,11 @@ export default function ConsumptionTracking() {
                                 value={loadQuantities[product.id] || ""}
                                 onChange={(e) => setLoadQuantities(prev => ({ ...prev, [product.id]: e.target.value }))}
                                 className="flex-1 h-11 text-center text-base"
-                                disabled={!hasStock}
                                 data-testid={`input-load-${product.id}`}
                               />
                               <Button
                                 onClick={() => handleLoad(product.id)}
-                                disabled={loadMutation.isPending || !hasStock}
+                                disabled={loadMutation.isPending}
                                 className="bg-green-600 hover:bg-green-700 h-11 px-4"
                                 aria-label={`Carica ${product.name}`}
                                 data-testid={`button-load-${product.id}`}

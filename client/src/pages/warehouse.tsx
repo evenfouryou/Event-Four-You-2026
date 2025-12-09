@@ -1365,7 +1365,6 @@ export default function Warehouse() {
                       </TableHeader>
                       <TableBody>
                         {stocks
-                          .filter(stock => parseFloat(stock.quantity) > 0)
                           .filter(stock => {
                             if (!searchQuery) return true;
                             const query = searchQuery.toLowerCase();
@@ -1415,7 +1414,6 @@ export default function Warehouse() {
                   {/* Mobile Cards */}
                   <div className="md:hidden space-y-3 p-4">
                     {stocks
-                      .filter(stock => parseFloat(stock.quantity) > 0)
                       .filter(stock => {
                         if (!searchQuery) return true;
                         const query = searchQuery.toLowerCase();
