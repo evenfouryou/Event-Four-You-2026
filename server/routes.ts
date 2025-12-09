@@ -4906,11 +4906,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Send verification email
-      const baseUrl = process.env.PUBLIC_URL 
-        ? process.env.PUBLIC_URL.replace(/\/$/, '')
-        : process.env.REPLIT_DEV_DOMAIN 
-          ? `https://${process.env.REPLIT_DEV_DOMAIN}`
-          : 'http://localhost:5000';
+      // Use custom domain if set, otherwise fall back to PUBLIC_URL or Replit domain
+      const baseUrl = process.env.CUSTOM_DOMAIN 
+        ? `https://${process.env.CUSTOM_DOMAIN}`
+        : process.env.PUBLIC_URL 
+          ? process.env.PUBLIC_URL.replace(/\/$/, '')
+          : process.env.REPLIT_DEV_DOMAIN 
+            ? `https://${process.env.REPLIT_DEV_DOMAIN}`
+            : 'http://localhost:5000';
       const verificationLink = `${baseUrl}/api/school-badges/verify?token=${verificationToken}`;
       const fromEmail = process.env.SMTP_FROM || 'Event4U <noreply@event4u.com>';
       
@@ -5024,12 +5027,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         attempts++;
       }
       
-      // Generate QR code URL
-      const baseUrl = process.env.PUBLIC_URL 
-        ? process.env.PUBLIC_URL.replace(/\/$/, '')
-        : process.env.REPLIT_DEV_DOMAIN 
-          ? `https://${process.env.REPLIT_DEV_DOMAIN}`
-          : 'http://localhost:5000';
+      // Generate QR code URL - prefer custom domain, then PUBLIC_URL, then Replit domain
+      const baseUrl = process.env.CUSTOM_DOMAIN 
+        ? `https://${process.env.CUSTOM_DOMAIN}`
+        : process.env.PUBLIC_URL 
+          ? process.env.PUBLIC_URL.replace(/\/$/, '')
+          : process.env.REPLIT_DEV_DOMAIN 
+            ? `https://${process.env.REPLIT_DEV_DOMAIN}`
+            : 'http://localhost:5000';
       const badgePageUrl = `${baseUrl}/badge/view/${uniqueCode}`;
       
       // Generate QR code as data URL

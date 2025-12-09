@@ -34,11 +34,14 @@ The system is an installable PWA with a `manifest.json` for metadata, a Service 
 
 ### School Badge Manager Module
 A digital badge creation system for schools and organizations, accessible via "Badge Scuole" in the sidebar (for gestore/admin users). Database schema includes 3 tables: `schoolBadgeLandings` (organization landing pages), `schoolBadgeRequests` (badge applications), and `schoolBadges` (generated badges with QR codes). Features include:
-- **Landing Page Creation**: Custom branded pages with school name, description, logo URL, email domain validation, and primary color
-- **Public Badge Request Flow**: `/badge/:slug` public landing where users submit name/email for badge request
+- **Landing Page Creation**: Custom branded pages with school name, description, logo upload (base64), email domain validation, and primary color
+- **Public Badge Request Flow**: `/badge/:slug` public landing where users submit name/email/phone for badge request
 - **Email Verification**: 24-hour verification tokens sent via SMTP with automatic expiration
 - **QR Code Generation**: Uses `qrcode` library to generate QR codes (data URLs) pointing to `/badge/view/:code`
 - **Badge View Page**: Public page at `/badge/view/:code` showing badge holder info, school branding, and QR code for verification
+- **Error Handling**: `/badge-error` page for invalid/expired/used verification tokens
+- **Activation Control**: Landing pages can be activated/deactivated by organizers
+- **Custom Domain**: Set `CUSTOM_DOMAIN` env var (e.g., `manage.eventfouryou.com`) for badge URLs
 - **Organizer Management**: Dashboard showing all landings with request counts and badge statistics
 
 ## External Dependencies

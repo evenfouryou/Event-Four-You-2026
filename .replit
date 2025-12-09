@@ -59,6 +59,7 @@ SMTP_HOST = "smtp.gmail.com"
 SMTP_PORT = "587"
 SMTP_FROM = "Event Four You <info@eventfouryou.com>"
 SIAE_MASTER_TOKEN = "61f12bc11ad07f8042ac953211cefe4127c900070cf51f66903988f90a31dfe4"
+CUSTOM_DOMAIN = "manage.eventfouryou.com"
 
 [userenv.production]
 PUBLIC_URL = "https://eventmanage.replit.app"
