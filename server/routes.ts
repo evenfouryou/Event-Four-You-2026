@@ -4803,6 +4803,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         primaryColor: landing.primaryColor,
         requirePhone: landing.requirePhone,
         customWelcomeText: landing.customWelcomeText,
+        isActive: landing.isActive,
+        authorizedDomains: landing.authorizedDomains,
       });
     } catch (error: any) {
       console.error("Error fetching school badge landing by slug:", error);
