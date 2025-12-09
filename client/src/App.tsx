@@ -79,6 +79,7 @@ import SchoolBadgeManager from "@/pages/school-badge-manager";
 import SchoolBadgeLanding from "@/pages/school-badge-landing";
 import SchoolBadgeVerify from "@/pages/school-badge-verify";
 import SchoolBadgeView from "@/pages/school-badge-view";
+import SchoolBadgeError from "@/pages/school-badge-error";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -118,6 +119,7 @@ function Router() {
         <Route path="/locali/:id" component={PublicVenueDetail} />
         <Route path="/locali" component={PublicVenues} />
         <Route path="/download-smart-card" component={DownloadSmartCardApp} />
+        <Route path="/badge-error" component={SchoolBadgeError} />
         <Route path="/badge/verify" component={SchoolBadgeVerify} />
         <Route path="/badge/view/:code" component={SchoolBadgeView} />
         <Route path="/badge/:slug" component={SchoolBadgeLanding} />
@@ -190,6 +192,7 @@ function Router() {
               <Route path="/pr/staff" component={PrStaff} />
               <Route path="/pr/my-events" component={PrMyEvents} />
               <Route path="/school-badges" component={SchoolBadgeManager} />
+              <Route path="/badge-error" component={SchoolBadgeError} />
               <Route path="/badge/verify" component={SchoolBadgeVerify} />
               <Route path="/badge/view/:code" component={SchoolBadgeView} />
               <Route path="/badge/:slug" component={SchoolBadgeLanding} />
