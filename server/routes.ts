@@ -4938,6 +4938,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Send verification email
       // Use custom domain if set, otherwise fall back to PUBLIC_URL or Replit domain
+      console.log('[BADGE EMAIL] CUSTOM_DOMAIN:', process.env.CUSTOM_DOMAIN);
+      console.log('[BADGE EMAIL] PUBLIC_URL:', process.env.PUBLIC_URL);
+      console.log('[BADGE EMAIL] REPLIT_DEV_DOMAIN:', process.env.REPLIT_DEV_DOMAIN);
       const baseUrl = process.env.CUSTOM_DOMAIN 
         ? `https://${process.env.CUSTOM_DOMAIN}`
         : process.env.PUBLIC_URL 
@@ -4945,6 +4948,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           : process.env.REPLIT_DEV_DOMAIN 
             ? `https://${process.env.REPLIT_DEV_DOMAIN}`
             : 'http://localhost:5000';
+      console.log('[BADGE EMAIL] Using baseUrl:', baseUrl);
       const verificationLink = `${baseUrl}/api/school-badges/verify?token=${verificationToken}`;
       const fromEmail = process.env.SMTP_FROM || 'Event4U <noreply@event4u.com>';
       
