@@ -156,12 +156,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Send welcome email with verification link
-      // Priority: PUBLIC_URL (production) > REPLIT_DEV_DOMAIN (development) > localhost
-      const baseUrl = process.env.PUBLIC_URL 
-        ? process.env.PUBLIC_URL.replace(/\/$/, '') // Remove trailing slash if present
-        : process.env.REPLIT_DEV_DOMAIN 
-          ? `https://${process.env.REPLIT_DEV_DOMAIN}`
-          : 'http://localhost:5000';
+      // Priority: CUSTOM_DOMAIN > PUBLIC_URL (production) > REPLIT_DEV_DOMAIN (development) > localhost
+      const baseUrl = process.env.CUSTOM_DOMAIN 
+        ? `https://${process.env.CUSTOM_DOMAIN}`
+        : process.env.PUBLIC_URL 
+          ? process.env.PUBLIC_URL.replace(/\/$/, '')
+          : process.env.REPLIT_DEV_DOMAIN 
+            ? `https://${process.env.REPLIT_DEV_DOMAIN}`
+            : 'http://localhost:5000';
       const verificationLink = `${baseUrl}/verify-email?token=${verificationToken}`;
       const fromEmail = process.env.SMTP_FROM || 'Event4U <noreply@event4u.com>';
       
@@ -306,12 +308,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await storage.updateUser(user.id, { verificationToken });
 
       // Send verification email
-      // Priority: PUBLIC_URL (production) > REPLIT_DEV_DOMAIN (development) > localhost
-      const baseUrl = process.env.PUBLIC_URL 
-        ? process.env.PUBLIC_URL.replace(/\/$/, '') // Remove trailing slash if present
-        : process.env.REPLIT_DEV_DOMAIN 
-          ? `https://${process.env.REPLIT_DEV_DOMAIN}`
-          : 'http://localhost:5000';
+      // Priority: CUSTOM_DOMAIN > PUBLIC_URL (production) > REPLIT_DEV_DOMAIN (development) > localhost
+      const baseUrl = process.env.CUSTOM_DOMAIN 
+        ? `https://${process.env.CUSTOM_DOMAIN}`
+        : process.env.PUBLIC_URL 
+          ? process.env.PUBLIC_URL.replace(/\/$/, '')
+          : process.env.REPLIT_DEV_DOMAIN 
+            ? `https://${process.env.REPLIT_DEV_DOMAIN}`
+            : 'http://localhost:5000';
       const verificationLink = `${baseUrl}/verify-email?token=${verificationToken}`;
       const fromEmail = process.env.SMTP_FROM || 'Event4U <noreply@event4u.com>';
 
@@ -391,12 +395,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         resetPasswordExpires: resetExpires 
       });
 
-      // Build reset link
-      const baseUrl = process.env.PUBLIC_URL 
-        ? process.env.PUBLIC_URL.replace(/\/$/, '')
-        : process.env.REPLIT_DEV_DOMAIN 
-          ? `https://${process.env.REPLIT_DEV_DOMAIN}`
-          : 'http://localhost:5000';
+      // Build reset link - Priority: CUSTOM_DOMAIN > PUBLIC_URL > REPLIT_DEV_DOMAIN > localhost
+      const baseUrl = process.env.CUSTOM_DOMAIN 
+        ? `https://${process.env.CUSTOM_DOMAIN}`
+        : process.env.PUBLIC_URL 
+          ? process.env.PUBLIC_URL.replace(/\/$/, '')
+          : process.env.REPLIT_DEV_DOMAIN 
+            ? `https://${process.env.REPLIT_DEV_DOMAIN}`
+            : 'http://localhost:5000';
       const resetLink = `${baseUrl}/reset-password?token=${resetToken}`;
       const fromEmail = process.env.SMTP_FROM || 'Event4U <noreply@event4u.com>';
 
@@ -1988,12 +1994,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      // Send welcome email with credentials
-      const baseUrl = process.env.PUBLIC_URL 
-        ? process.env.PUBLIC_URL.replace(/\/$/, '')
-        : process.env.REPLIT_DEV_DOMAIN 
-          ? `https://${process.env.REPLIT_DEV_DOMAIN}`
-          : 'http://localhost:5000';
+      // Send welcome email with credentials - Priority: CUSTOM_DOMAIN > PUBLIC_URL > REPLIT_DEV_DOMAIN > localhost
+      const baseUrl = process.env.CUSTOM_DOMAIN 
+        ? `https://${process.env.CUSTOM_DOMAIN}`
+        : process.env.PUBLIC_URL 
+          ? process.env.PUBLIC_URL.replace(/\/$/, '')
+          : process.env.REPLIT_DEV_DOMAIN 
+            ? `https://${process.env.REPLIT_DEV_DOMAIN}`
+            : 'http://localhost:5000';
       const loginLink = `${baseUrl}/login`;
       const fromEmail = process.env.SMTP_FROM || 'Event4U <noreply@event4u.com>';
 
