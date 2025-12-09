@@ -32,6 +32,7 @@ import {
   Armchair,
   UserPlus,
   ScanLine,
+  GraduationCap,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
@@ -268,6 +269,12 @@ export function AppSidebar() {
         title: "Utenti",
         icon: Users,
         url: "/users",
+        group: "Gestione",
+      },
+      {
+        title: "Badge Scuola",
+        icon: GraduationCap,
+        url: "/school-badges",
         group: "Gestione",
       }
     );

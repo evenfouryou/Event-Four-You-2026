@@ -57,6 +57,7 @@ import nodemailer from "nodemailer";
 import { db } from "./db";
 import { eq, and } from "drizzle-orm";
 import crypto from "crypto";
+import QRCode from "qrcode";
 import { companies } from "@shared/schema";
 import { setupBridgeRelay, isBridgeConnected, getCachedBridgeStatus } from "./bridge-relay";
 
@@ -4991,7 +4992,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (request.status === 'badge_generated') {
         const existingBadge = await storage.getSchoolBadgeByRequest(request.id);
         if (existingBadge) {
-          return res.redirect(`/badge/${existingBadge.uniqueCode}`);
+          return res.redirect(`/badge/view/${existingBadge.uniqueCode}`);
         }
       }
       
@@ -5021,10 +5022,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
         attempts++;
       }
       
+      // Generate QR code URL
+      const baseUrl = process.env.PUBLIC_URL 
+        ? process.env.PUBLIC_URL.replace(/\/$/, '')
+        : process.env.REPLIT_DEV_DOMAIN 
+          ? `https://${process.env.REPLIT_DEV_DOMAIN}`
+          : 'http://localhost:5000';
+      const badgePageUrl = `${baseUrl}/badge/view/${uniqueCode}`;
+      
+      // Generate QR code as data URL
+      let qrCodeUrl: string | null = null;
+      try {
+        qrCodeUrl = await QRCode.toDataURL(badgePageUrl, {
+          width: 300,
+          margin: 2,
+          color: {
+            dark: '#000000',
+            light: '#ffffff',
+          },
+        });
+      } catch (qrError) {
+        console.error("Failed to generate QR code:", qrError);
+      }
+      
       // Create badge record
       const badge = await storage.createSchoolBadge({
         requestId: request.id,
         uniqueCode,
+        qrCodeUrl,
         isActive: true,
       });
       
@@ -5038,12 +5063,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Send badge email
       if (landing) {
-        const baseUrl = process.env.PUBLIC_URL 
-          ? process.env.PUBLIC_URL.replace(/\/$/, '')
-          : process.env.REPLIT_DEV_DOMAIN 
-            ? `https://${process.env.REPLIT_DEV_DOMAIN}`
-            : 'http://localhost:5000';
-        const badgeUrl = `${baseUrl}/badge/${uniqueCode}`;
+        // Use the baseUrl already defined above for QR code
+        const badgeUrl = `${baseUrl}/badge/view/${uniqueCode}`;
         const fromEmail = process.env.SMTP_FROM || 'Event4U <noreply@event4u.com>';
         
         const smtpTransporter = nodemailer.createTransport({
@@ -5088,8 +5109,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      // Redirect to badge page
-      return res.redirect(`/badge/${uniqueCode}`);
+      // Redirect to badge view page
+      return res.redirect(`/badge/view/${uniqueCode}`);
     } catch (error: any) {
       console.error("Error verifying school badge:", error);
       return res.redirect('/badge-error?reason=server-error');
