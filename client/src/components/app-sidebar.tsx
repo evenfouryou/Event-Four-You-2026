@@ -211,6 +211,14 @@ export function AppSidebar() {
       group: "Moduli",
     });
 
+    // Add Formati Evento
+    menuItems.push({
+      title: "Formati Evento",
+      icon: ListChecks,
+      url: "/event-formats",
+      group: "Gestione",
+    });
+
     // Only show modules that are enabled for this user
     if (userFeatures?.beverageEnabled !== false) {
       menuItems.push({
