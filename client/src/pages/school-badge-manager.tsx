@@ -248,7 +248,7 @@ export default function SchoolBadgeManager() {
 
   const revokeMutation = useMutation({
     mutationFn: async (requestId: string) => {
-      const response = await apiRequest("POST", `/api/school-badges/requests/${requestId}/revoke`, {});
+      const response = await apiRequest("PUT", `/api/school-badges/requests/${requestId}/revoke`, {});
       return response.json();
     },
     onSuccess: () => {
