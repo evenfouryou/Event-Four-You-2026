@@ -401,32 +401,34 @@ export default function PurchaseOrders() {
   const exportToCSV = async (order: PurchaseOrder) => {
     const supplier = suppliers?.find(s => s.id === order.supplierId);
     
-    // Create CSV data
-    const csvData = [
-      ['Ordine d\'Acquisto'],
-      [''],
-      ['Numero Ordine', order.orderNumber || 'N/A'],
-      ['Data', format(new Date(order.orderDate as any), 'dd/MM/yyyy')],
-      ['Fornitore', supplier?.name || 'N/A'],
-      ['P.IVA Fornitore', supplier?.vatNumber || ''],
-      ['Email Fornitore', supplier?.email || ''],
-      ['Telefono Fornitore', supplier?.phone || ''],
-      ['Indirizzo Fornitore', supplier?.address || ''],
-      ['Consegna Prevista', order.expectedDeliveryDate ? format(new Date(order.expectedDeliveryDate as any), 'dd/MM/yyyy') : ''],
-      ['Stato', statusLabels[order.status]],
-      ['Totale (€)', parseFloat(order.totalAmount).toFixed(2)],
-      ['Note', order.notes || ''],
-    ];
-    
     // Create workbook and worksheet
-    const wb = XLSX.utils.book_new();
-    const ws = XLSX.utils.aoa_to_sheet(csvData);
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet('Ordine');
     
-    // Add worksheet to workbook
-    XLSX.utils.book_append_sheet(wb, ws, 'Ordine');
+    // Add data rows
+    ws.addRow(['Ordine d\'Acquisto']);
+    ws.addRow([]);
+    ws.addRow(['Numero Ordine', order.orderNumber || 'N/A']);
+    ws.addRow(['Data', format(new Date(order.orderDate as any), 'dd/MM/yyyy')]);
+    ws.addRow(['Fornitore', supplier?.name || 'N/A']);
+    ws.addRow(['P.IVA Fornitore', supplier?.vatNumber || '']);
+    ws.addRow(['Email Fornitore', supplier?.email || '']);
+    ws.addRow(['Telefono Fornitore', supplier?.phone || '']);
+    ws.addRow(['Indirizzo Fornitore', supplier?.address || '']);
+    ws.addRow(['Consegna Prevista', order.expectedDeliveryDate ? format(new Date(order.expectedDeliveryDate as any), 'dd/MM/yyyy') : '']);
+    ws.addRow(['Stato', statusLabels[order.status]]);
+    ws.addRow(['Totale (€)', parseFloat(order.totalAmount).toFixed(2)]);
+    ws.addRow(['Note', order.notes || '']);
     
     // Save file
-    XLSX.writeFile(wb, `ordine_${order.orderNumber || order.id}.xlsx`);
+    const buffer = await wb.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `ordine_${order.orderNumber || order.id}.xlsx`;
+    a.click();
+    URL.revokeObjectURL(url);
     
     toast({
       title: "Successo",
