@@ -1,6 +1,10 @@
-import { useQuery } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Building2, Calendar, TrendingUp, Package } from "lucide-react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Building2, Calendar, TrendingUp, Package, Settings, UserPlus } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
   BarChart,
   Bar,
@@ -34,12 +38,60 @@ type AnalyticsData = {
   };
 };
 
+type SystemSetting = {
+  id: string;
+  key: string;
+  value: string | null;
+  description: string | null;
+  updatedAt: string | null;
+  updatedBy: string | null;
+};
+
 const COLORS = ['hsl(var(--primary))', 'hsl(var(--accent))', 'hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))'];
 
 export default function SuperAdminDashboard() {
+  const { toast } = useToast();
+  
   const { data: analytics, isLoading } = useQuery<AnalyticsData>({
     queryKey: ['/api/super-admin/analytics'],
   });
+
+  const { data: systemSettings } = useQuery<SystemSetting[]>({
+    queryKey: ['/api/system-settings'],
+  });
+
+  const updateSettingMutation = useMutation({
+    mutationFn: async ({ key, value }: { key: string; value: string }) => {
+      return apiRequest(`/api/system-settings/${key}`, {
+        method: 'PUT',
+        body: JSON.stringify({ value }),
+        headers: { 'Content-Type': 'application/json' },
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/system-settings'] });
+      toast({
+        title: "Impostazione aggiornata",
+        description: "L'impostazione è stata salvata correttamente.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Errore",
+        description: "Impossibile aggiornare l'impostazione.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const registrationEnabled = systemSettings?.find(s => s.key === 'registration_enabled')?.value !== 'false';
+
+  const handleRegistrationToggle = (enabled: boolean) => {
+    updateSettingMutation.mutate({
+      key: 'registration_enabled',
+      value: enabled ? 'true' : 'false',
+    });
+  };
 
   if (isLoading) {
     return (
@@ -121,6 +173,43 @@ export default function SuperAdminDashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {/* System Settings Section */}
+      <Card className="glass-card">
+        <CardHeader className="p-3 md:p-4">
+          <div className="flex items-center gap-2">
+            <Settings className="w-5 h-5 text-muted-foreground" />
+            <CardTitle className="text-sm md:text-base">Impostazioni di Sistema</CardTitle>
+          </div>
+          <CardDescription className="text-xs md:text-sm">
+            Gestisci le impostazioni globali della piattaforma
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="p-3 md:p-4 pt-0 space-y-4">
+          <div className="flex items-center justify-between gap-4 p-3 rounded-lg bg-muted/50">
+            <div className="flex items-start gap-3">
+              <UserPlus className="w-5 h-5 text-muted-foreground mt-0.5" />
+              <div className="space-y-1">
+                <Label htmlFor="registration-toggle" className="text-sm font-medium">
+                  Registrazione Nuovi Organizzatori
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  {registrationEnabled 
+                    ? "La registrazione è attiva. Nuovi organizzatori possono registrarsi."
+                    : "La registrazione è disabilitata. I nuovi organizzatori non possono registrarsi."}
+                </p>
+              </div>
+            </div>
+            <Switch
+              id="registration-toggle"
+              checked={registrationEnabled}
+              onCheckedChange={handleRegistrationToggle}
+              disabled={updateSettingMutation.isPending}
+              data-testid="switch-registration-enabled"
+            />
+          </div>
+        </CardContent>
+      </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
         <Card className="glass-card">
