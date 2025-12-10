@@ -1494,8 +1494,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "Unauthorized" });
       }
       const user = await storage.getUser(userId);
-      if (!user || user.role !== 'super_admin') {
-        return res.status(403).json({ message: "Unauthorized: Super Admin access required" });
+      if (!user || !['super_admin', 'gestore', 'organizer'].includes(user.role)) {
+        return res.status(403).json({ message: "Unauthorized" });
       }
       const genres = await db.select().from(siaeEventGenres);
       res.json(genres);
@@ -1557,8 +1557,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "Unauthorized" });
       }
       const user = await storage.getUser(userId);
-      if (!user || user.role !== 'super_admin') {
-        return res.status(403).json({ message: "Unauthorized: Super Admin access required" });
+      if (!user || !['super_admin', 'gestore', 'organizer'].includes(user.role)) {
+        return res.status(403).json({ message: "Unauthorized" });
       }
       const codes = await db.select().from(siaeSectorCodes);
       res.json(codes);
@@ -1620,8 +1620,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "Unauthorized" });
       }
       const user = await storage.getUser(userId);
-      if (!user || user.role !== 'super_admin') {
-        return res.status(403).json({ message: "Unauthorized: Super Admin access required" });
+      if (!user || !['super_admin', 'gestore', 'organizer'].includes(user.role)) {
+        return res.status(403).json({ message: "Unauthorized" });
       }
       const types = await db.select().from(siaeTicketTypes);
       res.json(types);
@@ -1683,8 +1683,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "Unauthorized" });
       }
       const user = await storage.getUser(userId);
-      if (!user || user.role !== 'super_admin') {
-        return res.status(403).json({ message: "Unauthorized: Super Admin access required" });
+      if (!user || !['super_admin', 'gestore', 'organizer'].includes(user.role)) {
+        return res.status(403).json({ message: "Unauthorized" });
       }
       const codes = await db.select().from(siaeServiceCodes);
       res.json(codes);
@@ -1746,8 +1746,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "Unauthorized" });
       }
       const user = await storage.getUser(userId);
-      if (!user || user.role !== 'super_admin') {
-        return res.status(403).json({ message: "Unauthorized: Super Admin access required" });
+      if (!user || !['super_admin', 'gestore', 'organizer'].includes(user.role)) {
+        return res.status(403).json({ message: "Unauthorized" });
       }
       const reasons = await db.select().from(siaeCancellationReasons);
       res.json(reasons);
