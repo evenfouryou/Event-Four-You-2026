@@ -63,3 +63,53 @@ A digital badge creation system for schools and organizations, accessible via "B
 - **File Processing**: `papaparse` (CSV), `jspdf` (PDF), `xlsx` (Excel).
 - **QR Code**: `qrcode` for generating QR code data URLs.
 - **Build Tools**: `vite`, `esbuild`, `typescript`, `tsx`.
+- **Mobile App**: `@capacitor/core`, `@capacitor/cli`, `@capacitor/ios` for iOS native app packaging.
+
+## iOS App Build Instructions
+
+The project is configured with Capacitor to build a native iOS app. Follow these steps:
+
+### Prerequisites
+- Mac with Xcode installed (required for iOS builds)
+- Apple Developer Account ($99/year for App Store publishing)
+- Node.js 18+
+
+### Build Steps
+
+1. **Build the web app**:
+   ```bash
+   npm run build
+   ```
+
+2. **Add iOS platform** (first time only):
+   ```bash
+   npx cap add ios
+   ```
+
+3. **Sync web assets to iOS**:
+   ```bash
+   npx cap sync ios
+   ```
+
+4. **Open in Xcode**:
+   ```bash
+   npx cap open ios
+   ```
+
+5. **In Xcode**:
+   - Select your Team in Signing & Capabilities
+   - Set Bundle Identifier (e.g., `com.event4u.app`)
+   - Add app icons in Assets.xcassets
+   - Run on simulator or device with the Play button
+   - For App Store: Product → Archive → Distribute App
+
+### Configuration
+- App ID: `com.event4u.app` (change in `capacitor.config.ts`)
+- App Name: `Event4U`
+- Web Directory: `dist/public`
+
+### Updating the App
+After making changes to the web app:
+```bash
+npm run build && npx cap sync ios
+```
