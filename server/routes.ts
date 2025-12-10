@@ -58,7 +58,24 @@ import { db } from "./db";
 import { eq, and } from "drizzle-orm";
 import crypto from "crypto";
 import QRCode from "qrcode";
-import { companies } from "@shared/schema";
+import { 
+  companies,
+  siaeEventGenres,
+  siaeSectorCodes,
+  siaeTicketTypes,
+  siaeServiceCodes,
+  siaeCancellationReasons,
+  insertSiaeEventGenreSchema,
+  updateSiaeEventGenreSchema,
+  insertSiaeSectorCodeSchema,
+  updateSiaeSectorCodeSchema,
+  insertSiaeTicketTypeSchema,
+  updateSiaeTicketTypeSchema,
+  insertSiaeServiceCodeSchema,
+  updateSiaeServiceCodeSchema,
+  insertSiaeCancellationReasonSchema,
+  updateSiaeCancellationReasonSchema,
+} from "@shared/schema";
 import { setupBridgeRelay, isBridgeConnected, getCachedBridgeStatus } from "./bridge-relay";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -1464,6 +1481,323 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error checking registration status:", error);
       res.json({ enabled: true }); // Default to true on error
+    }
+  });
+
+  // ===== SIAE REFERENCE TABLES (Super Admin only) =====
+
+  // --- Event Genres ---
+  app.get('/api/siae/event-genres', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub || req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      const user = await storage.getUser(userId);
+      if (!user || user.role !== 'super_admin') {
+        return res.status(403).json({ message: "Unauthorized: Super Admin access required" });
+      }
+      const genres = await db.select().from(siaeEventGenres);
+      res.json(genres);
+    } catch (error) {
+      console.error("Error fetching SIAE event genres:", error);
+      res.status(500).json({ message: "Failed to fetch event genres" });
+    }
+  });
+
+  app.post('/api/siae/event-genres', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub || req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      const user = await storage.getUser(userId);
+      if (!user || user.role !== 'super_admin') {
+        return res.status(403).json({ message: "Unauthorized: Super Admin access required" });
+      }
+      const validated = insertSiaeEventGenreSchema.parse(req.body);
+      const [genre] = await db.insert(siaeEventGenres).values(validated).returning();
+      res.json(genre);
+    } catch (error: any) {
+      console.error("Error creating SIAE event genre:", error);
+      res.status(400).json({ message: error.message || "Failed to create event genre" });
+    }
+  });
+
+  app.patch('/api/siae/event-genres/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub || req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      const user = await storage.getUser(userId);
+      if (!user || user.role !== 'super_admin') {
+        return res.status(403).json({ message: "Unauthorized: Super Admin access required" });
+      }
+      const validated = updateSiaeEventGenreSchema.parse(req.body);
+      const [genre] = await db.update(siaeEventGenres)
+        .set({ ...validated, updatedAt: new Date() })
+        .where(eq(siaeEventGenres.id, req.params.id))
+        .returning();
+      if (!genre) {
+        return res.status(404).json({ message: "Event genre not found" });
+      }
+      res.json(genre);
+    } catch (error: any) {
+      console.error("Error updating SIAE event genre:", error);
+      res.status(400).json({ message: error.message || "Failed to update event genre" });
+    }
+  });
+
+  // --- Sector Codes ---
+  app.get('/api/siae/sector-codes', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub || req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      const user = await storage.getUser(userId);
+      if (!user || user.role !== 'super_admin') {
+        return res.status(403).json({ message: "Unauthorized: Super Admin access required" });
+      }
+      const codes = await db.select().from(siaeSectorCodes);
+      res.json(codes);
+    } catch (error) {
+      console.error("Error fetching SIAE sector codes:", error);
+      res.status(500).json({ message: "Failed to fetch sector codes" });
+    }
+  });
+
+  app.post('/api/siae/sector-codes', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub || req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      const user = await storage.getUser(userId);
+      if (!user || user.role !== 'super_admin') {
+        return res.status(403).json({ message: "Unauthorized: Super Admin access required" });
+      }
+      const validated = insertSiaeSectorCodeSchema.parse(req.body);
+      const [code] = await db.insert(siaeSectorCodes).values(validated).returning();
+      res.json(code);
+    } catch (error: any) {
+      console.error("Error creating SIAE sector code:", error);
+      res.status(400).json({ message: error.message || "Failed to create sector code" });
+    }
+  });
+
+  app.patch('/api/siae/sector-codes/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub || req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      const user = await storage.getUser(userId);
+      if (!user || user.role !== 'super_admin') {
+        return res.status(403).json({ message: "Unauthorized: Super Admin access required" });
+      }
+      const validated = updateSiaeSectorCodeSchema.parse(req.body);
+      const [code] = await db.update(siaeSectorCodes)
+        .set({ ...validated, updatedAt: new Date() })
+        .where(eq(siaeSectorCodes.id, req.params.id))
+        .returning();
+      if (!code) {
+        return res.status(404).json({ message: "Sector code not found" });
+      }
+      res.json(code);
+    } catch (error: any) {
+      console.error("Error updating SIAE sector code:", error);
+      res.status(400).json({ message: error.message || "Failed to update sector code" });
+    }
+  });
+
+  // --- Ticket Types ---
+  app.get('/api/siae/ticket-types', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub || req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      const user = await storage.getUser(userId);
+      if (!user || user.role !== 'super_admin') {
+        return res.status(403).json({ message: "Unauthorized: Super Admin access required" });
+      }
+      const types = await db.select().from(siaeTicketTypes);
+      res.json(types);
+    } catch (error) {
+      console.error("Error fetching SIAE ticket types:", error);
+      res.status(500).json({ message: "Failed to fetch ticket types" });
+    }
+  });
+
+  app.post('/api/siae/ticket-types', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub || req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      const user = await storage.getUser(userId);
+      if (!user || user.role !== 'super_admin') {
+        return res.status(403).json({ message: "Unauthorized: Super Admin access required" });
+      }
+      const validated = insertSiaeTicketTypeSchema.parse(req.body);
+      const [type] = await db.insert(siaeTicketTypes).values(validated).returning();
+      res.json(type);
+    } catch (error: any) {
+      console.error("Error creating SIAE ticket type:", error);
+      res.status(400).json({ message: error.message || "Failed to create ticket type" });
+    }
+  });
+
+  app.patch('/api/siae/ticket-types/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub || req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      const user = await storage.getUser(userId);
+      if (!user || user.role !== 'super_admin') {
+        return res.status(403).json({ message: "Unauthorized: Super Admin access required" });
+      }
+      const validated = updateSiaeTicketTypeSchema.parse(req.body);
+      const [type] = await db.update(siaeTicketTypes)
+        .set({ ...validated, updatedAt: new Date() })
+        .where(eq(siaeTicketTypes.id, req.params.id))
+        .returning();
+      if (!type) {
+        return res.status(404).json({ message: "Ticket type not found" });
+      }
+      res.json(type);
+    } catch (error: any) {
+      console.error("Error updating SIAE ticket type:", error);
+      res.status(400).json({ message: error.message || "Failed to update ticket type" });
+    }
+  });
+
+  // --- Service Codes ---
+  app.get('/api/siae/service-codes', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub || req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      const user = await storage.getUser(userId);
+      if (!user || user.role !== 'super_admin') {
+        return res.status(403).json({ message: "Unauthorized: Super Admin access required" });
+      }
+      const codes = await db.select().from(siaeServiceCodes);
+      res.json(codes);
+    } catch (error) {
+      console.error("Error fetching SIAE service codes:", error);
+      res.status(500).json({ message: "Failed to fetch service codes" });
+    }
+  });
+
+  app.post('/api/siae/service-codes', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub || req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      const user = await storage.getUser(userId);
+      if (!user || user.role !== 'super_admin') {
+        return res.status(403).json({ message: "Unauthorized: Super Admin access required" });
+      }
+      const validated = insertSiaeServiceCodeSchema.parse(req.body);
+      const [code] = await db.insert(siaeServiceCodes).values(validated).returning();
+      res.json(code);
+    } catch (error: any) {
+      console.error("Error creating SIAE service code:", error);
+      res.status(400).json({ message: error.message || "Failed to create service code" });
+    }
+  });
+
+  app.patch('/api/siae/service-codes/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub || req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      const user = await storage.getUser(userId);
+      if (!user || user.role !== 'super_admin') {
+        return res.status(403).json({ message: "Unauthorized: Super Admin access required" });
+      }
+      const validated = updateSiaeServiceCodeSchema.parse(req.body);
+      const [code] = await db.update(siaeServiceCodes)
+        .set({ ...validated, updatedAt: new Date() })
+        .where(eq(siaeServiceCodes.id, req.params.id))
+        .returning();
+      if (!code) {
+        return res.status(404).json({ message: "Service code not found" });
+      }
+      res.json(code);
+    } catch (error: any) {
+      console.error("Error updating SIAE service code:", error);
+      res.status(400).json({ message: error.message || "Failed to update service code" });
+    }
+  });
+
+  // --- Cancellation Reasons ---
+  app.get('/api/siae/cancellation-reasons', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub || req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      const user = await storage.getUser(userId);
+      if (!user || user.role !== 'super_admin') {
+        return res.status(403).json({ message: "Unauthorized: Super Admin access required" });
+      }
+      const reasons = await db.select().from(siaeCancellationReasons);
+      res.json(reasons);
+    } catch (error) {
+      console.error("Error fetching SIAE cancellation reasons:", error);
+      res.status(500).json({ message: "Failed to fetch cancellation reasons" });
+    }
+  });
+
+  app.post('/api/siae/cancellation-reasons', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub || req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      const user = await storage.getUser(userId);
+      if (!user || user.role !== 'super_admin') {
+        return res.status(403).json({ message: "Unauthorized: Super Admin access required" });
+      }
+      const validated = insertSiaeCancellationReasonSchema.parse(req.body);
+      const [reason] = await db.insert(siaeCancellationReasons).values(validated).returning();
+      res.json(reason);
+    } catch (error: any) {
+      console.error("Error creating SIAE cancellation reason:", error);
+      res.status(400).json({ message: error.message || "Failed to create cancellation reason" });
+    }
+  });
+
+  app.patch('/api/siae/cancellation-reasons/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub || req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      const user = await storage.getUser(userId);
+      if (!user || user.role !== 'super_admin') {
+        return res.status(403).json({ message: "Unauthorized: Super Admin access required" });
+      }
+      const validated = updateSiaeCancellationReasonSchema.parse(req.body);
+      const [reason] = await db.update(siaeCancellationReasons)
+        .set({ ...validated, updatedAt: new Date() })
+        .where(eq(siaeCancellationReasons.id, req.params.id))
+        .returning();
+      if (!reason) {
+        return res.status(404).json({ message: "Cancellation reason not found" });
+      }
+      res.json(reason);
+    } catch (error: any) {
+      console.error("Error updating SIAE cancellation reason:", error);
+      res.status(400).json({ message: error.message || "Failed to update cancellation reason" });
     }
   });
 
