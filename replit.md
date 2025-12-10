@@ -60,7 +60,7 @@ A digital badge creation system for schools and organizations, accessible via "B
 - **Database**: `drizzle-orm`, `drizzle-kit`, `@neondatabase/serverless`.
 - **Authentication**: `passport`, `openid-client`, `express-session`, `bcryptjs`.
 - **Charts**: `recharts`.
-- **File Processing**: `papaparse` (CSV), `jspdf` (PDF), `xlsx` (Excel).
+- **File Processing**: `papaparse` (CSV), `jspdf` (PDF), `exceljs` (Excel).
 - **QR Code**: `qrcode` for generating QR code data URLs.
 - **Build Tools**: `vite`, `esbuild`, `typescript`, `tsx`.
 - **Mobile App**: `@capacitor/core`, `@capacitor/cli`, `@capacitor/ios` for iOS native app packaging.
