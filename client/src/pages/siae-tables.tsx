@@ -23,7 +23,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Pencil, Music, MapPin, Ticket, Briefcase, XCircle, Loader2 } from "lucide-react";
+import { Plus, Pencil, Music, MapPin, Ticket, Briefcase, XCircle, Loader2, Percent } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -86,7 +87,7 @@ function EventGenresTab() {
       name: "",
       description: "",
       taxType: "S",
-      vatRate: 0,
+      vatRate: null as number | null,
       active: true,
     },
   });
@@ -133,7 +134,7 @@ function EventGenresTab() {
       name: item.name,
       description: item.description || "",
       taxType: item.taxType,
-      vatRate: item.vatRate || 0,
+      vatRate: item.vatRate ?? null,
       active: item.active,
     });
     setIsDialogOpen(true);
@@ -146,7 +147,7 @@ function EventGenresTab() {
       name: "",
       description: "",
       taxType: "S",
-      vatRate: 0,
+      vatRate: null,
       active: true,
     });
     setIsDialogOpen(true);
@@ -208,7 +209,41 @@ function EventGenresTab() {
                     <FormItem>
                       <FormLabel>Tipo Imposta</FormLabel>
                       <FormControl>
-                        <Input {...field} placeholder="S" data-testid="input-genre-taxtype" />
+                        <Select value={field.value} onValueChange={field.onChange}>
+                          <SelectTrigger data-testid="select-genre-taxtype">
+                            <SelectValue placeholder="Seleziona tipo" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="S">S - Spettacolo</SelectItem>
+                            <SelectItem value="I">I - Intrattenimento</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="vatRate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Aliquota IVA (%)</FormLabel>
+                      <FormControl>
+                        <Input 
+                          type="number" 
+                          step="0.01"
+                          min="0"
+                          max="100"
+                          {...field} 
+                          value={field.value ?? ''}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            field.onChange(val === '' ? null : parseFloat(val));
+                          }}
+                          placeholder="10" 
+                          data-testid="input-genre-vatrate" 
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -248,6 +283,7 @@ function EventGenresTab() {
               <TableHead className="w-20" data-testid="header-genre-code">Codice</TableHead>
               <TableHead data-testid="header-genre-name">Nome</TableHead>
               <TableHead className="w-24" data-testid="header-genre-tax">Imposta</TableHead>
+              <TableHead className="w-20" data-testid="header-genre-vat">IVA %</TableHead>
               <TableHead className="w-24" data-testid="header-genre-status">Stato</TableHead>
               <TableHead className="w-16" data-testid="header-genre-actions"></TableHead>
             </TableRow>
@@ -257,7 +293,18 @@ function EventGenresTab() {
               <TableRow key={genre.id} data-testid={`row-genre-${genre.id}`}>
                 <TableCell className="font-mono" data-testid={`cell-genre-code-${genre.id}`}>{genre.code}</TableCell>
                 <TableCell data-testid={`cell-genre-name-${genre.id}`}>{genre.name}</TableCell>
-                <TableCell data-testid={`cell-genre-tax-${genre.id}`}>{genre.taxType}</TableCell>
+                <TableCell data-testid={`cell-genre-tax-${genre.id}`}>
+                  <Badge variant="outline">
+                    {genre.taxType === 'S' ? 'Spettacolo' : 'Intratt.'}
+                  </Badge>
+                </TableCell>
+                <TableCell data-testid={`cell-genre-vat-${genre.id}`}>
+                  <Badge variant="secondary">
+                    {genre.vatRate !== null && genre.vatRate !== undefined 
+                      ? `${Number(genre.vatRate)}%` 
+                      : '-'}
+                  </Badge>
+                </TableCell>
                 <TableCell data-testid={`cell-genre-status-${genre.id}`}>
                   <Badge variant={genre.active ? "default" : "secondary"} data-testid={`badge-genre-${genre.id}`}>
                     {genre.active ? "Attivo" : "Disattivo"}

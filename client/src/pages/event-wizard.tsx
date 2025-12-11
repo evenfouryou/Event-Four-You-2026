@@ -880,15 +880,32 @@ export default function EventWizard() {
                 <div className="space-y-4">
                   <div className="space-y-2">
                     <Label>Genere Evento (TAB.1 SIAE)</Label>
-                    <Select value={siaeGenreCode} onValueChange={setSiaeGenreCode}>
+                    <Select 
+                      value={siaeGenreCode} 
+                      onValueChange={(code) => {
+                        setSiaeGenreCode(code);
+                        // Auto-imposta tipo imposta dal genere selezionato
+                        const selectedGenre = siaeGenres?.find(g => g.code === code);
+                        if (selectedGenre) {
+                          setSiaeTaxType(selectedGenre.taxType || 'S');
+                        }
+                      }}
+                    >
                       <SelectTrigger data-testid="select-siae-genre">
                         <SelectValue placeholder="Seleziona genere evento" />
                       </SelectTrigger>
                       <SelectContent>
-                        {siaeGenres?.map((genre) => (
+                        {siaeGenres?.filter(g => g.active).map((genre) => (
                           <SelectItem key={genre.id} value={genre.code}>
-                            <span className="font-mono mr-2">{genre.code}</span>
-                            {genre.name}
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono">{genre.code}</span>
+                              <span>{genre.name}</span>
+                              {genre.vatRate !== null && genre.vatRate !== undefined && (
+                                <Badge variant="outline" className="ml-2 text-xs">
+                                  IVA {Number(genre.vatRate)}%
+                                </Badge>
+                              )}
+                            </div>
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -897,6 +914,26 @@ export default function EventWizard() {
                       Categoria fiscale dell'evento secondo la normativa SIAE
                     </p>
                   </div>
+
+                  {/* Mostra IVA del genere selezionato */}
+                  {siaeGenreCode && (
+                    <div className="rounded-lg border bg-muted/30 p-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <Label className="text-sm font-medium">Aliquota IVA Applicata</Label>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Determinata dal genere evento selezionato
+                          </p>
+                        </div>
+                        <Badge variant="default" className="text-lg px-4 py-1" data-testid="badge-vat-rate">
+                          {(() => {
+                            const rate = siaeGenres?.find(g => g.code === siaeGenreCode)?.vatRate;
+                            return rate !== null && rate !== undefined ? `${Number(rate)}%` : 'N/D';
+                          })()}
+                        </Badge>
+                      </div>
+                    </div>
+                  )}
 
                   <div className="space-y-2">
                     <Label>Tipo Imposta</Label>
@@ -909,6 +946,9 @@ export default function EventWizard() {
                         <SelectItem value="I">Intrattenimento</SelectItem>
                       </SelectContent>
                     </Select>
+                    <p className="text-xs text-muted-foreground">
+                      {siaeTaxType === 'S' ? 'IVA detraibile per lo spettatore' : 'IVA non detraibile'}
+                    </p>
                   </div>
 
                   <div className="flex items-center justify-between rounded-lg border p-3">
@@ -1210,6 +1250,15 @@ export default function EventWizard() {
                       <div>
                         <span className="text-muted-foreground">Tipo Imposta: </span>
                         <span>{siaeTaxType === 'S' ? 'Spettacolo' : 'Intrattenimento'}</span>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Aliquota IVA: </span>
+                        <Badge variant="secondary" className="ml-1">
+                          {(() => {
+                            const rate = siaeGenres?.find(g => g.code === siaeGenreCode)?.vatRate;
+                            return rate !== null && rate !== undefined ? `${Number(rate)}%` : 'N/D';
+                          })()}
+                        </Badge>
                       </div>
                       <div>
                         <span className="text-muted-foreground">Nominativi: </span>
