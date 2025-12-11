@@ -451,22 +451,45 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
       }
       
-      const result = await window.siaeAPI.verifyPin(pin);
+      pinSubmit.disabled = true;
+      pinSubmit.textContent = 'Verifica...';
       
-      if (result.success) {
-        addLog('info', '✓ PIN verificato correttamente');
-        closePinDialog();
-      } else {
+      try {
+        const result = await window.siaeAPI.verifyPin(pin);
+        console.log('PIN verification result:', result);
+        
+        if (result && result.success) {
+          addLog('info', '✓ PIN verificato correttamente');
+          closePinDialog();
+        } else {
+          pinError.textContent = result?.error || 'PIN errato';
+          pinError.style.display = 'block';
+          pinInput.value = '';
+          pinInput.focus();
+          addLog('error', result?.error || 'PIN errato');
+        }
+      } catch (err) {
+        console.error('PIN verification error:', err);
+        pinError.textContent = 'Errore verifica: ' + err.message;
         pinError.style.display = 'block';
-        pinInput.value = '';
-        pinInput.focus();
-        addLog('error', 'PIN errato');
+        addLog('error', 'Errore verifica PIN: ' + err.message);
+      } finally {
+        pinSubmit.disabled = false;
+        pinSubmit.textContent = 'Conferma';
       }
     }
     
     function closePinDialog() {
-      overlay.remove();
+      console.log('Closing PIN dialog...');
+      try {
+        if (overlay && overlay.parentNode) {
+          overlay.parentNode.removeChild(overlay);
+        }
+      } catch (e) {
+        console.error('Error removing overlay:', e);
+      }
       pinDialogVisible = false;
+      console.log('PIN dialog closed, pinDialogVisible =', pinDialogVisible);
     }
     
     pinSubmit.addEventListener('click', verifyPin);
