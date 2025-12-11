@@ -44,7 +44,7 @@ export type InsertSystemSetting = z.infer<typeof insertSystemSettingSchema>;
 export type SystemSetting = typeof systemSettings.$inferSelect;
 
 // Users table - Required for Replit Auth + Extended for Event4U roles
-// Roles: super_admin, gestore, gestore_covisione, capo_staff, pr, warehouse, bartender, cliente
+// Roles: super_admin, gestore, gestore_covisione, capo_staff, pr, warehouse, bartender, cassiere, cliente
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   email: varchar("email").unique(),
@@ -53,7 +53,7 @@ export const users = pgTable("users", {
   firstName: varchar("first_name"),
   lastName: varchar("last_name"),
   profileImageUrl: varchar("profile_image_url"),
-  role: varchar("role").notNull().default('gestore'), // super_admin, gestore, gestore_covisione, capo_staff, pr, warehouse, bartender, cliente
+  role: varchar("role").notNull().default('gestore'), // super_admin, gestore, gestore_covisione, capo_staff, pr, warehouse, bartender, cassiere, cliente
   companyId: varchar("company_id").references(() => companies.id),
   parentUserId: varchar("parent_user_id"), // For PR: their Capo Staff; For Capo Staff: their Gestore
   emailVerified: boolean("email_verified").default(false), // Email verification status for classic registration
@@ -3249,3 +3249,204 @@ export type InsertSchoolBadgeRequest = z.infer<typeof insertSchoolBadgeRequestSc
 
 export type SchoolBadge = typeof schoolBadges.$inferSelect;
 export type InsertSchoolBadge = z.infer<typeof insertSchoolBadgeSchema>;
+
+// ==================== PRINTER MANAGEMENT SYSTEM ====================
+
+// Printer Models - Supported printer hardware models (admin-managed)
+export const printerModels = pgTable("printer_models", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  vendor: varchar("vendor", { length: 100 }).notNull(), // e.g., "X PRINTER", "Epson", "Zebra"
+  model: varchar("model", { length: 100 }).notNull(), // e.g., "XP-420B", "TM-T20"
+  dpi: integer("dpi").default(203), // Print resolution
+  maxWidthMm: integer("max_width_mm").default(80), // Maximum paper width
+  connectionType: varchar("connection_type", { length: 50 }).default('usb'), // usb, tcp, bluetooth
+  driverNotes: text("driver_notes"), // Driver installation notes
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Printer Agents - Connected desktop apps (per-company)
+export const printerAgents = pgTable("printer_agents", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").notNull().references(() => companies.id),
+  deviceName: varchar("device_name", { length: 255 }).notNull(), // Computer name
+  authToken: varchar("auth_token", { length: 128 }), // Hashed token for authentication
+  printerModelId: varchar("printer_model_id").references(() => printerModels.id),
+  printerName: varchar("printer_name", { length: 255 }), // OS printer name
+  status: varchar("status", { length: 30 }).default('offline'), // online, offline, printing, error
+  lastHeartbeat: timestamp("last_heartbeat"),
+  capabilities: jsonb("capabilities"), // Paper sizes, features
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Printer Profiles - Paper/ticket configurations (per-company)
+export const printerProfiles = pgTable("printer_profiles", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").notNull().references(() => companies.id),
+  printerModelId: varchar("printer_model_id").references(() => printerModels.id),
+  name: varchar("name", { length: 100 }).notNull(), // e.g., "Biglietto Standard", "Ingresso VIP"
+  paperWidthMm: integer("paper_width_mm").notNull().default(80),
+  paperHeightMm: integer("paper_height_mm").notNull().default(50),
+  marginTopMm: integer("margin_top_mm").default(2),
+  marginBottomMm: integer("margin_bottom_mm").default(2),
+  marginLeftMm: integer("margin_left_mm").default(2),
+  marginRightMm: integer("margin_right_mm").default(2),
+  templateJson: jsonb("template_json"), // Layout template
+  isDefault: boolean("is_default").default(false),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Print Jobs - Queue of print requests
+export const printJobs = pgTable("print_jobs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").notNull().references(() => companies.id),
+  agentId: varchar("agent_id").references(() => printerAgents.id),
+  profileId: varchar("profile_id").references(() => printerProfiles.id),
+  ticketId: varchar("ticket_id"), // Reference to SIAE ticket if applicable
+  status: varchar("status", { length: 30 }).notNull().default('pending'), // pending, printing, completed, failed
+  payload: jsonb("payload").notNull(), // Print data
+  errorMessage: text("error_message"),
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  printedAt: timestamp("printed_at"),
+});
+
+// Cashier Sessions - Box office audit trail (normativa italiana)
+export const cashierSessions = pgTable("cashier_sessions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").notNull().references(() => companies.id),
+  eventId: varchar("event_id").references(() => events.id),
+  userId: varchar("user_id").notNull().references(() => users.id), // Cassiere
+  printerAgentId: varchar("printer_agent_id").references(() => printerAgents.id),
+  status: varchar("status", { length: 30 }).notNull().default('active'), // active, closed
+  openedAt: timestamp("opened_at").defaultNow(),
+  closedAt: timestamp("closed_at"),
+  ticketsIssued: integer("tickets_issued").default(0),
+  totalAmount: decimal("total_amount", { precision: 10, scale: 2 }).default('0'),
+  notes: text("notes"),
+});
+
+// Relations
+export const printerModelsRelations = relations(printerModels, ({ many }) => ({
+  agents: many(printerAgents),
+  profiles: many(printerProfiles),
+}));
+
+export const printerAgentsRelations = relations(printerAgents, ({ one, many }) => ({
+  company: one(companies, {
+    fields: [printerAgents.companyId],
+    references: [companies.id],
+  }),
+  model: one(printerModels, {
+    fields: [printerAgents.printerModelId],
+    references: [printerModels.id],
+  }),
+  jobs: many(printJobs),
+  sessions: many(cashierSessions),
+}));
+
+export const printerProfilesRelations = relations(printerProfiles, ({ one }) => ({
+  company: one(companies, {
+    fields: [printerProfiles.companyId],
+    references: [companies.id],
+  }),
+  model: one(printerModels, {
+    fields: [printerProfiles.printerModelId],
+    references: [printerModels.id],
+  }),
+}));
+
+export const printJobsRelations = relations(printJobs, ({ one }) => ({
+  company: one(companies, {
+    fields: [printJobs.companyId],
+    references: [companies.id],
+  }),
+  agent: one(printerAgents, {
+    fields: [printJobs.agentId],
+    references: [printerAgents.id],
+  }),
+  profile: one(printerProfiles, {
+    fields: [printJobs.profileId],
+    references: [printerProfiles.id],
+  }),
+  createdByUser: one(users, {
+    fields: [printJobs.createdBy],
+    references: [users.id],
+  }),
+}));
+
+export const cashierSessionsRelations = relations(cashierSessions, ({ one }) => ({
+  company: one(companies, {
+    fields: [cashierSessions.companyId],
+    references: [companies.id],
+  }),
+  event: one(events, {
+    fields: [cashierSessions.eventId],
+    references: [events.id],
+  }),
+  user: one(users, {
+    fields: [cashierSessions.userId],
+    references: [users.id],
+  }),
+  printerAgent: one(printerAgents, {
+    fields: [cashierSessions.printerAgentId],
+    references: [printerAgents.id],
+  }),
+}));
+
+// ==================== SCHEMAS PRINTER ====================
+
+export const insertPrinterModelSchema = createInsertSchema(printerModels).omit({
+  id: true,
+  createdAt: true,
+});
+export const updatePrinterModelSchema = insertPrinterModelSchema.partial();
+
+export const insertPrinterAgentSchema = createInsertSchema(printerAgents).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export const updatePrinterAgentSchema = insertPrinterAgentSchema.partial();
+
+export const insertPrinterProfileSchema = createInsertSchema(printerProfiles).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export const updatePrinterProfileSchema = insertPrinterProfileSchema.partial();
+
+export const insertPrintJobSchema = createInsertSchema(printJobs).omit({
+  id: true,
+  createdAt: true,
+  printedAt: true,
+});
+
+export const insertCashierSessionSchema = createInsertSchema(cashierSessions).omit({
+  id: true,
+  openedAt: true,
+  closedAt: true,
+});
+
+// ==================== TYPES PRINTER ====================
+
+export type PrinterModel = typeof printerModels.$inferSelect;
+export type InsertPrinterModel = z.infer<typeof insertPrinterModelSchema>;
+export type UpdatePrinterModel = z.infer<typeof updatePrinterModelSchema>;
+
+export type PrinterAgent = typeof printerAgents.$inferSelect;
+export type InsertPrinterAgent = z.infer<typeof insertPrinterAgentSchema>;
+export type UpdatePrinterAgent = z.infer<typeof updatePrinterAgentSchema>;
+
+export type PrinterProfile = typeof printerProfiles.$inferSelect;
+export type InsertPrinterProfile = z.infer<typeof insertPrinterProfileSchema>;
+export type UpdatePrinterProfile = z.infer<typeof updatePrinterProfileSchema>;
+
+export type PrintJob = typeof printJobs.$inferSelect;
+export type InsertPrintJob = z.infer<typeof insertPrintJobSchema>;
+
+export type CashierSession = typeof cashierSessions.$inferSelect;
+export type InsertCashierSession = z.infer<typeof insertCashierSessionSchema>;
