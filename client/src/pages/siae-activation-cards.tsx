@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -51,6 +51,19 @@ type Company = {
   name: string;
 };
 
+type CardUsageStats = {
+  card: SiaeActivationCard | null;
+  totalSeals: number;
+  totalTickets: number;
+  organizers: {
+    userId: string;
+    username: string;
+    fullName: string;
+    ticketCount: number;
+    lastEmission: string | null;
+  }[];
+};
+
 export default function SiaeActivationCardsPage() {
   const { toast } = useToast();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -80,6 +93,14 @@ export default function SiaeActivationCardsPage() {
 
   const { data: cards = [], isLoading: cardsLoading } = useQuery<SiaeActivationCard[]>({
     queryKey: ['/api/siae/activation-cards', { companyId: selectedCompany }],
+  });
+
+  // Query to get usage stats when a physical card is inserted - auto-refresh every 5 seconds
+  const { data: cardUsageStats, isLoading: usageStatsLoading } = useQuery<CardUsageStats>({
+    queryKey: ['/api/siae/activation-cards/by-serial', smartCardStatus.cardSerial],
+    enabled: !!smartCardStatus.cardSerial && smartCardStatus.cardInserted,
+    refetchInterval: smartCardStatus.cardInserted ? 5000 : false, // Auto-refresh every 5 seconds while card inserted
+    retry: false, // Don't retry on 404
   });
 
   const createMutation = useMutation({
@@ -226,40 +247,98 @@ export default function SiaeActivationCardsPage() {
         </CardHeader>
         <CardContent>
           {smartCardStatus.cardInserted ? (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4" data-testid="live-card-data">
-              <div className="space-y-1">
-                <div className="text-xs text-muted-foreground flex items-center gap-1">
-                  <Hash className="w-3 h-3" /> Seriale Carta
+            <>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4" data-testid="live-card-data">
+                <div className="space-y-1">
+                  <div className="text-xs text-muted-foreground flex items-center gap-1">
+                    <Hash className="w-3 h-3" /> Seriale Carta
+                  </div>
+                  <div className="font-mono font-semibold text-sm" data-testid="live-card-serial">
+                    {smartCardStatus.cardSerial || '-'}
+                  </div>
                 </div>
-                <div className="font-mono font-semibold text-sm" data-testid="live-card-serial">
-                  {smartCardStatus.cardSerial || '-'}
+                <div className="space-y-1">
+                  <div className="text-xs text-muted-foreground flex items-center gap-1">
+                    <Shield className="w-3 h-3" /> Contatore Sigilli
+                  </div>
+                  <div className="font-mono font-semibold text-sm text-green-500" data-testid="live-card-counter">
+                    {smartCardStatus.cardCounter?.toLocaleString('it-IT') || '-'}
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <div className="text-xs text-muted-foreground flex items-center gap-1">
+                    <Wallet className="w-3 h-3" /> Saldo Carta
+                  </div>
+                  <div className="font-mono font-semibold text-sm" data-testid="live-card-balance">
+                    {smartCardStatus.cardBalance?.toLocaleString('it-IT') || '-'}
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <div className="text-xs text-muted-foreground flex items-center gap-1">
+                    <CreditCard className="w-3 h-3" /> Codice Sistema
+                  </div>
+                  <div className="font-mono font-semibold text-sm" data-testid="live-card-keyid">
+                    {smartCardStatus.cardKeyId || '-'}
+                  </div>
                 </div>
               </div>
-              <div className="space-y-1">
-                <div className="text-xs text-muted-foreground flex items-center gap-1">
-                  <Shield className="w-3 h-3" /> Contatore Sigilli
+
+              {usageStatsLoading ? (
+              <div className="mt-4 flex items-center justify-center py-4" data-testid="loading-usage-stats">
+                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                <span className="text-sm text-muted-foreground">Caricamento statistiche...</span>
+              </div>
+            ) : cardUsageStats?.organizers && cardUsageStats.organizers.length > 0 ? (
+              <div className="mt-4 border-t pt-4" data-testid="organizers-section">
+                <div className="flex items-center gap-2 mb-3">
+                  <Users className="w-4 h-4 text-muted-foreground" />
+                  <span className="font-medium text-sm">Organizzatori che hanno usato questa carta</span>
+                  <Badge variant="secondary" className="text-xs">
+                    {cardUsageStats.totalTickets} biglietti emessi
+                  </Badge>
                 </div>
-                <div className="font-mono font-semibold text-sm text-green-500" data-testid="live-card-counter">
-                  {smartCardStatus.cardCounter?.toLocaleString('it-IT') || '-'}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                  {cardUsageStats.organizers.map((org) => (
+                    <div 
+                      key={org.userId} 
+                      className="flex items-center justify-between p-2 rounded-md bg-muted/30"
+                      data-testid={`organizer-${org.userId}`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold">
+                          {org.fullName?.charAt(0) || org.username?.charAt(0) || '?'}
+                        </div>
+                        <div>
+                          <div className="text-sm font-medium">{org.fullName || org.username}</div>
+                          <div className="text-xs text-muted-foreground">@{org.username}</div>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <Badge variant="default" className="text-xs">
+                          {org.ticketCount} biglietti
+                        </Badge>
+                        {org.lastEmission && (
+                          <div className="text-xs text-muted-foreground mt-1">
+                            {format(new Date(org.lastEmission), 'dd/MM HH:mm', { locale: it })}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
-              <div className="space-y-1">
-                <div className="text-xs text-muted-foreground flex items-center gap-1">
-                  <Wallet className="w-3 h-3" /> Saldo Carta
-                </div>
-                <div className="font-mono font-semibold text-sm" data-testid="live-card-balance">
-                  {smartCardStatus.cardBalance?.toLocaleString('it-IT') || '-'}
-                </div>
+            ) : cardUsageStats?.card ? (
+              <div className="mt-4 border-t pt-4 text-center text-sm text-muted-foreground" data-testid="no-organizers">
+                <Users className="w-6 h-6 mx-auto mb-2 opacity-30" />
+                Nessun biglietto emesso con questa carta
               </div>
-              <div className="space-y-1">
-                <div className="text-xs text-muted-foreground flex items-center gap-1">
-                  <CreditCard className="w-3 h-3" /> Codice Sistema
-                </div>
-                <div className="font-mono font-semibold text-sm" data-testid="live-card-keyid">
-                  {smartCardStatus.cardKeyId || '-'}
-                </div>
+            ) : smartCardStatus.cardSerial ? (
+              <div className="mt-4 border-t pt-4 text-center text-sm text-muted-foreground" data-testid="card-not-in-db">
+                <CreditCard className="w-6 h-6 mx-auto mb-2 opacity-30" />
+                Carta non registrata nel database
               </div>
-            </div>
+            ) : null}
+            </>
           ) : (
             <div className="flex items-center justify-center py-6 text-muted-foreground" data-testid="no-card-message">
               <div className="text-center">
