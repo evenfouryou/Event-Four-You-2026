@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -27,12 +27,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Plus, CreditCard, Building2, Calendar, Shield, Loader2 } from "lucide-react";
+import { Plus, CreditCard, Building2, Calendar, Shield, Loader2, Wifi, WifiOff, RefreshCw, Users, Hash, Wallet } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
+import { useSmartCardStatus, smartCardService } from "@/lib/smart-card-service";
 
 type SiaeActivationCard = {
   id: string;
@@ -54,6 +55,15 @@ export default function SiaeActivationCardsPage() {
   const { toast } = useToast();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedCompany, setSelectedCompany] = useState<string | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  
+  const smartCardStatus = useSmartCardStatus();
+
+  const handleRefreshCard = async () => {
+    setIsRefreshing(true);
+    smartCardService.startPolling();
+    setTimeout(() => setIsRefreshing(false), 2000);
+  };
 
   const form = useForm({
     defaultValues: {
@@ -173,6 +183,96 @@ export default function SiaeActivationCardsPage() {
           </CardContent>
         </Card>
       </div>
+
+      <Card className={`glass-card border-2 ${smartCardStatus.cardInserted ? 'border-green-500/50' : 'border-orange-500/30'}`} data-testid="card-live-smartcard">
+        <CardHeader>
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-3">
+              <div className={`p-3 rounded-full ${smartCardStatus.cardInserted ? 'bg-green-500/20' : 'bg-orange-500/20'}`}>
+                <CreditCard className={`w-6 h-6 ${smartCardStatus.cardInserted ? 'text-green-500' : 'text-orange-500'}`} />
+              </div>
+              <div>
+                <CardTitle className="flex items-center gap-2" data-testid="title-live-card">
+                  Smart Card SIAE
+                  {smartCardStatus.connected ? (
+                    <Badge variant="default" className="bg-green-500 text-xs">
+                      <Wifi className="w-3 h-3 mr-1" /> LIVE
+                    </Badge>
+                  ) : (
+                    <Badge variant="secondary" className="text-xs">
+                      <WifiOff className="w-3 h-3 mr-1" /> Offline
+                    </Badge>
+                  )}
+                </CardTitle>
+                <CardDescription data-testid="description-live-card">
+                  {smartCardStatus.cardInserted 
+                    ? "Carta inserita - Dati letti in tempo reale"
+                    : smartCardStatus.readerDetected
+                      ? "Lettore connesso - Inserire la carta SIAE"
+                      : "Connettere il lettore MiniLector EVO"}
+                </CardDescription>
+              </div>
+            </div>
+            <Button 
+              variant="outline" 
+              size="icon" 
+              onClick={handleRefreshCard}
+              disabled={isRefreshing}
+              data-testid="button-refresh-card"
+            >
+              <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {smartCardStatus.cardInserted ? (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4" data-testid="live-card-data">
+              <div className="space-y-1">
+                <div className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Hash className="w-3 h-3" /> Seriale Carta
+                </div>
+                <div className="font-mono font-semibold text-sm" data-testid="live-card-serial">
+                  {smartCardStatus.cardSerial || '-'}
+                </div>
+              </div>
+              <div className="space-y-1">
+                <div className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Shield className="w-3 h-3" /> Contatore Sigilli
+                </div>
+                <div className="font-mono font-semibold text-sm text-green-500" data-testid="live-card-counter">
+                  {smartCardStatus.cardCounter?.toLocaleString('it-IT') || '-'}
+                </div>
+              </div>
+              <div className="space-y-1">
+                <div className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Wallet className="w-3 h-3" /> Saldo Carta
+                </div>
+                <div className="font-mono font-semibold text-sm" data-testid="live-card-balance">
+                  {smartCardStatus.cardBalance?.toLocaleString('it-IT') || '-'}
+                </div>
+              </div>
+              <div className="space-y-1">
+                <div className="text-xs text-muted-foreground flex items-center gap-1">
+                  <CreditCard className="w-3 h-3" /> Codice Sistema
+                </div>
+                <div className="font-mono font-semibold text-sm" data-testid="live-card-keyid">
+                  {smartCardStatus.cardKeyId || '-'}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center justify-center py-6 text-muted-foreground" data-testid="no-card-message">
+              <div className="text-center">
+                <CreditCard className="w-12 h-12 mx-auto mb-2 opacity-30" />
+                <p>Inserisci una Smart Card SIAE per visualizzare i dati</p>
+                {smartCardStatus.readerName && (
+                  <p className="text-xs mt-2">Lettore: {smartCardStatus.readerName}</p>
+                )}
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <Card className="glass-card" data-testid="card-cards-list">
         <CardHeader>
