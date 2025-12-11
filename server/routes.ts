@@ -78,6 +78,7 @@ import {
   updateSiaeCancellationReasonSchema,
 } from "@shared/schema";
 import { setupBridgeRelay, isBridgeConnected, getCachedBridgeStatus } from "./bridge-relay";
+import { setupPrintRelay } from "./print-relay";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Setup passport for classic email/password authentication (no Replit OAuth)
@@ -5766,8 +5767,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   const httpServer = createServer(app);
   
-  // Setup WebSocket bridge relay
+  // Setup WebSocket bridge relay (SIAE smart card)
   setupBridgeRelay(httpServer);
+  
+  // Setup WebSocket print relay (thermal printers)
+  setupPrintRelay(httpServer);
   
   return httpServer;
 }

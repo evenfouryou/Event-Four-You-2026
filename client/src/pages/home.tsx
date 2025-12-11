@@ -19,9 +19,10 @@ import {
   Sparkles,
   Clock,
   CheckCircle2,
+  Printer,
 } from "lucide-react";
 import { motion } from "framer-motion";
-import type { Company, UserFeatures } from "@shared/schema";
+import type { Company, UserFeatures, PrinterAgent } from "@shared/schema";
 
 interface ModuleCardProps {
   title: string;
@@ -142,6 +143,14 @@ export default function Home() {
     queryKey: ['/api/user-features/current/my'],
     enabled: !isSuperAdmin && !isBartender && !isWarehouse,
   });
+
+  const { data: printerAgents = [] } = useQuery<PrinterAgent[]>({
+    queryKey: ['/api/printers/agents'],
+    enabled: !isSuperAdmin && !isBartender && !isWarehouse,
+    refetchInterval: 30000,
+  });
+  
+  const onlineAgents = printerAgents.filter(a => a.status === 'online');
 
   useEffect(() => {
     if (isBartender || isWarehouse) {
@@ -416,6 +425,18 @@ export default function Home() {
           </div>
           <p className="text-xs text-muted-foreground">Prodotti</p>
         </div>
+        {printerAgents.length > 0 && (
+          <>
+            <div className="w-px h-10 bg-white/10" />
+            <Link href="/printer-settings" className="text-center px-4 cursor-pointer hover:opacity-80 transition-opacity" data-testid="link-printer-status">
+              <div className={`flex items-center justify-center gap-1 mb-1 ${onlineAgents.length > 0 ? 'text-teal' : 'text-red-400'}`}>
+                <Printer className="h-4 w-4" />
+                <span className="text-lg font-bold">{onlineAgents.length}/{printerAgents.length}</span>
+              </div>
+              <p className="text-xs text-muted-foreground">Stampanti</p>
+            </Link>
+          </>
+        )}
       </motion.div>
 
       {/* Modules Grid */}

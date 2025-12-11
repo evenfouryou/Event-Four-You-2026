@@ -26,7 +26,19 @@ function getUser(req: Request): AuthenticatedUser | null {
   return req.user as AuthenticatedUser | null;
 }
 
-// Middleware per verificare ruolo admin
+// Middleware per verificare ruolo super admin (modelli stampante solo super admin)
+function requireSuperAdmin(req: Request, res: Response, next: Function) {
+  const user = getUser(req);
+  if (!user) {
+    return res.status(401).json({ error: 'Non autenticato' });
+  }
+  if (user.role !== 'super_admin') {
+    return res.status(403).json({ error: 'Accesso negato - Solo Super Admin' });
+  }
+  next();
+}
+
+// Middleware per verificare ruolo gestore o superiore (profili e agenti)
 function requireAdmin(req: Request, res: Response, next: Function) {
   const user = getUser(req);
   if (!user) {
@@ -50,10 +62,10 @@ function requireCashierOrAbove(req: Request, res: Response, next: Function) {
   next();
 }
 
-// ==================== PRINTER MODELS (Admin only) ====================
+// ==================== PRINTER MODELS (Super Admin only) ====================
 
 // GET all printer models
-router.get('/models', requireAdmin, async (req: Request, res: Response) => {
+router.get('/models', requireSuperAdmin, async (req: Request, res: Response) => {
   try {
     const models = await db.select().from(printerModels).orderBy(desc(printerModels.createdAt));
     res.json(models);
@@ -64,7 +76,7 @@ router.get('/models', requireAdmin, async (req: Request, res: Response) => {
 });
 
 // POST create printer model
-router.post('/models', requireAdmin, async (req: Request, res: Response) => {
+router.post('/models', requireSuperAdmin, async (req: Request, res: Response) => {
   try {
     const parsed = insertPrinterModelSchema.safeParse(req.body);
     if (!parsed.success) {
@@ -80,7 +92,7 @@ router.post('/models', requireAdmin, async (req: Request, res: Response) => {
 });
 
 // PATCH update printer model
-router.patch('/models/:id', requireAdmin, async (req: Request, res: Response) => {
+router.patch('/models/:id', requireSuperAdmin, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const parsed = updatePrinterModelSchema.safeParse(req.body);
@@ -104,7 +116,7 @@ router.patch('/models/:id', requireAdmin, async (req: Request, res: Response) =>
 });
 
 // DELETE printer model
-router.delete('/models/:id', requireAdmin, async (req: Request, res: Response) => {
+router.delete('/models/:id', requireSuperAdmin, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     await db.delete(printerModels).where(eq(printerModels.id, id));
@@ -199,8 +211,8 @@ router.delete('/profiles/:id', requireAdmin, async (req: Request, res: Response)
 
 // ==================== PRINTER AGENTS ====================
 
-// GET agents for company
-router.get('/agents', requireAdmin, async (req: Request, res: Response) => {
+// GET agents for company (cassiere+ access per widget dashboard)
+router.get('/agents', requireCashierOrAbove, async (req: Request, res: Response) => {
   try {
     const user = getUser(req);
     const companyId = user?.companyId;
@@ -217,10 +229,17 @@ router.get('/agents', requireAdmin, async (req: Request, res: Response) => {
   }
 });
 
-// POST register agent (called by desktop app)
-router.post('/agents/register', async (req: Request, res: Response) => {
+// POST register agent (admin authenticated, returns token for desktop app)
+router.post('/agents/register', requireAdmin, async (req: Request, res: Response) => {
   try {
-    const { companyId, deviceName, printerModelId, printerName, capabilities } = req.body;
+    const user = getUser(req);
+    const { deviceName, printerModelId, printerName, capabilities } = req.body;
+    
+    // Use admin's company or allow super_admin to specify company
+    let companyId = user?.companyId;
+    if (user?.role === 'super_admin' && req.body.companyId) {
+      companyId = req.body.companyId;
+    }
     
     if (!companyId || !deviceName) {
       return res.status(400).json({ error: 'companyId e deviceName richiesti' });
@@ -275,13 +294,42 @@ router.post('/agents/register', async (req: Request, res: Response) => {
   }
 });
 
-// PATCH heartbeat from agent
-router.patch('/agents/:id/heartbeat', async (req: Request, res: Response) => {
+// Middleware per verificare token agente stampante (per endpoint desktop app)
+async function verifyAgentToken(req: Request, res: Response, next: Function) {
+  const authHeader = req.headers.authorization;
+  if (!authHeader?.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Token richiesto' });
+  }
+  
+  const token = authHeader.substring(7);
+  const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+  
+  const agents = await db.select().from(printerAgents)
+    .where(eq(printerAgents.authToken, hashedToken))
+    .limit(1);
+  
+  if (agents.length === 0) {
+    return res.status(401).json({ error: 'Token non valido' });
+  }
+  
+  (req as any).printerAgent = agents[0];
+  next();
+}
+
+// PATCH heartbeat from agent (requires agent token)
+router.patch('/agents/:id/heartbeat', verifyAgentToken, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
+    const agent = (req as any).printerAgent;
+    
+    // Verify agent matches ID
+    if (agent.id !== id) {
+      return res.status(403).json({ error: 'Non autorizzato per questo agente' });
+    }
+    
     const { status, capabilities } = req.body;
     
-    const [agent] = await db.update(printerAgents)
+    const [updatedAgent] = await db.update(printerAgents)
       .set({
         status: status || 'online',
         capabilities,
@@ -291,10 +339,10 @@ router.patch('/agents/:id/heartbeat', async (req: Request, res: Response) => {
       .where(eq(printerAgents.id, id))
       .returning();
     
-    if (!agent) {
+    if (!updatedAgent) {
       return res.status(404).json({ error: 'Agent non trovato' });
     }
-    res.json(agent);
+    res.json(updatedAgent);
   } catch (error) {
     console.error('Error updating agent heartbeat:', error);
     res.status(500).json({ error: 'Errore nell\'aggiornamento heartbeat' });
@@ -303,10 +351,16 @@ router.patch('/agents/:id/heartbeat', async (req: Request, res: Response) => {
 
 // ==================== PRINT JOBS ====================
 
-// GET pending jobs for agent
-router.get('/jobs/pending/:agentId', async (req: Request, res: Response) => {
+// GET pending jobs for agent (requires agent token)
+router.get('/jobs/pending/:agentId', verifyAgentToken, async (req: Request, res: Response) => {
   try {
     const { agentId } = req.params;
+    const agent = (req as any).printerAgent;
+    
+    // Verify agent matches ID
+    if (agent.id !== agentId) {
+      return res.status(403).json({ error: 'Non autorizzato per questo agente' });
+    }
     
     const jobs = await db.select().from(printJobs)
       .where(and(

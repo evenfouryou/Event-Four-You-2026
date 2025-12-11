@@ -33,6 +33,7 @@ import {
   UserPlus,
   ScanLine,
   GraduationCap,
+  Printer,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
@@ -189,6 +190,12 @@ export function AppSidebar() {
         icon: CreditCard,
         url: "/siae/card-reader",
         group: "Biglietteria SIAE",
+      },
+      {
+        title: "Stampante",
+        icon: Printer,
+        url: "/printer-settings",
+        group: "Sistema",
       }
     );
   }
@@ -283,6 +290,12 @@ export function AppSidebar() {
         title: "Badge Scuola",
         icon: GraduationCap,
         url: "/school-badges",
+        group: "Gestione",
+      },
+      {
+        title: "Stampante",
+        icon: Printer,
+        url: "/printer-settings",
         group: "Gestione",
       }
     );
