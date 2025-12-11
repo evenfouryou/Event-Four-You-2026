@@ -10,6 +10,7 @@ import cookieParser from "cookie-parser";
 import siaeRoutes from "./siae-routes";
 import publicRoutes from "./public-routes";
 import prRoutes from "./pr-routes";
+import printerRoutes from "./printer-routes";
 import {
   insertCompanySchema,
   insertLocationSchema,
@@ -98,6 +99,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Register public portal routes (ticket purchase)
   app.use(publicRoutes);
+  
+  // Register printer management routes
+  app.use('/api/printers', printerRoutes);
 
   // Email transporter setup
   const emailTransporter = nodemailer.createTransport({
