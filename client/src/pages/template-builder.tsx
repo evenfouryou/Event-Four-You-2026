@@ -111,7 +111,6 @@ export default function TemplateBuilder() {
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>('');
   const [showTestPrintDialog, setShowTestPrintDialog] = useState(false);
   const [selectedAgentId, setSelectedAgentId] = useState<string>('');
-  const [selectedProfileId, setSelectedProfileId] = useState<string>('');
   
   // Template metadata
   const [templateName, setTemplateName] = useState('Nuovo Template');
@@ -137,16 +136,6 @@ export default function TemplateBuilder() {
     enabled: !!id && showTestPrintDialog,
   });
 
-  // Fetch printer profiles (only when dialog is open)
-  const { data: printerProfiles = [] } = useQuery<{ id: string; name: string; agentId: string | null }[]>({
-    queryKey: ['/api/printers/profiles'],
-    enabled: showTestPrintDialog,
-  });
-
-  // Filter profiles for the selected agent
-  const profilesForAgent = selectedAgentId 
-    ? printerProfiles.filter((profile) => profile.agentId === selectedAgentId)
-    : [];
 
   // Load template data when fetched
   useEffect(() => {
@@ -271,17 +260,16 @@ export default function TemplateBuilder() {
     },
   });
 
-  // Test print mutation
+  // Test print mutation - uses template dimensions directly, no profile needed
   const testPrintMutation = useMutation({
-    mutationFn: async ({ agentId, profileId }: { agentId: string; profileId: string }) => {
-      const res = await apiRequest('POST', `/api/ticket/templates/${id}/test-print`, { agentId, profileId });
+    mutationFn: async ({ agentId }: { agentId: string }) => {
+      const res = await apiRequest('POST', `/api/ticket/templates/${id}/test-print`, { agentId });
       return res.json();
     },
     onSuccess: () => {
       toast({ title: 'Stampa di prova inviata', description: 'Verifica la stampante' });
       setShowTestPrintDialog(false);
       setSelectedAgentId('');
-      setSelectedProfileId('');
     },
     onError: (error: any) => {
       toast({ title: 'Errore', description: error?.message || 'Impossibile inviare la stampa di prova', variant: 'destructive' });
@@ -966,10 +954,7 @@ export default function TemplateBuilder() {
             <div className="space-y-4">
               <div className="space-y-2">
                 <Label>Seleziona Agente</Label>
-                <Select value={selectedAgentId} onValueChange={(value) => {
-                  setSelectedAgentId(value);
-                  setSelectedProfileId('');
-                }}>
+                <Select value={selectedAgentId} onValueChange={setSelectedAgentId}>
                   <SelectTrigger data-testid="select-agent-test-print">
                     <SelectValue placeholder="Seleziona agente..." />
                   </SelectTrigger>
@@ -983,27 +968,9 @@ export default function TemplateBuilder() {
                 </Select>
               </div>
               
-              {selectedAgentId && (
-                <div className="space-y-2">
-                  <Label>Seleziona Profilo Stampante</Label>
-                  {profilesForAgent.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">Nessun profilo configurato per questo agente</p>
-                  ) : (
-                    <Select value={selectedProfileId} onValueChange={setSelectedProfileId}>
-                      <SelectTrigger data-testid="select-profile-test-print">
-                        <SelectValue placeholder="Seleziona profilo..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {profilesForAgent.map((profile) => (
-                          <SelectItem key={profile.id} value={profile.id}>
-                            {profile.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
-                </div>
-              )}
+              <p className="text-sm text-muted-foreground">
+                La stampa userà le dimensioni del template: {paperWidth}mm × {paperHeight}mm
+              </p>
             </div>
           )}
           
@@ -1011,13 +978,12 @@ export default function TemplateBuilder() {
             <Button variant="outline" onClick={() => {
               setShowTestPrintDialog(false);
               setSelectedAgentId('');
-              setSelectedProfileId('');
             }} data-testid="button-cancel-test-print">
               Annulla
             </Button>
             <Button 
-              onClick={() => selectedAgentId && selectedProfileId && testPrintMutation.mutate({ agentId: selectedAgentId, profileId: selectedProfileId })}
-              disabled={!selectedAgentId || !selectedProfileId || testPrintMutation.isPending || connectedAgents.length === 0}
+              onClick={() => selectedAgentId && testPrintMutation.mutate({ agentId: selectedAgentId })}
+              disabled={!selectedAgentId || testPrintMutation.isPending || connectedAgents.length === 0}
               data-testid="button-confirm-test-print"
             >
               {testPrintMutation.isPending ? 'Invio...' : 'Stampa Prova'}

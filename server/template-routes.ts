@@ -510,11 +510,11 @@ router.get('/templates/:templateId/agents', requireSuperAdmin, async (req: Reque
 router.post('/templates/:templateId/test-print', requireSuperAdmin, async (req: Request, res: Response) => {
   try {
     const { templateId } = req.params;
-    const { agentId, profileId } = req.body;
+    const { agentId } = req.body;
     const user = getUser(req);
     
-    if (!agentId || !profileId) {
-      return res.status(400).json({ error: 'ID agente e profilo stampante richiesti' });
+    if (!agentId) {
+      return res.status(400).json({ error: 'ID agente richiesto' });
     }
     
     // Verify template exists and belongs to user's company
@@ -535,10 +535,11 @@ router.post('/templates/:templateId/test-print', requireSuperAdmin, async (req: 
       .where(eq(ticketTemplateElements.templateId, templateId))
       .orderBy(ticketTemplateElements.zIndex);
     
-    // Build the print job payload with profileId at top level (required by desktop app)
+    // Build the print job payload using template dimensions directly
     const printPayload = {
       id: `test-${Date.now()}`,
-      profileId,
+      paperWidthMm: template.paperWidthMm,
+      paperHeightMm: template.paperHeightMm,
       payload: {
         type: 'test_print',
         template: {
