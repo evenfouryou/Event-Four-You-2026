@@ -568,6 +568,7 @@ export default function EventHub() {
   const [alerts, setAlerts] = useState<AlertItem[]>([]);
   const [quickActionsOpen, setQuickActionsOpen] = useState(false);
   const [statusChangeDialogOpen, setStatusChangeDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [pauseTicketingDialogOpen, setPauseTicketingDialogOpen] = useState(false);
 
   const { data: event, isLoading: eventLoading } = useQuery<Event>({
@@ -630,10 +631,31 @@ export default function EventHub() {
         message: 'Stato evento aggiornato',
       });
     },
-    onError: () => {
+    onError: (error: any) => {
       toast({
         title: "Errore",
-        description: "Impossibile aggiornare lo stato dell'evento.",
+        description: error?.message || "Impossibile aggiornare lo stato dell'evento.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteEventMutation = useMutation({
+    mutationFn: async () => {
+      await apiRequest('DELETE', `/api/events/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/events'] });
+      toast({
+        title: "Evento eliminato",
+        description: "L'evento è stato eliminato con successo.",
+      });
+      navigate('/events');
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Errore",
+        description: error?.message || "Impossibile eliminare l'evento.",
         variant: "destructive",
       });
     },
@@ -819,6 +841,17 @@ export default function EventHub() {
             </div>
 
             <div className="flex items-center gap-2">
+              {(user?.role === 'super_admin' || user?.role === 'gestore') && (
+                <Button
+                  variant="destructive"
+                  size="icon"
+                  onClick={() => setDeleteDialogOpen(true)}
+                  data-testid="button-delete-event"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              )}
+              
               {currentTransition && (
                 <Button
                   onClick={() => setStatusChangeDialogOpen(true)}
@@ -1633,6 +1666,28 @@ export default function EventHub() {
             >
               {changeStatusMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               Conferma
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Elimina Evento</AlertDialogTitle>
+            <AlertDialogDescription>
+              Questa azione eliminerà l'evento "{event?.name}" e tutti i dati correlati (postazioni, scorte, prenotazioni, liste ospiti, ecc.)
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annulla</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteEventMutation.mutate()}
+              disabled={deleteEventMutation.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteEventMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Elimina
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
