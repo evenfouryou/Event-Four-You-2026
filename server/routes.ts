@@ -11,6 +11,7 @@ import siaeRoutes from "./siae-routes";
 import publicRoutes from "./public-routes";
 import prRoutes from "./pr-routes";
 import printerRoutes from "./printer-routes";
+import templateRoutes from "./template-routes";
 import {
   insertCompanySchema,
   insertLocationSchema,
@@ -103,6 +104,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Register printer management routes
   app.use('/api/printers', printerRoutes);
+  
+  // Register ticket template builder routes
+  app.use('/api/ticket', templateRoutes);
 
   // Email transporter setup
   const emailTransporter = nodemailer.createTransport({
