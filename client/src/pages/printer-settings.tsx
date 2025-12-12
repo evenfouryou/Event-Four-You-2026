@@ -68,6 +68,9 @@ import {
   AlertTriangle,
   Settings,
   Download,
+  Key,
+  Copy,
+  Check,
 } from "lucide-react";
 import type { 
   PrinterModel, 
@@ -108,6 +111,10 @@ export default function PrinterSettings() {
   const [profileDialogOpen, setProfileDialogOpen] = useState(false);
   const [editingModel, setEditingModel] = useState<PrinterModel | null>(null);
   const [editingProfile, setEditingProfile] = useState<PrinterProfile | null>(null);
+  const [registerDialogOpen, setRegisterDialogOpen] = useState(false);
+  const [generatedToken, setGeneratedToken] = useState<string | null>(null);
+  const [deviceName, setDeviceName] = useState("");
+  const [tokenCopied, setTokenCopied] = useState(false);
 
   const { data: models = [], isLoading: modelsLoading, refetch: refetchModels } = useQuery<PrinterModel[]>({
     queryKey: ["/api/printers/models"],
@@ -244,6 +251,45 @@ export default function PrinterSettings() {
     },
   });
 
+  const registerAgentMutation = useMutation({
+    mutationFn: async (data: { deviceName: string }) => {
+      const response = await apiRequest("POST", "/api/printers/agents/register", data);
+      return response.json();
+    },
+    onSuccess: (data) => {
+      setGeneratedToken(data.authToken);
+      queryClient.invalidateQueries({ queryKey: ["/api/printers/agents"] });
+      toast({ title: "Agent registrato", description: "Copia il token nel Print Agent" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Errore", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const handleCopyToken = () => {
+    if (generatedToken) {
+      navigator.clipboard.writeText(generatedToken);
+      setTokenCopied(true);
+      setTimeout(() => setTokenCopied(false), 2000);
+      toast({ title: "Token copiato!" });
+    }
+  };
+
+  const handleRegisterAgent = () => {
+    if (!deviceName.trim()) {
+      toast({ title: "Errore", description: "Inserisci un nome per il dispositivo", variant: "destructive" });
+      return;
+    }
+    registerAgentMutation.mutate({ deviceName: deviceName.trim() });
+  };
+
+  const resetRegisterDialog = () => {
+    setRegisterDialogOpen(false);
+    setGeneratedToken(null);
+    setDeviceName("");
+    setTokenCopied(false);
+  };
+
   const handleEditModel = (model: PrinterModel) => {
     setEditingModel(model);
     modelForm.reset({
@@ -367,11 +413,97 @@ export default function PrinterSettings() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="mb-4">
+              <div className="mb-4 flex flex-wrap gap-2">
                 <Button variant="outline" data-testid="button-download-agent">
                   <Download className="h-4 w-4 mr-2" />
-                  Scarica Event4U Print Agent
+                  Scarica Print Agent
                 </Button>
+                
+                <Dialog open={registerDialogOpen} onOpenChange={(open) => {
+                  if (!open) resetRegisterDialog();
+                  else setRegisterDialogOpen(true);
+                }}>
+                  <DialogTrigger asChild>
+                    <Button data-testid="button-register-agent">
+                      <Key className="h-4 w-4 mr-2" />
+                      Genera Token Agent
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-md">
+                    <DialogHeader>
+                      <DialogTitle>Registra Nuovo Agent</DialogTitle>
+                      <DialogDescription>
+                        Genera un token di autenticazione per collegare un nuovo computer con Print Agent
+                      </DialogDescription>
+                    </DialogHeader>
+                    
+                    {!generatedToken ? (
+                      <div className="space-y-4">
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium">Nome Dispositivo</label>
+                          <Input
+                            placeholder="es. Box Office 1, Cassa Ingresso..."
+                            value={deviceName}
+                            onChange={(e) => setDeviceName(e.target.value)}
+                            data-testid="input-device-name"
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            Un nome identificativo per riconoscere questo computer
+                          </p>
+                        </div>
+                        <DialogFooter>
+                          <Button
+                            onClick={handleRegisterAgent}
+                            disabled={registerAgentMutation.isPending || !deviceName.trim()}
+                            data-testid="button-confirm-register"
+                          >
+                            {registerAgentMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                            Genera Token
+                          </Button>
+                        </DialogFooter>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        <div className="p-4 bg-green-500/10 border border-green-500/20 rounded-lg">
+                          <div className="flex items-center gap-2 mb-2 text-green-600">
+                            <CheckCircle2 className="h-5 w-5" />
+                            <span className="font-medium">Token Generato!</span>
+                          </div>
+                          <p className="text-sm text-muted-foreground mb-3">
+                            Copia questo token nel Print Agent sul computer "{deviceName}"
+                          </p>
+                          <div className="flex gap-2">
+                            <Input
+                              value={generatedToken}
+                              readOnly
+                              className="font-mono text-xs"
+                              data-testid="input-generated-token"
+                            />
+                            <Button
+                              size="icon"
+                              variant="outline"
+                              onClick={handleCopyToken}
+                              data-testid="button-copy-token"
+                            >
+                              {tokenCopied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                            </Button>
+                          </div>
+                        </div>
+                        <div className="p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
+                          <p className="text-xs text-yellow-600">
+                            <AlertTriangle className="h-4 w-4 inline mr-1" />
+                            Questo token viene mostrato una sola volta. Salvalo subito!
+                          </p>
+                        </div>
+                        <DialogFooter>
+                          <Button variant="outline" onClick={resetRegisterDialog} data-testid="button-close-register">
+                            Chiudi
+                          </Button>
+                        </DialogFooter>
+                      </div>
+                    )}
+                  </DialogContent>
+                </Dialog>
               </div>
               
               {agentsLoading ? (
