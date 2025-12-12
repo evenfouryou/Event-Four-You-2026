@@ -342,10 +342,10 @@ router.post('/agents/connect', async (req: Request, res: Response) => {
     
     const agent = agents[0];
     
-    // Update status and heartbeat
+    // Only update heartbeat here - status is set to 'online' by WebSocket connection
+    // This prevents showing 'online' when WebSocket fails to connect
     await db.update(printerAgents)
       .set({
-        status: 'online',
         lastHeartbeat: new Date(),
         updatedAt: new Date()
       })
