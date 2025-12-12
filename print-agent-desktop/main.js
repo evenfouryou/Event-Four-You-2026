@@ -56,10 +56,9 @@ function createTray() {
 
 async function connectToServer() {
   const token = store.get('token');
-  const companyId = store.get('companyId');
   
-  if (!token || !companyId) {
-    sendToRenderer('log', 'Token o Company ID mancante');
+  if (!token) {
+    sendToRenderer('log', 'Token mancante');
     sendToRenderer('status', 'disconnected');
     return;
   }
@@ -67,11 +66,11 @@ async function connectToServer() {
   sendToRenderer('log', 'Connessione in corso...');
   
   try {
-    // First verify credentials via HTTP
+    // First verify credentials via HTTP - only send token, server returns companyId
     const response = await fetch(API_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token, companyId })
+      body: JSON.stringify({ token })
     });
     
     if (!response.ok) {
@@ -84,9 +83,10 @@ async function connectToServer() {
     const data = await response.json();
     sendToRenderer('log', `Autenticato come: ${data.deviceName || data.agentId}`);
     store.set('agentId', data.agentId);
+    store.set('companyId', data.companyId); // Store from server (trusted)
     
     // Now connect via WebSocket
-    connectWebSocket(token, companyId, data.agentId);
+    connectWebSocket(token, data.companyId, data.agentId);
     
   } catch (error) {
     sendToRenderer('log', `Errore connessione: ${error.message}`);
@@ -266,7 +266,6 @@ function sendToRenderer(channel, data) {
 // IPC handlers
 ipcMain.handle('save-config', (event, config) => {
   store.set('token', config.token);
-  store.set('companyId', config.companyId);
   store.set('deviceName', config.deviceName);
   store.set('printerName', config.printerName);
   sendToRenderer('log', 'Configurazione salvata');
@@ -276,7 +275,6 @@ ipcMain.handle('save-config', (event, config) => {
 ipcMain.handle('get-config', () => {
   return {
     token: store.get('token') || '',
-    companyId: store.get('companyId') || '',
     deviceName: store.get('deviceName') || '',
     printerName: store.get('printerName') || '',
     serverUrl: SERVER_URL

@@ -294,6 +294,19 @@ export default function PrinterSettings() {
     },
   });
 
+  const deleteAgentMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest("DELETE", `/api/printers/agents/${id}`);
+    },
+    onSuccess: () => {
+      toast({ title: "Agent eliminato" });
+      queryClient.invalidateQueries({ queryKey: ["/api/printers/agents"] });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Errore", description: error.message, variant: "destructive" });
+    },
+  });
+
   const handleCopyToken = () => {
     if (generatedToken) {
       navigator.clipboard.writeText(generatedToken);
@@ -587,6 +600,7 @@ export default function PrinterSettings() {
                       <TableHead>Stampante</TableHead>
                       <TableHead>Stato</TableHead>
                       <TableHead>Ultimo Heartbeat</TableHead>
+                      <TableHead className="text-right">Azioni</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -597,6 +611,16 @@ export default function PrinterSettings() {
                         <TableCell>{getStatusBadge(agent.status)}</TableCell>
                         <TableCell className="text-muted-foreground">
                           {formatDate(agent.lastHeartbeat)}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button 
+                            size="icon" 
+                            variant="ghost" 
+                            onClick={() => deleteAgentMutation.mutate(agent.id)}
+                            data-testid={`button-delete-agent-${agent.id}`}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -619,19 +643,20 @@ export default function PrinterSettings() {
                   Configura le dimensioni della carta e i margini per diversi tipi di biglietti
                 </CardDescription>
               </div>
-              <Dialog open={profileDialogOpen} onOpenChange={(open) => {
-                setProfileDialogOpen(open);
-                if (!open) {
-                  setEditingProfile(null);
-                  profileForm.reset();
-                }
-              }}>
-                <DialogTrigger asChild>
-                  <Button data-testid="button-add-profile">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Nuovo Profilo
-                  </Button>
-                </DialogTrigger>
+              {isSuperAdmin && (
+                <Dialog open={profileDialogOpen} onOpenChange={(open) => {
+                  setProfileDialogOpen(open);
+                  if (!open) {
+                    setEditingProfile(null);
+                    profileForm.reset();
+                  }
+                }}>
+                  <DialogTrigger asChild>
+                    <Button data-testid="button-add-profile">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Nuovo Profilo
+                    </Button>
+                  </DialogTrigger>
                 <DialogContent className="max-w-md">
                   <DialogHeader>
                     <DialogTitle>
@@ -809,7 +834,8 @@ export default function PrinterSettings() {
                     </form>
                   </Form>
                 </DialogContent>
-              </Dialog>
+                </Dialog>
+              )}
             </CardHeader>
             <CardContent>
               {profilesLoading ? (
@@ -830,7 +856,7 @@ export default function PrinterSettings() {
                       <TableHead>Dimensioni</TableHead>
                       <TableHead>Margini</TableHead>
                       <TableHead>Stato</TableHead>
-                      <TableHead className="text-right">Azioni</TableHead>
+                      {isSuperAdmin && <TableHead className="text-right">Azioni</TableHead>}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -853,16 +879,18 @@ export default function PrinterSettings() {
                             <Badge variant="secondary"><XCircle className="h-3 w-3 mr-1" />Inattivo</Badge>
                           )}
                         </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex justify-end gap-1">
-                            <Button size="icon" variant="ghost" onClick={() => handleEditProfile(profile)} data-testid={`button-edit-profile-${profile.id}`}>
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button size="icon" variant="ghost" onClick={() => deleteProfileMutation.mutate(profile.id)} data-testid={`button-delete-profile-${profile.id}`}>
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
-                          </div>
-                        </TableCell>
+                        {isSuperAdmin && (
+                          <TableCell className="text-right">
+                            <div className="flex justify-end gap-1">
+                              <Button size="icon" variant="ghost" onClick={() => handleEditProfile(profile)} data-testid={`button-edit-profile-${profile.id}`}>
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button size="icon" variant="ghost" onClick={() => deleteProfileMutation.mutate(profile.id)} data-testid={`button-delete-profile-${profile.id}`}>
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        )}
                       </TableRow>
                     ))}
                   </TableBody>

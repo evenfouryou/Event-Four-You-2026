@@ -151,8 +151,8 @@ router.get('/profiles', requireAdmin, async (req: Request, res: Response) => {
   }
 });
 
-// POST create profile
-router.post('/profiles', requireAdmin, async (req: Request, res: Response) => {
+// POST create profile (super_admin only)
+router.post('/profiles', requireSuperAdmin, async (req: Request, res: Response) => {
   try {
     const user = getUser(req);
     const companyId = user?.companyId;
@@ -173,8 +173,8 @@ router.post('/profiles', requireAdmin, async (req: Request, res: Response) => {
   }
 });
 
-// PATCH update profile
-router.patch('/profiles/:id', requireAdmin, async (req: Request, res: Response) => {
+// PATCH update profile (super_admin only)
+router.patch('/profiles/:id', requireSuperAdmin, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const parsed = updatePrinterProfileSchema.safeParse(req.body);
@@ -197,8 +197,8 @@ router.patch('/profiles/:id', requireAdmin, async (req: Request, res: Response) 
   }
 });
 
-// DELETE profile
-router.delete('/profiles/:id', requireAdmin, async (req: Request, res: Response) => {
+// DELETE profile (super_admin only)
+router.delete('/profiles/:id', requireSuperAdmin, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     await db.delete(printerProfiles).where(eq(printerProfiles.id, id));
@@ -266,8 +266,7 @@ router.post('/agents/register', requireAdmin, async (req: Request, res: Response
           printerModelId,
           printerName,
           capabilities,
-          status: 'online',
-          lastHeartbeat: new Date(),
+          status: 'offline',
           updatedAt: new Date()
         })
         .where(eq(printerAgents.id, existing[0].id))
@@ -281,8 +280,7 @@ router.post('/agents/register', requireAdmin, async (req: Request, res: Response
         printerModelId,
         printerName,
         capabilities,
-        status: 'online',
-        lastHeartbeat: new Date()
+        status: 'offline'
       }).returning();
     }
     
@@ -294,26 +292,52 @@ router.post('/agents/register', requireAdmin, async (req: Request, res: Response
   }
 });
 
+// DELETE agent (gestore can delete own company agents)
+router.delete('/agents/:id', requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const user = getUser(req);
+    
+    // Verify agent belongs to user's company (unless super_admin)
+    const agent = await db.select().from(printerAgents)
+      .where(eq(printerAgents.id, id))
+      .limit(1);
+    
+    if (agent.length === 0) {
+      return res.status(404).json({ error: 'Agente non trovato' });
+    }
+    
+    if (user?.role !== 'super_admin' && agent[0].companyId !== user?.companyId) {
+      return res.status(403).json({ error: 'Non autorizzato ad eliminare questo agente' });
+    }
+    
+    await db.delete(printerAgents).where(eq(printerAgents.id, id));
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting printer agent:', error);
+    res.status(500).json({ error: 'Errore nell\'eliminazione agente stampante' });
+  }
+});
+
 // POST verify/connect agent (for desktop app - no session required)
+// Security: Only validate by token hash - companyId from stored agent, not from client
 router.post('/agents/connect', async (req: Request, res: Response) => {
   try {
-    const { token, companyId, deviceName } = req.body;
+    const { token } = req.body;
     
-    if (!token || !companyId) {
-      return res.status(400).json({ error: 'Token e companyId richiesti' });
+    if (!token) {
+      return res.status(400).json({ error: 'Token richiesto' });
     }
     
     const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
     
+    // Find agent by token only - do NOT trust client-provided companyId
     const agents = await db.select().from(printerAgents)
-      .where(and(
-        eq(printerAgents.companyId, companyId),
-        eq(printerAgents.authToken, hashedToken)
-      ))
+      .where(eq(printerAgents.authToken, hashedToken))
       .limit(1);
     
     if (agents.length === 0) {
-      return res.status(401).json({ error: 'Token o companyId non valido' });
+      return res.status(401).json({ error: 'Token non valido' });
     }
     
     const agent = agents[0];
@@ -327,7 +351,7 @@ router.post('/agents/connect', async (req: Request, res: Response) => {
       })
       .where(eq(printerAgents.id, agent.id));
     
-    // Return agent info (without auth token)
+    // Return agent info including companyId from server (trusted source)
     res.json({
       success: true,
       agentId: agent.id,

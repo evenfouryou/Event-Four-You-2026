@@ -112,40 +112,35 @@ function getDeviceName() {
 }
 
 async function registerAgent() {
-  const companyId = store.get('companyId');
-  const printerName = store.get('printerName');
+  const authToken = store.get('authToken');
   
-  if (!companyId) {
-    log.warn('No company ID configured');
+  if (!authToken) {
+    log.warn('No auth token configured - generate one from the web portal first');
     return null;
   }
 
   const serverUrl = store.get('serverUrl').replace('wss://', 'https://').replace('ws://', 'http://');
   
   try {
-    const response = await fetch(`${serverUrl}/api/printers/agents/register`, {
+    // Use /connect endpoint which doesn't require session auth
+    // Only send token - companyId comes from server (security)
+    const response = await fetch(`${serverUrl}/api/printers/agents/connect`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        companyId,
-        deviceName: getDeviceName(),
-        printerName,
-        capabilities: {
-          thermalPrint: true,
-          paperWidth: 80
-        }
-      })
+      body: JSON.stringify({ token: authToken })
     });
 
     if (!response.ok) {
-      throw new Error(`Registration failed: ${response.status}`);
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || `Connection failed: ${response.status}`);
     }
 
     const agent = await response.json();
-    log.info('Agent registered:', agent.id);
+    log.info('Agent connected:', agent.agentId);
     
-    store.set('authToken', agent.authToken);
-    agentId = agent.id;
+    agentId = agent.agentId;
+    // Store companyId from server response (trusted source)
+    store.set('companyId', agent.companyId);
     
     return agent;
   } catch (error) {
