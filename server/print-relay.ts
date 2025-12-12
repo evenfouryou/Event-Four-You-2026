@@ -200,18 +200,16 @@ async function getSessionData(sessionId: string): Promise<any> {
 }
 
 async function authenticateAgent(payload: any): Promise<{ agentId: string; companyId: string } | null> {
-  const { token, companyId, agentId, deviceName } = payload;
+  const { token } = payload;
   
-  if (!token || !companyId) return null;
+  if (!token) return null;
   
   try {
     const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
     
+    // Find agent by token only - companyId comes from database (trusted source)
     const agents = await db.select().from(printerAgents)
-      .where(and(
-        eq(printerAgents.companyId, companyId),
-        eq(printerAgents.authToken, hashedToken)
-      ))
+      .where(eq(printerAgents.authToken, hashedToken))
       .limit(1);
     
     if (agents.length > 0) {
