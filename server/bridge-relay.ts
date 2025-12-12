@@ -52,13 +52,13 @@ export function setupBridgeRelay(server: Server): void {
   server.on('upgrade', async (request: IncomingMessage, socket, head) => {
     const url = new URL(request.url || '', `http://${request.headers.host}`);
     
+    // Only handle /ws/bridge - let other handlers manage their paths
     if (url.pathname === '/ws/bridge') {
       wss.handleUpgrade(request, socket, head, (ws) => {
         wss.emit('connection', ws, request);
       });
-    } else {
-      socket.destroy();
     }
+    // Don't destroy socket for other paths - they may be handled by other WebSocket servers
   });
 
   wss.on('connection', async (ws: WebSocket, request: IncomingMessage) => {
