@@ -243,8 +243,10 @@ export default function TemplateBuilder() {
         navigate(`/template-builder/${templateId}`);
       }
     },
-    onError: () => {
-      toast({ title: 'Errore', description: 'Impossibile salvare il template', variant: 'destructive' });
+    onError: (error: any) => {
+      console.error('Template save error:', error);
+      const message = error?.message || 'Impossibile salvare il template';
+      toast({ title: 'Errore', description: message, variant: 'destructive' });
     },
   });
 
