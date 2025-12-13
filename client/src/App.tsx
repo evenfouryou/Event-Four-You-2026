@@ -25,6 +25,7 @@ import PurchaseOrders from "@/pages/purchase-orders";
 import Events from "@/pages/events";
 import EventDetail from "@/pages/event-detail";
 import EventHub from "@/pages/event-hub";
+import EventDirectStock from "@/pages/event-direct-stock";
 import StationDetail from "@/pages/station-detail";
 import EventFormats from "@/pages/event-formats";
 import EventWizard from "@/pages/event-wizard";
@@ -157,6 +158,7 @@ function Router() {
               <Route path="/events/wizard/:id?" component={EventWizard} />
               <Route path="/events/:id/hub" component={EventHub} />
               <Route path="/events/:eventId/stations/:stationId" component={StationDetail} />
+              <Route path="/events/:id/direct-stock" component={EventDirectStock} />
               <Route path="/events/:id" component={EventDetail} />
               <Route path="/events" component={Events} />
               <Route path="/event-formats" component={EventFormats} />

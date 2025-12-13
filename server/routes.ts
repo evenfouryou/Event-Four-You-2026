@@ -57,7 +57,7 @@ import bcrypt from "bcryptjs";
 import { z } from "zod";
 import nodemailer from "nodemailer";
 import { db } from "./db";
-import { eq, and } from "drizzle-orm";
+import { eq, and, or, inArray, desc } from "drizzle-orm";
 import crypto from "crypto";
 import QRCode from "qrcode";
 import { 
@@ -2032,6 +2032,263 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("Error creating station:", error);
       res.status(400).json({ message: error.message || "Failed to create station" });
+    }
+  });
+
+  // ===== DIRECT EVENT STOCK (Carico/Scarico senza magazzino) =====
+
+  // GET stock diretto evento (movimenti DIRECT_LOAD e DIRECT_CONSUME)
+  app.get('/api/events/:id/direct-stock', isAuthenticated, async (req: any, res) => {
+    try {
+      const companyId = await getUserCompanyId(req);
+      if (!companyId) {
+        return res.status(403).json({ message: "No company associated" });
+      }
+      
+      const eventId = req.params.id;
+      
+      // Verify event belongs to company
+      const event = await storage.getEvent(eventId);
+      if (!event || event.companyId !== companyId) {
+        return res.status(404).json({ message: "Evento non trovato" });
+      }
+      
+      // Get all DIRECT_LOAD and DIRECT_CONSUME movements for this event
+      const movements = await db.select()
+        .from(stockMovements)
+        .where(and(
+          eq(stockMovements.companyId, companyId),
+          or(
+            eq(stockMovements.toEventId, eventId),
+            eq(stockMovements.fromEventId, eventId)
+          ),
+          inArray(stockMovements.type, ['DIRECT_LOAD', 'DIRECT_CONSUME'])
+        ));
+      
+      // Get products for enrichment
+      const products = await storage.getProductsByCompany(companyId);
+      
+      // Aggregate by productId
+      const aggregation = new Map<string, { loaded: number; consumed: number }>();
+      
+      for (const mov of movements) {
+        const existing = aggregation.get(mov.productId) || { loaded: 0, consumed: 0 };
+        const qty = parseFloat(mov.quantity);
+        
+        if (mov.type === 'DIRECT_LOAD') {
+          existing.loaded += qty;
+        } else if (mov.type === 'DIRECT_CONSUME') {
+          existing.consumed += qty;
+        }
+        
+        aggregation.set(mov.productId, existing);
+      }
+      
+      // Build response with product names
+      const result = Array.from(aggregation.entries()).map(([productId, data]) => {
+        const product = products.find(p => p.id === productId);
+        return {
+          productId,
+          productName: product?.name || 'Prodotto sconosciuto',
+          productCode: product?.code || '',
+          unitOfMeasure: product?.unitOfMeasure || '',
+          loaded: data.loaded,
+          consumed: data.consumed,
+          available: data.loaded - data.consumed,
+        };
+      });
+      
+      res.json(result);
+    } catch (error) {
+      console.error("Error fetching direct event stock:", error);
+      res.status(500).json({ message: "Errore nel recupero stock diretto" });
+    }
+  });
+
+  // POST carica prodotto diretto (senza magazzino)
+  app.post('/api/events/:id/direct-stock/load', isAuthenticated, async (req: any, res) => {
+    try {
+      const companyId = await getUserCompanyId(req);
+      if (!companyId) {
+        return res.status(403).json({ message: "No company associated" });
+      }
+      
+      const eventId = req.params.id;
+      const userId = req.user?.claims?.sub || req.user?.id;
+      
+      // Validate input
+      const loadSchema = z.object({
+        productId: z.string().uuid(),
+        quantity: z.number().positive("La quantità deve essere maggiore di 0"),
+        reason: z.string().optional(),
+      });
+      
+      const validated = loadSchema.parse(req.body);
+      
+      // Verify event belongs to company
+      const event = await storage.getEvent(eventId);
+      if (!event || event.companyId !== companyId) {
+        return res.status(404).json({ message: "Evento non trovato" });
+      }
+      
+      // Create stock movement with type DIRECT_LOAD
+      const movement = await storage.createStockMovement({
+        companyId,
+        productId: validated.productId,
+        toEventId: eventId,
+        quantity: validated.quantity.toString(),
+        type: 'DIRECT_LOAD',
+        reason: validated.reason || 'Carico diretto evento',
+        performedBy: userId,
+      });
+      
+      res.json({ success: true, movement });
+    } catch (error: any) {
+      console.error("Error loading direct stock:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: error.errors.map(e => e.message).join(', ') });
+      }
+      res.status(400).json({ message: error.message || "Errore nel carico diretto" });
+    }
+  });
+
+  // POST consuma prodotto diretto
+  app.post('/api/events/:id/direct-stock/consume', isAuthenticated, async (req: any, res) => {
+    try {
+      const companyId = await getUserCompanyId(req);
+      if (!companyId) {
+        return res.status(403).json({ message: "No company associated" });
+      }
+      
+      const eventId = req.params.id;
+      const userId = req.user?.claims?.sub || req.user?.id;
+      
+      // Validate input
+      const consumeSchema = z.object({
+        productId: z.string().uuid(),
+        quantity: z.number().positive("La quantità deve essere maggiore di 0"),
+        reason: z.string().optional(),
+      });
+      
+      const validated = consumeSchema.parse(req.body);
+      
+      // Verify event belongs to company
+      const event = await storage.getEvent(eventId);
+      if (!event || event.companyId !== companyId) {
+        return res.status(404).json({ message: "Evento non trovato" });
+      }
+      
+      // Calcola disponibilità per il prodotto specifico
+      const movements = await db.select()
+        .from(stockMovements)
+        .where(and(
+          eq(stockMovements.companyId, companyId),
+          eq(stockMovements.productId, validated.productId),
+          or(
+            eq(stockMovements.toEventId, eventId),
+            eq(stockMovements.fromEventId, eventId)
+          ),
+          inArray(stockMovements.type, ['DIRECT_LOAD', 'DIRECT_CONSUME'])
+        ));
+      
+      let loaded = 0;
+      let consumed = 0;
+      for (const m of movements) {
+        const qty = parseFloat(m.quantity);
+        if (m.type === 'DIRECT_LOAD') {
+          loaded += qty;
+        } else if (m.type === 'DIRECT_CONSUME') {
+          consumed += qty;
+        }
+      }
+      const available = loaded - consumed;
+      
+      if (available < validated.quantity) {
+        return res.status(400).json({ 
+          message: `Quantità insufficiente. Disponibile: ${available.toFixed(2)}` 
+        });
+      }
+      
+      // Create stock movement with type DIRECT_CONSUME
+      const movement = await storage.createStockMovement({
+        companyId,
+        productId: validated.productId,
+        toEventId: eventId,
+        quantity: validated.quantity.toString(),
+        type: 'DIRECT_CONSUME',
+        reason: validated.reason || 'Consumo diretto evento',
+        performedBy: userId,
+      });
+      
+      res.json({ success: true, movement });
+    } catch (error: any) {
+      console.error("Error consuming direct stock:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: error.errors.map(e => e.message).join(', ') });
+      }
+      res.status(400).json({ message: error.message || "Errore nel consumo diretto" });
+    }
+  });
+
+  // GET riepilogo consumi evento
+  app.get('/api/events/:id/direct-stock/summary', isAuthenticated, async (req: any, res) => {
+    try {
+      const companyId = await getUserCompanyId(req);
+      if (!companyId) {
+        return res.status(403).json({ message: "No company associated" });
+      }
+      
+      const eventId = req.params.id;
+      
+      // Verify event belongs to company
+      const event = await storage.getEvent(eventId);
+      if (!event || event.companyId !== companyId) {
+        return res.status(404).json({ message: "Evento non trovato" });
+      }
+      
+      // Get all movements with limit
+      const movements = await db.select()
+        .from(stockMovements)
+        .where(and(
+          eq(stockMovements.companyId, companyId),
+          or(
+            eq(stockMovements.toEventId, eventId),
+            eq(stockMovements.fromEventId, eventId)
+          ),
+          inArray(stockMovements.type, ['DIRECT_LOAD', 'DIRECT_CONSUME'])
+        ))
+        .orderBy(desc(stockMovements.createdAt))
+        .limit(50);
+      
+      // Get products for enrichment
+      const products = await storage.getProductsByCompany(companyId);
+      
+      // Calculate totals
+      let totalLoaded = 0;
+      let totalConsumed = 0;
+      
+      const enrichedMovements = movements.map(mov => {
+        const qty = parseFloat(mov.quantity);
+        const product = products.find(p => p.id === mov.productId);
+        
+        if (mov.type === 'DIRECT_LOAD') totalLoaded += qty;
+        else if (mov.type === 'DIRECT_CONSUME') totalConsumed += qty;
+        
+        return {
+          ...mov,
+          productName: product?.name || 'Prodotto sconosciuto',
+          productCode: product?.code || '',
+        };
+      });
+      
+      res.json({
+        totalLoaded,
+        totalConsumed,
+        movements: enrichedMovements,
+      });
+    } catch (error) {
+      console.error("Error fetching direct stock summary:", error);
+      res.status(500).json({ message: "Errore nel recupero riepilogo" });
     }
   });
 

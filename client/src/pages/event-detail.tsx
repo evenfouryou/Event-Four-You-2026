@@ -637,6 +637,11 @@ export default function EventDetail() {
               <Trash2 className="h-4 w-4" />
             </Button>
           )}
+          <Button asChild variant="outline" data-testid="button-direct-stock">
+            <Link href={`/events/${id}/direct-stock`}>
+              Carico Diretto
+            </Link>
+          </Button>
           <Button asChild variant="outline" data-testid="button-view-report">
             <Link href={`/reports?eventId=${id}`}>
               Report
