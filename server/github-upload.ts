@@ -338,7 +338,7 @@ export async function updatePrintAgentRepo(): Promise<{ success: boolean; repoUr
         owner: user.login,
         repo: repoName,
         path: filename,
-        message: sha ? `Update ${filename} (v1.4.3 - detailed debug logs)` : `Add ${filename}`,
+        message: sha ? `Update ${filename} (v1.4.4 - FIX: save authToken)` : `Add ${filename}`,
         content: Buffer.from(content).toString('base64'),
         ...(sha ? { sha } : {})
       });
