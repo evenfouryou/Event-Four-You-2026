@@ -5674,6 +5674,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // GitHub: Update Print Agent repository
+  app.post('/api/github/update-print-agent', async (req: any, res) => {
+    try {
+      const { updatePrintAgentRepo } = await import('./github-upload');
+      const result = await updatePrintAgentRepo();
+      
+      if (result.success) {
+        res.json({ success: true, repoUrl: result.repoUrl, filesUploaded: result.filesUploaded });
+      } else {
+        res.status(500).json({ success: false, error: result.error });
+      }
+    } catch (error: any) {
+      console.error('GitHub print agent update error:', error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
   // ===== BRIDGE RELAY API =====
   
   // Get or generate a bridge token for the current user's company
