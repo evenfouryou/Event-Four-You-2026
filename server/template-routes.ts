@@ -458,6 +458,108 @@ router.post('/templates/:templateId/elements/bulk', requireSuperAdmin, async (re
 
 // ==================== TEST PRINT ====================
 
+// Generate HTML for printing a ticket from template
+function generateTicketHtml(
+  template: { paperWidthMm: number; paperHeightMm: number; backgroundImageUrl: string | null },
+  elements: Array<{ type: string; x: number; y: number; width: number; height: number; content: string | null; fontSize: number | null; fontFamily: string | null; fontWeight: string | null; fontColor: string | null; textAlign: string | null; rotation: number | null }>,
+  data: Record<string, string>
+): string {
+  // Convert mm to pixels (assuming 96 DPI, 1mm = 3.78px)
+  const mmToPx = 3.78;
+  const widthPx = Math.round(template.paperWidthMm * mmToPx);
+  const heightPx = Math.round(template.paperHeightMm * mmToPx);
+  
+  // Replace placeholders in content with actual data
+  const replacePlaceholders = (text: string | null): string => {
+    if (!text) return '';
+    return text.replace(/\{\{(\w+)\}\}/g, (_, key) => data[key] || `{{${key}}}`);
+  };
+  
+  // Generate element HTML
+  const elementsHtml = elements.map(el => {
+    const x = Math.round(el.x * mmToPx);
+    const y = Math.round(el.y * mmToPx);
+    const w = Math.round(el.width * mmToPx);
+    const h = Math.round(el.height * mmToPx);
+    const rotation = el.rotation || 0;
+    
+    const baseStyle = `
+      position: absolute;
+      left: ${x}px;
+      top: ${y}px;
+      width: ${w}px;
+      height: ${h}px;
+      ${rotation ? `transform: rotate(${rotation}deg);` : ''}
+    `;
+    
+    if (el.type === 'text') {
+      const content = replacePlaceholders(el.content);
+      return `<div style="${baseStyle}
+        font-size: ${el.fontSize || 12}px;
+        font-family: ${el.fontFamily || 'Arial'}, sans-serif;
+        font-weight: ${el.fontWeight || 'normal'};
+        color: ${el.fontColor || '#000000'};
+        text-align: ${el.textAlign || 'left'};
+        overflow: hidden;
+        white-space: pre-wrap;
+        word-break: break-word;
+      ">${content}</div>`;
+    } else if (el.type === 'image' && el.content) {
+      return `<img src="${el.content}" style="${baseStyle} object-fit: contain;" />`;
+    } else if (el.type === 'qrcode') {
+      const qrContent = replacePlaceholders(el.content);
+      return `<div style="${baseStyle} display: flex; align-items: center; justify-content: center;">
+        <img src="https://api.qrserver.com/v1/create-qr-code/?size=${Math.min(w, h)}x${Math.min(w, h)}&data=${encodeURIComponent(qrContent)}" style="max-width: 100%; max-height: 100%;" />
+      </div>`;
+    } else if (el.type === 'rectangle') {
+      return `<div style="${baseStyle}
+        background-color: ${el.fontColor || 'transparent'};
+        border: 1px solid ${el.fontColor || '#000000'};
+      "></div>`;
+    } else if (el.type === 'line') {
+      return `<div style="${baseStyle}
+        border-top: 1px solid ${el.fontColor || '#000000'};
+        height: 0;
+      "></div>`;
+    }
+    return '';
+  }).join('\n');
+  
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    @page {
+      size: ${template.paperWidthMm}mm ${template.paperHeightMm}mm;
+      margin: 0;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { 
+      width: ${widthPx}px; 
+      height: ${heightPx}px; 
+      position: relative;
+      overflow: hidden;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    .background {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+  </style>
+</head>
+<body>
+  ${template.backgroundImageUrl ? `<img class="background" src="${template.backgroundImageUrl}" />` : ''}
+  ${elementsHtml}
+</body>
+</html>`;
+}
+
 // Sample data for test prints
 const TEST_PRINT_DATA: Record<string, string> = {
   event_name: 'Concerto Rock Festival',
@@ -535,28 +637,41 @@ router.post('/templates/:templateId/test-print', requireSuperAdmin, async (req: 
       .where(eq(ticketTemplateElements.templateId, templateId))
       .orderBy(ticketTemplateElements.zIndex);
     
-    // Build the print job payload using template dimensions directly
-    // Note: 'type' must be at top level for print-agent to recognize the job
-    const printPayload = {
-      id: `test-${Date.now()}`,
-      type: 'test', // Required for print-agent to handle the job
-      paperWidthMm: template.paperWidthMm,
-      paperHeightMm: template.paperHeightMm,
-      template: {
-        id: template.id,
-        name: template.name,
+    // Parse elements for HTML generation
+    const parsedElements = elements.map(el => ({
+      type: el.type,
+      x: parseFloat(el.x as any),
+      y: parseFloat(el.y as any),
+      width: parseFloat(el.width as any),
+      height: parseFloat(el.height as any),
+      content: el.content,
+      fontSize: el.fontSize,
+      fontFamily: el.fontFamily,
+      fontWeight: el.fontWeight,
+      fontColor: el.fontColor,
+      textAlign: el.textAlign,
+      rotation: el.rotation,
+    }));
+    
+    // Generate HTML for the ticket
+    const ticketHtml = generateTicketHtml(
+      {
         paperWidthMm: template.paperWidthMm,
         paperHeightMm: template.paperHeightMm,
         backgroundImageUrl: template.backgroundImageUrl,
-        elements: elements.map(el => ({
-          ...el,
-          x: parseFloat(el.x as any),
-          y: parseFloat(el.y as any),
-          width: parseFloat(el.width as any),
-          height: parseFloat(el.height as any),
-        })),
       },
-      data: TEST_PRINT_DATA,
+      parsedElements,
+      TEST_PRINT_DATA
+    );
+    
+    // Build the print job payload with pre-rendered HTML
+    // Note: 'type' must be 'ticket' for print-agent to use the HTML
+    const printPayload = {
+      id: `test-${Date.now()}`,
+      type: 'ticket', // Use 'ticket' type so print-agent uses the HTML
+      paperWidthMm: template.paperWidthMm,
+      paperHeightMm: template.paperHeightMm,
+      html: ticketHtml, // Pre-rendered HTML for the printer
       isTestPrint: true,
     };
     
