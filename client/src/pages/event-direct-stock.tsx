@@ -24,9 +24,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Plus, Minus, Package, Upload, Download, History } from "lucide-react";
+import { ArrowLeft, Plus, Minus, Package, Upload, Download, History, MapPin } from "lucide-react";
 import { motion } from "framer-motion";
-import type { Event, Product } from "@shared/schema";
+import type { Event, Product, Station } from "@shared/schema";
 
 type DirectStock = {
   productId: string;
@@ -57,6 +57,8 @@ export default function EventDirectStock() {
   const { id } = useParams();
   const { toast } = useToast();
 
+  const [selectedStationId, setSelectedStationId] = useState<string>("_all");
+  
   const [loadProductId, setLoadProductId] = useState<string>("");
   const [loadQuantity, setLoadQuantity] = useState<string>("");
   const [loadReason, setLoadReason] = useState<string>("");
@@ -73,18 +75,41 @@ export default function EventDirectStock() {
     queryKey: ['/api/products'],
   });
 
-  const { data: directStock, isLoading: stockLoading } = useQuery<DirectStock[]>({
-    queryKey: ['/api/events', id, 'direct-stock'],
+  const { data: stations } = useQuery<Station[]>({
+    queryKey: ['/api/events', id, 'stations'],
     enabled: !!id,
+  });
+
+  const activeStationId = selectedStationId === "_all" ? undefined : selectedStationId;
+
+  const { data: directStock, isLoading: stockLoading } = useQuery<DirectStock[]>({
+    queryKey: ['/api/events', id, 'direct-stock', { stationId: activeStationId }],
+    enabled: !!id,
+    queryFn: async () => {
+      const url = activeStationId 
+        ? `/api/events/${id}/direct-stock?stationId=${activeStationId}`
+        : `/api/events/${id}/direct-stock`;
+      const res = await fetch(url, { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to fetch stock');
+      return res.json();
+    },
   });
 
   const { data: summary, isLoading: summaryLoading } = useQuery<DirectStockSummary>({
-    queryKey: ['/api/events', id, 'direct-stock', 'summary'],
+    queryKey: ['/api/events', id, 'direct-stock', 'summary', { stationId: activeStationId }],
     enabled: !!id,
+    queryFn: async () => {
+      const url = activeStationId 
+        ? `/api/events/${id}/direct-stock/summary?stationId=${activeStationId}`
+        : `/api/events/${id}/direct-stock/summary`;
+      const res = await fetch(url, { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to fetch summary');
+      return res.json();
+    },
   });
 
   const loadMutation = useMutation({
-    mutationFn: async (data: { productId: string; quantity: number; reason?: string }) => {
+    mutationFn: async (data: { productId: string; quantity: number; stationId?: string; reason?: string }) => {
       await apiRequest('POST', `/api/events/${id}/direct-stock/load`, data);
     },
     onSuccess: () => {
@@ -108,7 +133,7 @@ export default function EventDirectStock() {
   });
 
   const consumeMutation = useMutation({
-    mutationFn: async (data: { productId: string; quantity: number; reason?: string }) => {
+    mutationFn: async (data: { productId: string; quantity: number; stationId?: string; reason?: string }) => {
       await apiRequest('POST', `/api/events/${id}/direct-stock/consume`, data);
     },
     onSuccess: () => {
@@ -144,6 +169,7 @@ export default function EventDirectStock() {
     loadMutation.mutate({
       productId: loadProductId,
       quantity: qty,
+      stationId: activeStationId,
       reason: loadReason || undefined,
     });
   };
@@ -161,6 +187,7 @@ export default function EventDirectStock() {
     consumeMutation.mutate({
       productId: consumeProductId,
       quantity: qty,
+      stationId: activeStationId,
       reason: consumeReason || undefined,
     });
   };
@@ -224,6 +251,45 @@ export default function EventDirectStock() {
           <p className="text-sm text-muted-foreground">{event.name}</p>
         </div>
       </motion.div>
+
+      {stations && stations.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.05 }}
+          className="mb-6"
+        >
+          <Card className="glass-card">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <MapPin className="h-5 w-5 text-primary" />
+                <div className="flex-1">
+                  <Label htmlFor="station-filter" className="text-sm text-muted-foreground">
+                    Filtra per Stazione
+                  </Label>
+                  <Select
+                    value={selectedStationId}
+                    onValueChange={setSelectedStationId}
+                    data-testid="select-station"
+                  >
+                    <SelectTrigger id="station-filter" data-testid="trigger-station-filter">
+                      <SelectValue placeholder="Tutte le stazioni" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="_all">Tutte le stazioni</SelectItem>
+                      {stations.map((station) => (
+                        <SelectItem key={station.id} value={station.id}>
+                          {station.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+      )}
 
       <div className="grid gap-6 md:grid-cols-2 mb-8">
         <motion.div

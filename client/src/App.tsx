@@ -26,6 +26,7 @@ import Events from "@/pages/events";
 import EventDetail from "@/pages/event-detail";
 import EventHub from "@/pages/event-hub";
 import EventDirectStock from "@/pages/event-direct-stock";
+import BartenderDirectStock from "@/pages/bartender-direct-stock";
 import StationDetail from "@/pages/station-detail";
 import EventFormats from "@/pages/event-formats";
 import EventWizard from "@/pages/event-wizard";
@@ -159,6 +160,7 @@ function Router() {
               <Route path="/events/:id/hub" component={EventHub} />
               <Route path="/events/:eventId/stations/:stationId" component={StationDetail} />
               <Route path="/events/:id/direct-stock" component={EventDirectStock} />
+              <Route path="/bartender/events/:id/direct-stock" component={BartenderDirectStock} />
               <Route path="/events/:id" component={EventDetail} />
               <Route path="/events" component={Events} />
               <Route path="/event-formats" component={EventFormats} />
