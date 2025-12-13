@@ -1338,13 +1338,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Get all consumptions for this event with company scoping for security
+      // Include both CONSUME and DIRECT_CONSUME for complete revenue analysis
       const movements = await db
         .select()
         .from(stockMovements)
         .where(and(
           eq(stockMovements.companyId, companyId),
           eq(stockMovements.toEventId, id),
-          eq(stockMovements.type, 'CONSUME')
+          inArray(stockMovements.type, ['CONSUME', 'DIRECT_CONSUME'])
         ));
 
       let theoreticalRevenue = 0;
@@ -2053,17 +2054,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Evento non trovato" });
       }
       
+      // Get stationId query param for filtering
+      const stationId = req.query.stationId as string | undefined;
+      
+      // Build where conditions
+      const whereConditions = [
+        eq(stockMovements.companyId, companyId),
+        or(
+          eq(stockMovements.toEventId, eventId),
+          eq(stockMovements.fromEventId, eventId)
+        ),
+        inArray(stockMovements.type, ['DIRECT_LOAD', 'DIRECT_CONSUME'])
+      ];
+      
+      // Add station filter if provided
+      if (stationId) {
+        whereConditions.push(eq(stockMovements.toStationId, stationId));
+      }
+      
       // Get all DIRECT_LOAD and DIRECT_CONSUME movements for this event
       const movements = await db.select()
         .from(stockMovements)
-        .where(and(
-          eq(stockMovements.companyId, companyId),
-          or(
-            eq(stockMovements.toEventId, eventId),
-            eq(stockMovements.fromEventId, eventId)
-          ),
-          inArray(stockMovements.type, ['DIRECT_LOAD', 'DIRECT_CONSUME'])
-        ));
+        .where(and(...whereConditions));
       
       // Get products for enrichment
       const products = await storage.getProductsByCompany(companyId);
@@ -2120,6 +2132,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const loadSchema = z.object({
         productId: z.string().uuid(),
         quantity: z.number().positive("La quantità deve essere maggiore di 0"),
+        stationId: z.string().uuid().optional(),
         reason: z.string().optional(),
       });
       
@@ -2136,6 +2149,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         companyId,
         productId: validated.productId,
         toEventId: eventId,
+        toStationId: validated.stationId || null,
         quantity: validated.quantity.toString(),
         type: 'DIRECT_LOAD',
         reason: validated.reason || 'Carico diretto evento',
@@ -2167,6 +2181,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const consumeSchema = z.object({
         productId: z.string().uuid(),
         quantity: z.number().positive("La quantità deve essere maggiore di 0"),
+        stationId: z.string().uuid().optional(),
         reason: z.string().optional(),
       });
       
@@ -2178,18 +2193,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Evento non trovato" });
       }
       
-      // Calcola disponibilità per il prodotto specifico
+      // Build where conditions for availability check
+      const availabilityConditions = [
+        eq(stockMovements.companyId, companyId),
+        eq(stockMovements.productId, validated.productId),
+        or(
+          eq(stockMovements.toEventId, eventId),
+          eq(stockMovements.fromEventId, eventId)
+        ),
+        inArray(stockMovements.type, ['DIRECT_LOAD', 'DIRECT_CONSUME'])
+      ];
+      
+      // Filter by station if provided
+      if (validated.stationId) {
+        availabilityConditions.push(eq(stockMovements.toStationId, validated.stationId));
+      }
+      
+      // Calcola disponibilità per il prodotto specifico (e stazione se fornita)
       const movements = await db.select()
         .from(stockMovements)
-        .where(and(
-          eq(stockMovements.companyId, companyId),
-          eq(stockMovements.productId, validated.productId),
-          or(
-            eq(stockMovements.toEventId, eventId),
-            eq(stockMovements.fromEventId, eventId)
-          ),
-          inArray(stockMovements.type, ['DIRECT_LOAD', 'DIRECT_CONSUME'])
-        ));
+        .where(and(...availabilityConditions));
       
       let loaded = 0;
       let consumed = 0;
@@ -2214,6 +2237,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         companyId,
         productId: validated.productId,
         toEventId: eventId,
+        toStationId: validated.stationId || null,
         quantity: validated.quantity.toString(),
         type: 'DIRECT_CONSUME',
         reason: validated.reason || 'Consumo diretto evento',
@@ -2246,17 +2270,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Evento non trovato" });
       }
       
+      // Get stationId query param for filtering
+      const stationId = req.query.stationId as string | undefined;
+      
+      // Build where conditions
+      const summaryConditions = [
+        eq(stockMovements.companyId, companyId),
+        or(
+          eq(stockMovements.toEventId, eventId),
+          eq(stockMovements.fromEventId, eventId)
+        ),
+        inArray(stockMovements.type, ['DIRECT_LOAD', 'DIRECT_CONSUME'])
+      ];
+      
+      // Add station filter if provided
+      if (stationId) {
+        summaryConditions.push(eq(stockMovements.toStationId, stationId));
+      }
+      
       // Get all movements with limit
       const movements = await db.select()
         .from(stockMovements)
-        .where(and(
-          eq(stockMovements.companyId, companyId),
-          or(
-            eq(stockMovements.toEventId, eventId),
-            eq(stockMovements.fromEventId, eventId)
-          ),
-          inArray(stockMovements.type, ['DIRECT_LOAD', 'DIRECT_CONSUME'])
-        ))
+        .where(and(...summaryConditions))
         .orderBy(desc(stockMovements.createdAt))
         .limit(50);
       
@@ -3776,8 +3811,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const movements = await storage.getMovementsByEvent(eventId);
       const products = await storage.getProductsByCompany(companyId);
 
-      // Get CONSUME and RETURN movements separately
-      const consumeMovements = movements.filter(m => m.type === 'CONSUME');
+      // Get CONSUME, DIRECT_CONSUME and RETURN movements separately
+      const consumeMovements = movements.filter(m => m.type === 'CONSUME' || m.type === 'DIRECT_CONSUME');
       const returnMovements = movements.filter(m => m.type === 'RETURN');
 
       // Calculate NET consumption by aggregating CONSUME and RETURN separately, then subtracting
