@@ -461,13 +461,15 @@ router.post('/templates/:templateId/elements/bulk', requireSuperAdmin, async (re
 // Generate HTML for printing a ticket from template
 // skipBackground: true when printing on pre-printed paper (carta pre-stampata)
 function generateTicketHtml(
-  template: { paperWidthMm: number; paperHeightMm: number; backgroundImageUrl: string | null },
+  template: { paperWidthMm: number; paperHeightMm: number; backgroundImageUrl: string | null; dpi?: number },
   elements: Array<{ type: string; x: number; y: number; width: number; height: number; content: string | null; fontSize: number | null; fontFamily: string | null; fontWeight: string | null; fontColor: string | null; textAlign: string | null; rotation: number | null }>,
   data: Record<string, string>,
   skipBackground: boolean = false
 ): string {
-  // Convert mm to pixels (assuming 96 DPI, 1mm = 3.78px)
-  const mmToPx = 3.78;
+  // Convert mm to pixels using template DPI (default 203 for thermal printers)
+  // 203 DPI = 8 pixels per mm, 96 DPI = 3.78 pixels per mm
+  const dpi = template.dpi || 203;
+  const mmToPx = dpi / 25.4; // inches to mm conversion
   const widthPx = Math.round(template.paperWidthMm * mmToPx);
   const heightPx = Math.round(template.paperHeightMm * mmToPx);
   
@@ -677,6 +679,7 @@ router.post('/templates/:templateId/test-print', requireSuperAdmin, async (req: 
         paperWidthMm: template.paperWidthMm,
         paperHeightMm: template.paperHeightMm,
         backgroundImageUrl: template.backgroundImageUrl,
+        dpi: template.dpi || 203, // Use template DPI, default 203 for thermal
       },
       parsedElements,
       TEST_PRINT_DATA,
