@@ -36,6 +36,7 @@ import {
   ArrowRight,
   ChevronRight,
   RotateCcw,
+  GlassWater,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import type { Event, Product, Station } from "@shared/schema";
@@ -211,6 +212,30 @@ export default function Beverage() {
               <p className="text-muted-foreground text-sm">Seleziona la tua postazione</p>
             </div>
           </motion.div>
+
+          {/* Direct Stock Action Card */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-6"
+          >
+            <Link href={`/bartender/events/${selectedEventId}/direct-stock`}>
+              <div className="glass-card p-5 cursor-pointer hover:border-amber-500/30 transition-all group" data-testid="button-direct-stock">
+                <div className="flex items-center gap-4">
+                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <GlassWater className="h-7 w-7 text-white" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-lg font-semibold">Consumi Diretti</h3>
+                    <p className="text-sm text-muted-foreground">Registra consumi senza magazzino</p>
+                  </div>
+                  <ArrowRight className="h-5 w-5 text-muted-foreground group-hover:text-amber-500 group-hover:translate-x-1 transition-all" />
+                </div>
+              </div>
+            </Link>
+          </motion.div>
+
+          <h2 className="text-lg font-semibold mb-4">Le tue postazioni</h2>
 
           {stationsLoading ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
