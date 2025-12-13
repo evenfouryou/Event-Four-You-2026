@@ -644,11 +644,11 @@ router.post('/templates/:templateId/test-print', requireSuperAdmin, async (req: 
       y: parseFloat(el.y as any),
       width: parseFloat(el.width as any),
       height: parseFloat(el.height as any),
-      content: el.content,
+      content: el.staticValue,
       fontSize: el.fontSize,
       fontFamily: el.fontFamily,
       fontWeight: el.fontWeight,
-      fontColor: el.fontColor,
+      fontColor: el.color,
       textAlign: el.textAlign,
       rotation: el.rotation,
     }));

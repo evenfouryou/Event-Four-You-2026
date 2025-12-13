@@ -257,3 +257,57 @@ export async function updateSmartCardReaderRepo(): Promise<{ success: boolean; r
 
 // Keep old function name for backward compatibility
 export const createSmartCardReaderRepo = updateSmartCardReaderRepo;
+
+// Update Print Agent Repository
+export async function updatePrintAgentRepo(mainJsContent: string): Promise<{ success: boolean; repoUrl?: string; error?: string }> {
+  try {
+    const octokit = await getUncachableGitHubClient();
+    const { data: user } = await octokit.users.getAuthenticated();
+    console.log(`GitHub user: ${user.login}`);
+    
+    const repoName = 'event4u-print-agent';
+    
+    // Check if repo exists
+    try {
+      await octokit.repos.get({ owner: user.login, repo: repoName });
+    } catch (e: any) {
+      if (e.status === 404) {
+        return { success: false, error: 'Repository non trovato' };
+      }
+      throw e;
+    }
+    
+    // Get current file SHA
+    let sha: string | undefined;
+    try {
+      const { data: existingFile } = await octokit.repos.getContent({
+        owner: user.login,
+        repo: repoName,
+        path: 'main.js'
+      });
+      if ('sha' in existingFile) {
+        sha = existingFile.sha;
+      }
+    } catch (e: any) {
+      // File doesn't exist
+    }
+    
+    // Update main.js
+    await octokit.repos.createOrUpdateFileContents({
+      owner: user.login,
+      repo: repoName,
+      path: 'main.js',
+      message: 'Fix print scaling and margins (v1.3.0)',
+      content: Buffer.from(mainJsContent).toString('base64'),
+      ...(sha ? { sha } : {})
+    });
+    
+    const repoUrl = `https://github.com/${user.login}/${repoName}`;
+    console.log(`Print Agent updated: ${repoUrl}`);
+    
+    return { success: true, repoUrl };
+  } catch (error: any) {
+    console.error('GitHub error:', error.message);
+    return { success: false, error: error.message };
+  }
+}
