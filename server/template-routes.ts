@@ -466,10 +466,11 @@ function generateTicketHtml(
   data: Record<string, string>,
   skipBackground: boolean = false
 ): string {
-  // Convert mm to pixels using template DPI (default 203 for thermal printers)
-  // 203 DPI = 8 pixels per mm, 96 DPI = 3.78 pixels per mm
-  const dpi = template.dpi || 203;
-  const mmToPx = dpi / 25.4; // inches to mm conversion
+  // IMPORTANT: Always use 96 DPI for HTML rendering (browser standard)
+  // The printer will receive the page in mm and handle scaling itself
+  // Using higher DPI here would cause misaligned elements
+  const browserDpi = 96;
+  const mmToPx = browserDpi / 25.4; // 96 DPI = ~3.78 pixels per mm
   const widthPx = Math.round(template.paperWidthMm * mmToPx);
   const heightPx = Math.round(template.paperHeightMm * mmToPx);
   
