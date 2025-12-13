@@ -640,20 +640,35 @@ router.post('/templates/:templateId/test-print', requireSuperAdmin, async (req: 
       .orderBy(ticketTemplateElements.zIndex);
     
     // Parse elements for HTML generation
-    const parsedElements = elements.map(el => ({
-      type: el.type,
-      x: parseFloat(el.x as any),
-      y: parseFloat(el.y as any),
-      width: parseFloat(el.width as any),
-      height: parseFloat(el.height as any),
-      content: el.staticValue,
-      fontSize: el.fontSize,
-      fontFamily: el.fontFamily,
-      fontWeight: el.fontWeight,
-      fontColor: el.color,
-      textAlign: el.textAlign,
-      rotation: el.rotation,
-    }));
+    const parsedElements = elements.map(el => {
+      // For dynamic fields, use {{fieldKey}} as content so it gets replaced
+      // For static fields, use staticValue directly
+      let content = el.staticValue;
+      if (el.fieldKey && !el.staticValue) {
+        content = `{{${el.fieldKey}}}`;
+      } else if (el.fieldKey && el.staticValue) {
+        // If both are set, staticValue might contain the template with placeholders
+        content = el.staticValue;
+      }
+      
+      return {
+        type: el.type,
+        x: parseFloat(el.x as any),
+        y: parseFloat(el.y as any),
+        width: parseFloat(el.width as any),
+        height: parseFloat(el.height as any),
+        content,
+        fontSize: el.fontSize,
+        fontFamily: el.fontFamily,
+        fontWeight: el.fontWeight,
+        fontColor: el.color,
+        textAlign: el.textAlign,
+        rotation: el.rotation,
+      };
+    });
+    
+    console.log('[TestPrint] Template:', template.name, 'Elements count:', parsedElements.length);
+    console.log('[TestPrint] Parsed elements:', JSON.stringify(parsedElements, null, 2));
     
     // Generate HTML for the ticket
     // skipBackground: true = don't print background (for pre-printed paper)
@@ -667,6 +682,9 @@ router.post('/templates/:templateId/test-print', requireSuperAdmin, async (req: 
       TEST_PRINT_DATA,
       skipBackground // Default true for pre-printed paper
     );
+    
+    console.log('[TestPrint] Generated HTML length:', ticketHtml.length);
+    console.log('[TestPrint] HTML preview:', ticketHtml.substring(0, 500));
     
     // Build the print job payload with pre-rendered HTML
     // Note: 'type' must be 'ticket' for print-agent to use the HTML
