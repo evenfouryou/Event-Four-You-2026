@@ -487,7 +487,7 @@ function isLightColor(hex: string | null): boolean {
 }
 
 function generateTicketHtml(
-  template: { paperWidthMm: number; paperHeightMm: number; backgroundImageUrl: string | null; dpi?: number },
+  template: { paperWidthMm: number; paperHeightMm: number; backgroundImageUrl: string | null; dpi?: number; printOrientation?: string },
   elements: Array<{ type: string; x: number; y: number; width: number; height: number; content: string | null; fontSize: number | null; fontFamily: string | null; fontWeight: string | null; fontColor: string | null; textAlign: string | null; rotation: number | null }>,
   data: Record<string, string>,
   skipBackground: boolean = false
@@ -576,7 +576,7 @@ function generateTicketHtml(
   }).join('\n');
   
   // Determine print orientation: use template setting or calculate from dimensions
-  const templateOrientation = (template as any).printOrientation;
+  const templateOrientation = template.printOrientation;
   const naturalOrientation = template.paperWidthMm > template.paperHeightMm ? 'landscape' : 'portrait';
   const printOrientation = templateOrientation === 'auto' || !templateOrientation
     ? naturalOrientation
@@ -749,6 +749,7 @@ router.post('/templates/:templateId/test-print', requireSuperAdmin, async (req: 
         paperHeightMm: template.paperHeightMm,
         backgroundImageUrl: template.backgroundImageUrl,
         dpi: template.dpi || 203, // Use template DPI, default 203 for thermal
+        printOrientation: (template as any).printOrientation || 'auto',
       },
       parsedElements,
       TEST_PRINT_DATA,
@@ -757,6 +758,13 @@ router.post('/templates/:templateId/test-print', requireSuperAdmin, async (req: 
     
     console.log('[TestPrint] Generated HTML length:', ticketHtml.length);
     console.log('[TestPrint] HTML preview:', ticketHtml.substring(0, 500));
+    console.log('[TestPrint] Print orientation:', (template as any).printOrientation || 'auto');
+    
+    // Determine effective orientation for the print agent
+    const naturalOrientation = template.paperWidthMm > template.paperHeightMm ? 'landscape' : 'portrait';
+    const effectiveOrientation = (template as any).printOrientation === 'auto' || !(template as any).printOrientation
+      ? naturalOrientation
+      : (template as any).printOrientation;
     
     // Build the print job payload with pre-rendered HTML
     // Note: 'type' must be 'ticket' for print-agent to use the HTML
@@ -765,6 +773,7 @@ router.post('/templates/:templateId/test-print', requireSuperAdmin, async (req: 
       type: 'ticket', // Use 'ticket' type so print-agent uses the HTML
       paperWidthMm: template.paperWidthMm,
       paperHeightMm: template.paperHeightMm,
+      orientation: effectiveOrientation, // Pass orientation to print agent
       html: ticketHtml, // Pre-rendered HTML for the printer
       isTestPrint: true,
     };
