@@ -1,0 +1,70 @@
+Time
+Log
+12-14 23:57:17
+[PrintRelay] Agent disconnected: 26fdf6cf-d43a-4eff-9b25-6bbaa8ea1991
+12-15 00:03:55
+[Bridge] Global bridge not connected
+12-15 00:04:20
+[Bridge] Client disconnected: userId=9d593553-939f-47cc-9b08-7cf92e5b6f68
+12-15 00:04:20
+[Bridge] Connection closed: type=client
+12-15 00:04:26
+[Bridge] New WebSocket connection
+12-15 00:04:26
+[Bridge] URL-decoded session ID: s:Z-4MzQecNxAuF9KBE8P_lClP79Jd...
+12-15 00:04:26
+[Bridge] Raw cookie header: _ga=GA1.1.962813290.1739208627; _fbp=fb.1.1739799389741.16040837828192548; _ga_EQDN3BWDSD=GS1.1.1741...
+12-15 00:04:26
+[Bridge] Raw session ID from cookie: s:Z-4MzQecNxAuF9KBE8P_lClP79Jd...
+12-15 00:04:26
+[Bridge] Clean session ID for DB lookup: Z-4MzQecNxAuF9KBE8P_lClP79JdJaSU
+12-15 00:04:26
+[Bridge] Cookie received: yes (connect.sid present)
+12-15 00:04:26
+[Bridge] Client connected: userId=9d593553-939f-47cc-9b08-7cf92e5b6f68, companyId=null, effectiveCompanyId=super_admin, role=super_admin
+12-15 00:04:26
+[Bridge] Sending connection_status to client: bridgeConnected=false
+12-15 00:04:26
+[Bridge] Session passport.user: present
+12-15 00:04:26
+[Bridge] Session data: role=super_admin, companyId=null, hasClaimsSub=true
+12-15 00:04:26
+[Bridge] DB lookup returned 1 rows
+12-15 00:04:26
+[Bridge] Session lookup result: found
+12-15 00:04:26
+[Bridge] Global bridge not connected
+12-15 00:04:26
+[Bridge] Message received: type=get_status
+12-15 00:04:53
+[Bridge] Message received: type=pong
+12-15 00:04:53
+[Bridge] Pong received from userId=9d593553-939f-47cc-9b08-7cf92e5b6f68, lastPing updated
+12-15 00:04:57
+[Bridge] Global bridge not connected
+12-15 00:04:57
+[Bridge] Message received: type=ping
+12-15 00:05:23
+[Bridge] Message received: type=pong
+12-15 00:05:23
+[Bridge] Pong received from userId=9d593553-939f-47cc-9b08-7cf92e5b6f68, lastPing updated
+12-15 00:05:27
+[Bridge] Global bridge not connected
+12-15 00:05:27
+[Bridge] Message received: type=ping
+12-15 00:05:53
+[Bridge] Message received: type=pong
+12-15 00:05:53
+[Bridge] Pong received from userId=9d593553-939f-47cc-9b08-7cf92e5b6f68, lastPing updated
+12-15 00:05:57
+[Bridge] Message received: type=ping
+12-15 00:05:57
+[Bridge] Global bridge not connected
+12-15 00:06:23
+[Bridge] Message received: type=pong
+12-15 00:06:23
+[Bridge] Pong received from userId=9d593553-939f-47cc-9b08-7cf92e5b6f68, lastPing updated
+12-15 00:06:23
+[Bridge] Pong received from userId=9d593553-939f-47cc-9b08-7cf92e5b6f68, lastPing updated
+12-15 00:06:23
+[Bridge] Message received: type=pong
