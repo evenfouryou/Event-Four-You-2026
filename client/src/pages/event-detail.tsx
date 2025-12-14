@@ -135,7 +135,7 @@ export default function EventDetail() {
   const [newQuantity, setNewQuantity] = useState('');
   const [adjustReason, setAdjustReason] = useState('');
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
 
   // Redirect bartenders to their dedicated page
   const isBartender = user?.role === 'bartender';
@@ -144,6 +144,21 @@ export default function EventDetail() {
       setLocation(`/bartender/events/${id}/direct-stock`);
     }
   }, [isBartender, id, setLocation]);
+
+  // Show loading while checking user role to prevent bartenders from seeing manager page
+  if (authLoading) {
+    return (
+      <div className="p-4 md:p-8 max-w-7xl mx-auto pb-24 md:pb-8">
+        <Skeleton className="h-12 w-64 mb-8 rounded-xl" />
+        <div className="grid gap-4 md:grid-cols-4">
+          <Skeleton className="h-24 rounded-2xl" />
+          <Skeleton className="h-24 rounded-2xl" />
+          <Skeleton className="h-24 rounded-2xl" />
+          <Skeleton className="h-24 rounded-2xl" />
+        </div>
+      </div>
+    );
+  }
 
   if (isBartender) {
     return null;
