@@ -146,6 +146,7 @@ router.patch('/templates/:id', requireSuperAdmin, async (req: Request, res: Resp
       dpi: z.number().optional(),
       isDefault: z.boolean().optional(),
       isActive: z.boolean().optional(),
+      printOrientation: z.enum(['auto', 'portrait', 'landscape']).optional(),
     });
     const validated = updateSchema.parse(req.body);
     
@@ -161,6 +162,7 @@ router.patch('/templates/:id', requireSuperAdmin, async (req: Request, res: Resp
     if (validated.dpi !== undefined) updateData.dpi = validated.dpi;
     if (validated.isDefault !== undefined) updateData.isDefault = validated.isDefault;
     if (validated.isActive !== undefined) updateData.isActive = validated.isActive;
+    if (validated.printOrientation !== undefined) updateData.printOrientation = validated.printOrientation;
     
     const [template] = await db.update(ticketTemplates)
       .set(updateData)
