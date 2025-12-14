@@ -576,9 +576,26 @@ function generateTicketHtml(
   }).join('\n');
   
   // Determine print orientation: use template setting or calculate from dimensions
-  const printOrientation = (template as any).printOrientation === 'auto' || !(template as any).printOrientation
-    ? (template.paperWidthMm > template.paperHeightMm ? 'landscape' : 'portrait')
-    : (template as any).printOrientation;
+  const templateOrientation = (template as any).printOrientation;
+  const naturalOrientation = template.paperWidthMm > template.paperHeightMm ? 'landscape' : 'portrait';
+  const printOrientation = templateOrientation === 'auto' || !templateOrientation
+    ? naturalOrientation
+    : templateOrientation;
+  
+  // Calculate actual print dimensions - swap if orientation differs from natural
+  let printWidthMm = template.paperWidthMm;
+  let printHeightMm = template.paperHeightMm;
+  let printWidthPx = widthPx;
+  let printHeightPx = heightPx;
+  
+  // If forced orientation is different from natural, swap dimensions for print
+  const needsSwap = templateOrientation && templateOrientation !== 'auto' && templateOrientation !== naturalOrientation;
+  if (needsSwap) {
+    printWidthMm = template.paperHeightMm;
+    printHeightMm = template.paperWidthMm;
+    printWidthPx = heightPx;
+    printHeightPx = widthPx;
+  }
   
   return `<!DOCTYPE html>
 <html>
@@ -586,17 +603,18 @@ function generateTicketHtml(
   <meta charset="utf-8">
   <style>
     @page {
-      size: ${template.paperWidthMm}mm ${template.paperHeightMm}mm ${printOrientation};
+      size: ${printWidthMm}mm ${printHeightMm}mm;
       margin: 0;
     }
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { 
-      width: ${widthPx}px; 
-      height: ${heightPx}px; 
+      width: ${printWidthPx}px; 
+      height: ${printHeightPx}px; 
       position: relative;
       overflow: hidden;
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
+      ${needsSwap ? `transform-origin: top left; transform: rotate(-90deg) translateX(-${printHeightPx}px);` : ''}
     }
     .background {
       position: absolute;
