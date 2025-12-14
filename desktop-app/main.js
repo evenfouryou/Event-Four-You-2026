@@ -68,7 +68,8 @@ let lastStatusJson = '';
 // PIN verification state (SIAE compliance)
 let pinVerified = false;
 let cardWasInserted = false;
-let pinLocked = false;  // True when waiting for PIN after card removal
+let pinLocked = true;  // Start locked - PIN required on first card insertion
+let firstCardHandled = false;  // Track if first card insertion has been handled
 // Note: PIN is now verified on the SIAE card itself, not hardcoded
 
 // Debounce for card removal detection - prevents false positives from intermittent contact
@@ -725,15 +726,19 @@ function startStatusPolling() {
         }
       }
       
-      // When card is RE-INSERTED and PIN was locked, show PIN dialog ONCE
+      // When card is INSERTED (first time or re-inserted) and PIN is locked, show PIN dialog
       // Only trigger when card transitions from not-inserted to inserted while locked
       if (!cardWasInserted && cardCurrentlyInserted && pinLocked && !pinVerified) {
-        log.info('SIAE: Carta reinserita - richiesta verifica PIN');
-        // Notify renderer to show PIN dialog (only once per reinsert)
+        const reason = firstCardHandled 
+          ? 'Carta SIAE reinserita - inserire PIN per continuare'
+          : 'Carta SIAE inserita - inserire PIN per abilitare le operazioni';
+        
+        log.info(`SIAE: ${reason}`);
+        firstCardHandled = true;
+        
+        // Notify renderer to show PIN dialog
         if (mainWindow && mainWindow.webContents) {
-          mainWindow.webContents.send('pin:required', {
-            reason: 'Carta SIAE reinserita - inserire PIN per continuare'
-          });
+          mainWindow.webContents.send('pin:required', { reason });
         }
       }
       
