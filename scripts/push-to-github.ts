@@ -126,7 +126,7 @@ async function main() {
     
     // Create commit
     console.log('📝 Creating commit...');
-    const commitMessage = 'Fix stampa: DPI corretto e timeout aumentato v1.4.5\n\n- Timeout caricamento immagini da 800ms a 2000ms per QR code\n- Versione 1.4.5';
+    const commitMessage = 'Aggiunto supporto orientamento stampa v1.5.0\n\n- Nuovo parametro orientation (portrait/landscape) dal server\n- Stampante ora rispetta il verso impostato nel template\n- Versione 1.5.0';
     
     const { data: commit } = await octokit.git.createCommit({
       owner,
