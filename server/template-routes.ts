@@ -497,8 +497,29 @@ function generateTicketHtml(
   // Using higher DPI here would cause misaligned elements
   const browserDpi = 96;
   const mmToPx = browserDpi / 25.4; // 96 DPI = ~3.78 pixels per mm
-  const widthPx = Math.round(template.paperWidthMm * mmToPx);
-  const heightPx = Math.round(template.paperHeightMm * mmToPx);
+  
+  // Determine print orientation
+  const templateOrientation = template.printOrientation;
+  const naturalOrientation = template.paperWidthMm > template.paperHeightMm ? 'landscape' : 'portrait';
+  const printOrientation = templateOrientation === 'auto' || !templateOrientation
+    ? naturalOrientation
+    : templateOrientation;
+  const isLandscape = printOrientation === 'landscape';
+  
+  // For landscape on thermal printers, we need to swap dimensions
+  // The print agent will also swap dimensions, so HTML must match
+  let pageWidthMm: number, pageHeightMm: number;
+  if (isLandscape && template.paperWidthMm < template.paperHeightMm) {
+    // Swap dimensions for landscape when paper is naturally portrait
+    pageWidthMm = template.paperHeightMm;
+    pageHeightMm = template.paperWidthMm;
+  } else {
+    pageWidthMm = template.paperWidthMm;
+    pageHeightMm = template.paperHeightMm;
+  }
+  
+  const widthPx = Math.round(pageWidthMm * mmToPx);
+  const heightPx = Math.round(pageHeightMm * mmToPx);
   
   // Replace placeholders in content with actual data
   const replacePlaceholders = (text: string | null): string => {
@@ -575,12 +596,7 @@ function generateTicketHtml(
     return '';
   }).join('\n');
   
-  // Determine print orientation: use template setting or calculate from dimensions
-  const templateOrientation = template.printOrientation;
-  const naturalOrientation = template.paperWidthMm > template.paperHeightMm ? 'landscape' : 'portrait';
-  const printOrientation = templateOrientation === 'auto' || !templateOrientation
-    ? naturalOrientation
-    : templateOrientation;
+  // Note: printOrientation is already calculated at the top of the function
   
   return `<!DOCTYPE html>
 <html>
@@ -588,7 +604,7 @@ function generateTicketHtml(
   <meta charset="utf-8">
   <style>
     @page {
-      size: ${template.paperWidthMm}mm ${template.paperHeightMm}mm;
+      size: ${pageWidthMm}mm ${pageHeightMm}mm;
       margin: 0;
     }
     * { margin: 0; padding: 0; box-sizing: border-box; }
