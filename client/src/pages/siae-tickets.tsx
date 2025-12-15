@@ -179,9 +179,22 @@ export default function SiaeTicketsPage() {
 
   const selectedSector = formSectors?.find(s => s.id === selectedSectorId);
   
+  // Auto-select sector if there's only one
+  const hasSingleSector = formSectors?.length === 1;
+  
   // Get selected event details to check if nominative is required
   const selectedEventDetails = ticketedEvents?.find(e => e.id === selectedEventForForm);
   const isNominativeRequired = selectedEventDetails?.requiresNominative || false;
+  
+  // Auto-select single sector when available
+  useEffect(() => {
+    if (hasSingleSector && formSectors && formSectors[0]) {
+      const currentSectorId = form.getValues("sectorId");
+      if (currentSectorId !== formSectors[0].id) {
+        form.setValue("sectorId", formSectors[0].id);
+      }
+    }
+  }, [hasSingleSector, formSectors, form]);
   
   // Calculate prices
   const getTicketPrice = () => {
@@ -684,34 +697,42 @@ export default function SiaeTicketsPage() {
                 )}
               />
 
-              <FormField
-                control={form.control}
-                name="sectorId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Settore</FormLabel>
-                    <Select 
-                      onValueChange={field.onChange} 
-                      value={field.value}
-                      disabled={!formSectors?.length}
-                    >
-                      <FormControl>
-                        <SelectTrigger data-testid="select-sector">
-                          <SelectValue placeholder="Seleziona settore" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {formSectors?.map((sector) => (
-                          <SelectItem key={sector.id} value={sector.id}>
-                            {sector.name} - {sector.availableSeats} disponibili
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              {/* Show sector selector only if there are multiple sectors */}
+              {formSectors && formSectors.length > 1 ? (
+                <FormField
+                  control={form.control}
+                  name="sectorId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Settore</FormLabel>
+                      <Select 
+                        onValueChange={field.onChange} 
+                        value={field.value}
+                      >
+                        <FormControl>
+                          <SelectTrigger data-testid="select-sector">
+                            <SelectValue placeholder="Seleziona settore" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {formSectors.map((sector) => (
+                            <SelectItem key={sector.id} value={sector.id}>
+                              {sector.name} - {sector.availableSeats} disponibili
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              ) : hasSingleSector && selectedSector ? (
+                <div className="rounded-lg border border-white/10 bg-white/5 p-3">
+                  <p className="text-xs text-muted-foreground mb-1">Settore</p>
+                  <p className="text-sm font-medium">{selectedSector.name}</p>
+                  <p className="text-xs text-muted-foreground">{selectedSector.availableSeats} posti disponibili</p>
+                </div>
+              ) : null}
 
               <FormField
                 control={form.control}
