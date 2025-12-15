@@ -609,6 +609,21 @@ router.post("/api/siae/otp/verify", async (req: Request, res: Response) => {
 
 // ==================== Ticketed Events (Organizer) ====================
 
+// Get ticketing info by event ID (used by event-hub)
+router.get("/api/siae/events/:eventId/ticketing", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const ticketedEvent = await siaeStorage.getSiaeTicketedEventByEventId(req.params.eventId);
+    if (!ticketedEvent) {
+      return res.json(null); // No ticketing configured for this event
+    }
+    // Also get sectors for complete ticketing info
+    const sectors = await siaeStorage.getSiaeEventSectors(ticketedEvent.id);
+    res.json({ ...ticketedEvent, sectors });
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
 router.get("/api/siae/companies/:companyId/ticketed-events", requireAuth, requireOrganizer, async (req: Request, res: Response) => {
   try {
     const events = await siaeStorage.getSiaeTicketedEventsByCompany(req.params.companyId);
