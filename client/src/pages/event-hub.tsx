@@ -120,10 +120,13 @@ import type {
   TableBooking,
   SiaeTicketedEvent,
   SiaeEventSector,
+  SiaeTransaction,
   User,
   Product,
   Location as LocationType,
 } from "@shared/schema";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 const statusConfig: Record<string, { label: string; color: string; bgColor: string; icon: React.ElementType; gradient: string }> = {
   draft: { label: 'Bozza', color: 'text-slate-400', bgColor: 'bg-slate-500/20', icon: Circle, gradient: 'from-slate-500 to-slate-600' },
@@ -605,13 +608,69 @@ export default function EventHub() {
     enabled: !!id,
   });
 
-  const { data: ticketedEvent } = useQuery<SiaeTicketedEvent>({
+  const { data: ticketedEvent } = useQuery<SiaeTicketedEvent & { sectors?: SiaeEventSector[] }>({
     queryKey: ['/api/siae/events', id, 'ticketing'],
     enabled: !!id,
   });
 
+  const { data: siaeTransactions = [] } = useQuery<SiaeTransaction[]>({
+    queryKey: ['/api/siae/ticketed-events', ticketedEvent?.id, 'transactions'],
+    enabled: !!ticketedEvent?.id,
+  });
+
   const { data: users = [] } = useQuery<User[]>({
     queryKey: ['/api/users'],
+  });
+
+  // SIAE sector mutations
+  const [editingSector, setEditingSector] = useState<SiaeEventSector | null>(null);
+  const [editingCapacity, setEditingCapacity] = useState<string>('');
+
+  const toggleSectorMutation = useMutation({
+    mutationFn: async ({ sectorId, active }: { sectorId: string; active: boolean }) => {
+      await apiRequest('PATCH', `/api/siae/event-sectors/${sectorId}`, { active });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/siae/events', id, 'ticketing'] });
+      toast({
+        title: "Biglietto aggiornato",
+        description: "Lo stato del biglietto è stato modificato.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Errore",
+        description: error?.message || "Impossibile aggiornare il biglietto.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const updateSectorCapacityMutation = useMutation({
+    mutationFn: async ({ sectorId, capacity, currentSoldCount }: { sectorId: string; capacity: number; currentSoldCount: number }) => {
+      if (capacity < currentSoldCount) {
+        throw new Error(`La quantità non può essere inferiore ai biglietti già venduti (${currentSoldCount})`);
+      }
+      await apiRequest('PATCH', `/api/siae/event-sectors/${sectorId}`, { 
+        capacity, 
+        availableSeats: capacity - currentSoldCount
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/siae/events', id, 'ticketing'] });
+      setEditingSector(null);
+      toast({
+        title: "Quantità aggiornata",
+        description: "La quantità del biglietto è stata modificata.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Errore",
+        description: error?.message || "Impossibile aggiornare la quantità.",
+        variant: "destructive",
+      });
+    },
   });
 
   const changeStatusMutation = useMutation({
@@ -1302,59 +1361,288 @@ export default function EventHub() {
           </TabsContent>
 
           <TabsContent value="ticketing">
-            <Card className="glass-card">
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle className="flex items-center gap-2">
-                    <Ticket className="h-5 w-5 text-blue-400" />
-                    Biglietteria SIAE
-                  </CardTitle>
-                  <Button onClick={() => navigate('/siae/ticketed-events')} variant="outline" size="sm">
-                    Gestisci <ChevronRight className="h-4 w-4 ml-1" />
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                {ticketedEvent ? (
-                  <div className="space-y-6">
-                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                      <div className="p-4 rounded-lg bg-background/50 border">
+            {ticketedEvent ? (
+              <div className="space-y-6">
+                {/* Statistiche Generali */}
+                <Card className="glass-card">
+                  <CardHeader>
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <CardTitle className="flex items-center gap-2">
+                        <Ticket className="h-5 w-5 text-blue-400" />
+                        Riepilogo Biglietteria
+                      </CardTitle>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Badge variant={ticketedEvent.ticketingStatus === 'active' ? 'default' : 'secondary'}>
+                          {ticketedEvent.ticketingStatus === 'active' ? 'Attiva' : 
+                           ticketedEvent.ticketingStatus === 'draft' ? 'Bozza' : 
+                           ticketedEvent.ticketingStatus === 'suspended' ? 'Sospesa' : 'Chiusa'}
+                        </Badge>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+                      <div className="p-4 rounded-lg bg-background/50 border" data-testid="stat-sold">
                         <div className="text-2xl font-bold text-blue-400">{ticketedEvent.ticketsSold}</div>
                         <div className="text-xs text-muted-foreground">Venduti</div>
                       </div>
-                      <div className="p-4 rounded-lg bg-background/50 border">
+                      <div className="p-4 rounded-lg bg-background/50 border" data-testid="stat-available">
                         <div className="text-2xl font-bold text-emerald-400">{ticketedEvent.totalCapacity - ticketedEvent.ticketsSold}</div>
                         <div className="text-xs text-muted-foreground">Disponibili</div>
                       </div>
-                      <div className="p-4 rounded-lg bg-background/50 border">
+                      <div className="p-4 rounded-lg bg-background/50 border" data-testid="stat-cancelled">
                         <div className="text-2xl font-bold text-rose-400">{ticketedEvent.ticketsCancelled}</div>
                         <div className="text-xs text-muted-foreground">Annullati</div>
                       </div>
-                      <div className="p-4 rounded-lg bg-background/50 border">
-                        <div className="text-2xl font-bold text-amber-400">€{Number(ticketedEvent.totalRevenue || 0).toFixed(0)}</div>
+                      <div className="p-4 rounded-lg bg-background/50 border" data-testid="stat-revenue">
+                        <div className="text-2xl font-bold text-amber-400">€{Number(ticketedEvent.totalRevenue || 0).toFixed(2)}</div>
                         <div className="text-xs text-muted-foreground">Incasso</div>
                       </div>
                     </div>
-                    <Progress value={(ticketedEvent.ticketsSold / ticketedEvent.totalCapacity) * 100} className="h-3" />
-                    <div className="flex items-center justify-between text-sm">
+                    <Progress value={ticketedEvent.totalCapacity > 0 ? (ticketedEvent.ticketsSold / ticketedEvent.totalCapacity) * 100 : 0} className="h-3" />
+                    <div className="flex items-center justify-between text-sm mt-2">
                       <span className="text-muted-foreground">Occupazione</span>
-                      <span className="font-medium">{((ticketedEvent.ticketsSold / ticketedEvent.totalCapacity) * 100).toFixed(1)}%</span>
+                      <span className="font-medium">{ticketedEvent.totalCapacity > 0 ? ((ticketedEvent.ticketsSold / ticketedEvent.totalCapacity) * 100).toFixed(1) : 0}%</span>
                     </div>
-                  </div>
-                ) : (
-                  <div className="text-center py-12">
+                  </CardContent>
+                </Card>
+
+                {/* Elenco Biglietti (Sectors) */}
+                <Card className="glass-card">
+                  <CardHeader>
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <CardTitle className="flex items-center gap-2">
+                        <FileText className="h-5 w-5 text-cyan-400" />
+                        Tipologie Biglietti
+                      </CardTitle>
+                      <Button onClick={() => navigate('/siae/ticketed-events')} variant="outline" size="sm" data-testid="btn-manage-tickets">
+                        Gestisci <ChevronRight className="h-4 w-4 ml-1" />
+                      </Button>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    {ticketedEvent.sectors && ticketedEvent.sectors.length > 0 ? (
+                      <div className="space-y-3">
+                        {ticketedEvent.sectors.map((sector) => {
+                          const soldCount = sector.capacity - sector.availableSeats;
+                          return (
+                            <div 
+                              key={sector.id} 
+                              className="flex items-center justify-between p-4 rounded-lg bg-background/50 border"
+                              data-testid={`ticket-row-${sector.id}`}
+                            >
+                              <div className="flex-1">
+                                <div className="flex items-center gap-3">
+                                  <h4 className="font-medium">{sector.name}</h4>
+                                  <Badge variant={sector.active ? 'default' : 'secondary'} className="text-xs">
+                                    {sector.active ? 'Attivo' : 'Disattivato'}
+                                  </Badge>
+                                </div>
+                                <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
+                                  <span>Intero: €{Number(sector.priceIntero).toFixed(2)}</span>
+                                  {sector.priceRidotto && <span>Ridotto: €{Number(sector.priceRidotto).toFixed(2)}</span>}
+                                  {sector.prevendita && Number(sector.prevendita) > 0 && <span>DDP: €{Number(sector.prevendita).toFixed(2)}</span>}
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-4">
+                                <div className="text-right">
+                                  <div className="text-sm">
+                                    <span className="font-bold text-blue-400">{soldCount}</span>
+                                    <span className="text-muted-foreground"> / {sector.capacity}</span>
+                                  </div>
+                                  <div className="text-xs text-muted-foreground">
+                                    {sector.availableSeats} disponibili
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <Switch
+                                    checked={sector.active}
+                                    onCheckedChange={(checked) => toggleSectorMutation.mutate({ sectorId: sector.id, active: checked })}
+                                    disabled={toggleSectorMutation.isPending}
+                                    data-testid={`toggle-sector-${sector.id}`}
+                                  />
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    onClick={() => {
+                                      setEditingSector(sector);
+                                      setEditingCapacity(sector.capacity.toString());
+                                    }}
+                                    data-testid={`btn-edit-sector-${sector.id}`}
+                                  >
+                                    <Edit className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="text-center py-8 text-muted-foreground">
+                        <Ticket className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                        <p>Nessun biglietto configurato</p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Pulsanti Report */}
+                <Card className="glass-card">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <BarChart3 className="h-5 w-5 text-purple-400" />
+                      Report SIAE
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      <Button variant="outline" className="h-auto py-4 flex flex-col gap-2" data-testid="btn-report-c1">
+                        <FileText className="h-6 w-6 text-blue-400" />
+                        <span className="text-sm font-medium">Report C1</span>
+                        <span className="text-xs text-muted-foreground">Registro Giornaliero</span>
+                      </Button>
+                      <Button variant="outline" className="h-auto py-4 flex flex-col gap-2" data-testid="btn-report-c2">
+                        <FileText className="h-6 w-6 text-emerald-400" />
+                        <span className="text-sm font-medium">Report C2</span>
+                        <span className="text-xs text-muted-foreground">Riepilogo Evento</span>
+                      </Button>
+                      <Button variant="outline" className="h-auto py-4 flex flex-col gap-2" data-testid="btn-report-xml">
+                        <Download className="h-6 w-6 text-amber-400" />
+                        <span className="text-sm font-medium">Export XML</span>
+                        <span className="text-xs text-muted-foreground">Trasmissione SIAE</span>
+                      </Button>
+                      <Button variant="outline" className="h-auto py-4 flex flex-col gap-2" data-testid="btn-report-pdf">
+                        <Download className="h-6 w-6 text-rose-400" />
+                        <span className="text-sm font-medium">Export PDF</span>
+                        <span className="text-xs text-muted-foreground">Stampa Registro</span>
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Transazioni Recenti */}
+                <Card className="glass-card">
+                  <CardHeader>
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <CardTitle className="flex items-center gap-2">
+                        <Activity className="h-5 w-5 text-amber-400" />
+                        Transazioni Recenti
+                      </CardTitle>
+                      <Badge variant="secondary">{siaeTransactions.length} transazioni</Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    {siaeTransactions.length > 0 ? (
+                      <ScrollArea className="h-[300px]">
+                        <div className="space-y-3">
+                          {siaeTransactions.slice(0, 20).map((tx) => (
+                            <div 
+                              key={tx.id} 
+                              className="flex items-center justify-between p-3 rounded-lg bg-background/50 border"
+                              data-testid={`transaction-${tx.id}`}
+                            >
+                              <div>
+                                <div className="font-medium text-sm">{tx.transactionCode}</div>
+                                <div className="text-xs text-muted-foreground">
+                                  {tx.ticketsCount} bigliett{tx.ticketsCount === 1 ? 'o' : 'i'} • {tx.paymentMethod || 'N/D'}
+                                </div>
+                              </div>
+                              <div className="text-right">
+                                <div className="font-bold text-emerald-400">€{Number(tx.totalAmount).toFixed(2)}</div>
+                                <Badge 
+                                  variant={tx.status === 'completed' ? 'default' : tx.status === 'pending' ? 'secondary' : 'destructive'}
+                                  className="text-xs"
+                                >
+                                  {tx.status === 'completed' ? 'Completata' : 
+                                   tx.status === 'pending' ? 'In attesa' : 
+                                   tx.status === 'refunded' ? 'Rimborsata' : 'Fallita'}
+                                </Badge>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </ScrollArea>
+                    ) : (
+                      <div className="text-center py-8 text-muted-foreground">
+                        <Activity className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                        <p>Nessuna transazione registrata</p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Dialog Modifica Quantità */}
+                <Dialog open={!!editingSector} onOpenChange={(open) => !open && setEditingSector(null)}>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Modifica Quantità</DialogTitle>
+                      <DialogDescription>
+                        Modifica la quantità disponibile per "{editingSector?.name}"
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="capacity">Quantità Totale</Label>
+                        <Input
+                          id="capacity"
+                          type="number"
+                          min={editingSector ? editingSector.capacity - editingSector.availableSeats : 0}
+                          value={editingCapacity}
+                          onChange={(e) => setEditingCapacity(e.target.value)}
+                          data-testid="input-edit-capacity"
+                        />
+                        {editingSector && (
+                          <p className="text-xs text-muted-foreground">
+                            Minimo: {editingSector.capacity - editingSector.availableSeats} (già venduti)
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <DialogFooter>
+                      <Button variant="outline" onClick={() => setEditingSector(null)} data-testid="btn-cancel-edit">
+                        Annulla
+                      </Button>
+                      <Button 
+                        onClick={() => {
+                          if (editingSector) {
+                            const currentSoldCount = editingSector.capacity - editingSector.availableSeats;
+                            updateSectorCapacityMutation.mutate({
+                              sectorId: editingSector.id,
+                              capacity: parseInt(editingCapacity) || editingSector.capacity,
+                              currentSoldCount,
+                            });
+                          }
+                        }}
+                        disabled={updateSectorCapacityMutation.isPending}
+                        data-testid="btn-save-capacity"
+                      >
+                        {updateSectorCapacityMutation.isPending ? (
+                          <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Salvataggio...</>
+                        ) : (
+                          'Salva'
+                        )}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+              </div>
+            ) : (
+              <Card className="glass-card">
+                <CardContent className="py-12">
+                  <div className="text-center">
                     <Ticket className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
                     <h3 className="font-semibold mb-2">Biglietteria Non Attiva</h3>
                     <p className="text-sm text-muted-foreground mb-4">
                       Attiva la biglietteria SIAE per vendere biglietti
                     </p>
-                    <Button onClick={() => navigate('/siae/ticketed-events')}>
+                    <Button onClick={() => navigate('/siae/ticketed-events')} data-testid="btn-activate-ticketing">
                       Attiva Biglietteria
                     </Button>
                   </div>
-                )}
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
 
           <TabsContent value="guests">
