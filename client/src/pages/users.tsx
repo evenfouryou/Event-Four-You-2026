@@ -130,6 +130,163 @@ const warehouseFeaturesList: FeatureConfig[] = [
   { key: 'canCreateProducts', label: 'Crea Prodotti', description: 'Permesso di creare nuovi prodotti', icon: <Plus className="h-4 w-4" /> },
 ];
 
+interface UserCardProps {
+  user: User;
+  index: number;
+  isSuperAdmin: boolean;
+  isAdmin: boolean;
+  currentUser: User | null | undefined;
+  getCompanyName: (companyId: string | null) => string;
+  handleEdit: (user: User) => void;
+  handleOpenFeaturesDialog: (user: User) => void;
+  handleDeleteClick: (userId: string) => void;
+  toggleActiveMutation: any;
+  impersonateMutation: any;
+}
+
+function UserCard({ 
+  user, 
+  index, 
+  isSuperAdmin, 
+  isAdmin, 
+  currentUser, 
+  getCompanyName, 
+  handleEdit, 
+  handleOpenFeaturesDialog, 
+  handleDeleteClick,
+  toggleActiveMutation,
+  impersonateMutation
+}: UserCardProps) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: index * 0.03 }}
+      className="glass-card p-5 hover:border-primary/30 transition-all"
+      data-testid={`card-user-${user.id}`}
+    >
+      <div className="flex items-start gap-4 mb-4">
+        <div className={`w-12 h-12 rounded-2xl bg-gradient-to-br ${roleGradients[user.role] || 'from-gray-500 to-gray-600'} flex items-center justify-center shrink-0`}>
+          <Shield className="h-6 w-6 text-white" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <h3 className="font-semibold text-lg truncate" data-testid={`text-user-name-${user.id}`}>
+            {user.firstName} {user.lastName}
+          </h3>
+          <p className="text-sm text-muted-foreground truncate flex items-center gap-1">
+            <Mail className="h-3 w-3" />
+            {user.email}
+          </p>
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        <div className="flex items-center gap-2 flex-wrap">
+          <Badge variant="outline" className="shrink-0" data-testid={`badge-role-${user.id}`}>
+            {roleLabels[user.role]}
+          </Badge>
+          {user.isActive ? (
+            <Badge variant="outline" className="text-teal border-teal/30" data-testid={`badge-active-${user.id}`}>
+              <CheckCircle className="h-3 w-3 mr-1" />
+              Attivo
+            </Badge>
+          ) : (
+            <Badge variant="destructive" className="text-xs" data-testid={`badge-inactive-${user.id}`}>
+              <UserX className="h-3 w-3 mr-1" />
+              Disattivato
+            </Badge>
+          )}
+          {user.emailVerified && (
+            <Badge variant="secondary" className="text-xs" data-testid={`badge-verified-${user.id}`}>
+              Verificato
+            </Badge>
+          )}
+        </div>
+
+        {isSuperAdmin && (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Building2 className="h-3 w-3" />
+            <span className="truncate" data-testid={`text-company-${user.id}`}>{getCompanyName(user.companyId)}</span>
+          </div>
+        )}
+
+        <div className="flex gap-1 pt-2 border-t border-white/5 flex-wrap">
+          {isSuperAdmin && user.role === 'gestore' && (
+            <Button
+              size="icon"
+              variant="ghost"
+              onClick={() => handleOpenFeaturesDialog(user)}
+              data-testid={`button-features-user-${user.id}`}
+              title="Gestisci Moduli"
+              className="rounded-xl min-w-[44px] min-h-[44px]"
+            >
+              <Settings2 className="h-4 w-4" />
+            </Button>
+          )}
+          {isAdmin && user.role === 'warehouse' && (
+            <Button
+              size="icon"
+              variant="ghost"
+              onClick={() => handleOpenFeaturesDialog(user)}
+              data-testid={`button-permissions-user-${user.id}`}
+              title="Gestisci Permessi"
+              className="rounded-xl min-w-[44px] min-h-[44px]"
+            >
+              <Settings2 className="h-4 w-4" />
+            </Button>
+          )}
+          <Button
+            size="icon"
+            variant="ghost"
+            onClick={() => handleEdit(user)}
+            data-testid={`button-edit-user-${user.id}`}
+            title="Modifica utente"
+            className="rounded-xl min-w-[44px] min-h-[44px]"
+          >
+            <Edit className="h-4 w-4" />
+          </Button>
+          {user.id !== currentUser?.id && (
+            <>
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={() => toggleActiveMutation.mutate({ id: user.id, isActive: !user.isActive })}
+                data-testid={`button-toggle-active-user-${user.id}`}
+                title={user.isActive ? "Disattiva utente" : "Riattiva utente"}
+                className="rounded-xl min-w-[44px] min-h-[44px]"
+              >
+                {user.isActive ? <Ban className="h-4 w-4" /> : <CheckCircle className="h-4 w-4" />}
+              </Button>
+              {(isSuperAdmin || (isAdmin && user.role !== 'super_admin' && user.role !== 'gestore' && currentUser && user.companyId === currentUser.companyId)) && (
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  onClick={() => impersonateMutation.mutate(user.id)}
+                  data-testid={`button-impersonate-user-${user.id}`}
+                  title="Impersonifica utente"
+                  className="rounded-xl min-w-[44px] min-h-[44px]"
+                >
+                  <LogIn className="h-4 w-4" />
+                </Button>
+              )}
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={() => handleDeleteClick(user.id)}
+                data-testid={`button-delete-user-${user.id}`}
+                title="Elimina utente"
+                className="rounded-xl text-destructive hover:text-destructive min-w-[44px] min-h-[44px]"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </>
+          )}
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
 export default function UsersPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
@@ -461,6 +618,36 @@ export default function UsersPage() {
   const activeUsers = users?.filter(u => u.isActive).length || 0;
   const verifiedUsers = users?.filter(u => u.emailVerified).length || 0;
 
+  // Group users by role
+  const usersByRole = users?.reduce((acc, user) => {
+    const role = user.role || 'unknown';
+    if (!acc[role]) acc[role] = [];
+    acc[role].push(user);
+    return acc;
+  }, {} as Record<string, User[]>) || {};
+
+  // For super_admin: also group by company/gestore
+  const usersByCompany = users?.reduce((acc, user) => {
+    const companyId = user.companyId || 'no_company';
+    if (!acc[companyId]) acc[companyId] = [];
+    acc[companyId].push(user);
+    return acc;
+  }, {} as Record<string, User[]>) || {};
+
+  // Order roles for display
+  const roleOrder = ['super_admin', 'gestore', 'organizer', 'warehouse', 'bartender'];
+  const sortedRoles = Object.keys(usersByRole).sort((a, b) => {
+    const indexA = roleOrder.indexOf(a);
+    const indexB = roleOrder.indexOf(b);
+    return (indexA === -1 ? 999 : indexA) - (indexB === -1 ? 999 : indexB);
+  });
+
+  // State for view mode - default to 'role', only super_admin with companies can use 'company'
+  const [viewMode, setViewMode] = useState<'role' | 'company'>('role');
+  
+  // Ensure viewMode is 'role' if user doesn't have access to company view
+  const effectiveViewMode = (isSuperAdmin && companies && companies.length > 0) ? viewMode : 'role';
+
   return (
     <div className="p-4 md:p-8 max-w-7xl mx-auto pb-24 md:pb-8">
       <motion.div 
@@ -690,6 +877,35 @@ export default function UsersPage() {
         </div>
       </motion.div>
 
+      {/* View Mode Toggle for Super Admin - only show if companies data is available */}
+      {isSuperAdmin && users && users.length > 0 && companies && companies.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.15 }}
+          className="flex gap-2 mb-6"
+        >
+          <Button
+            variant={viewMode === 'role' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setViewMode('role')}
+            data-testid="button-view-by-role"
+          >
+            <Shield className="h-4 w-4 mr-2" />
+            Per Tipologia
+          </Button>
+          <Button
+            variant={viewMode === 'company' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setViewMode('company')}
+            data-testid="button-view-by-company"
+          >
+            <Building2 className="h-4 w-4 mr-2" />
+            Per Gestore
+          </Button>
+        </motion.div>
+      )}
+
       {usersLoading ? (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {[1, 2, 3].map((i) => (
@@ -705,135 +921,83 @@ export default function UsersPage() {
           ))}
         </div>
       ) : users && users.length > 0 ? (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {users.map((user, index) => (
+        <div className="space-y-8">
+          {/* View by Role */}
+          {effectiveViewMode === 'role' && sortedRoles.map((role) => (
             <motion.div
-              key={user.id}
+              key={role}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.05 }}
-              className="glass-card p-5 hover:border-primary/30 transition-all"
-              data-testid={`card-user-${user.id}`}
+              className="space-y-4"
             >
-              <div className="flex items-start gap-4 mb-4">
-                <div className={`w-12 h-12 rounded-2xl bg-gradient-to-br ${roleGradients[user.role] || 'from-gray-500 to-gray-600'} flex items-center justify-center shrink-0`}>
-                  <Shield className="h-6 w-6 text-white" />
+              <div className="flex items-center gap-3">
+                <div className={`w-8 h-8 rounded-xl bg-gradient-to-br ${roleGradients[role] || 'from-gray-500 to-gray-600'} flex items-center justify-center`}>
+                  <Shield className="h-4 w-4 text-white" />
                 </div>
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-semibold text-lg truncate" data-testid={`text-user-name-${user.id}`}>
-                    {user.firstName} {user.lastName}
-                  </h3>
-                  <p className="text-sm text-muted-foreground truncate flex items-center gap-1">
-                    <Mail className="h-3 w-3" />
-                    {user.email}
-                  </p>
-                </div>
+                <h2 className="text-lg font-semibold" data-testid={`text-role-section-${role}`}>
+                  {roleLabels[role] || role}
+                </h2>
+                <Badge variant="secondary" className="text-xs">
+                  {usersByRole[role]?.length || 0}
+                </Badge>
               </div>
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {usersByRole[role]?.map((user, index) => (
+                  <UserCard 
+                    key={user.id} 
+                    user={user} 
+                    index={index}
+                    isSuperAdmin={isSuperAdmin}
+                    isAdmin={isAdmin}
+                    currentUser={currentUser}
+                    getCompanyName={getCompanyName}
+                    handleEdit={handleEdit}
+                    handleOpenFeaturesDialog={handleOpenFeaturesDialog}
+                    handleDeleteClick={handleDeleteClick}
+                    toggleActiveMutation={toggleActiveMutation}
+                    impersonateMutation={impersonateMutation}
+                  />
+                ))}
+              </div>
+            </motion.div>
+          ))}
 
-              <div className="space-y-3">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <Badge variant="outline" className="shrink-0" data-testid={`badge-role-${user.id}`}>
-                    {roleLabels[user.role]}
-                  </Badge>
-                  {user.isActive ? (
-                    <Badge variant="outline" className="text-teal border-teal/30" data-testid={`badge-active-${user.id}`}>
-                      <CheckCircle className="h-3 w-3 mr-1" />
-                      Attivo
-                    </Badge>
-                  ) : (
-                    <Badge variant="destructive" className="text-xs" data-testid={`badge-inactive-${user.id}`}>
-                      <UserX className="h-3 w-3 mr-1" />
-                      Disattivato
-                    </Badge>
-                  )}
-                  {user.emailVerified && (
-                    <Badge variant="secondary" className="text-xs" data-testid={`badge-verified-${user.id}`}>
-                      Verificato
-                    </Badge>
-                  )}
+          {/* View by Company (Super Admin only) */}
+          {effectiveViewMode === 'company' && isSuperAdmin && Object.keys(usersByCompany).map((companyId) => (
+            <motion.div
+              key={companyId}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="space-y-4"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center">
+                  <Building2 className="h-4 w-4 text-white" />
                 </div>
-
-                {isSuperAdmin && (
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Building2 className="h-3 w-3" />
-                    <span className="truncate" data-testid={`text-company-${user.id}`}>{getCompanyName(user.companyId)}</span>
-                  </div>
-                )}
-
-                <div className="flex gap-1 pt-2 border-t border-white/5 flex-wrap">
-                  {/* Super Admin can manage features for gestori */}
-                  {isSuperAdmin && user.role === 'gestore' && (
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      onClick={() => handleOpenFeaturesDialog(user)}
-                      data-testid={`button-features-user-${user.id}`}
-                      title="Gestisci Moduli"
-                      className="rounded-xl min-w-[44px] min-h-[44px]"
-                    >
-                      <Settings2 className="h-4 w-4" />
-                    </Button>
-                  )}
-                  {/* Organizer (gestore) can manage permissions for warehouse users */}
-                  {isAdmin && user.role === 'warehouse' && (
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      onClick={() => handleOpenFeaturesDialog(user)}
-                      data-testid={`button-permissions-user-${user.id}`}
-                      title="Gestisci Permessi"
-                      className="rounded-xl min-w-[44px] min-h-[44px]"
-                    >
-                      <Settings2 className="h-4 w-4" />
-                    </Button>
-                  )}
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    onClick={() => handleEdit(user)}
-                    data-testid={`button-edit-user-${user.id}`}
-                    title="Modifica utente"
-                    className="rounded-xl min-w-[44px] min-h-[44px]"
-                  >
-                    <Edit className="h-4 w-4" />
-                  </Button>
-                  {user.id !== currentUser?.id && (
-                    <>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        onClick={() => toggleActiveMutation.mutate({ id: user.id, isActive: !user.isActive })}
-                        data-testid={`button-toggle-active-user-${user.id}`}
-                        title={user.isActive ? "Disattiva utente" : "Riattiva utente"}
-                        className="rounded-xl min-w-[44px] min-h-[44px]"
-                      >
-                        {user.isActive ? <Ban className="h-4 w-4" /> : <CheckCircle className="h-4 w-4" />}
-                      </Button>
-                      {(isSuperAdmin || (isAdmin && user.role !== 'super_admin' && user.role !== 'gestore' && user.companyId === currentUser.companyId)) && (
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          onClick={() => impersonateMutation.mutate(user.id)}
-                          data-testid={`button-impersonate-user-${user.id}`}
-                          title="Impersonifica utente"
-                          className="rounded-xl min-w-[44px] min-h-[44px]"
-                        >
-                          <LogIn className="h-4 w-4" />
-                        </Button>
-                      )}
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        onClick={() => handleDeleteClick(user.id)}
-                        data-testid={`button-delete-user-${user.id}`}
-                        title="Elimina utente"
-                        className="rounded-xl text-destructive hover:text-destructive min-w-[44px] min-h-[44px]"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </>
-                  )}
-                </div>
+                <h2 className="text-lg font-semibold" data-testid={`text-company-section-${companyId}`}>
+                  {companyId === 'no_company' ? 'Senza Azienda' : getCompanyName(companyId)}
+                </h2>
+                <Badge variant="secondary" className="text-xs">
+                  {usersByCompany[companyId]?.length || 0}
+                </Badge>
+              </div>
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {usersByCompany[companyId]?.map((user, index) => (
+                  <UserCard 
+                    key={user.id} 
+                    user={user} 
+                    index={index}
+                    isSuperAdmin={isSuperAdmin}
+                    isAdmin={isAdmin}
+                    currentUser={currentUser}
+                    getCompanyName={getCompanyName}
+                    handleEdit={handleEdit}
+                    handleOpenFeaturesDialog={handleOpenFeaturesDialog}
+                    handleDeleteClick={handleDeleteClick}
+                    toggleActiveMutation={toggleActiveMutation}
+                    impersonateMutation={impersonateMutation}
+                  />
+                ))}
               </div>
             </motion.div>
           ))}
