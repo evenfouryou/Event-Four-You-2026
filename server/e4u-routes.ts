@@ -1210,6 +1210,45 @@ router.get("/api/e4u/events/:eventId/stats", requireAuth, async (req: Request, r
       .from(eventScanners)
       .where(eq(eventScanners.eventId, eventId));
     
+    // Get hourly check-in data for entrance chart
+    const hourlyCheckIns: Record<string, number> = {};
+    
+    // Collect all check-in times from list entries
+    for (const listId of listIds) {
+      const entries = await db.select().from(listEntries).where(eq(listEntries.listId, listId));
+      for (const entry of entries) {
+        if (entry.status === 'checked_in' && entry.checkedInAt) {
+          const hour = new Date(entry.checkedInAt).getHours().toString().padStart(2, '0') + ':00';
+          hourlyCheckIns[hour] = (hourlyCheckIns[hour] || 0) + 1;
+        }
+      }
+    }
+    
+    // Collect all check-in times from table guests
+    for (const reservation of reservations) {
+      const guests = await db.select()
+        .from(tableGuests)
+        .where(eq(tableGuests.reservationId, reservation.id));
+      for (const guest of guests) {
+        if (guest.status === 'checked_in' && guest.checkedInAt) {
+          const hour = new Date(guest.checkedInAt).getHours().toString().padStart(2, '0') + ':00';
+          hourlyCheckIns[hour] = (hourlyCheckIns[hour] || 0) + 1;
+        }
+      }
+    }
+    
+    // Convert to array format for the chart, sorted by hour
+    const hourlyData = Object.entries(hourlyCheckIns)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([time, entries]) => ({ time, entries }));
+    
+    // Add cumulative data
+    let cumulative = 0;
+    const entranceFlowData = hourlyData.map(item => {
+      cumulative += item.entries;
+      return { ...item, cumulative };
+    });
+
     res.json({
       lists: {
         total: lists.length,
@@ -1228,6 +1267,7 @@ router.get("/api/e4u/events/:eventId/stats", requireAuth, async (req: Request, r
       pr: prCount.length,
       scanners: scannerCount.length,
       totalCheckIns: checkedInListEntries + checkedInTableGuests,
+      entranceFlowData,
     });
   } catch (error: any) {
     res.status(500).json({ message: error.message });

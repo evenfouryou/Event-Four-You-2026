@@ -99,6 +99,7 @@ import {
   Volume2,
   VolumeX,
   X,
+  LogIn,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -333,48 +334,57 @@ function EntranceChart({ data }: { data: Array<{ time: string; entries: number; 
         <CardDescription>Ingressi per fascia oraria</CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="h-[160px] md:h-[200px]">
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-              <defs>
-                <linearGradient id="entriesGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
-                  <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} />
-              <XAxis 
-                dataKey="time" 
-                stroke="hsl(var(--muted-foreground))" 
-                fontSize={11}
-                tickLine={false}
-              />
-              <YAxis 
-                stroke="hsl(var(--muted-foreground))" 
-                fontSize={11}
-                tickLine={false}
-                axisLine={false}
-              />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: 'hsl(var(--card))',
-                  border: '1px solid hsl(var(--border))',
-                  borderRadius: '8px',
-                  fontSize: '12px',
-                }}
-                labelStyle={{ color: 'hsl(var(--foreground))' }}
-              />
-              <Area
-                type="monotone"
-                dataKey="entries"
-                stroke="hsl(var(--primary))"
-                strokeWidth={2}
-                fill="url(#entriesGradient)"
-                name="Ingressi"
-              />
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
+        {data.length === 0 ? (
+          <div className="h-[160px] md:h-[200px] flex items-center justify-center text-muted-foreground">
+            <div className="text-center">
+              <LogIn className="h-8 w-8 mx-auto mb-2 opacity-50" />
+              <p className="text-sm">Nessun check-in registrato</p>
+            </div>
+          </div>
+        ) : (
+          <div className="h-[160px] md:h-[200px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="entriesGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} />
+                <XAxis 
+                  dataKey="time" 
+                  stroke="hsl(var(--muted-foreground))" 
+                  fontSize={11}
+                  tickLine={false}
+                />
+                <YAxis 
+                  stroke="hsl(var(--muted-foreground))" 
+                  fontSize={11}
+                  tickLine={false}
+                  axisLine={false}
+                />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: 'hsl(var(--card))',
+                    border: '1px solid hsl(var(--border))',
+                    borderRadius: '8px',
+                    fontSize: '12px',
+                  }}
+                  labelStyle={{ color: 'hsl(var(--foreground))' }}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="entries"
+                  stroke="hsl(var(--primary))"
+                  strokeWidth={2}
+                  fill="url(#entriesGradient)"
+                  name="Ingressi"
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        )}
       </CardContent>
     </Card>
   );
@@ -495,21 +505,13 @@ function VenueMap({
 }
 
 function TopConsumptionsWidget({ eventId }: { eventId: string }) {
-  const { data: consumptions } = useQuery<Array<{ productName: string; quantity: number; revenue: number }>>({
+  const { data: consumptions, isLoading } = useQuery<Array<{ productName: string; quantity: number; revenue: number }>>({
     queryKey: ['/api/events', eventId, 'top-consumptions'],
     enabled: !!eventId,
   });
 
-  const mockData = [
-    { productName: 'Vodka Premium', quantity: 45, revenue: 675 },
-    { productName: 'Gin Tonic', quantity: 38, revenue: 342 },
-    { productName: 'Prosecco', quantity: 32, revenue: 256 },
-    { productName: 'Rum Cuba', quantity: 28, revenue: 224 },
-    { productName: 'Whisky', quantity: 22, revenue: 330 },
-  ];
-
-  const data = consumptions || mockData;
   const COLORS = ['#FFD700', '#22d3ee', '#a855f7', '#f472b6', '#34d399'];
+  const data = consumptions || [];
 
   return (
     <Card className="glass-card">
@@ -518,44 +520,55 @@ function TopConsumptionsWidget({ eventId }: { eventId: string }) {
           <TrendingUp className="h-5 w-5 text-amber-400" />
           Top Consumi
         </CardTitle>
-        <CardDescription>Prodotti più venduti stasera</CardDescription>
+        <CardDescription>Prodotti più consumati stasera</CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="flex gap-4">
-          <div className="w-24 h-24">
-            <ResponsiveContainer width="100%" height="100%">
-              <RechartsPieChart>
-                <Pie
-                  data={data.slice(0, 5)}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={25}
-                  outerRadius={40}
-                  dataKey="quantity"
-                  strokeWidth={0}
-                >
-                  {data.slice(0, 5).map((_, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Pie>
-              </RechartsPieChart>
-            </ResponsiveContainer>
+        {isLoading ? (
+          <div className="space-y-2">
+            {[1, 2, 3].map(i => <Skeleton key={i} className="h-6 w-full" />)}
           </div>
-          <div className="flex-1 space-y-2">
-            {data.slice(0, 5).map((item, index) => (
-              <div key={item.productName} className="flex items-center justify-between text-sm">
-                <div className="flex items-center gap-2">
-                  <div 
-                    className="w-2 h-2 rounded-full" 
-                    style={{ backgroundColor: COLORS[index % COLORS.length] }}
-                  />
-                  <span className="truncate max-w-[120px]">{item.productName}</span>
+        ) : data.length === 0 ? (
+          <div className="text-center py-4 text-muted-foreground">
+            <Package className="h-8 w-8 mx-auto mb-2 opacity-50" />
+            <p className="text-sm">Nessun consumo registrato</p>
+          </div>
+        ) : (
+          <div className="flex gap-4">
+            <div className="w-24 h-24">
+              <ResponsiveContainer width="100%" height="100%">
+                <RechartsPieChart>
+                  <Pie
+                    data={data.slice(0, 5)}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={25}
+                    outerRadius={40}
+                    dataKey="quantity"
+                    strokeWidth={0}
+                  >
+                    {data.slice(0, 5).map((_, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                </RechartsPieChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="flex-1 space-y-2">
+              {data.slice(0, 5).map((item, index) => (
+                <div key={item.productName} className="flex items-center justify-between text-sm">
+                  <div className="flex items-center gap-2">
+                    <div 
+                      className="w-2 h-2 rounded-full" 
+                      style={{ backgroundColor: COLORS[index % COLORS.length] }}
+                    />
+                    <span className="truncate max-w-[120px]">{item.productName}</span>
+                  </div>
+                  <span className="font-medium">{item.quantity}</span>
                 </div>
-                <span className="font-medium">{item.quantity}</span>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
+        )}
       </CardContent>
     </Card>
   );
@@ -1617,14 +1630,7 @@ export default function EventHub() {
                 )}
 
                 <EntranceChart 
-                  data={[
-                    { time: '21:00', entries: 12, cumulative: 12 },
-                    { time: '22:00', entries: 45, cumulative: 57 },
-                    { time: '23:00', entries: 78, cumulative: 135 },
-                    { time: '00:00', entries: 92, cumulative: 227 },
-                    { time: '01:00', entries: 35, cumulative: 262 },
-                    { time: '02:00', entries: 18, cumulative: 280 },
-                  ]} 
+                  data={e4uStats?.entranceFlowData || []} 
                 />
 
                 <VenueMap 
@@ -2024,19 +2030,23 @@ export default function EventHub() {
               {e4uStats && (
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div className="p-4 rounded-lg bg-cyan-500/10 border border-cyan-500/30">
-                    <div className="text-2xl font-bold text-cyan-400">{e4uStats.totalLists || guestLists.length}</div>
+                    <div className="text-2xl font-bold text-cyan-400">{e4uStats.lists?.total || guestLists.length}</div>
                     <div className="text-sm text-muted-foreground">Liste Attive</div>
                   </div>
                   <div className="p-4 rounded-lg bg-background/50 border">
-                    <div className="text-2xl font-bold">{e4uStats.totalEntries || totalGuests}</div>
+                    <div className="text-2xl font-bold">{(e4uStats.lists?.entries || 0) + (e4uStats.tables?.totalGuests || 0) || totalGuests}</div>
                     <div className="text-sm text-muted-foreground">Iscritti Totali</div>
                   </div>
                   <div className="p-4 rounded-lg bg-background/50 border">
-                    <div className="text-2xl font-bold text-emerald-400">{e4uStats.totalCheckedIn || checkedInGuests}</div>
+                    <div className="text-2xl font-bold text-emerald-400">{e4uStats.totalCheckIns || checkedInGuests}</div>
                     <div className="text-sm text-muted-foreground">Check-in</div>
                   </div>
                   <div className="p-4 rounded-lg bg-background/50 border">
-                    <div className="text-2xl font-bold">{maxGuests > 0 ? `${Math.round((checkedInGuests / maxGuests) * 100)}%` : '--'}</div>
+                    <div className="text-2xl font-bold">{(() => {
+                      const total = (e4uStats.lists?.entries || 0) + (e4uStats.tables?.totalGuests || 0);
+                      const checked = e4uStats.totalCheckIns || 0;
+                      return total > 0 ? `${Math.round((checked / total) * 100)}%` : '--';
+                    })()}</div>
                     <div className="text-sm text-muted-foreground">Tasso Check-in</div>
                   </div>
                 </div>

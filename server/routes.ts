@@ -63,6 +63,7 @@ import crypto from "crypto";
 import QRCode from "qrcode";
 import { 
   companies,
+  products,
   siaeEventGenres,
   siaeSectorCodes,
   siaeTicketTypes,
@@ -1400,6 +1401,84 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error calculating revenue analysis:", error);
       res.status(500).json({ message: "Failed to calculate revenue analysis" });
+    }
+  });
+
+  // Get top consumptions for an event (used in Event Hub overview)
+  app.get('/api/events/:id/top-consumptions', isAuthenticated, async (req: any, res) => {
+    try {
+      const companyId = await getUserCompanyId(req);
+      if (!companyId) {
+        return res.status(403).json({ message: "No company associated" });
+      }
+
+      const { id } = req.params;
+      const event = await storage.getEvent(id);
+      if (!event || event.companyId !== companyId) {
+        return res.status(404).json({ message: "Event not found" });
+      }
+
+      // Get all consumptions for this event (CONSUME and DIRECT_CONSUME)
+      const movements = await db
+        .select()
+        .from(stockMovements)
+        .where(and(
+          eq(stockMovements.companyId, companyId),
+          eq(stockMovements.toEventId, id),
+          inArray(stockMovements.type, ['CONSUME', 'DIRECT_CONSUME'])
+        ));
+
+      // Aggregate by productId
+      const aggregation = new Map<string, { quantity: number; revenue: number }>();
+      
+      for (const mov of movements) {
+        const qty = parseFloat(mov.quantity);
+        const existing = aggregation.get(mov.productId) || { quantity: 0, revenue: 0 };
+        existing.quantity += qty;
+        
+        // Calculate revenue if price list exists
+        if (event.priceListId) {
+          const priceItem = await db
+            .select()
+            .from(priceListItems)
+            .where(and(
+              eq(priceListItems.priceListId, event.priceListId),
+              eq(priceListItems.productId, mov.productId)
+            ))
+            .limit(1);
+
+          if (priceItem[0]) {
+            const price = parseFloat(priceItem[0].salePrice);
+            existing.revenue += qty * price;
+          }
+        }
+        
+        aggregation.set(mov.productId, existing);
+      }
+
+      // Get product names
+      const productIds = Array.from(aggregation.keys());
+      const productsList = productIds.length > 0 
+        ? await db.select().from(products).where(inArray(products.id, productIds))
+        : [];
+      
+      const productMap = new Map(productsList.map(p => [p.id, p.name]));
+
+      // Convert to array and sort by quantity descending
+      const result = Array.from(aggregation.entries())
+        .map(([productId, data]) => ({
+          productId,
+          productName: productMap.get(productId) || 'Prodotto sconosciuto',
+          quantity: Math.round(data.quantity),
+          revenue: Math.round(data.revenue * 100) / 100,
+        }))
+        .sort((a, b) => b.quantity - a.quantity)
+        .slice(0, 10); // Top 10
+
+      res.json(result);
+    } catch (error) {
+      console.error("Error fetching top consumptions:", error);
+      res.status(500).json({ message: "Failed to fetch top consumptions" });
     }
   });
 
