@@ -108,6 +108,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Register ticket template builder routes
   app.use('/api/ticket', templateRoutes);
 
+  // Health check endpoint for Replit Deploy
+  app.get('/api/health', (_req, res) => {
+    res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+  });
+
   // Email transporter setup
   const emailTransporter = nodemailer.createTransport({
     host: process.env.SMTP_HOST || 'smtp.gmail.com',
