@@ -85,6 +85,7 @@ import SchoolBadgeError from "@/pages/school-badge-error";
 import SchoolBadgeScanner from "@/pages/school-badge-scanner";
 import PrinterSettings from "@/pages/printer-settings";
 import TemplateBuilder from "@/pages/template-builder";
+import StripeAdmin from "@/pages/stripe-admin";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -207,6 +208,7 @@ function Router() {
               <Route path="/printer-settings" component={PrinterSettings} />
               <Route path="/template-builder" component={TemplateBuilder} />
               <Route path="/template-builder/:id" component={TemplateBuilder} />
+              <Route path="/stripe-admin" component={StripeAdmin} />
               <Route component={NotFound} />
             </Switch>
           </main>

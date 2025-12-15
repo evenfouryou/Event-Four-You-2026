@@ -196,6 +196,12 @@ export function AppSidebar() {
         icon: Printer,
         url: "/printer-settings",
         group: "Sistema",
+      },
+      {
+        title: "Pagamenti Stripe",
+        icon: CreditCard,
+        url: "/stripe-admin",
+        group: "Sistema",
       }
     );
   }

@@ -67,6 +67,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
 import {
   Ticket,
   Calendar,
@@ -84,13 +86,29 @@ import {
   ChevronRight,
   TrendingUp,
   AlertTriangle,
+  ArrowLeft,
+  Gift,
+  Tag,
 } from "lucide-react";
+import { Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 
 const formSchema = insertSiaeTicketedEventSchema.omit({ companyId: true });
 type FormData = z.infer<typeof formSchema>;
 
-const sectorFormSchema = insertSiaeEventSectorSchema.omit({ ticketedEventId: true });
+// New sector form schema matching wizard style
+const sectorFormSchema = z.object({
+  name: z.string().min(1, "Nome biglietto richiesto"),
+  sectorCode: z.string().min(1, "Codice settore richiesto"),
+  capacity: z.number().min(1, "Quantità richiesta"),
+  isNumbered: z.boolean().default(false),
+  ticketType: z.enum(['INT', 'RID', 'OMA']),
+  price: z.string().default("0"),
+  ddp: z.string().default("0"),
+  ivaRate: z.string().default("22"),
+  sortOrder: z.number().default(0),
+  active: z.boolean().default(true),
+});
 type SectorFormData = z.infer<typeof sectorFormSchema>;
 
 export default function SiaeTicketedEventsPage() {
@@ -148,17 +166,18 @@ export default function SiaeTicketedEventsPage() {
       sectorCode: "",
       name: "",
       capacity: 0,
-      availableSeats: 0,
       isNumbered: false,
-      priceIntero: "0",
-      priceRidotto: null,
-      priceOmaggio: "0",
-      prevendita: "0",
+      ticketType: "INT",
+      price: "0",
+      ddp: "0",
       ivaRate: "22",
       sortOrder: 0,
       active: true,
     },
   });
+
+  // Watch ticket type to control price field
+  const watchedTicketType = sectorForm.watch("ticketType");
 
   useEffect(() => {
     if (!isCreateDialogOpen) {
@@ -183,18 +202,23 @@ export default function SiaeTicketedEventsPage() {
         sectorCode: "",
         name: "",
         capacity: 0,
-        availableSeats: 0,
         isNumbered: false,
-        priceIntero: "0",
-        priceRidotto: null,
-        priceOmaggio: "0",
-        prevendita: "0",
+        ticketType: "INT",
+        price: "0",
+        ddp: "0",
         ivaRate: "22",
         sortOrder: 0,
         active: true,
       });
     }
   }, [isSectorDialogOpen, sectorForm]);
+
+  // Auto-set price to 0 when Omaggio is selected
+  useEffect(() => {
+    if (watchedTicketType === 'OMA') {
+      sectorForm.setValue('price', '0');
+    }
+  }, [watchedTicketType, sectorForm]);
 
   const createMutation = useMutation({
     mutationFn: async (data: FormData) => {
@@ -269,11 +293,25 @@ export default function SiaeTicketedEventsPage() {
 
   const onSubmitSector = (data: SectorFormData) => {
     if (!selectedEvent) return;
+    
+    // Map new ticket format to backend sector format
+    const priceValue = data.price || '0';
     const submitData = {
-      ...data,
+      sectorCode: data.sectorCode,
+      name: data.name,
+      capacity: data.capacity,
       availableSeats: data.capacity,
+      isNumbered: data.isNumbered,
+      // Map price based on ticket type
+      priceIntero: data.ticketType === 'INT' ? priceValue : '0',
+      priceRidotto: data.ticketType === 'RID' ? priceValue : '0',
+      priceOmaggio: data.ticketType === 'OMA' ? '0' : '0',
+      prevendita: data.ddp || '0',
+      ivaRate: data.ivaRate,
+      sortOrder: data.sortOrder,
+      active: data.active,
     };
-    createSectorMutation.mutate(submitData);
+    createSectorMutation.mutate(submitData as any);
   };
 
   const getStatusBadge = (status: string) => {
@@ -316,14 +354,21 @@ export default function SiaeTicketedEventsPage() {
   return (
     <div className="p-6 space-y-6" data-testid="page-siae-ticketed-events">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground flex items-center gap-3" data-testid="page-title">
-            <Ticket className="w-8 h-8 text-[#FFD700]" />
-            Eventi Biglietteria SIAE
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            Gestisci la biglietteria SIAE per i tuoi eventi
-          </p>
+        <div className="flex items-center gap-4">
+          <Link href="/events">
+            <Button variant="ghost" size="icon" data-testid="button-back-siae-events">
+              <ArrowLeft className="w-5 h-5" />
+            </Button>
+          </Link>
+          <div>
+            <h1 className="text-3xl font-bold text-foreground flex items-center gap-3" data-testid="page-title">
+              <Ticket className="w-8 h-8 text-[#FFD700]" />
+              Eventi Biglietteria SIAE
+            </h1>
+            <p className="text-muted-foreground mt-1">
+              Gestisci la biglietteria SIAE per i tuoi eventi
+            </p>
+          </div>
         </div>
         <Button
           onClick={() => setIsCreateDialogOpen(true)}
@@ -826,11 +871,13 @@ export default function SiaeTicketedEventsPage() {
       </Dialog>
 
       <Dialog open={isSectorDialogOpen} onOpenChange={setIsSectorDialogOpen}>
-        <DialogContent className="max-w-lg" data-testid="dialog-sector">
+        <DialogContent className="max-w-xl" data-testid="dialog-sector">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Plus className="w-5 h-5 text-[#FFD700]" />
-              Crea Nuovo Biglietto
+              <div className="w-8 h-8 rounded-full bg-[#FFD700]/20 flex items-center justify-center">
+                <Ticket className="w-4 h-4 text-[#FFD700]" />
+              </div>
+              Nuovo Biglietto
             </DialogTitle>
             <DialogDescription>
               Configura un nuovo tipo di biglietto per l'evento
@@ -838,167 +885,239 @@ export default function SiaeTicketedEventsPage() {
           </DialogHeader>
 
           <Form {...sectorForm}>
-            <form onSubmit={sectorForm.handleSubmit(onSubmitSector)} className="space-y-4" data-testid="form-sector">
-              <div className="grid grid-cols-2 gap-4">
+            <form onSubmit={sectorForm.handleSubmit(onSubmitSector)} className="space-y-5" data-testid="form-sector">
+              <div className="p-4 rounded-lg bg-background/50 border border-border/50 space-y-4">
+                <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                  <Settings className="w-4 h-4" />
+                  Informazioni Base
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={sectorForm.control}
+                    name="name"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Nome Biglietto</FormLabel>
+                        <FormControl>
+                          <Input {...field} placeholder="es. Ingresso Standard" data-testid="input-sector-name" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={sectorForm.control}
+                    name="sectorCode"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Codice Settore SIAE</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-sector-code">
+                              <SelectValue placeholder="Seleziona" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {sectorCodes?.map((code) => (
+                              <SelectItem key={code.code} value={code.code}>
+                                {code.code} - {code.description}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={sectorForm.control}
+                    name="capacity"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Quantità Disponibile</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            {...field}
+                            onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                            data-testid="input-sector-capacity"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={sectorForm.control}
+                    name="isNumbered"
+                    render={({ field }) => (
+                      <FormItem className="flex items-center justify-between pt-7">
+                        <FormLabel className="text-sm">Posti Numerati</FormLabel>
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                            data-testid="switch-numbered"
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </div>
+
+              <div className="p-4 rounded-lg bg-background/50 border border-border/50 space-y-4">
+                <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                  <Ticket className="w-4 h-4" />
+                  Tipo Biglietto
+                </div>
                 <FormField
                   control={sectorForm.control}
-                  name="sectorCode"
+                  name="ticketType"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Codice Settore (TAB.2)</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <div className="grid grid-cols-3 gap-3">
+                          <div
+                            onClick={() => field.onChange('INT')}
+                            className={`p-4 rounded-lg border-2 cursor-pointer transition-all ${
+                              field.value === 'INT'
+                                ? 'border-[#FFD700] bg-[#FFD700]/10'
+                                : 'border-border hover:border-[#FFD700]/50'
+                            }`}
+                            data-testid="option-ticket-intero"
+                          >
+                            <div className="text-center">
+                              <Badge className={`mb-2 ${field.value === 'INT' ? 'bg-[#FFD700] text-black' : 'bg-muted'}`}>INT</Badge>
+                              <div className="font-medium text-sm">Intero</div>
+                              <div className="text-xs text-muted-foreground">Prezzo pieno</div>
+                            </div>
+                          </div>
+                          <div
+                            onClick={() => field.onChange('RID')}
+                            className={`p-4 rounded-lg border-2 cursor-pointer transition-all ${
+                              field.value === 'RID'
+                                ? 'border-blue-400 bg-blue-400/10'
+                                : 'border-border hover:border-blue-400/50'
+                            }`}
+                            data-testid="option-ticket-ridotto"
+                          >
+                            <div className="text-center">
+                              <Badge className={`mb-2 ${field.value === 'RID' ? 'bg-blue-400 text-white' : 'bg-muted'}`}>RID</Badge>
+                              <div className="font-medium text-sm">Ridotto</div>
+                              <div className="text-xs text-muted-foreground">Prezzo ridotto</div>
+                            </div>
+                          </div>
+                          <div
+                            onClick={() => field.onChange('OMA')}
+                            className={`p-4 rounded-lg border-2 cursor-pointer transition-all ${
+                              field.value === 'OMA'
+                                ? 'border-emerald-400 bg-emerald-400/10'
+                                : 'border-border hover:border-emerald-400/50'
+                            }`}
+                            data-testid="option-ticket-omaggio"
+                          >
+                            <div className="text-center">
+                              <Badge className={`mb-2 ${field.value === 'OMA' ? 'bg-emerald-400 text-white' : 'bg-muted'}`}>OMA</Badge>
+                              <div className="font-medium text-sm">Omaggio</div>
+                              <div className="text-xs text-muted-foreground">Gratuito</div>
+                            </div>
+                          </div>
+                        </div>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="p-4 rounded-lg bg-background/50 border border-border/50 space-y-4">
+                <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                  <Euro className="w-4 h-4" />
+                  Prezzo e IVA
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={sectorForm.control}
+                    name="price"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Prezzo Biglietto</FormLabel>
                         <FormControl>
-                          <SelectTrigger data-testid="select-sector-code">
-                            <SelectValue placeholder="Seleziona" />
+                          <div className="relative">
+                            <Euro className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                            <Input
+                              {...field}
+                              type="number"
+                              step="0.01"
+                              className="pl-9"
+                              disabled={watchedTicketType === 'OMA'}
+                              data-testid="input-price"
+                            />
+                          </div>
+                        </FormControl>
+                        {watchedTicketType === 'OMA' && (
+                          <p className="text-xs text-muted-foreground">Biglietto omaggio - prezzo gratuito</p>
+                        )}
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={sectorForm.control}
+                    name="ddp"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="flex items-center gap-2">
+                          DDP
+                          <Badge variant="secondary" className="text-xs">Prevendita</Badge>
+                        </FormLabel>
+                        <FormControl>
+                          <div className="relative">
+                            <Euro className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                            <Input
+                              {...field}
+                              value={field.value ?? ""}
+                              type="number"
+                              step="0.01"
+                              className="pl-9"
+                              data-testid="input-ddp"
+                            />
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <FormField
+                  control={sectorForm.control}
+                  name="ivaRate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Aliquota IVA</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value ?? "22"}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-iva-rate" className="w-48">
+                            <SelectValue />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {sectorCodes?.map((code) => (
-                            <SelectItem key={code.code} value={code.code}>
-                              {code.code} - {code.description}
-                            </SelectItem>
-                          ))}
+                          <SelectItem value="22">22% - Standard</SelectItem>
+                          <SelectItem value="10">10% - Ridotta (Teatro/Circo)</SelectItem>
+                          <SelectItem value="4">4% - Super Ridotta</SelectItem>
+                          <SelectItem value="0">Esente IVA</SelectItem>
                         </SelectContent>
                       </Select>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-
-                <FormField
-                  control={sectorForm.control}
-                  name="name"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Nome Biglietto</FormLabel>
-                      <FormControl>
-                        <Input {...field} placeholder="es. Ingresso Standard" data-testid="input-sector-name" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={sectorForm.control}
-                  name="capacity"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Quantità</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          {...field}
-                          onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
-                          data-testid="input-sector-capacity"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={sectorForm.control}
-                  name="isNumbered"
-                  render={({ field }) => (
-                    <FormItem className="flex items-center justify-between pt-6">
-                      <FormLabel className="text-sm">Posti Numerati</FormLabel>
-                      <FormControl>
-                        <Switch
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
-                          data-testid="switch-numbered"
-                        />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              <div className="grid grid-cols-3 gap-4">
-                <FormField
-                  control={sectorForm.control}
-                  name="priceIntero"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Prezzo Intero (€)</FormLabel>
-                      <FormControl>
-                        <Input {...field} type="number" step="0.01" data-testid="input-price-full" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={sectorForm.control}
-                  name="priceRidotto"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Prezzo Ridotto (€)</FormLabel>
-                      <FormControl>
-                        <Input
-                          {...field}
-                          value={field.value ?? ""}
-                          type="number"
-                          step="0.01"
-                          data-testid="input-price-reduced"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={sectorForm.control}
-                  name="prevendita"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>DDP - Diritto di Prevendita (€)</FormLabel>
-                      <FormControl>
-                        <Input
-                          {...field}
-                          value={field.value ?? ""}
-                          type="number"
-                          step="0.01"
-                          data-testid="input-presale"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              <FormField
-                control={sectorForm.control}
-                name="ivaRate"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Aliquota IVA (%)</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value ?? "22"}>
-                      <FormControl>
-                        <SelectTrigger data-testid="select-iva-rate">
-                          <SelectValue />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="22">22%</SelectItem>
-                        <SelectItem value="10">10%</SelectItem>
-                        <SelectItem value="4">4%</SelectItem>
-                        <SelectItem value="0">Esente</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <DialogFooter>
+              <DialogFooter className="gap-2">
                 <Button type="button" variant="outline" onClick={() => setIsSectorDialogOpen(false)}>
                   Annulla
                 </Button>

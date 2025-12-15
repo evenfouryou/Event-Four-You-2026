@@ -22,6 +22,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogClose,
 } from "@/components/ui/dialog";
 import {
   AlertDialog,
@@ -97,6 +98,7 @@ import {
   Unlock,
   Volume2,
   VolumeX,
+  X,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -573,6 +575,10 @@ export default function EventHub() {
   const [statusChangeDialogOpen, setStatusChangeDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [pauseTicketingDialogOpen, setPauseTicketingDialogOpen] = useState(false);
+  const [reportDialogOpen, setReportDialogOpen] = useState(false);
+  const [reportData, setReportData] = useState<any>(null);
+  const [reportType, setReportType] = useState<'C1' | 'C2' | null>(null);
+  const [reportLoading, setReportLoading] = useState(false);
 
   const { data: event, isLoading: eventLoading } = useQuery<Event>({
     queryKey: ['/api/events', id],
@@ -719,6 +725,135 @@ export default function EventHub() {
       });
     },
   });
+
+  const handleReportC1 = async () => {
+    if (!ticketedEvent?.id) {
+      toast({ title: "Errore", description: "Nessun evento SIAE associato.", variant: "destructive" });
+      return;
+    }
+    setReportLoading(true);
+    setReportType('C1');
+    try {
+      const response = await fetch(`/api/siae/ticketed-events/${ticketedEvent.id}/reports/c1`, { credentials: 'include' });
+      if (!response.ok) throw new Error("Errore nel caricamento del report");
+      const data = await response.json();
+      setReportData(data);
+      setReportDialogOpen(true);
+    } catch (error: any) {
+      toast({ title: "Errore", description: error.message || "Impossibile generare il report C1.", variant: "destructive" });
+      setReportType(null);
+    } finally {
+      setReportLoading(false);
+    }
+  };
+
+  const handleReportC2 = async () => {
+    if (!ticketedEvent?.id) {
+      toast({ title: "Errore", description: "Nessun evento SIAE associato.", variant: "destructive" });
+      return;
+    }
+    setReportLoading(true);
+    setReportType('C2');
+    try {
+      const response = await fetch(`/api/siae/ticketed-events/${ticketedEvent.id}/reports/c2`, { credentials: 'include' });
+      if (!response.ok) throw new Error("Errore nel caricamento del report");
+      const data = await response.json();
+      setReportData(data);
+      setReportDialogOpen(true);
+    } catch (error: any) {
+      toast({ title: "Errore", description: error.message || "Impossibile generare il report C2.", variant: "destructive" });
+      setReportType(null);
+    } finally {
+      setReportLoading(false);
+    }
+  };
+
+  const handleExportXML = async () => {
+    if (!ticketedEvent?.id) {
+      toast({ title: "Errore", description: "Nessun evento SIAE associato.", variant: "destructive" });
+      return;
+    }
+    setReportLoading(true);
+    toast({ title: "Generazione XML", description: "Preparazione file XML in corso..." });
+    try {
+      const response = await fetch(`/api/siae/ticketed-events/${ticketedEvent.id}/reports/xml`, { credentials: 'include' });
+      if (!response.ok) throw new Error("Errore nel download del file XML");
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `SIAE_Report_${ticketedEvent.id}.xml`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+      toast({ title: "Download completato", description: "File XML scaricato con successo." });
+    } catch (error: any) {
+      toast({ title: "Errore", description: error.message || "Impossibile scaricare il file XML.", variant: "destructive" });
+    } finally {
+      setReportLoading(false);
+    }
+  };
+
+  const handleExportPDF = async () => {
+    if (!ticketedEvent?.id) {
+      toast({ title: "Errore", description: "Nessun evento SIAE associato.", variant: "destructive" });
+      return;
+    }
+    setReportLoading(true);
+    toast({ title: "Generazione PDF", description: "Preparazione file PDF in corso..." });
+    try {
+      const response = await fetch(`/api/siae/ticketed-events/${ticketedEvent.id}/reports/pdf`, { credentials: 'include' });
+      if (!response.ok) throw new Error("Errore nel caricamento dei dati");
+      const data = await response.json();
+      
+      const { jsPDF } = await import('jspdf');
+      const doc = new jsPDF();
+      
+      doc.setFontSize(18);
+      doc.text('Registro SIAE', 105, 20, { align: 'center' });
+      
+      doc.setFontSize(12);
+      doc.text(`Evento: ${data.eventName || 'N/D'}`, 20, 35);
+      doc.text(`Data: ${data.eventDate ? new Date(data.eventDate).toLocaleDateString('it-IT') : 'N/D'}`, 20, 42);
+      doc.text(`Luogo: ${data.eventLocation || 'N/D'}`, 20, 49);
+      doc.text(`Genere: ${data.eventGenre || 'N/D'}`, 20, 56);
+      
+      doc.setFontSize(14);
+      doc.text('Riepilogo', 20, 70);
+      doc.setFontSize(11);
+      doc.text(`Capienza Totale: ${data.summary?.totalCapacity || 0}`, 20, 78);
+      doc.text(`Biglietti Venduti: ${data.summary?.ticketsSold || 0}`, 20, 85);
+      doc.text(`Biglietti Annullati: ${data.summary?.ticketsCancelled || 0}`, 20, 92);
+      doc.text(`Incasso Totale: EUR ${(data.summary?.totalRevenue || 0).toFixed(2)}`, 20, 99);
+      doc.text(`Aliquota IVA: ${data.summary?.vatRate || 10}%`, 20, 106);
+      
+      if (data.sectors && data.sectors.length > 0) {
+        doc.setFontSize(14);
+        doc.text('Settori/Tipologie Biglietto', 20, 120);
+        doc.setFontSize(10);
+        let yPos = 128;
+        for (const sector of data.sectors) {
+          if (yPos > 270) {
+            doc.addPage();
+            yPos = 20;
+          }
+          doc.text(`${sector.name}: ${sector.soldCount}/${sector.capacity} - EUR ${sector.revenue?.toFixed(2) || '0.00'}`, 20, yPos);
+          yPos += 7;
+        }
+      }
+      
+      doc.setFontSize(8);
+      doc.text(`Generato il: ${new Date(data.generatedAt).toLocaleString('it-IT')}`, 20, 285);
+      
+      doc.save(`SIAE_Registro_${data.eventName?.replace(/[^a-zA-Z0-9]/g, '_') || 'evento'}.pdf`);
+      toast({ title: "Download completato", description: "File PDF generato con successo." });
+    } catch (error: any) {
+      toast({ title: "Errore", description: error.message || "Impossibile generare il PDF.", variant: "destructive" });
+    } finally {
+      setReportLoading(false);
+    }
+  };
 
   const addActivityLog = useCallback((item: Omit<ActivityLogItem, 'id' | 'timestamp'>) => {
     setActivityLog(prev => [{
@@ -1497,23 +1632,47 @@ export default function EventHub() {
                   </CardHeader>
                   <CardContent>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                      <Button variant="outline" className="h-auto py-4 flex flex-col gap-2" data-testid="btn-report-c1">
-                        <FileText className="h-6 w-6 text-blue-400" />
+                      <Button 
+                        variant="outline" 
+                        className="h-auto py-4 flex flex-col gap-2" 
+                        data-testid="btn-report-c1"
+                        onClick={handleReportC1}
+                        disabled={!ticketedEvent?.id || reportLoading}
+                      >
+                        {reportLoading ? <Loader2 className="h-6 w-6 animate-spin text-blue-400" /> : <FileText className="h-6 w-6 text-blue-400" />}
                         <span className="text-sm font-medium">Report C1</span>
                         <span className="text-xs text-muted-foreground">Registro Giornaliero</span>
                       </Button>
-                      <Button variant="outline" className="h-auto py-4 flex flex-col gap-2" data-testid="btn-report-c2">
-                        <FileText className="h-6 w-6 text-emerald-400" />
+                      <Button 
+                        variant="outline" 
+                        className="h-auto py-4 flex flex-col gap-2" 
+                        data-testid="btn-report-c2"
+                        onClick={handleReportC2}
+                        disabled={!ticketedEvent?.id || reportLoading}
+                      >
+                        {reportLoading ? <Loader2 className="h-6 w-6 animate-spin text-emerald-400" /> : <FileText className="h-6 w-6 text-emerald-400" />}
                         <span className="text-sm font-medium">Report C2</span>
                         <span className="text-xs text-muted-foreground">Riepilogo Evento</span>
                       </Button>
-                      <Button variant="outline" className="h-auto py-4 flex flex-col gap-2" data-testid="btn-report-xml">
-                        <Download className="h-6 w-6 text-amber-400" />
+                      <Button 
+                        variant="outline" 
+                        className="h-auto py-4 flex flex-col gap-2" 
+                        data-testid="btn-report-xml"
+                        onClick={handleExportXML}
+                        disabled={!ticketedEvent?.id || reportLoading}
+                      >
+                        {reportLoading ? <Loader2 className="h-6 w-6 animate-spin text-amber-400" /> : <Download className="h-6 w-6 text-amber-400" />}
                         <span className="text-sm font-medium">Export XML</span>
                         <span className="text-xs text-muted-foreground">Trasmissione SIAE</span>
                       </Button>
-                      <Button variant="outline" className="h-auto py-4 flex flex-col gap-2" data-testid="btn-report-pdf">
-                        <Download className="h-6 w-6 text-rose-400" />
+                      <Button 
+                        variant="outline" 
+                        className="h-auto py-4 flex flex-col gap-2" 
+                        data-testid="btn-report-pdf"
+                        onClick={handleExportPDF}
+                        disabled={!ticketedEvent?.id || reportLoading}
+                      >
+                        {reportLoading ? <Loader2 className="h-6 w-6 animate-spin text-rose-400" /> : <Download className="h-6 w-6 text-rose-400" />}
                         <span className="text-sm font-medium">Export PDF</span>
                         <span className="text-xs text-muted-foreground">Stampa Registro</span>
                       </Button>
@@ -2009,6 +2168,197 @@ export default function EventHub() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog 
+        open={reportDialogOpen} 
+        onOpenChange={(open) => {
+          setReportDialogOpen(open);
+          if (!open) {
+            setTimeout(() => {
+              setReportData(null);
+              setReportType(null);
+            }, 200);
+          }
+        }}
+      >
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader className="relative pr-8">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="absolute right-0 top-0 h-8 w-8 rounded-full"
+              onClick={() => setReportDialogOpen(false)}
+              data-testid="btn-close-report-x"
+            >
+              <X className="h-4 w-4" />
+              <span className="sr-only">Chiudi</span>
+            </Button>
+            <DialogTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              {reportType === 'C1' ? 'Report C1 - Registro Giornaliero' : 'Report C2 - Riepilogo Evento'}
+            </DialogTitle>
+            <DialogDescription>
+              Evento: {reportData?.eventName || event?.name || 'N/D'} - {reportData?.eventDate ? new Date(reportData.eventDate).toLocaleDateString('it-IT') : event?.startDatetime ? new Date(event.startDatetime).toLocaleDateString('it-IT') : 'N/D'}
+            </DialogDescription>
+          </DialogHeader>
+          
+          {reportType === 'C1' && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <Card className="bg-background/50">
+                  <CardContent className="p-4">
+                    <div className="text-2xl font-bold text-blue-400">{reportData?.totalTicketsSold || 0}</div>
+                    <div className="text-sm text-muted-foreground">Biglietti Venduti</div>
+                  </CardContent>
+                </Card>
+                <Card className="bg-background/50">
+                  <CardContent className="p-4">
+                    <div className="text-2xl font-bold text-emerald-400">EUR {(reportData?.totalRevenue || 0).toFixed(2)}</div>
+                    <div className="text-sm text-muted-foreground">Incasso Totale</div>
+                  </CardContent>
+                </Card>
+              </div>
+              
+              {reportData?.dailySales?.length > 0 && (
+                <div>
+                  <h4 className="font-semibold mb-2">Vendite per Data</h4>
+                  <div className="space-y-2">
+                    {reportData.dailySales.map((day: any) => (
+                      <div key={day.date} className="flex items-center justify-between p-3 rounded-lg bg-background/50 border">
+                        <div>
+                          <div className="font-medium">{day.date}</div>
+                          <div className="text-xs text-muted-foreground">{day.ticketsSold} biglietti</div>
+                        </div>
+                        <div className="text-right font-bold text-emerald-400">EUR {day.totalAmount.toFixed(2)}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {reportData?.sectors?.length > 0 && (
+                <div>
+                  <h4 className="font-semibold mb-2">Dettaglio Settori</h4>
+                  <div className="space-y-2">
+                    {reportData.sectors.map((sector: any) => (
+                      <div key={sector.id} className="flex items-center justify-between p-3 rounded-lg bg-background/50 border">
+                        <div>
+                          <div className="font-medium">{sector.name}</div>
+                          <div className="text-xs text-muted-foreground">{sector.soldCount}/{sector.capacity} - EUR {sector.price.toFixed(2)}/biglietto</div>
+                        </div>
+                        <div className="text-right font-bold text-emerald-400">EUR {sector.revenue.toFixed(2)}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {reportType === 'C2' && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <Card className="bg-background/50">
+                  <CardContent className="p-3">
+                    <div className="text-xl font-bold">{reportData?.summary?.totalCapacity || 0}</div>
+                    <div className="text-xs text-muted-foreground">Capienza</div>
+                  </CardContent>
+                </Card>
+                <Card className="bg-background/50">
+                  <CardContent className="p-3">
+                    <div className="text-xl font-bold text-blue-400">{reportData?.summary?.ticketsSold || 0}</div>
+                    <div className="text-xs text-muted-foreground">Venduti</div>
+                  </CardContent>
+                </Card>
+                <Card className="bg-background/50">
+                  <CardContent className="p-3">
+                    <div className="text-xl font-bold text-rose-400">{reportData?.summary?.ticketsCancelled || 0}</div>
+                    <div className="text-xs text-muted-foreground">Annullati</div>
+                  </CardContent>
+                </Card>
+                <Card className="bg-background/50">
+                  <CardContent className="p-3">
+                    <div className="text-xl font-bold text-amber-400">{reportData?.summary?.occupancyRate || 0}%</div>
+                    <div className="text-xs text-muted-foreground">Occupazione</div>
+                  </CardContent>
+                </Card>
+              </div>
+              
+              <div>
+                <h4 className="font-semibold mb-2">Dati Finanziari</h4>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="p-3 rounded-lg bg-background/50 border">
+                    <div className="text-sm text-muted-foreground">Incasso Lordo</div>
+                    <div className="font-bold text-lg">EUR {(reportData?.financials?.grossRevenue || 0).toFixed(2)}</div>
+                  </div>
+                  <div className="p-3 rounded-lg bg-background/50 border">
+                    <div className="text-sm text-muted-foreground">IVA ({reportData?.financials?.vatRate || 10}%)</div>
+                    <div className="font-bold text-lg">EUR {(reportData?.financials?.vatAmount || 0).toFixed(2)}</div>
+                  </div>
+                  <div className="p-3 rounded-lg bg-background/50 border">
+                    <div className="text-sm text-muted-foreground">Incasso Netto</div>
+                    <div className="font-bold text-lg text-emerald-400">EUR {(reportData?.financials?.netRevenue || 0).toFixed(2)}</div>
+                  </div>
+                  <div className="p-3 rounded-lg bg-background/50 border">
+                    <div className="text-sm text-muted-foreground">Transazioni</div>
+                    <div className="font-bold text-lg">{reportData?.financials?.transactionCount || 0}</div>
+                  </div>
+                </div>
+              </div>
+
+              {reportData?.paymentBreakdown?.length > 0 && (
+                <div>
+                  <h4 className="font-semibold mb-2">Metodi di Pagamento</h4>
+                  <div className="space-y-2">
+                    {reportData.paymentBreakdown.map((payment: any) => (
+                      <div key={payment.method} className="flex items-center justify-between p-3 rounded-lg bg-background/50 border">
+                        <div>
+                          <div className="font-medium capitalize">{payment.method === 'cash' ? 'Contanti' : payment.method === 'card' ? 'Carta' : payment.method}</div>
+                          <div className="text-xs text-muted-foreground">{payment.count} transazioni</div>
+                        </div>
+                        <div className="text-right font-bold">EUR {payment.amount.toFixed(2)}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {reportData?.sectorBreakdown?.length > 0 && (
+                <div>
+                  <h4 className="font-semibold mb-2">Dettaglio per Settore</h4>
+                  <div className="space-y-2">
+                    {reportData.sectorBreakdown.map((sector: any) => (
+                      <div key={sector.id} className="p-3 rounded-lg bg-background/50 border">
+                        <div className="flex items-center justify-between mb-1">
+                          <div className="font-medium">{sector.name}</div>
+                          <Badge variant="secondary">{sector.sectorCode || 'N/D'}</Badge>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2 text-sm">
+                          <div>
+                            <span className="text-muted-foreground">Venduti:</span> {sector.ticketsSold}/{sector.capacity}
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">Lordo:</span> EUR {sector.grossRevenue.toFixed(2)}
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">Netto:</span> EUR {sector.netRevenue.toFixed(2)}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setReportDialogOpen(false)} data-testid="btn-close-report">
+              Chiudi
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

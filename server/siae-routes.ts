@@ -1950,6 +1950,299 @@ router.get('/smart-card/verify-emission', requireAuth, async (req: Request, res:
   }
 });
 
+// ==================== SIAE Reports ====================
+
+// C1 Report - Daily Register (Registro Giornaliero)
+router.get('/api/siae/ticketed-events/:id/reports/c1', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const event = await siaeStorage.getSiaeTicketedEvent(id);
+    if (!event) {
+      return res.status(404).json({ message: "Evento non trovato" });
+    }
+
+    const sectors = await siaeStorage.getSiaeEventSectorsByEvent(id);
+    const transactions = await siaeStorage.getSiaeTransactionsByEvent(id);
+    const tickets = await siaeStorage.getSiaeTicketsByEvent(id);
+
+    const salesByDate: Record<string, { 
+      date: string; 
+      ticketsSold: number; 
+      totalAmount: number;
+      byTicketType: Record<string, { name: string; quantity: number; amount: number }>;
+    }> = {};
+
+    for (const tx of transactions) {
+      if (tx.status !== 'completed') continue;
+      const dateStr = tx.transactionDate ? new Date(tx.transactionDate).toISOString().split('T')[0] : 'N/D';
+      
+      if (!salesByDate[dateStr]) {
+        salesByDate[dateStr] = {
+          date: dateStr,
+          ticketsSold: 0,
+          totalAmount: 0,
+          byTicketType: {},
+        };
+      }
+      
+      salesByDate[dateStr].ticketsSold += tx.ticketsCount || 0;
+      salesByDate[dateStr].totalAmount += Number(tx.totalAmount) || 0;
+
+      const txTickets = tickets.filter(t => t.transactionId === tx.id);
+      for (const ticket of txTickets) {
+        const sector = sectors.find(s => s.id === ticket.sectorId);
+        const sectorName = sector?.name || 'Sconosciuto';
+        if (!salesByDate[dateStr].byTicketType[sectorName]) {
+          salesByDate[dateStr].byTicketType[sectorName] = { name: sectorName, quantity: 0, amount: 0 };
+        }
+        salesByDate[dateStr].byTicketType[sectorName].quantity += 1;
+        salesByDate[dateStr].byTicketType[sectorName].amount += Number(ticket.ticketPrice) || 0;
+      }
+    }
+
+    const dailySales = Object.values(salesByDate).sort((a, b) => a.date.localeCompare(b.date));
+
+    res.json({
+      reportType: 'C1',
+      reportName: 'Registro Giornaliero',
+      eventId: id,
+      eventName: event.eventName,
+      eventDate: event.eventDate,
+      generatedAt: new Date().toISOString(),
+      totalTicketsSold: event.ticketsSold || 0,
+      totalRevenue: Number(event.totalRevenue) || 0,
+      dailySales,
+      sectors: sectors.map(s => ({
+        id: s.id,
+        name: s.name,
+        capacity: s.capacity,
+        availableSeats: s.availableSeats,
+        soldCount: s.capacity - s.availableSeats,
+        price: Number(s.price) || 0,
+        revenue: (s.capacity - s.availableSeats) * (Number(s.price) || 0),
+      })),
+    });
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// C2 Report - Event Summary (Riepilogo Evento)
+router.get('/api/siae/ticketed-events/:id/reports/c2', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const event = await siaeStorage.getSiaeTicketedEvent(id);
+    if (!event) {
+      return res.status(404).json({ message: "Evento non trovato" });
+    }
+
+    const sectors = await siaeStorage.getSiaeEventSectorsByEvent(id);
+    const transactions = await siaeStorage.getSiaeTransactionsByEvent(id);
+    
+    const completedTransactions = transactions.filter(tx => tx.status === 'completed');
+    const totalRevenue = completedTransactions.reduce((sum, tx) => sum + (Number(tx.totalAmount) || 0), 0);
+    const ticketsSold = completedTransactions.reduce((sum, tx) => sum + (tx.ticketsCount || 0), 0);
+
+    const vatRate = event.vatRate || 10;
+    const vatAmount = totalRevenue * (vatRate / (100 + vatRate));
+    const netRevenue = totalRevenue - vatAmount;
+
+    const paymentBreakdown: Record<string, { method: string; count: number; amount: number }> = {};
+    for (const tx of completedTransactions) {
+      const method = tx.paymentMethod || 'other';
+      if (!paymentBreakdown[method]) {
+        paymentBreakdown[method] = { method, count: 0, amount: 0 };
+      }
+      paymentBreakdown[method].count += 1;
+      paymentBreakdown[method].amount += Number(tx.totalAmount) || 0;
+    }
+
+    const sectorBreakdown = sectors.map(s => {
+      const soldCount = s.capacity - s.availableSeats;
+      const sectorRevenue = soldCount * (Number(s.price) || 0);
+      const sectorVat = sectorRevenue * (vatRate / (100 + vatRate));
+      return {
+        id: s.id,
+        name: s.name,
+        sectorCode: s.sectorCode,
+        ticketTypeCode: s.ticketTypeCode,
+        capacity: s.capacity,
+        ticketsSold: soldCount,
+        availableSeats: s.availableSeats,
+        price: Number(s.price) || 0,
+        grossRevenue: sectorRevenue,
+        vatAmount: sectorVat,
+        netRevenue: sectorRevenue - sectorVat,
+      };
+    });
+
+    res.json({
+      reportType: 'C2',
+      reportName: 'Riepilogo Evento',
+      eventId: id,
+      eventName: event.eventName,
+      eventDate: event.eventDate,
+      eventGenre: event.eventGenre,
+      eventLocation: event.eventLocation,
+      generatedAt: new Date().toISOString(),
+      summary: {
+        totalCapacity: event.totalCapacity || 0,
+        ticketsSold,
+        ticketsCancelled: event.ticketsCancelled || 0,
+        occupancyRate: event.totalCapacity ? ((ticketsSold / event.totalCapacity) * 100).toFixed(2) : 0,
+      },
+      financials: {
+        grossRevenue: totalRevenue,
+        vatRate,
+        vatAmount,
+        netRevenue,
+        transactionCount: completedTransactions.length,
+      },
+      paymentBreakdown: Object.values(paymentBreakdown),
+      sectorBreakdown,
+    });
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// XML Report - SIAE Transmission Format
+router.get('/api/siae/ticketed-events/:id/reports/xml', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const event = await siaeStorage.getSiaeTicketedEvent(id);
+    if (!event) {
+      return res.status(404).json({ message: "Evento non trovato" });
+    }
+
+    const sectors = await siaeStorage.getSiaeEventSectorsByEvent(id);
+    const tickets = await siaeStorage.getSiaeTicketsByEvent(id);
+
+    const eventDateStr = event.eventDate ? new Date(event.eventDate).toISOString().split('T')[0] : '';
+    const generatedAt = new Date().toISOString();
+    
+    let xmlContent = `<?xml version="1.0" encoding="UTF-8"?>
+<SIAETransmission xmlns="http://www.siae.it/biglietteria">
+  <Header>
+    <VersioneSchema>1.0</VersioneSchema>
+    <DataOraCreazione>${generatedAt}</DataOraCreazione>
+    <TipoTrasmissione>RENDICONTO</TipoTrasmissione>
+  </Header>
+  <Evento>
+    <CodiceEvento>${event.id}</CodiceEvento>
+    <NomeEvento><![CDATA[${event.eventName || ''}]]></NomeEvento>
+    <DataEvento>${eventDateStr}</DataEvento>
+    <LuogoEvento><![CDATA[${event.eventLocation || ''}]]></LuogoEvento>
+    <GenereEvento>${event.eventGenre || ''}</GenereEvento>
+    <CapienzaTotale>${event.totalCapacity || 0}</CapienzaTotale>
+    <BigliettiVenduti>${event.ticketsSold || 0}</BigliettiVenduti>
+    <BigliettiAnnullati>${event.ticketsCancelled || 0}</BigliettiAnnullati>
+    <IncassoTotale>${Number(event.totalRevenue || 0).toFixed(2)}</IncassoTotale>
+    <AliquotaIVA>${event.vatRate || 10}</AliquotaIVA>
+  </Evento>
+  <Settori>
+${sectors.map(s => `    <Settore>
+      <CodiceSettore>${s.sectorCode || ''}</CodiceSettore>
+      <NomeSettore><![CDATA[${s.name || ''}]]></NomeSettore>
+      <TipoBiglietto>${s.ticketTypeCode || ''}</TipoBiglietto>
+      <Capienza>${s.capacity || 0}</Capienza>
+      <BigliettiVenduti>${s.capacity - s.availableSeats}</BigliettiVenduti>
+      <PostiDisponibili>${s.availableSeats || 0}</PostiDisponibili>
+      <Prezzo>${Number(s.price || 0).toFixed(2)}</Prezzo>
+      <Incasso>${((s.capacity - s.availableSeats) * Number(s.price || 0)).toFixed(2)}</Incasso>
+    </Settore>`).join('\n')}
+  </Settori>
+  <Biglietti>
+${tickets.slice(0, 1000).map(t => `    <Biglietto>
+      <CodiceBiglietto>${t.ticketCode || ''}</CodiceBiglietto>
+      <NumeroProgressivo>${t.progressiveNumber || ''}</NumeroProgressivo>
+      <SigilloFiscale>${t.fiscalSealId || ''}</SigilloFiscale>
+      <Stato>${t.status || ''}</Stato>
+      <Prezzo>${Number(t.ticketPrice || 0).toFixed(2)}</Prezzo>
+      <DataEmissione>${t.emissionDate ? new Date(t.emissionDate).toISOString() : ''}</DataEmissione>
+    </Biglietto>`).join('\n')}
+  </Biglietti>
+</SIAETransmission>`;
+
+    res.setHeader('Content-Type', 'application/xml');
+    res.setHeader('Content-Disposition', `attachment; filename="SIAE_${event.eventName?.replace(/[^a-zA-Z0-9]/g, '_')}_${eventDateStr}.xml"`);
+    res.send(xmlContent);
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// PDF Report data - Returns data for frontend PDF generation
+router.get('/api/siae/ticketed-events/:id/reports/pdf', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const event = await siaeStorage.getSiaeTicketedEvent(id);
+    if (!event) {
+      return res.status(404).json({ message: "Evento non trovato" });
+    }
+
+    const sectors = await siaeStorage.getSiaeEventSectorsByEvent(id);
+    const transactions = await siaeStorage.getSiaeTransactionsByEvent(id);
+    const tickets = await siaeStorage.getSiaeTicketsByEvent(id);
+
+    const completedTransactions = transactions.filter(tx => tx.status === 'completed');
+    const totalRevenue = completedTransactions.reduce((sum, tx) => sum + (Number(tx.totalAmount) || 0), 0);
+
+    const salesByDate: Record<string, { 
+      date: string; 
+      ticketsSold: number; 
+      totalAmount: number;
+    }> = {};
+
+    for (const tx of completedTransactions) {
+      const dateStr = tx.transactionDate ? new Date(tx.transactionDate).toISOString().split('T')[0] : 'N/D';
+      if (!salesByDate[dateStr]) {
+        salesByDate[dateStr] = { date: dateStr, ticketsSold: 0, totalAmount: 0 };
+      }
+      salesByDate[dateStr].ticketsSold += tx.ticketsCount || 0;
+      salesByDate[dateStr].totalAmount += Number(tx.totalAmount) || 0;
+    }
+
+    res.json({
+      reportType: 'PDF',
+      reportName: 'Registro SIAE - Stampa',
+      eventId: id,
+      eventName: event.eventName,
+      eventDate: event.eventDate,
+      eventLocation: event.eventLocation,
+      eventGenre: event.eventGenre,
+      generatedAt: new Date().toISOString(),
+      summary: {
+        totalCapacity: event.totalCapacity || 0,
+        ticketsSold: event.ticketsSold || 0,
+        ticketsCancelled: event.ticketsCancelled || 0,
+        totalRevenue,
+        vatRate: event.vatRate || 10,
+      },
+      dailySales: Object.values(salesByDate).sort((a, b) => a.date.localeCompare(b.date)),
+      sectors: sectors.map(s => ({
+        name: s.name,
+        sectorCode: s.sectorCode,
+        ticketTypeCode: s.ticketTypeCode,
+        capacity: s.capacity,
+        soldCount: s.capacity - s.availableSeats,
+        availableSeats: s.availableSeats,
+        price: Number(s.price) || 0,
+        revenue: (s.capacity - s.availableSeats) * (Number(s.price) || 0),
+      })),
+      ticketsSample: tickets.slice(0, 50).map(t => ({
+        ticketCode: t.ticketCode,
+        progressiveNumber: t.progressiveNumber,
+        status: t.status,
+        price: Number(t.ticketPrice) || 0,
+        emissionDate: t.emissionDate,
+      })),
+    });
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
 // Log seal generation
 router.post('/smart-card/seal-log', requireAuth, async (req: Request, res: Response) => {
   try {
