@@ -6,6 +6,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { insertEventSchema, type Location as LocationType, type EventFormat, type InsertEvent, type SiaeEventGenre, type SiaeSectorCode } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -102,6 +103,7 @@ export default function EventWizard() {
   const [, params] = useRoute("/events/wizard/:id?");
   const [, navigate] = useLocation();
   const { toast } = useToast();
+  const { user } = useAuth();
   const [currentStep, setCurrentStep] = useState(1);
   const [draftId, setDraftId] = useState<string | null>(params?.id || null);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
@@ -303,6 +305,7 @@ export default function EventWizard() {
           // Create SIAE ticketed event
           const siaeEventData = {
             eventId: savedEvent.id,
+            companyId: user?.companyId,
             genreCode: siaeGenreCode,
             taxType: siaeTaxType,
             totalCapacity: siaeSectors.reduce((sum, s) => sum + s.quantity, 0),
