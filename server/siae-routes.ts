@@ -2530,11 +2530,34 @@ router.patch("/api/cashiers/allocations/:id", requireAuth, requireGestore, async
 
 // POST /api/cashiers/events/:eventId/tickets - Emit ticket from cashier
 // Uses atomic transaction to prevent race conditions on quota
+// REQUIRES: Bridge SIAE connected for fiscal seal generation
 router.post("/api/cashiers/events/:eventId/tickets", requireAuth, async (req: Request, res: Response) => {
   try {
     const user = req.user as any;
     const { eventId } = req.params;
-    const { sectorId, ticketType, price, participantFirstName, participantLastName, participantPhone, participantEmail, paymentMethod } = req.body;
+    const { sectorId, ticketType, price, participantFirstName, participantLastName, participantPhone, participantEmail, paymentMethod, skipFiscalSeal } = req.body;
+    
+    // Check if bridge is connected (REQUIRED for fiscal seal emission)
+    // Super admin can skip fiscal seal for testing purposes
+    const canSkipSeal = user.role === 'super_admin' && skipFiscalSeal === true;
+    
+    if (!canSkipSeal) {
+      if (!isBridgeConnected()) {
+        return res.status(503).json({ 
+          message: "Bridge SIAE non connesso. Avviare l'applicazione desktop Event4U per emettere biglietti con sigillo fiscale.",
+          errorCode: "BRIDGE_NOT_CONNECTED"
+        });
+      }
+      
+      // Check if card is ready for seal emission
+      const cardReady = isCardReadyForSeals();
+      if (!cardReady.ready) {
+        return res.status(503).json({ 
+          message: cardReady.error || "Smart Card SIAE non pronta. Verificare che la carta sia inserita nel lettore.",
+          errorCode: "CARD_NOT_READY"
+        });
+      }
+    }
     
     // Check for active box office session (cassiere role check)
     const isCashierRole = user.role === 'cassiere';
@@ -2582,6 +2605,44 @@ router.post("/api/cashiers/events/:eventId/tickets", requireAuth, async (req: Re
       return res.status(404).json({ message: "Evento non trovato" });
     }
     
+    // Calculate ticket price before requesting seal
+    const ticketPrice = price || Number(sector.price) || 0;
+    const priceInCents = Math.round(ticketPrice * 100);
+    
+    // Request fiscal seal from bridge BEFORE creating ticket (only if not skipped)
+    // This is a HARD STOP - no DB operations until seal is confirmed
+    let fiscalSealData: any = null;
+    if (!canSkipSeal) {
+      try {
+        console.log(`[CashierTicket] Requesting fiscal seal for €${ticketPrice}...`);
+        fiscalSealData = await requestFiscalSeal(priceInCents);
+        console.log(`[CashierTicket] Fiscal seal obtained: counter=${fiscalSealData.counter}, sealNumber=${fiscalSealData.sealNumber}`);
+      } catch (sealError: any) {
+        console.error(`[CashierTicket] Failed to obtain fiscal seal:`, sealError.message);
+        
+        // Audit log per tentativo fallito (prima di restituire errore)
+        try {
+          await siaeStorage.createAuditLog({
+            companyId: user.companyId,
+            userId: user.id,
+            action: 'ticket_emission_failed',
+            entityType: 'ticket',
+            entityId: eventId,
+            description: `Tentativo emissione biglietto fallito - Sigillo fiscale non ottenuto: ${sealError.message}`,
+            ipAddress: (req.ip || '').substring(0, 45),
+            userAgent: (req.get('user-agent') || '').substring(0, 500)
+          });
+        } catch (auditError: any) {
+          console.warn(`[CashierTicket] Failed to create audit log for failed emission:`, auditError.message);
+        }
+        
+        return res.status(503).json({ 
+          message: `Impossibile ottenere sigillo fiscale: ${sealError.message}`,
+          errorCode: "SEAL_GENERATION_FAILED"
+        });
+      }
+    }
+    
     // Get or create customer if participant data provided
     let customerId: string | null = null;
     if (participantPhone || participantEmail) {
@@ -2611,9 +2672,9 @@ router.post("/api/cashiers/events/:eventId/tickets", requireAuth, async (req: Re
       }
     }
     
-    // ATOMIC TRANSACTION: Reserve quota and emit ticket
-    const ticketPrice = price || Number(sector.price) || 0;
-    const ticketCode = `${event.eventCode || 'TK'}-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+    // Generate ticket code including fiscal seal info if available
+    const sealSuffix = fiscalSealData ? `-${fiscalSealData.counter}` : '';
+    const ticketCode = `${event.eventCode || 'TK'}-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}${sealSuffix}`;
     
     const result = await siaeStorage.emitTicketWithAtomicQuota({
       allocationId: allocation.id,
@@ -2647,22 +2708,39 @@ router.post("/api/cashiers/events/:eventId/tickets", requireAuth, async (req: Re
       operationType: 'emission',
       performedBy: user.id,
       reason: null,
-      metadata: { paymentMethod, ticketType, price: ticketPrice }
+      metadata: { 
+        paymentMethod, 
+        ticketType, 
+        price: ticketPrice,
+        fiscalSeal: fiscalSealData ? {
+          sealNumber: fiscalSealData.sealNumber,
+          sealCode: fiscalSealData.sealCode,
+          serialNumber: fiscalSealData.serialNumber,
+          counter: fiscalSealData.counter,
+          mac: fiscalSealData.mac,
+          dateTime: fiscalSealData.dateTime
+        } : null
+      }
     });
     
     // General audit log
+    const sealInfo = fiscalSealData ? ` (Sigillo: ${fiscalSealData.counter})` : '';
     await siaeStorage.createAuditLog({
       companyId: user.companyId,
       userId: user.id,
       action: 'ticket_emitted',
       entityType: 'ticket',
       entityId: result.ticket!.id,
-      description: `Emesso biglietto ${ticketCode} - €${ticketPrice}`,
+      description: `Emesso biglietto ${ticketCode} - €${ticketPrice}${sealInfo}`,
       ipAddress: (req.ip || '').substring(0, 45),
       userAgent: (req.get('user-agent') || '').substring(0, 500)
     });
     
-    res.status(201).json(result.ticket);
+    // Return ticket with fiscal seal data
+    res.status(201).json({
+      ...result.ticket,
+      fiscalSeal: fiscalSealData || null
+    });
   } catch (error: any) {
     res.status(500).json({ message: error.message });
   }
@@ -2684,6 +2762,7 @@ router.get("/api/cashiers/events/:eventId/today-tickets", requireAuth, async (re
 
 // PATCH /api/siae/tickets/:id/cancel - Cancel a ticket
 // Uses atomic transaction to prevent race conditions on quota restoration
+// Registers fiscal cancellation via bridge if available
 router.patch("/api/siae/tickets/:id/cancel", requireAuth, async (req: Request, res: Response) => {
   try {
     const user = req.user as any;
@@ -2716,6 +2795,83 @@ router.patch("/api/siae/tickets/:id/cancel", requireAuth, async (req: Request, r
       });
     }
     
+    // HARD STOP: Bridge SIAE OBBLIGATORIO per annullamento fiscale
+    // L'annullamento fiscale è OBBLIGATORIO, non opzionale
+    // Super admin può bypassare solo se esplicitamente richiesto
+    const canBypassBridge = user.role === 'super_admin' && req.body.skipFiscalCancellation === true;
+    
+    if (!canBypassBridge) {
+      if (!isBridgeConnected()) {
+        // Audit log per tentativo di annullamento senza bridge
+        try {
+          await siaeStorage.createAuditLog({
+            companyId: user.companyId,
+            userId: user.id,
+            action: 'ticket_cancellation_blocked',
+            entityType: 'ticket',
+            entityId: id,
+            description: `Tentativo annullamento biglietto ${ticket.ticketCode} bloccato - Bridge SIAE non connesso`,
+            ipAddress: (req.ip || '').substring(0, 45),
+            userAgent: (req.get('user-agent') || '').substring(0, 500)
+          });
+        } catch (auditError: any) {
+          console.warn(`[TicketCancel] Failed to create audit log for blocked cancellation:`, auditError.message);
+        }
+        
+        return res.status(503).json({ 
+          message: "Bridge SIAE richiesto per annullamento fiscale. Avviare l'applicazione desktop Event4U prima di procedere.",
+          errorCode: "BRIDGE_REQUIRED_FOR_CANCELLATION"
+        });
+      }
+      
+      const cardReady = isCardReadyForSeals();
+      if (!cardReady.ready) {
+        return res.status(503).json({ 
+          message: cardReady.error || "Smart Card SIAE non pronta. Verificare che la carta sia inserita nel lettore.",
+          errorCode: "CARD_NOT_READY_FOR_CANCELLATION"
+        });
+      }
+    }
+    
+    // Register fiscal cancellation via bridge (OBBLIGATORIO se bridge richiesto)
+    let fiscalCancellationRegistered = false;
+    let fiscalCancellationData: any = null;
+    
+    if (!canBypassBridge) {
+      try {
+        console.log(`[TicketCancel] Registering fiscal cancellation for ticket ${ticket.ticketCode}...`);
+        // Request a cancellation seal (price 0 to indicate cancellation)
+        fiscalCancellationData = await requestFiscalSeal(0);
+        fiscalCancellationRegistered = true;
+        console.log(`[TicketCancel] Fiscal cancellation registered: counter=${fiscalCancellationData.counter}`);
+      } catch (sealError: any) {
+        console.error(`[TicketCancel] Failed to register fiscal cancellation:`, sealError.message);
+        
+        // Audit log per tentativo fallito
+        try {
+          await siaeStorage.createAuditLog({
+            companyId: user.companyId,
+            userId: user.id,
+            action: 'ticket_cancellation_failed',
+            entityType: 'ticket',
+            entityId: id,
+            description: `Annullamento biglietto ${ticket.ticketCode} fallito - Errore sigillo fiscale: ${sealError.message}`,
+            ipAddress: (req.ip || '').substring(0, 45),
+            userAgent: (req.get('user-agent') || '').substring(0, 500)
+          });
+        } catch (auditError: any) {
+          console.warn(`[TicketCancel] Failed to create audit log for failed cancellation:`, auditError.message);
+        }
+        
+        return res.status(503).json({ 
+          message: `Impossibile registrare annullamento fiscale: ${sealError.message}`,
+          errorCode: "FISCAL_CANCELLATION_FAILED"
+        });
+      }
+    } else {
+      console.log(`[TicketCancel] Super admin bypassing fiscal cancellation for ticket ${ticket.ticketCode}`);
+    }
+    
     // ATOMIC TRANSACTION: Cancel ticket and restore quota
     const result = await siaeStorage.cancelTicketWithAtomicQuotaRestore({
       ticketId: id,
@@ -2741,22 +2897,37 @@ router.patch("/api/siae/tickets/:id/cancel", requireAuth, async (req: Request, r
       operationType: 'cancellation',
       performedBy: user.id,
       reason,
-      metadata: { originalPrice: ticket.ticketPrice, cancelledBy: user.fullName || user.username }
+      metadata: { 
+        originalPrice: ticket.ticketPrice, 
+        cancelledBy: user.fullName || user.username,
+        originalTicketCode: ticket.ticketCode,
+        fiscalCancellation: fiscalCancellationData ? {
+          registered: true,
+          sealNumber: fiscalCancellationData.sealNumber,
+          counter: fiscalCancellationData.counter,
+          serialNumber: fiscalCancellationData.serialNumber,
+          dateTime: fiscalCancellationData.dateTime
+        } : { registered: false }
+      }
     });
     
     // General audit log
+    const fiscalInfo = fiscalCancellationRegistered ? ' (Registrato fiscalmente)' : '';
     await siaeStorage.createAuditLog({
       companyId: user.companyId,
       userId: user.id,
       action: 'ticket_cancelled',
       entityType: 'ticket',
       entityId: id,
-      description: `Annullato biglietto ${ticket.ticketCode} - Motivo: ${reason}`,
+      description: `Annullato biglietto ${ticket.ticketCode} - Motivo: ${reason}${fiscalInfo}`,
       ipAddress: (req.ip || '').substring(0, 45),
       userAgent: (req.get('user-agent') || '').substring(0, 500)
     });
     
-    res.json(result.ticket);
+    res.json({
+      ...result.ticket,
+      fiscalCancellationRegistered
+    });
   } catch (error: any) {
     res.status(500).json({ message: error.message });
   }

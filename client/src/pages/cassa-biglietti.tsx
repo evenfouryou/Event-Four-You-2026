@@ -6,6 +6,7 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { type SiaeTicketedEvent, type SiaeEventSector, type SiaeTicket, type SiaeCashierAllocation } from "@shared/schema";
+import { useSmartCardStatus } from "@/lib/smart-card-service";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -61,11 +62,15 @@ import {
   Users,
   Plus,
   CheckCircle2,
+  Wifi,
+  WifiOff,
+  Radio,
 } from "lucide-react";
 
 export default function CassaBigliettiPage() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const smartCardStatus = useSmartCardStatus();
   const [selectedEventId, setSelectedEventId] = useState<string>("");
   const [selectedSectorId, setSelectedSectorId] = useState<string>("");
   const [ticketType, setTicketType] = useState<string>("intero");
@@ -82,6 +87,15 @@ export default function CassaBigliettiPage() {
 
   const companyId = user?.companyId;
   const isGestore = user?.role === "gestore" || user?.role === "admin" || user?.role === "super_admin";
+  const isSuperAdmin = user?.role === "super_admin";
+  
+  // Bridge status for fiscal seal emission
+  // IMPORTANTE: cardInserted deve essere true, non solo readerDetected
+  const bridgeConnected = smartCardStatus.bridgeConnected;
+  const cardInserted = smartCardStatus.cardInserted === true;
+  const readerDetected = smartCardStatus.readerDetected === true;
+  const cardReady = cardInserted && readerDetected;
+  const canEmitTickets = bridgeConnected && cardReady;
 
   const { data: events, isLoading: eventsLoading } = useQuery<SiaeTicketedEvent[]>({
     queryKey: ["/api/siae/ticketed-events"],
@@ -131,7 +145,16 @@ export default function CassaBigliettiPage() {
       let title = "Errore Emissione";
       let description = error.message || "Errore durante l'emissione del biglietto";
       
-      if (error.message?.includes("QUOTA_EXCEEDED") || error.message?.includes("quota")) {
+      if (error.message?.includes("BRIDGE_NOT_CONNECTED") || error.message?.includes("Bridge SIAE non connesso")) {
+        title = "Bridge SIAE Non Connesso";
+        description = "Avviare l'applicazione desktop Event4U per emettere biglietti con sigillo fiscale.";
+      } else if (error.message?.includes("CARD_NOT_READY") || error.message?.includes("Smart Card")) {
+        title = "Smart Card Non Pronta";
+        description = "Verificare che la Smart Card SIAE sia inserita correttamente nel lettore.";
+      } else if (error.message?.includes("SEAL_GENERATION_FAILED") || error.message?.includes("sigillo fiscale")) {
+        title = "Errore Sigillo Fiscale";
+        description = "Impossibile ottenere il sigillo fiscale. Verificare la connessione con il bridge.";
+      } else if (error.message?.includes("QUOTA_EXCEEDED") || error.message?.includes("quota")) {
         title = "Quota Esaurita";
         description = "La tua quota biglietti è esaurita. Contatta il gestore per aumentarla.";
       } else if (error.message?.includes("NO_ACTIVE_SESSION") || error.message?.includes("sessione cassa")) {
@@ -185,11 +208,46 @@ export default function CassaBigliettiPage() {
     },
   });
 
+  const handleFormSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!canEmitTickets && !isSuperAdmin) {
+      toast({
+        title: "Bridge non disponibile",
+        description: !bridgeConnected 
+          ? "Connetti il bridge SIAE per emettere biglietti"
+          : "Inserisci la Smart Card SIAE nel lettore",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    handleEmitTicket();
+  };
+
   const handleEmitTicket = () => {
     if (!selectedEventId) {
       toast({
         title: "Errore",
         description: "Seleziona un evento",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    if (!selectedSectorId) {
+      toast({
+        title: "Errore",
+        description: "Seleziona un settore",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    if (quotaRemaining <= 0) {
+      toast({
+        title: "Quota Esaurita",
+        description: "La tua quota biglietti è esaurita. Contatta il gestore per aumentarla.",
         variant: "destructive",
       });
       return;
@@ -233,6 +291,35 @@ export default function CassaBigliettiPage() {
         </div>
 
         <div className="flex items-center gap-3">
+          {/* Bridge SIAE Status Indicator */}
+          <div 
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-md border ${
+              canEmitTickets 
+                ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400" 
+                : bridgeConnected 
+                  ? "bg-yellow-500/10 border-yellow-500/30 text-yellow-500"
+                  : "bg-red-500/10 border-red-500/30 text-red-400"
+            }`}
+            data-testid="bridge-status-indicator"
+          >
+            {canEmitTickets ? (
+              <>
+                <Wifi className="w-4 h-4" />
+                <span className="text-sm font-medium">Bridge Connesso</span>
+              </>
+            ) : bridgeConnected ? (
+              <>
+                <Radio className="w-4 h-4" />
+                <span className="text-sm font-medium">Inserire Smart Card</span>
+              </>
+            ) : (
+              <>
+                <WifiOff className="w-4 h-4" />
+                <span className="text-sm font-medium">Bridge Non Connesso</span>
+              </>
+            )}
+          </div>
+
           <Select value={selectedEventId} onValueChange={setSelectedEventId}>
             <SelectTrigger className="w-[280px]" data-testid="select-event">
               <SelectValue placeholder="Seleziona evento..." />
@@ -339,6 +426,7 @@ export default function CassaBigliettiPage() {
                   Emissione Biglietto
                 </CardTitle>
               </CardHeader>
+              <form onSubmit={handleFormSubmit}>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
                   <Label>Settore</Label>
@@ -439,10 +527,10 @@ export default function CassaBigliettiPage() {
                 </div>
 
                 <Button
+                  type="submit"
                   className="w-full"
                   size="lg"
-                  onClick={handleEmitTicket}
-                  disabled={emitTicketMutation.isPending || quotaRemaining <= 0 || !selectedSectorId}
+                  disabled={emitTicketMutation.isPending || quotaRemaining <= 0 || !selectedSectorId || (!canEmitTickets && !isSuperAdmin)}
                   data-testid="button-emit-ticket"
                 >
                   {emitTicketMutation.isPending ? (
@@ -458,6 +546,17 @@ export default function CassaBigliettiPage() {
                   )}
                 </Button>
 
+                {!canEmitTickets && !isSuperAdmin && (
+                  <div className="flex items-center gap-2 text-sm text-yellow-500 p-2 rounded-md bg-yellow-500/10 border border-yellow-500/30">
+                    <WifiOff className="w-4 h-4 flex-shrink-0" />
+                    <span>
+                      {!bridgeConnected 
+                        ? "Avviare l'app desktop Event4U per emettere biglietti fiscali."
+                        : "Inserire la Smart Card SIAE nel lettore."}
+                    </span>
+                  </div>
+                )}
+
                 {quotaRemaining <= 0 && (
                   <div className="flex items-center gap-2 text-sm text-red-500">
                     <AlertCircle className="w-4 h-4" />
@@ -465,6 +564,7 @@ export default function CassaBigliettiPage() {
                   </div>
                 )}
               </CardContent>
+              </form>
             </Card>
 
             <Card className="glass-card lg:col-span-2" data-testid="card-today-tickets">

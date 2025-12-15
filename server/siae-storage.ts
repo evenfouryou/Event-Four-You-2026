@@ -1602,24 +1602,32 @@ export class SiaeStorage implements ISiaeStorage {
   }): Promise<{ success: boolean; ticket?: SiaeTicket; error?: string }> {
     try {
       const result = await db.transaction(async (tx) => {
-        // Step 1: Atomically check and increment quota
-        const [updatedAllocation] = await tx
+        // Step 1: Lock row with SELECT FOR UPDATE to prevent race conditions
+        const lockedAllocation = await tx.execute(
+          sql`SELECT * FROM siae_cashier_allocations 
+              WHERE id = ${params.allocationId} FOR UPDATE`
+        );
+        
+        const allocation = lockedAllocation.rows?.[0] as any;
+        if (!allocation) {
+          throw new Error("ALLOCATION_NOT_FOUND");
+        }
+        
+        // Check quota AFTER acquiring lock
+        if (allocation.quota_used >= allocation.quota_quantity) {
+          throw new Error("QUOTA_EXCEEDED");
+        }
+        
+        // Step 2: Now safe to update quota (row is locked)
+        await tx
           .update(siaeCashierAllocations)
           .set({
             quotaUsed: sql`${siaeCashierAllocations.quotaUsed} + 1`,
             updatedAt: new Date()
           })
-          .where(and(
-            eq(siaeCashierAllocations.id, params.allocationId),
-            sql`${siaeCashierAllocations.quotaUsed} < ${siaeCashierAllocations.quotaQuantity}`
-          ))
-          .returning();
+          .where(eq(siaeCashierAllocations.id, params.allocationId));
 
-        if (!updatedAllocation) {
-          throw new Error("QUOTA_EXCEEDED");
-        }
-
-        // Step 2: Create ticket
+        // Step 3: Create ticket
         const progressiveNumber = params.currentTicketsSold + 1;
         const [ticket] = await tx
           .insert(siaeTickets)

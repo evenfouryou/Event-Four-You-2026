@@ -494,7 +494,7 @@ export function AppSidebar() {
     );
   }
 
-  // PR menu - pannello dedicato
+  // PR menu - pannello dedicato (PR semplice non può scansionare)
   if (isPr) {
     menuItems.push(
       {
@@ -508,12 +508,6 @@ export function AppSidebar() {
         icon: Calendar,
         url: "/staff-pr-home",
         group: "Gestione",
-      },
-      {
-        title: "Scanner QR",
-        icon: QrCode,
-        url: "/scanner",
-        group: "Operazioni",
       }
     );
   }

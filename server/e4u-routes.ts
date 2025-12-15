@@ -1056,6 +1056,7 @@ router.delete("/api/e4u/scanners/:id", requireAuth, requireGestore, async (req: 
 });
 
 // POST /api/e4u/scan - Scan QR code (for lists/tables)
+// SECURITY: Verifica permessi scanner per ogni operazione
 router.post("/api/e4u/scan", requireAuth, async (req: Request, res: Response) => {
   try {
     const { qrCode, eventId } = req.body;
@@ -1085,6 +1086,19 @@ router.post("/api/e4u/scan", requireAuth, async (req: Request, res: Response) =>
       
       if (eventId && entry.eventId !== eventId) {
         return res.status(400).json({ message: "QR code non valido per questo evento" });
+      }
+      
+      // SECURITY: Verifica permessi scanner per questo evento
+      // PR semplice NON può accedere senza permesso esplicito di scansione
+      const isGestore = await isGestoreForEvent(user, entry.eventId);
+      if (!isGestore) {
+        const canScan = await checkScannerPermission(user.id, entry.eventId, 'lists');
+        if (!canScan) {
+          return res.status(403).json({ 
+            message: "Non hai i permessi di scansione per questo evento. Contatta l'organizzatore.",
+            errorCode: "SCANNER_PERMISSION_DENIED"
+          });
+        }
       }
       
       if (entry.status === 'checked_in') {
@@ -1122,6 +1136,19 @@ router.post("/api/e4u/scan", requireAuth, async (req: Request, res: Response) =>
       
       if (eventId && guest.eventId !== eventId) {
         return res.status(400).json({ message: "QR code non valido per questo evento" });
+      }
+      
+      // SECURITY: Verifica permessi scanner per questo evento
+      // PR semplice NON può accedere senza permesso esplicito di scansione
+      const isGestore = await isGestoreForEvent(user, guest.eventId);
+      if (!isGestore) {
+        const canScan = await checkScannerPermission(user.id, guest.eventId, 'tables');
+        if (!canScan) {
+          return res.status(403).json({ 
+            message: "Non hai i permessi di scansione per questo evento. Contatta l'organizzatore.",
+            errorCode: "SCANNER_PERMISSION_DENIED"
+          });
+        }
       }
       
       if (guest.status === 'checked_in') {
