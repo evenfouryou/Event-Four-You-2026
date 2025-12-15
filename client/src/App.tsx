@@ -91,6 +91,7 @@ import E4uScanner from "@/pages/e4u-scanner";
 import ClientWallet from "@/pages/client-wallet";
 import StaffPrHome from "@/pages/staff-pr-home";
 import StaffPrEventPanel from "@/pages/staff-pr-event-panel";
+import CassaBiglietti from "@/pages/cassa-biglietti";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -219,6 +220,7 @@ function Router() {
               <Route path="/wallet" component={ClientWallet} />
               <Route path="/staff-pr-home" component={StaffPrHome} />
               <Route path="/events/:id/panel" component={StaffPrEventPanel} />
+              <Route path="/cassa-biglietti" component={CassaBiglietti} />
               <Route component={NotFound} />
             </Switch>
           </main>

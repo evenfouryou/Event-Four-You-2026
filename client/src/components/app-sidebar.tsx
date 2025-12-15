@@ -67,6 +67,7 @@ export function AppSidebar() {
   const isWarehouse = user?.role === 'warehouse';
   const isBartender = user?.role === 'bartender';
   const isCliente = user?.role === 'cliente';
+  const isCassiere = user?.role === 'cassiere';
   
   // Combined role checks for menu access
   const canManageLists = isSuperAdmin || isAdmin || isGestoreCovisione || isCapoStaff || isPr;
@@ -382,6 +383,12 @@ export function AppSidebar() {
             icon: Grid3X3,
             url: "/siae/numbered-seats",
             group: "Biglietteria SIAE",
+          },
+          {
+            title: "Cassa Biglietti",
+            icon: Store,
+            url: "/cassa-biglietti",
+            group: "Biglietteria SIAE",
           }
       );
     }
@@ -557,6 +564,23 @@ export function AppSidebar() {
     );
   }
 
+  if (isCassiere) {
+    menuItems.push(
+      {
+        title: "Home",
+        icon: Home,
+        url: "/",
+        group: "Bacheca",
+      },
+      {
+        title: "Cassa Biglietti",
+        icon: Store,
+        url: "/cassa-biglietti",
+        group: "Operazioni",
+      }
+    );
+  }
+
   if (isCliente) {
     menuItems.push(
       {
@@ -617,6 +641,11 @@ export function AppSidebar() {
     gestore: 'Gestore',
     warehouse: 'Magazziniere',
     bartender: 'Barista',
+    cassiere: 'Cassiere',
+    cliente: 'Cliente',
+    pr: 'PR',
+    capo_staff: 'Capo Staff',
+    gestore_covisione: 'Gestore Covisione',
   };
 
   return (

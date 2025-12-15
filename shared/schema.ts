@@ -3964,3 +3964,86 @@ export const siaeC1Reports = pgTable("siae_c1_reports", {
   transmittedAt: timestamp("transmitted_at"),
   createdAt: timestamp("created_at").defaultNow(),
 });
+
+// ==================== MODULO CASSA BIGLIETTI ====================
+
+// Allocazione Cassieri - Quota assegnata a ciascun cassiere per evento
+export const siaeCashierAllocations = pgTable("siae_cashier_allocations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").notNull().references(() => companies.id),
+  eventId: varchar("event_id").notNull().references(() => siaeTicketedEvents.id),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  sectorId: varchar("sector_id").references(() => siaeEventSectors.id),
+  quotaQuantity: integer("quota_quantity").notNull().default(0),
+  quotaUsed: integer("quota_used").notNull().default(0),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const siaeCashierAllocationsRelations = relations(siaeCashierAllocations, ({ one }) => ({
+  company: one(companies, {
+    fields: [siaeCashierAllocations.companyId],
+    references: [companies.id],
+  }),
+  event: one(siaeTicketedEvents, {
+    fields: [siaeCashierAllocations.eventId],
+    references: [siaeTicketedEvents.id],
+  }),
+  user: one(users, {
+    fields: [siaeCashierAllocations.userId],
+    references: [users.id],
+  }),
+  sector: one(siaeEventSectors, {
+    fields: [siaeCashierAllocations.sectorId],
+    references: [siaeEventSectors.id],
+  }),
+}));
+
+// Audit Biglietti - Log di tutte le operazioni su biglietti
+export const siaeTicketAudit = pgTable("siae_ticket_audit", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").notNull().references(() => companies.id),
+  ticketId: varchar("ticket_id").notNull().references(() => siaeTickets.id),
+  operationType: varchar("operation_type", { length: 20 }).notNull(), // emission, cancellation, reprint
+  performedBy: varchar("performed_by").notNull().references(() => users.id),
+  reason: text("reason"),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const siaeTicketAuditRelations = relations(siaeTicketAudit, ({ one }) => ({
+  company: one(companies, {
+    fields: [siaeTicketAudit.companyId],
+    references: [companies.id],
+  }),
+  ticket: one(siaeTickets, {
+    fields: [siaeTicketAudit.ticketId],
+    references: [siaeTickets.id],
+  }),
+  performer: one(users, {
+    fields: [siaeTicketAudit.performedBy],
+    references: [users.id],
+  }),
+}));
+
+// Schemas per validazione
+export const insertSiaeCashierAllocationSchema = createInsertSchema(siaeCashierAllocations).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export const updateSiaeCashierAllocationSchema = insertSiaeCashierAllocationSchema.partial().omit({ companyId: true, eventId: true, userId: true });
+
+export const insertSiaeTicketAuditSchema = createInsertSchema(siaeTicketAudit).omit({
+  id: true,
+  createdAt: true,
+});
+
+// Types
+export type SiaeCashierAllocation = typeof siaeCashierAllocations.$inferSelect;
+export type InsertSiaeCashierAllocation = z.infer<typeof insertSiaeCashierAllocationSchema>;
+export type UpdateSiaeCashierAllocation = z.infer<typeof updateSiaeCashierAllocationSchema>;
+
+export type SiaeTicketAudit = typeof siaeTicketAudit.$inferSelect;
+export type InsertSiaeTicketAudit = z.infer<typeof insertSiaeTicketAuditSchema>;

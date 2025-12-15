@@ -26,6 +26,8 @@ import {
   siaeNumberedSeats,
   siaeSmartCardSessions,
   siaeSmartCardSealLogs,
+  siaeCashierAllocations,
+  siaeTicketAudit,
   type SiaeEventGenre,
   type InsertSiaeEventGenre,
   type SiaeSectorCode,
@@ -78,6 +80,10 @@ import {
   type InsertSiaeSmartCardSession,
   type SiaeSmartCardSealLog,
   type InsertSiaeSmartCardSealLog,
+  type SiaeCashierAllocation,
+  type InsertSiaeCashierAllocation,
+  type SiaeTicketAudit,
+  type InsertSiaeTicketAudit,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, sql, lt, gt, isNull, count } from "drizzle-orm";
@@ -1448,6 +1454,299 @@ export class SiaeStorage implements ISiaeStorage {
       .from(siaeActivationCards)
       .where(eq(siaeActivationCards.cardCode, serial));
     return card;
+  }
+
+  // ==================== Cashier Allocations ====================
+
+  async getCashierAllocationsByEvent(eventId: string): Promise<SiaeCashierAllocation[]> {
+    return await db
+      .select()
+      .from(siaeCashierAllocations)
+      .where(eq(siaeCashierAllocations.eventId, eventId))
+      .orderBy(desc(siaeCashierAllocations.createdAt));
+  }
+
+  async getCashierAllocationByUserAndEvent(userId: string, eventId: string): Promise<SiaeCashierAllocation | undefined> {
+    const [allocation] = await db
+      .select()
+      .from(siaeCashierAllocations)
+      .where(and(
+        eq(siaeCashierAllocations.userId, userId),
+        eq(siaeCashierAllocations.eventId, eventId),
+        eq(siaeCashierAllocations.isActive, true)
+      ));
+    return allocation;
+  }
+
+  async getCashierAllocation(id: string): Promise<SiaeCashierAllocation | undefined> {
+    const [allocation] = await db
+      .select()
+      .from(siaeCashierAllocations)
+      .where(eq(siaeCashierAllocations.id, id));
+    return allocation;
+  }
+
+  async createCashierAllocation(data: InsertSiaeCashierAllocation): Promise<SiaeCashierAllocation> {
+    const [allocation] = await db
+      .insert(siaeCashierAllocations)
+      .values(data)
+      .returning();
+    return allocation;
+  }
+
+  async updateCashierAllocation(id: string, data: Partial<SiaeCashierAllocation>): Promise<SiaeCashierAllocation | undefined> {
+    const [allocation] = await db
+      .update(siaeCashierAllocations)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(siaeCashierAllocations.id, id))
+      .returning();
+    return allocation;
+  }
+
+  async incrementCashierQuotaUsed(id: string): Promise<SiaeCashierAllocation | undefined> {
+    const [allocation] = await db
+      .update(siaeCashierAllocations)
+      .set({ 
+        quotaUsed: sql`${siaeCashierAllocations.quotaUsed} + 1`,
+        updatedAt: new Date()
+      })
+      .where(eq(siaeCashierAllocations.id, id))
+      .returning();
+    return allocation;
+  }
+
+  async decrementCashierQuotaUsed(id: string): Promise<SiaeCashierAllocation | undefined> {
+    const [allocation] = await db
+      .update(siaeCashierAllocations)
+      .set({ 
+        quotaUsed: sql`GREATEST(0, ${siaeCashierAllocations.quotaUsed} - 1)`,
+        updatedAt: new Date()
+      })
+      .where(eq(siaeCashierAllocations.id, id))
+      .returning();
+    return allocation;
+  }
+
+  // ==================== Ticket Audit ====================
+
+  async createTicketAudit(data: InsertSiaeTicketAudit): Promise<SiaeTicketAudit> {
+    const [audit] = await db
+      .insert(siaeTicketAudit)
+      .values(data)
+      .returning();
+    return audit;
+  }
+
+  async getTicketAuditByTicket(ticketId: string): Promise<SiaeTicketAudit[]> {
+    return await db
+      .select()
+      .from(siaeTicketAudit)
+      .where(eq(siaeTicketAudit.ticketId, ticketId))
+      .orderBy(desc(siaeTicketAudit.createdAt));
+  }
+
+  async getTicketAuditByCompany(companyId: string, limit: number = 100): Promise<SiaeTicketAudit[]> {
+    return await db
+      .select()
+      .from(siaeTicketAudit)
+      .where(eq(siaeTicketAudit.companyId, companyId))
+      .orderBy(desc(siaeTicketAudit.createdAt))
+      .limit(limit);
+  }
+
+  async getTicketAuditByUser(userId: string, limit: number = 100): Promise<SiaeTicketAudit[]> {
+    return await db
+      .select()
+      .from(siaeTicketAudit)
+      .where(eq(siaeTicketAudit.performedBy, userId))
+      .orderBy(desc(siaeTicketAudit.createdAt))
+      .limit(limit);
+  }
+
+  async getTodayTicketsByUser(userId: string, eventId: string): Promise<SiaeTicket[]> {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    return await db
+      .select()
+      .from(siaeTickets)
+      .where(and(
+        eq(siaeTickets.issuedByUserId, userId),
+        eq(siaeTickets.ticketedEventId, eventId),
+        gt(siaeTickets.emissionDate, today),
+        lt(siaeTickets.emissionDate, tomorrow)
+      ))
+      .orderBy(desc(siaeTickets.emissionDate));
+  }
+
+  // ==================== Atomic Transaction Methods ====================
+
+  async emitTicketWithAtomicQuota(params: {
+    allocationId: string;
+    eventId: string;
+    sectorId: string;
+    ticketCode: string;
+    ticketType: string;
+    ticketPrice: number;
+    customerId: string | null;
+    issuedByUserId: string;
+    participantFirstName: string | null;
+    participantLastName: string | null;
+    isComplimentary: boolean;
+    paymentMethod: string;
+    currentTicketsSold: number;
+    currentTotalRevenue: number;
+    currentAvailableSeats: number;
+  }): Promise<{ success: boolean; ticket?: SiaeTicket; error?: string }> {
+    try {
+      const result = await db.transaction(async (tx) => {
+        // Step 1: Atomically check and increment quota
+        const [updatedAllocation] = await tx
+          .update(siaeCashierAllocations)
+          .set({
+            quotaUsed: sql`${siaeCashierAllocations.quotaUsed} + 1`,
+            updatedAt: new Date()
+          })
+          .where(and(
+            eq(siaeCashierAllocations.id, params.allocationId),
+            sql`${siaeCashierAllocations.quotaUsed} < ${siaeCashierAllocations.quotaQuantity}`
+          ))
+          .returning();
+
+        if (!updatedAllocation) {
+          throw new Error("QUOTA_EXCEEDED");
+        }
+
+        // Step 2: Create ticket
+        const progressiveNumber = params.currentTicketsSold + 1;
+        const [ticket] = await tx
+          .insert(siaeTickets)
+          .values({
+            ticketedEventId: params.eventId,
+            sectorId: params.sectorId,
+            ticketCode: params.ticketCode,
+            progressiveNumber,
+            ticketType: params.ticketType,
+            ticketPrice: params.ticketPrice.toString(),
+            emissionDate: new Date(),
+            status: 'active',
+            issuedByUserId: params.issuedByUserId,
+            customerId: params.customerId,
+            participantFirstName: params.participantFirstName,
+            participantLastName: params.participantLastName,
+            isComplimentary: params.isComplimentary,
+            paymentMethod: params.paymentMethod
+          })
+          .returning();
+
+        // Step 3: Update event stats
+        await tx
+          .update(siaeTicketedEvents)
+          .set({
+            ticketsSold: progressiveNumber,
+            totalRevenue: (params.currentTotalRevenue + params.ticketPrice).toString(),
+            updatedAt: new Date()
+          })
+          .where(eq(siaeTicketedEvents.id, params.eventId));
+
+        // Step 4: Update sector availability
+        await tx
+          .update(siaeEventSectors)
+          .set({
+            availableSeats: sql`${siaeEventSectors.availableSeats} - 1`,
+            updatedAt: new Date()
+          })
+          .where(eq(siaeEventSectors.id, params.sectorId));
+
+        return ticket;
+      });
+
+      return { success: true, ticket: result };
+    } catch (error: any) {
+      if (error.message === "QUOTA_EXCEEDED") {
+        return { success: false, error: "Quota biglietti esaurita. Contatta il gestore per aumentare la quota." };
+      }
+      throw error;
+    }
+  }
+
+  async cancelTicketWithAtomicQuotaRestore(params: {
+    ticketId: string;
+    cancelledByUserId: string;
+    cancellationReason: string;
+    issuedByUserId: string | null;
+    ticketedEventId: string;
+    sectorId: string;
+    ticketPrice: number;
+  }): Promise<{ success: boolean; ticket?: SiaeTicket; error?: string }> {
+    try {
+      const result = await db.transaction(async (tx) => {
+        // Step 1: Update ticket status to cancelled
+        const [cancelledTicket] = await tx
+          .update(siaeTickets)
+          .set({
+            status: 'cancelled',
+            cancelledAt: new Date(),
+            cancelledByUserId: params.cancelledByUserId,
+            cancellationReason: params.cancellationReason,
+            updatedAt: new Date()
+          })
+          .where(and(
+            eq(siaeTickets.id, params.ticketId),
+            sql`${siaeTickets.status} != 'cancelled'`
+          ))
+          .returning();
+
+        if (!cancelledTicket) {
+          throw new Error("ALREADY_CANCELLED");
+        }
+
+        // Step 2: Restore sector availability
+        await tx
+          .update(siaeEventSectors)
+          .set({
+            availableSeats: sql`${siaeEventSectors.availableSeats} + 1`,
+            updatedAt: new Date()
+          })
+          .where(eq(siaeEventSectors.id, params.sectorId));
+
+        // Step 3: Update event stats
+        await tx
+          .update(siaeTicketedEvents)
+          .set({
+            ticketsCancelled: sql`COALESCE(${siaeTicketedEvents.ticketsCancelled}, 0) + 1`,
+            totalRevenue: sql`GREATEST(0, COALESCE(${siaeTicketedEvents.totalRevenue}::numeric, 0) - ${params.ticketPrice})::text`,
+            updatedAt: new Date()
+          })
+          .where(eq(siaeTicketedEvents.id, params.ticketedEventId));
+
+        // Step 4: Restore cashier quota if issued by a user
+        if (params.issuedByUserId) {
+          await tx
+            .update(siaeCashierAllocations)
+            .set({
+              quotaUsed: sql`GREATEST(0, ${siaeCashierAllocations.quotaUsed} - 1)`,
+              updatedAt: new Date()
+            })
+            .where(and(
+              eq(siaeCashierAllocations.userId, params.issuedByUserId),
+              eq(siaeCashierAllocations.eventId, params.ticketedEventId),
+              eq(siaeCashierAllocations.isActive, true)
+            ));
+        }
+
+        return cancelledTicket;
+      });
+
+      return { success: true, ticket: result };
+    } catch (error: any) {
+      if (error.message === "ALREADY_CANCELLED") {
+        return { success: false, error: "Il biglietto è già stato annullato" };
+      }
+      throw error;
+    }
   }
 }
 

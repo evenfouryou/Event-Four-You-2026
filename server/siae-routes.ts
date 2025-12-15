@@ -2414,4 +2414,465 @@ router.get("/api/siae/tickets/my", requireAuth, async (req: Request, res: Respon
   }
 });
 
+// ==================== CASSA BIGLIETTI API ====================
+
+// GET /api/cashiers/events/:eventId/allocation - Get current user's allocation for event
+router.get("/api/cashiers/events/:eventId/allocation", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const user = req.user as any;
+    const { eventId } = req.params;
+    
+    const allocation = await siaeStorage.getCashierAllocationByUserAndEvent(user.id, eventId);
+    
+    if (!allocation) {
+      return res.status(404).json({ message: "Nessuna allocazione trovata per questo evento" });
+    }
+    
+    res.json(allocation);
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// GET /api/cashiers/events/:eventId/allocations - Get all allocations for event (gestore only)
+router.get("/api/cashiers/events/:eventId/allocations", requireAuth, requireGestore, async (req: Request, res: Response) => {
+  try {
+    const { eventId } = req.params;
+    
+    const allocations = await siaeStorage.getCashierAllocationsByEvent(eventId);
+    
+    res.json(allocations);
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// POST /api/cashiers/allocations - Create cashier allocation (gestore only)
+router.post("/api/cashiers/allocations", requireAuth, requireGestore, async (req: Request, res: Response) => {
+  try {
+    const user = req.user as any;
+    const { eventId, userId, sectorId, quotaQuantity } = req.body;
+    
+    if (!eventId || !userId || quotaQuantity === undefined) {
+      return res.status(400).json({ message: "Dati mancanti: eventId, userId e quotaQuantity sono richiesti" });
+    }
+    
+    // Check if allocation already exists
+    const existing = await siaeStorage.getCashierAllocationByUserAndEvent(userId, eventId);
+    if (existing) {
+      return res.status(409).json({ message: "Esiste già un'allocazione per questo cassiere per l'evento" });
+    }
+    
+    const allocation = await siaeStorage.createCashierAllocation({
+      companyId: user.companyId,
+      eventId,
+      userId,
+      sectorId: sectorId || null,
+      quotaQuantity: Number(quotaQuantity),
+      quotaUsed: 0,
+      isActive: true
+    });
+    
+    // Audit log
+    await siaeStorage.createAuditLog({
+      companyId: user.companyId,
+      userId: user.id,
+      action: 'cashier_allocation_created',
+      entityType: 'cashier_allocation',
+      entityId: allocation.id,
+      description: `Creata allocazione per cassiere con quota ${quotaQuantity}`,
+      ipAddress: (req.ip || '').substring(0, 45),
+      userAgent: (req.get('user-agent') || '').substring(0, 500)
+    });
+    
+    res.status(201).json(allocation);
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// PATCH /api/cashiers/allocations/:id - Update cashier allocation (gestore only)
+router.patch("/api/cashiers/allocations/:id", requireAuth, requireGestore, async (req: Request, res: Response) => {
+  try {
+    const user = req.user as any;
+    const { id } = req.params;
+    const { quotaQuantity, sectorId, isActive } = req.body;
+    
+    const allocation = await siaeStorage.getCashierAllocation(id);
+    if (!allocation) {
+      return res.status(404).json({ message: "Allocazione non trovata" });
+    }
+    
+    const updateData: any = {};
+    if (quotaQuantity !== undefined) updateData.quotaQuantity = Number(quotaQuantity);
+    if (sectorId !== undefined) updateData.sectorId = sectorId;
+    if (isActive !== undefined) updateData.isActive = isActive;
+    
+    const updated = await siaeStorage.updateCashierAllocation(id, updateData);
+    
+    // Audit log
+    await siaeStorage.createAuditLog({
+      companyId: user.companyId,
+      userId: user.id,
+      action: 'cashier_allocation_updated',
+      entityType: 'cashier_allocation',
+      entityId: id,
+      description: `Aggiornata allocazione cassiere`,
+      ipAddress: (req.ip || '').substring(0, 45),
+      userAgent: (req.get('user-agent') || '').substring(0, 500)
+    });
+    
+    res.json(updated);
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// POST /api/cashiers/events/:eventId/tickets - Emit ticket from cashier
+// Uses atomic transaction to prevent race conditions on quota
+router.post("/api/cashiers/events/:eventId/tickets", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const user = req.user as any;
+    const { eventId } = req.params;
+    const { sectorId, ticketType, price, participantFirstName, participantLastName, participantPhone, participantEmail, paymentMethod } = req.body;
+    
+    // Check for active box office session (cassiere role check)
+    const isCashierRole = user.role === 'cassiere';
+    if (isCashierRole) {
+      const activeSession = await siaeStorage.getActiveSiaeBoxOfficeSession(user.id);
+      if (!activeSession) {
+        return res.status(403).json({ 
+          message: "Nessuna sessione cassa attiva. Apri una sessione prima di emettere biglietti.",
+          errorCode: "NO_ACTIVE_SESSION"
+        });
+      }
+    }
+    
+    // Get cashier allocation
+    const allocation = await siaeStorage.getCashierAllocationByUserAndEvent(user.id, eventId);
+    if (!allocation) {
+      return res.status(403).json({ 
+        message: "Non sei autorizzato a emettere biglietti per questo evento",
+        errorCode: "NO_ALLOCATION"
+      });
+    }
+    
+    // Get sector if specified, otherwise use allocation's sector
+    const finalSectorId = sectorId || allocation.sectorId;
+    if (!finalSectorId) {
+      return res.status(400).json({ message: "Settore non specificato" });
+    }
+    
+    const sector = await siaeStorage.getSiaeEventSector(finalSectorId);
+    if (!sector) {
+      return res.status(404).json({ message: "Settore non trovato" });
+    }
+    
+    // Check sector availability
+    if (sector.availableSeats <= 0) {
+      return res.status(400).json({ 
+        message: "Posti esauriti per questo settore",
+        errorCode: "NO_SEATS_AVAILABLE"
+      });
+    }
+    
+    // Get event
+    const event = await siaeStorage.getSiaeTicketedEvent(eventId);
+    if (!event) {
+      return res.status(404).json({ message: "Evento non trovato" });
+    }
+    
+    // Get or create customer if participant data provided
+    let customerId: string | null = null;
+    if (participantPhone || participantEmail) {
+      let customer = participantPhone 
+        ? await siaeStorage.getSiaeCustomerByPhone(participantPhone)
+        : participantEmail 
+          ? await siaeStorage.getSiaeCustomerByEmail(participantEmail)
+          : undefined;
+      
+      if (!customer && (participantFirstName || participantLastName)) {
+        customer = await siaeStorage.createSiaeCustomer({
+          companyId: user.companyId,
+          firstName: participantFirstName || '',
+          lastName: participantLastName || '',
+          phone: participantPhone || null,
+          email: participantEmail || null,
+          fiscalCode: null,
+          idNumber: null,
+          idType: null,
+          privacyAccepted: true,
+          privacyAcceptedAt: new Date(),
+          marketingConsent: false
+        });
+      }
+      if (customer) {
+        customerId = customer.id;
+      }
+    }
+    
+    // ATOMIC TRANSACTION: Reserve quota and emit ticket
+    const ticketPrice = price || Number(sector.price) || 0;
+    const ticketCode = `${event.eventCode || 'TK'}-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+    
+    const result = await siaeStorage.emitTicketWithAtomicQuota({
+      allocationId: allocation.id,
+      eventId,
+      sectorId: finalSectorId,
+      ticketCode,
+      ticketType: ticketType || 'intero',
+      ticketPrice,
+      customerId,
+      issuedByUserId: user.id,
+      participantFirstName: participantFirstName || null,
+      participantLastName: participantLastName || null,
+      isComplimentary: ticketType === 'omaggio',
+      paymentMethod: paymentMethod || 'cash',
+      currentTicketsSold: event.ticketsSold || 0,
+      currentTotalRevenue: Number(event.totalRevenue) || 0,
+      currentAvailableSeats: sector.availableSeats
+    });
+    
+    if (!result.success) {
+      return res.status(400).json({ 
+        message: result.error || "Quota biglietti esaurita. Contatta il gestore per aumentare la quota.",
+        errorCode: "QUOTA_EXCEEDED"
+      });
+    }
+    
+    // Create ticket audit entry (outside transaction, not critical)
+    await siaeStorage.createTicketAudit({
+      companyId: user.companyId,
+      ticketId: result.ticket!.id,
+      operationType: 'emission',
+      performedBy: user.id,
+      reason: null,
+      metadata: { paymentMethod, ticketType, price: ticketPrice }
+    });
+    
+    // General audit log
+    await siaeStorage.createAuditLog({
+      companyId: user.companyId,
+      userId: user.id,
+      action: 'ticket_emitted',
+      entityType: 'ticket',
+      entityId: result.ticket!.id,
+      description: `Emesso biglietto ${ticketCode} - €${ticketPrice}`,
+      ipAddress: (req.ip || '').substring(0, 45),
+      userAgent: (req.get('user-agent') || '').substring(0, 500)
+    });
+    
+    res.status(201).json(result.ticket);
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// GET /api/cashiers/events/:eventId/today-tickets - Get today's tickets for current cashier
+router.get("/api/cashiers/events/:eventId/today-tickets", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const user = req.user as any;
+    const { eventId } = req.params;
+    
+    const tickets = await siaeStorage.getTodayTicketsByUser(user.id, eventId);
+    
+    res.json(tickets);
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// PATCH /api/siae/tickets/:id/cancel - Cancel a ticket
+// Uses atomic transaction to prevent race conditions on quota restoration
+router.patch("/api/siae/tickets/:id/cancel", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const user = req.user as any;
+    const { id } = req.params;
+    const { reason } = req.body;
+    
+    if (!reason) {
+      return res.status(400).json({ message: "Il motivo dell'annullamento è richiesto" });
+    }
+    
+    const ticket = await siaeStorage.getSiaeTicket(id);
+    if (!ticket) {
+      return res.status(404).json({ message: "Biglietto non trovato" });
+    }
+    
+    // Verify ticket is not already cancelled
+    if (ticket.status === 'cancelled') {
+      return res.status(400).json({ 
+        message: "Il biglietto è già stato annullato",
+        errorCode: "ALREADY_CANCELLED"
+      });
+    }
+    
+    // Check authorization: cassiere can only cancel own tickets, gestore/admin/super_admin can cancel any
+    const isGestoreOrHigher = ['gestore', 'admin', 'super_admin'].includes(user.role);
+    if (!isGestoreOrHigher && ticket.issuedByUserId !== user.id) {
+      return res.status(403).json({ 
+        message: "Non sei autorizzato ad annullare questo biglietto. Solo il cassiere che ha emesso il biglietto può annullarlo.",
+        errorCode: "UNAUTHORIZED_CANCELLATION"
+      });
+    }
+    
+    // ATOMIC TRANSACTION: Cancel ticket and restore quota
+    const result = await siaeStorage.cancelTicketWithAtomicQuotaRestore({
+      ticketId: id,
+      cancelledByUserId: user.id,
+      cancellationReason: reason,
+      issuedByUserId: ticket.issuedByUserId,
+      ticketedEventId: ticket.ticketedEventId,
+      sectorId: ticket.sectorId,
+      ticketPrice: Number(ticket.ticketPrice || 0)
+    });
+    
+    if (!result.success) {
+      return res.status(400).json({ 
+        message: result.error || "Errore durante l'annullamento del biglietto",
+        errorCode: "CANCELLATION_FAILED"
+      });
+    }
+    
+    // Create ticket audit entry (outside transaction, not critical)
+    await siaeStorage.createTicketAudit({
+      companyId: user.companyId,
+      ticketId: id,
+      operationType: 'cancellation',
+      performedBy: user.id,
+      reason,
+      metadata: { originalPrice: ticket.ticketPrice, cancelledBy: user.fullName || user.username }
+    });
+    
+    // General audit log
+    await siaeStorage.createAuditLog({
+      companyId: user.companyId,
+      userId: user.id,
+      action: 'ticket_cancelled',
+      entityType: 'ticket',
+      entityId: id,
+      description: `Annullato biglietto ${ticket.ticketCode} - Motivo: ${reason}`,
+      ipAddress: (req.ip || '').substring(0, 45),
+      userAgent: (req.get('user-agent') || '').substring(0, 500)
+    });
+    
+    res.json(result.ticket);
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// GET /api/siae/events/:eventId/report-c1 - Generate C1 fiscal report
+router.get("/api/siae/events/:eventId/report-c1", requireAuth, requireGestore, async (req: Request, res: Response) => {
+  try {
+    const user = req.user as any;
+    const { eventId } = req.params;
+    
+    const event = await siaeStorage.getSiaeTicketedEvent(eventId);
+    if (!event) {
+      return res.status(404).json({ message: "Evento non trovato" });
+    }
+    
+    // Get all tickets for event
+    const tickets = await siaeStorage.getSiaeTicketsByEvent(eventId);
+    const sectors = await siaeStorage.getSiaeEventSectorsByEvent(eventId);
+    
+    // Aggregate by sector and ticket type
+    const sectorStats = new Map<string, {
+      sectorName: string;
+      sectorCode: string;
+      interoCount: number;
+      interoAmount: number;
+      ridottoCount: number;
+      ridottoAmount: number;
+      omaggioCount: number;
+      cancelledCount: number;
+    }>();
+    
+    for (const sector of sectors) {
+      sectorStats.set(sector.id, {
+        sectorName: sector.name,
+        sectorCode: sector.sectorCode || '',
+        interoCount: 0,
+        interoAmount: 0,
+        ridottoCount: 0,
+        ridottoAmount: 0,
+        omaggioCount: 0,
+        cancelledCount: 0
+      });
+    }
+    
+    for (const ticket of tickets) {
+      const stats = sectorStats.get(ticket.sectorId);
+      if (!stats) continue;
+      
+      if (ticket.status === 'cancelled') {
+        stats.cancelledCount++;
+        continue;
+      }
+      
+      const price = Number(ticket.ticketPrice) || 0;
+      
+      switch (ticket.ticketType) {
+        case 'intero':
+          stats.interoCount++;
+          stats.interoAmount += price;
+          break;
+        case 'ridotto':
+          stats.ridottoCount++;
+          stats.ridottoAmount += price;
+          break;
+        case 'omaggio':
+          stats.omaggioCount++;
+          break;
+      }
+    }
+    
+    const activeTickets = tickets.filter(t => t.status !== 'cancelled');
+    const totalRevenue = activeTickets.reduce((sum, t) => sum + (Number(t.ticketPrice) || 0), 0);
+    const vatRate = event.vatRate || 10;
+    const vatAmount = totalRevenue * vatRate / (100 + vatRate);
+    const netRevenue = totalRevenue - vatAmount;
+    
+    const report = {
+      eventId: event.id,
+      eventName: event.eventName,
+      eventCode: event.eventCode,
+      eventDate: event.eventDate,
+      eventTime: event.eventTime,
+      venueName: event.venueName,
+      venueCapacity: event.venueCapacity,
+      generatedAt: new Date(),
+      generatedBy: user.fullName || user.username,
+      summary: {
+        totalTicketsSold: activeTickets.length,
+        totalTicketsCancelled: tickets.filter(t => t.status === 'cancelled').length,
+        totalRevenue,
+        vatRate,
+        vatAmount,
+        netRevenue
+      },
+      sectors: Array.from(sectorStats.values()),
+      ticketTypes: {
+        intero: {
+          count: activeTickets.filter(t => t.ticketType === 'intero').length,
+          amount: activeTickets.filter(t => t.ticketType === 'intero').reduce((s, t) => s + (Number(t.ticketPrice) || 0), 0)
+        },
+        ridotto: {
+          count: activeTickets.filter(t => t.ticketType === 'ridotto').length,
+          amount: activeTickets.filter(t => t.ticketType === 'ridotto').reduce((s, t) => s + (Number(t.ticketPrice) || 0), 0)
+        },
+        omaggio: {
+          count: activeTickets.filter(t => t.ticketType === 'omaggio').length,
+          amount: 0
+        }
+      }
+    };
+    
+    res.json(report);
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
 export default router;
