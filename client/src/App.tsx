@@ -19,6 +19,7 @@ import Beverage from "@/pages/beverage";
 import Companies from "@/pages/companies";
 import Users from "@/pages/users";
 import Locations from "@/pages/locations";
+import LocationDetail from "@/pages/location-detail";
 import Products from "@/pages/products";
 import Suppliers from "@/pages/suppliers";
 import PurchaseOrders from "@/pages/purchase-orders";
@@ -86,6 +87,10 @@ import SchoolBadgeScanner from "@/pages/school-badge-scanner";
 import PrinterSettings from "@/pages/printer-settings";
 import TemplateBuilder from "@/pages/template-builder";
 import StripeAdmin from "@/pages/stripe-admin";
+import E4uScanner from "@/pages/e4u-scanner";
+import ClientWallet from "@/pages/client-wallet";
+import StaffPrHome from "@/pages/staff-pr-home";
+import StaffPrEventPanel from "@/pages/staff-pr-event-panel";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -152,6 +157,7 @@ function Router() {
               <Route path="/beverage" component={Beverage} />
               <Route path="/companies" component={Companies} />
               <Route path="/users" component={Users} />
+              <Route path="/locations/:id" component={LocationDetail} />
               <Route path="/locations" component={Locations} />
               <Route path="/products" component={Products} />
               <Route path="/suppliers" component={Suppliers} />
@@ -209,6 +215,10 @@ function Router() {
               <Route path="/template-builder" component={TemplateBuilder} />
               <Route path="/template-builder/:id" component={TemplateBuilder} />
               <Route path="/stripe-admin" component={StripeAdmin} />
+              <Route path="/scanner/:eventId?" component={E4uScanner} />
+              <Route path="/wallet" component={ClientWallet} />
+              <Route path="/staff-pr-home" component={StaffPrHome} />
+              <Route path="/events/:id/panel" component={StaffPrEventPanel} />
               <Route component={NotFound} />
             </Switch>
           </main>

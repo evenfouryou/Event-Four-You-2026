@@ -4,6 +4,7 @@
  */
 
 import { useSmartCardStatus, smartCardService } from "@/lib/smart-card-service";
+import { useAuth } from "@/hooks/useAuth";
 import {
   Tooltip,
   TooltipContent,
@@ -47,8 +48,14 @@ export function SmartCardStatus({
   showLabel = true,
   className 
 }: SmartCardStatusProps) {
+  const { user } = useAuth();
   const status = useSmartCardStatus();
   const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Only show SmartCardStatus to super_admin
+  if (user?.role !== 'super_admin') {
+    return null;
+  }
 
   const handleRefresh = async () => {
     setIsRefreshing(true);

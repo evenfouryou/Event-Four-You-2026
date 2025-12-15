@@ -2373,4 +2373,45 @@ router.post('/smart-card/seal-log', requireAuth, async (req: Request, res: Respo
   }
 });
 
+// ==================== CLIENT WALLET API ====================
+
+// GET /api/siae/tickets/my - Get current user's purchased SIAE tickets
+router.get("/api/siae/tickets/my", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const user = req.user as any;
+    
+    if (!user.phone && !user.email) {
+      return res.json([]);
+    }
+    
+    // Get all tickets for the user via customer association (by phone or email)
+    // Import required tables
+    const { siaeTickets, siaeCustomers, siaeTicketedEvents, siaeEventSectors } = await import("@shared/schema");
+    const { db } = await import("./db");
+    const { eq, or, desc, sql } = await import("drizzle-orm");
+    
+    const tickets = await db.select({
+      ticket: siaeTickets,
+      event: siaeTicketedEvents,
+      sector: siaeEventSectors,
+    })
+      .from(siaeTickets)
+      .innerJoin(siaeCustomers, eq(siaeTickets.customerId, siaeCustomers.id))
+      .innerJoin(siaeTicketedEvents, eq(siaeTickets.ticketedEventId, siaeTicketedEvents.id))
+      .innerJoin(siaeEventSectors, eq(siaeTickets.sectorId, siaeEventSectors.id))
+      .where(
+        user.phone && user.email
+          ? sql`(${siaeCustomers.phone} = ${user.phone} OR ${siaeCustomers.email} = ${user.email})`
+          : user.phone
+            ? eq(siaeCustomers.phone, user.phone)
+            : eq(siaeCustomers.email, user.email)
+      )
+      .orderBy(desc(siaeTicketedEvents.eventDate));
+    
+    res.json(tickets);
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
 export default router;

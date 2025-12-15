@@ -78,8 +78,9 @@ const userFormSchema = z.object({
   password: z.string().optional(),
   firstName: z.string().min(1, "Nome richiesto"),
   lastName: z.string().min(1, "Cognome richiesto"),
-  role: z.enum(['super_admin', 'gestore', 'warehouse', 'bartender']),
+  role: z.enum(['super_admin', 'gestore', 'gestore_covisione', 'capo_staff', 'pr', 'warehouse', 'bartender', 'cassiere', 'scanner']),
   companyId: z.string().optional().nullable(),
+  phone: z.string().optional(),
   isEditing: z.boolean().optional(),
 }).refine((data) => {
   if (!data.isEditing && (!data.password || data.password.length < 8)) {
@@ -99,15 +100,25 @@ type UserFormData = z.infer<typeof userFormSchema>;
 const roleLabels: Record<string, string> = {
   super_admin: 'Super Admin',
   gestore: 'Gestore',
+  gestore_covisione: 'Gestore Covisione',
+  capo_staff: 'Capo Staff',
+  pr: 'PR',
   warehouse: 'Magazzino',
   bartender: 'Bartender',
+  cassiere: 'Cassiere',
+  scanner: 'Scanner',
 };
 
 const roleGradients: Record<string, string> = {
   super_admin: 'from-purple-500 to-indigo-600',
   gestore: 'from-amber-500 to-orange-600',
+  gestore_covisione: 'from-amber-400 to-orange-500',
+  capo_staff: 'from-teal-500 to-cyan-600',
+  pr: 'from-pink-500 to-rose-600',
   warehouse: 'from-blue-500 to-cyan-600',
   bartender: 'from-teal-500 to-emerald-600',
+  cassiere: 'from-green-500 to-emerald-600',
+  scanner: 'from-emerald-500 to-green-600',
 };
 
 interface FeatureConfig {
@@ -327,6 +338,13 @@ export default function UsersPage() {
 
   const isSuperAdmin = currentUser?.role === 'super_admin';
   const isAdmin = currentUser?.role === 'gestore';
+  const isCapoStaff = currentUser?.role === 'capo_staff';
+
+  const getDefaultRole = () => {
+    if (isCapoStaff) return 'pr';
+    if (isAdmin) return 'warehouse';
+    return 'gestore';
+  };
 
   const form = useForm<UserFormData>({
     resolver: zodResolver(userFormSchema),
@@ -335,11 +353,14 @@ export default function UsersPage() {
       password: '',
       firstName: '',
       lastName: '',
-      role: isAdmin ? 'warehouse' : 'gestore',
+      role: getDefaultRole(),
       companyId: null,
+      phone: '',
       isEditing: false,
     },
   });
+
+  const watchRole = form.watch('role');
 
   const createMutation = useMutation({
     mutationFn: async (data: UserFormData) => {
@@ -524,6 +545,7 @@ export default function UsersPage() {
         lastName: data.lastName,
         role: data.role,
         companyId: data.companyId,
+        phone: data.phone,
       };
       if (data.password && data.password.trim() !== '') {
         updateData.password = data.password;
@@ -548,6 +570,7 @@ export default function UsersPage() {
       lastName: user.lastName || '',
       role: user.role as any,
       companyId: user.companyId,
+      phone: (user as any).phone || '',
       isEditing: true,
     });
     setDialogOpen(true);
@@ -562,8 +585,9 @@ export default function UsersPage() {
         password: '',
         firstName: '',
         lastName: '',
-        role: isAdmin ? 'warehouse' : 'gestore',
+        role: getDefaultRole(),
         companyId: null,
+        phone: '',
         isEditing: false,
       });
     }
@@ -635,7 +659,7 @@ export default function UsersPage() {
   }, {} as Record<string, User[]>) || {};
 
   // Order roles for display
-  const roleOrder = ['super_admin', 'gestore', 'organizer', 'warehouse', 'bartender'];
+  const roleOrder = ['super_admin', 'gestore', 'gestore_covisione', 'capo_staff', 'pr', 'warehouse', 'bartender', 'cassiere', 'scanner'];
   const sortedRoles = Object.keys(usersByRole).sort((a, b) => {
     const indexA = roleOrder.indexOf(a);
     const indexB = roleOrder.indexOf(b);
@@ -772,16 +796,50 @@ export default function UsersPage() {
                             <>
                               <SelectItem value="super_admin">Super Admin</SelectItem>
                               <SelectItem value="gestore">Gestore</SelectItem>
+                              <SelectItem value="gestore_covisione">Gestore Covisione</SelectItem>
+                              <SelectItem value="capo_staff">Capo Staff</SelectItem>
+                              <SelectItem value="pr">PR</SelectItem>
+                              <SelectItem value="warehouse">Magazzino</SelectItem>
+                              <SelectItem value="bartender">Bartender</SelectItem>
+                              <SelectItem value="cassiere">Cassiere</SelectItem>
+                              <SelectItem value="scanner">Scanner</SelectItem>
                             </>
                           )}
-                          <SelectItem value="warehouse">Magazzino</SelectItem>
-                          <SelectItem value="bartender">Bartender</SelectItem>
+                          {isAdmin && (
+                            <>
+                              <SelectItem value="gestore_covisione">Gestore Covisione</SelectItem>
+                              <SelectItem value="capo_staff">Capo Staff</SelectItem>
+                              <SelectItem value="pr">PR</SelectItem>
+                              <SelectItem value="warehouse">Magazzino</SelectItem>
+                              <SelectItem value="bartender">Bartender</SelectItem>
+                              <SelectItem value="cassiere">Cassiere</SelectItem>
+                              <SelectItem value="scanner">Scanner</SelectItem>
+                            </>
+                          )}
+                          {isCapoStaff && (
+                            <SelectItem value="pr">PR</SelectItem>
+                          )}
                         </SelectContent>
                       </Select>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
+                {(watchRole === 'pr' || watchRole === 'scanner') && (
+                  <FormField
+                    control={form.control}
+                    name="phone"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Telefono</FormLabel>
+                        <FormControl>
+                          <Input placeholder="+39..." {...field} data-testid="input-user-phone" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
                 {isSuperAdmin && (
                   <FormField
                     control={form.control}

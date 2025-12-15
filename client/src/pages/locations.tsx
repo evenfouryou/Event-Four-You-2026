@@ -26,15 +26,15 @@ import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { Label } from "@/components/ui/label";
-import { Plus, MapPin, Edit, Users, Clock, Globe, Image as ImageIcon, Ticket } from "lucide-react";
+import { Plus, MapPin, Edit, Users, Clock, Globe, Ticket } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { insertLocationSchema, type Location, type InsertLocation } from "@shared/schema";
+import { useLocation } from "wouter";
 
 export default function Locations() {
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [editingLocation, setEditingLocation] = useState<Location | null>(null);
+  const [, setLocationPath] = useLocation();
   const { toast } = useToast();
 
   const { data: locations, isLoading } = useQuery<Location[]>({
@@ -89,67 +89,16 @@ export default function Locations() {
     },
   });
 
-  const updateMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: Partial<Location> }) => {
-      await apiRequest('PATCH', `/api/locations/${id}`, data);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/locations'] });
-      setDialogOpen(false);
-      setEditingLocation(null);
-      form.reset();
-      toast({
-        title: "Successo",
-        description: "Location aggiornata con successo",
-      });
-    },
-    onError: (error: Error) => {
-      if (isUnauthorizedError(error)) {
-        toast({
-          title: "Non autorizzato",
-          description: "Effettua nuovamente il login...",
-          variant: "destructive",
-        });
-        setTimeout(() => window.location.href = '/api/login', 500);
-        return;
-      }
-      toast({
-        title: "Errore",
-        description: "Impossibile aggiornare la location",
-        variant: "destructive",
-      });
-    },
-  });
-
   const handleSubmit = (data: InsertLocation) => {
-    if (editingLocation) {
-      updateMutation.mutate({ id: editingLocation.id, data });
-    } else {
-      createMutation.mutate(data);
-    }
+    createMutation.mutate(data);
   };
 
   const handleEdit = (location: Location) => {
-    setEditingLocation(location);
-    form.reset({
-      name: location.name,
-      address: location.address || '',
-      city: location.city || '',
-      capacity: location.capacity || undefined,
-      notes: location.notes || '',
-      siaeLocationCode: location.siaeLocationCode || '',
-      heroImageUrl: location.heroImageUrl || '',
-      shortDescription: location.shortDescription || '',
-      openingHours: location.openingHours || '',
-      isPublic: location.isPublic || false,
-      companyId: location.companyId,
-    });
-    setDialogOpen(true);
+    setLocationPath(`/locations/${location.id}`);
   };
 
   const handleDialogClose = () => {
     setDialogOpen(false);
-    setEditingLocation(null);
     form.reset();
   };
 
@@ -171,9 +120,7 @@ export default function Locations() {
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>
-                {editingLocation ? 'Modifica Location' : 'Nuova Location'}
-              </DialogTitle>
+              <DialogTitle>Nuova Location</DialogTitle>
             </DialogHeader>
             <Form {...form}>
               <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
@@ -382,10 +329,10 @@ export default function Locations() {
                   </Button>
                   <Button
                     type="submit"
-                    disabled={createMutation.isPending || updateMutation.isPending}
+                    disabled={createMutation.isPending}
                     data-testid="button-submit-location"
                   >
-                    {editingLocation ? 'Aggiorna' : 'Crea'}
+                    Crea
                   </Button>
                 </DialogFooter>
               </form>

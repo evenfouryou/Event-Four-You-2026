@@ -34,6 +34,7 @@ import {
   ScanLine,
   GraduationCap,
   Printer,
+  Wallet,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
@@ -65,6 +66,7 @@ export function AppSidebar() {
   const isPr = user?.role === 'pr';
   const isWarehouse = user?.role === 'warehouse';
   const isBartender = user?.role === 'bartender';
+  const isCliente = user?.role === 'cliente';
   
   // Combined role checks for menu access
   const canManageLists = isSuperAdmin || isAdmin || isGestoreCovisione || isCapoStaff || isPr;
@@ -405,6 +407,12 @@ export function AppSidebar() {
         group: "Gestione PR",
       },
       {
+        title: "Scanner E4U",
+        icon: QrCode,
+        url: "/scanner",
+        group: "Gestione PR",
+      },
+      {
         title: "Staff Eventi",
         icon: UserPlus,
         url: "/pr/staff",
@@ -445,66 +453,60 @@ export function AppSidebar() {
         icon: ScanLine,
         url: "/pr/scanner",
         group: "Gestione PR",
+      },
+      {
+        title: "Scanner E4U",
+        icon: QrCode,
+        url: "/scanner",
+        group: "Gestione PR",
       }
     );
   }
 
-  // Capo Staff menu
+  // Capo Staff menu - pannello dedicato
   if (isCapoStaff) {
     menuItems.push(
       {
         title: "Home",
         icon: Home,
-        url: "/",
+        url: "/staff-pr-home",
         group: "Bacheca",
       },
       {
         title: "I Miei Eventi",
         icon: Calendar,
-        url: "/pr/my-events",
+        url: "/staff-pr-home",
         group: "Gestione",
       },
       {
-        title: "Liste Ospiti",
-        icon: ListChecks,
-        url: "/pr/guest-lists",
-        group: "Gestione PR",
-      },
-      {
         title: "Scanner QR",
-        icon: ScanLine,
-        url: "/pr/scanner",
-        group: "Gestione PR",
+        icon: QrCode,
+        url: "/scanner",
+        group: "Operazioni",
       }
     );
   }
 
-  // PR menu
+  // PR menu - pannello dedicato
   if (isPr) {
     menuItems.push(
       {
         title: "Home",
         icon: Home,
-        url: "/",
+        url: "/staff-pr-home",
         group: "Bacheca",
       },
       {
         title: "I Miei Eventi",
         icon: Calendar,
-        url: "/pr/my-events",
+        url: "/staff-pr-home",
         group: "Gestione",
       },
       {
-        title: "Le Mie Liste",
-        icon: ListChecks,
-        url: "/pr/guest-lists",
-        group: "Gestione PR",
-      },
-      {
-        title: "Le Mie Prenotazioni",
-        icon: Armchair,
-        url: "/pr/my-bookings",
-        group: "Gestione PR",
+        title: "Scanner QR",
+        icon: QrCode,
+        url: "/scanner",
+        group: "Operazioni",
       }
     );
   }
@@ -551,6 +553,23 @@ export function AppSidebar() {
         icon: Calendar,
         url: "/",
         group: "Operazioni",
+      }
+    );
+  }
+
+  if (isCliente) {
+    menuItems.push(
+      {
+        title: "Home",
+        icon: Home,
+        url: "/",
+        group: "Bacheca",
+      },
+      {
+        title: "Il Mio Wallet",
+        icon: Wallet,
+        url: "/wallet",
+        group: "I Miei QR",
       }
     );
   }

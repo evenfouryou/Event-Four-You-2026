@@ -8,6 +8,7 @@ import { getSession } from "./replitAuth";
 import passport from "passport";
 import cookieParser from "cookie-parser";
 import siaeRoutes from "./siae-routes";
+import e4uRoutes from "./e4u-routes";
 import publicRoutes from "./public-routes";
 import prRoutes from "./pr-routes";
 import printerRoutes from "./printer-routes";
@@ -95,6 +96,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Register SIAE module routes
   app.use(siaeRoutes);
+  
+  // Register E4U module routes (liste, tavoli, staff, PR, scanners)
+  app.use(e4uRoutes);
   
   // Register PR module routes (liste, tavoli, QR)
   app.use(prRoutes);
@@ -2712,20 +2716,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user?.claims?.sub || req.user?.id;
       const currentUser = await storage.getUser(userId);
       
-      if (!currentUser || (currentUser.role !== 'super_admin' && currentUser.role !== 'gestore')) {
+      if (!currentUser || (currentUser.role !== 'super_admin' && currentUser.role !== 'gestore' && currentUser.role !== 'capo_staff')) {
         return res.status(403).json({ message: "Forbidden: Admin access required" });
       }
 
-      const { email, password, firstName, lastName, role, companyId } = req.body;
+      const { email, password, firstName, lastName, role, companyId, phone } = req.body;
 
       // Validation
       if (!email || !password || !firstName || !lastName || !role) {
         return res.status(400).json({ message: "Missing required fields" });
       }
 
+      // Capo Staff can only create PR users
+      if (currentUser.role === 'capo_staff' && role !== 'pr') {
+        return res.status(403).json({ message: "Capo Staff can only create PR users" });
+      }
+
       // Admin può creare utenti solo nella sua company
       let targetCompanyId = companyId;
-      if (currentUser.role === 'gestore') {
+      if (currentUser.role === 'gestore' || currentUser.role === 'capo_staff') {
         targetCompanyId = currentUser.companyId;
         if (!targetCompanyId) {
           return res.status(403).json({ message: "No company associated" });
@@ -2749,6 +2758,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         lastName,
         role,
         companyId: targetCompanyId,
+        phone: phone || null,
         emailVerified: true, // Admin-created users are auto-verified
       });
 
@@ -2777,10 +2787,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Role labels in Italian
       const roleLabels: Record<string, string> = {
+        'super_admin': 'Super Admin',
         'gestore': 'Gestore',
-        'organizer': 'Organizzatore',
+        'gestore_covisione': 'Gestore Covisione',
+        'capo_staff': 'Capo Staff',
+        'pr': 'PR',
         'warehouse': 'Magazziniere',
         'bartender': 'Bartender',
+        'cassiere': 'Cassiere',
+        'scanner': 'Scanner',
       };
 
       try {

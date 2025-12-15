@@ -312,8 +312,8 @@ export default function Settings() {
         </div>
       </motion.div>
 
-      {/* Bridge Lettore Smart Card Section - Hidden for bartenders */}
-      {!isBartender && (
+      {/* Bridge Lettore Smart Card Section - Only for super_admin */}
+      {user?.role === 'super_admin' && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}

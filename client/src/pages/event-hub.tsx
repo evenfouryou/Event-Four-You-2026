@@ -580,6 +580,21 @@ export default function EventHub() {
   const [reportType, setReportType] = useState<'C1' | 'C2' | null>(null);
   const [reportLoading, setReportLoading] = useState(false);
 
+  // E4U Dialog State
+  const [showCreateListDialog, setShowCreateListDialog] = useState(false);
+  const [showCreateTableTypeDialog, setShowCreateTableTypeDialog] = useState(false);
+  const [newListData, setNewListData] = useState({ name: '', maxCapacity: '', price: '' });
+  const [newTableTypeData, setNewTableTypeData] = useState({ name: '', price: '', maxGuests: '', totalQuantity: '' });
+  
+  // E4U Staff/PR/Scanner Dialog State
+  const [showAssignStaffDialog, setShowAssignStaffDialog] = useState(false);
+  const [showAssignPrDialog, setShowAssignPrDialog] = useState(false);
+  const [showAssignScannerDialog, setShowAssignScannerDialog] = useState(false);
+  const [selectedStaffForPr, setSelectedStaffForPr] = useState<string | null>(null);
+  const [newStaffData, setNewStaffData] = useState({ userId: '', canManageLists: true, canManageTables: true, canCreatePr: false, canApproveTables: false });
+  const [newPrData, setNewPrData] = useState({ userId: '', staffUserId: '', canAddToLists: true, canProposeTables: false });
+  const [newScannerData, setNewScannerData] = useState({ userId: '', canScanLists: true, canScanTables: true, canScanTickets: true });
+
   const { data: event, isLoading: eventLoading } = useQuery<Event>({
     queryKey: ['/api/events', id],
   });
@@ -626,6 +641,54 @@ export default function EventHub() {
 
   const { data: users = [] } = useQuery<User[]>({
     queryKey: ['/api/users'],
+  });
+
+  // E4U Lists
+  const { data: e4uLists = [] } = useQuery<any[]>({
+    queryKey: ['/api/e4u/events', id, 'lists'],
+    enabled: !!id,
+  });
+
+  // E4U Table Types
+  const { data: e4uTableTypes = [] } = useQuery<any[]>({
+    queryKey: ['/api/e4u/events', id, 'table-types'],
+    enabled: !!id,
+  });
+
+  // E4U Reservations
+  const { data: e4uReservations = [] } = useQuery<any[]>({
+    queryKey: ['/api/e4u/events', id, 'reservations'],
+    enabled: !!id,
+  });
+
+  // E4U Stats
+  const { data: e4uStats } = useQuery<any>({
+    queryKey: ['/api/e4u/events', id, 'stats'],
+    enabled: !!id,
+  });
+
+  // E4U Staff Assignments
+  const { data: e4uStaff = [] } = useQuery<any[]>({
+    queryKey: ['/api/e4u/events', id, 'staff'],
+    enabled: !!id,
+  });
+
+  // E4U PR Assignments
+  const { data: e4uPr = [] } = useQuery<any[]>({
+    queryKey: ['/api/e4u/events', id, 'pr'],
+    enabled: !!id,
+  });
+
+  // E4U Scanners
+  const { data: e4uScanners = [] } = useQuery<any[]>({
+    queryKey: ['/api/e4u/events', id, 'scanners'],
+    enabled: !!id,
+  });
+
+  // E4U Report Data
+  const { data: e4uReport } = useQuery<any>({
+    queryKey: ['/api/e4u/events', id, 'report'],
+    enabled: !!id,
   });
 
   // SIAE sector mutations
@@ -723,6 +786,157 @@ export default function EventHub() {
         description: error?.message || "Impossibile eliminare l'evento.",
         variant: "destructive",
       });
+    },
+  });
+
+  // E4U Mutations
+  const createListMutation = useMutation({
+    mutationFn: async (data: { name: string; maxCapacity?: number; price?: string }) => {
+      return apiRequest('POST', `/api/e4u/events/${id}/lists`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/e4u/events', id, 'lists'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/pr/events', id, 'guest-lists'] });
+      setShowCreateListDialog(false);
+      setNewListData({ name: '', maxCapacity: '', price: '' });
+      toast({ title: "Lista creata con successo" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Errore", description: error?.message || "Impossibile creare la lista", variant: "destructive" });
+    },
+  });
+
+  const createTableTypeMutation = useMutation({
+    mutationFn: async (data: { name: string; price: string; maxGuests: number; totalQuantity: number }) => {
+      return apiRequest('POST', `/api/e4u/events/${id}/table-types`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/e4u/events', id, 'table-types'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/pr/events', id, 'tables'] });
+      setShowCreateTableTypeDialog(false);
+      setNewTableTypeData({ name: '', price: '', maxGuests: '', totalQuantity: '' });
+      toast({ title: "Tipologia tavolo creata" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Errore", description: error?.message || "Impossibile creare la tipologia", variant: "destructive" });
+    },
+  });
+
+  const approveReservationMutation = useMutation({
+    mutationFn: async (reservationId: string) => {
+      return apiRequest('POST', `/api/e4u/reservations/${reservationId}/approve`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/e4u/events', id, 'reservations'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/pr/events', id, 'bookings'] });
+      toast({ title: "Prenotazione approvata" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Errore", description: error?.message || "Impossibile approvare", variant: "destructive" });
+    },
+  });
+
+  const rejectReservationMutation = useMutation({
+    mutationFn: async ({ reservationId, reason }: { reservationId: string; reason?: string }) => {
+      return apiRequest('POST', `/api/e4u/reservations/${reservationId}/reject`, { reason });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/e4u/events', id, 'reservations'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/pr/events', id, 'bookings'] });
+      toast({ title: "Prenotazione rifiutata" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Errore", description: error?.message || "Impossibile rifiutare", variant: "destructive" });
+    },
+  });
+
+  // Assign Staff mutation
+  const assignStaffMutation = useMutation({
+    mutationFn: async (data: { userId: string; canManageLists: boolean; canManageTables: boolean; canCreatePr: boolean; canApproveTables: boolean }) => {
+      return apiRequest('POST', `/api/e4u/events/${id}/staff`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/e4u/events', id, 'staff'] });
+      toast({ title: "Staff assegnato all'evento" });
+      setShowAssignStaffDialog(false);
+      setNewStaffData({ userId: '', canManageLists: true, canManageTables: true, canCreatePr: false, canApproveTables: false });
+    },
+    onError: (error: any) => {
+      toast({ title: "Errore", description: error?.message || "Impossibile assegnare lo staff", variant: "destructive" });
+    },
+  });
+
+  // Assign PR mutation
+  const assignPrMutation = useMutation({
+    mutationFn: async (data: { userId: string; staffUserId?: string; canAddToLists: boolean; canProposeTables: boolean }) => {
+      return apiRequest('POST', `/api/e4u/events/${id}/pr`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/e4u/events', id, 'pr'] });
+      toast({ title: "PR assegnato all'evento" });
+      setShowAssignPrDialog(false);
+      setNewPrData({ userId: '', staffUserId: '', canAddToLists: true, canProposeTables: false });
+    },
+    onError: (error: any) => {
+      toast({ title: "Errore", description: error?.message || "Impossibile assegnare il PR", variant: "destructive" });
+    },
+  });
+
+  // Assign Scanner mutation
+  const assignScannerMutation = useMutation({
+    mutationFn: async (data: { userId: string; canScanLists: boolean; canScanTables: boolean; canScanTickets: boolean }) => {
+      return apiRequest('POST', `/api/e4u/events/${id}/scanners`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/e4u/events', id, 'scanners'] });
+      toast({ title: "Scanner assegnato all'evento" });
+      setShowAssignScannerDialog(false);
+      setNewScannerData({ userId: '', canScanLists: true, canScanTables: true, canScanTickets: true });
+    },
+    onError: (error: any) => {
+      toast({ title: "Errore", description: error?.message || "Impossibile assegnare lo scanner", variant: "destructive" });
+    },
+  });
+
+  // Remove Staff mutation
+  const removeStaffMutation = useMutation({
+    mutationFn: async (staffId: string) => {
+      return apiRequest('DELETE', `/api/e4u/staff/${staffId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/e4u/events', id, 'staff'] });
+      toast({ title: "Staff rimosso" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Errore", description: error?.message || "Impossibile rimuovere lo staff", variant: "destructive" });
+    },
+  });
+
+  // Remove PR mutation
+  const removePrMutation = useMutation({
+    mutationFn: async (prId: string) => {
+      return apiRequest('DELETE', `/api/e4u/pr/${prId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/e4u/events', id, 'pr'] });
+      toast({ title: "PR rimosso" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Errore", description: error?.message || "Impossibile rimuovere il PR", variant: "destructive" });
+    },
+  });
+
+  // Remove Scanner mutation
+  const removeScannerMutation = useMutation({
+    mutationFn: async (scannerId: string) => {
+      return apiRequest('DELETE', `/api/e4u/scanners/${scannerId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/e4u/events', id, 'scanners'] });
+      toast({ title: "Scanner rimosso" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Errore", description: error?.message || "Impossibile rimuovere lo scanner", variant: "destructive" });
     },
   });
 
@@ -1276,6 +1490,7 @@ export default function EventHub() {
               { id: 'staff', label: 'Staff', icon: Users },
               { id: 'inventory', label: 'Inventario', icon: Package },
               { id: 'finance', label: 'Incassi', icon: Euro },
+              { id: 'report', label: 'Report', icon: BarChart3 },
             ].map(tab => (
               <TabsTrigger
                 key={tab.id}
@@ -1805,189 +2020,625 @@ export default function EventHub() {
           </TabsContent>
 
           <TabsContent value="guests">
-            <Card className="glass-card">
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle className="flex items-center gap-2">
-                    <Users className="h-5 w-5 text-cyan-400" />
-                    Liste Ospiti
-                  </CardTitle>
-                  <Button onClick={() => navigate(`/pr/guest-lists?eventId=${id}`)} variant="outline" size="sm">
-                    Gestisci <ChevronRight className="h-4 w-4 ml-1" />
-                  </Button>
+            <div className="space-y-6">
+              {e4uStats && (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="p-4 rounded-lg bg-cyan-500/10 border border-cyan-500/30">
+                    <div className="text-2xl font-bold text-cyan-400">{e4uStats.totalLists || guestLists.length}</div>
+                    <div className="text-sm text-muted-foreground">Liste Attive</div>
+                  </div>
+                  <div className="p-4 rounded-lg bg-background/50 border">
+                    <div className="text-2xl font-bold">{e4uStats.totalEntries || totalGuests}</div>
+                    <div className="text-sm text-muted-foreground">Iscritti Totali</div>
+                  </div>
+                  <div className="p-4 rounded-lg bg-background/50 border">
+                    <div className="text-2xl font-bold text-emerald-400">{e4uStats.totalCheckedIn || checkedInGuests}</div>
+                    <div className="text-sm text-muted-foreground">Check-in</div>
+                  </div>
+                  <div className="p-4 rounded-lg bg-background/50 border">
+                    <div className="text-2xl font-bold">{maxGuests > 0 ? `${Math.round((checkedInGuests / maxGuests) * 100)}%` : '--'}</div>
+                    <div className="text-sm text-muted-foreground">Tasso Check-in</div>
+                  </div>
                 </div>
-              </CardHeader>
-              <CardContent>
-                {guestLists.length > 0 ? (
-                  <div className="space-y-4">
-                    {guestLists.map(list => (
-                      <div key={list.id} className="flex items-center justify-between p-4 rounded-lg bg-background/50 border">
-                        <div>
-                          <h4 className="font-medium">{list.name}</h4>
-                          <p className="text-sm text-muted-foreground">
-                            {(list as any).checkedInCount || 0} check-in / {list.currentCount || 0} ospiti
-                          </p>
-                        </div>
-                        <div className="text-right">
-                          <div className="text-lg font-bold">{list.currentCount || 0}</div>
-                          {list.maxGuests && (
-                            <Progress 
-                              value={((list.currentCount || 0) / list.maxGuests) * 100} 
-                              className="h-1.5 w-20 mt-1" 
-                            />
-                          )}
-                        </div>
-                      </div>
-                    ))}
+              )}
+
+              <Card className="glass-card">
+                <CardHeader>
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <CardTitle className="flex items-center gap-2">
+                      <Users className="h-5 w-5 text-cyan-400" />
+                      Liste Ospiti
+                    </CardTitle>
+                    <div className="flex items-center gap-2">
+                      <Button 
+                        onClick={() => setShowCreateListDialog(true)} 
+                        size="sm"
+                        data-testid="btn-create-list"
+                      >
+                        <Plus className="h-4 w-4 mr-1" />
+                        Nuova Lista
+                      </Button>
+                      <Button onClick={() => navigate(`/pr/guest-lists?eventId=${id}`)} variant="outline" size="sm" data-testid="btn-manage-lists">
+                        Gestisci <ChevronRight className="h-4 w-4 ml-1" />
+                      </Button>
+                    </div>
                   </div>
-                ) : (
-                  <div className="text-center py-12">
-                    <Users className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
-                    <h3 className="font-semibold mb-2">Nessuna Lista</h3>
-                    <p className="text-sm text-muted-foreground mb-4">
-                      Crea una lista ospiti per questo evento
-                    </p>
-                    <Button onClick={() => navigate(`/pr/guest-lists?eventId=${id}`)}>
-                      <Plus className="h-4 w-4 mr-2" />
-                      Crea Lista
-                    </Button>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+                </CardHeader>
+                <CardContent>
+                  {(e4uLists.length > 0 || guestLists.length > 0) ? (
+                    <div className="space-y-4">
+                      {(e4uLists.length > 0 ? e4uLists : guestLists).map((list: any) => {
+                        const entryCount = list.entryCount || list.currentCount || 0;
+                        const checkedIn = list.checkedInCount || 0;
+                        const maxCapacity = list.maxCapacity || list.maxGuests || 0;
+                        const capacityPercent = maxCapacity > 0 ? (entryCount / maxCapacity) * 100 : 0;
+
+                        return (
+                          <div 
+                            key={list.id} 
+                            className="flex items-center justify-between gap-4 p-4 rounded-lg bg-background/50 border hover:border-cyan-500/50 transition-colors"
+                            data-testid={`list-item-${list.id}`}
+                          >
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <h4 className="font-medium">{list.name}</h4>
+                                {list.price && (
+                                  <Badge variant="secondary" className="text-xs">€{list.price}</Badge>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
+                                <span className="flex items-center gap-1">
+                                  <Users className="h-3 w-3" />
+                                  {entryCount} iscritti
+                                </span>
+                                <span className="flex items-center gap-1 text-emerald-400">
+                                  <CheckCircle2 className="h-3 w-3" />
+                                  {checkedIn} check-in
+                                </span>
+                              </div>
+                              {maxCapacity > 0 && (
+                                <div className="mt-2">
+                                  <Progress value={capacityPercent} className="h-1.5" />
+                                  <p className="text-xs text-muted-foreground mt-1">{entryCount}/{maxCapacity} ({Math.round(capacityPercent)}%)</p>
+                                </div>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Button 
+                                variant="ghost" 
+                                size="icon"
+                                onClick={() => navigate(`/pr/guest-lists?eventId=${id}&listId=${list.id}`)}
+                                data-testid={`btn-view-list-${list.id}`}
+                              >
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                              <Button 
+                                variant="ghost" 
+                                size="icon"
+                                onClick={() => navigate(`/pr/guest-lists?eventId=${id}&listId=${list.id}&add=true`)}
+                                data-testid={`btn-add-to-list-${list.id}`}
+                              >
+                                <UserPlus className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="text-center py-12">
+                      <Users className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
+                      <h3 className="font-semibold mb-2">Nessuna Lista</h3>
+                      <p className="text-sm text-muted-foreground mb-4">
+                        Crea una lista ospiti per questo evento
+                      </p>
+                      <Button onClick={() => setShowCreateListDialog(true)} data-testid="btn-create-first-list">
+                        <Plus className="h-4 w-4 mr-2" />
+                        Crea Lista
+                      </Button>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
 
           <TabsContent value="tables">
-            <Card className="glass-card">
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle className="flex items-center gap-2">
-                    <Armchair className="h-5 w-5 text-purple-400" />
-                    Tavoli e Prenotazioni
-                  </CardTitle>
-                  <Button onClick={() => navigate(`/pr/tables?eventId=${id}`)} variant="outline" size="sm">
-                    Gestisci <ChevronRight className="h-4 w-4 ml-1" />
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                {tables.length > 0 ? (
-                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                    {tables.map(table => {
-                      const booking = bookings.find(b => b.tableId === table.id && b.status !== 'cancelled');
-                      const isBooked = !!booking;
-                      
-                      return (
-                        <div 
-                          key={table.id}
-                          className={`p-4 rounded-lg border-2 text-center transition-all ${
-                            isBooked 
-                              ? 'bg-purple-500/20 border-purple-500/50' 
-                              : 'bg-background/50 border-dashed border-muted hover:border-muted-foreground'
-                          }`}
-                        >
-                          <Armchair className={`h-8 w-8 mx-auto mb-2 ${isBooked ? 'text-purple-400' : 'text-muted-foreground'}`} />
-                          <div className="font-medium">{table.name}</div>
-                          <div className="text-xs text-muted-foreground capitalize">{table.tableType}</div>
-                          {isBooked && booking && (
-                            <div className="mt-2 text-xs">
-                              <div className="font-medium text-purple-400">{booking.customerName}</div>
-                              <div className="text-muted-foreground">{booking.guestsCount} ospiti</div>
-                            </div>
-                          )}
+            <div className="space-y-6">
+              {(() => {
+                const pendingReservations = e4uReservations.filter((r: any) => r.status === 'pending');
+                const approvedReservations = e4uReservations.filter((r: any) => r.status === 'approved' || r.status === 'confirmed');
+                
+                return (
+                  <>
+                    {(e4uTableTypes.length > 0 || pendingReservations.length > 0) && (
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div className="p-4 rounded-lg bg-purple-500/10 border border-purple-500/30">
+                          <div className="text-2xl font-bold text-purple-400">{e4uTableTypes.length || tables.length}</div>
+                          <div className="text-sm text-muted-foreground">Tipologie Tavoli</div>
                         </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div className="text-center py-12">
-                    <Armchair className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
-                    <h3 className="font-semibold mb-2">Nessun Tavolo</h3>
-                    <p className="text-sm text-muted-foreground mb-4">
-                      Configura i tavoli per questo evento
-                    </p>
-                    <Button onClick={() => navigate(`/pr/tables?eventId=${id}`)}>
-                      <Plus className="h-4 w-4 mr-2" />
-                      Aggiungi Tavoli
-                    </Button>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+                        <div className="p-4 rounded-lg bg-background/50 border">
+                          <div className="text-2xl font-bold">{bookedTables}/{tables.length}</div>
+                          <div className="text-sm text-muted-foreground">Prenotati</div>
+                        </div>
+                        {pendingReservations.length > 0 && (
+                          <div className="p-4 rounded-lg bg-amber-500/10 border border-amber-500/30">
+                            <div className="text-2xl font-bold text-amber-400">{pendingReservations.length}</div>
+                            <div className="text-sm text-muted-foreground">In Attesa</div>
+                          </div>
+                        )}
+                        <div className="p-4 rounded-lg bg-background/50 border">
+                          <div className="text-2xl font-bold text-emerald-400">{approvedReservations.length}</div>
+                          <div className="text-sm text-muted-foreground">Confermate</div>
+                        </div>
+                      </div>
+                    )}
+
+                    <Card className="glass-card">
+                      <CardHeader>
+                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                          <CardTitle className="flex items-center gap-2">
+                            <Armchair className="h-5 w-5 text-purple-400" />
+                            Tipologie Tavoli
+                          </CardTitle>
+                          <div className="flex items-center gap-2">
+                            <Button 
+                              onClick={() => setShowCreateTableTypeDialog(true)} 
+                              size="sm"
+                              data-testid="btn-create-table-type"
+                            >
+                              <Plus className="h-4 w-4 mr-1" />
+                              Nuova Tipologia
+                            </Button>
+                            <Button onClick={() => navigate(`/pr/tables?eventId=${id}`)} variant="outline" size="sm" data-testid="btn-manage-tables">
+                              Gestisci <ChevronRight className="h-4 w-4 ml-1" />
+                            </Button>
+                          </div>
+                        </div>
+                      </CardHeader>
+                      <CardContent>
+                        {(e4uTableTypes.length > 0 || tables.length > 0) ? (
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {(e4uTableTypes.length > 0 ? e4uTableTypes : Array.from(new Set(tables.map(t => t.tableType))).map(type => ({
+                              id: type,
+                              name: type,
+                              totalQuantity: tables.filter(t => t.tableType === type).length,
+                              reserved: bookings.filter(b => tables.find(t => t.id === b.tableId && t.tableType === type) && b.status !== 'cancelled').length,
+                            }))).map((tableType: any) => {
+                              const available = (tableType.totalQuantity || 0) - (tableType.reserved || 0);
+                              const availablePercent = tableType.totalQuantity > 0 ? (available / tableType.totalQuantity) * 100 : 0;
+
+                              return (
+                                <div 
+                                  key={tableType.id} 
+                                  className="p-4 rounded-lg bg-background/50 border hover:border-purple-500/50 transition-colors"
+                                  data-testid={`table-type-${tableType.id}`}
+                                >
+                                  <div className="flex items-center justify-between mb-2">
+                                    <h4 className="font-medium capitalize">{tableType.name}</h4>
+                                    {tableType.price && (
+                                      <Badge className="bg-purple-500/20 text-purple-400">€{tableType.price}</Badge>
+                                    )}
+                                  </div>
+                                  <div className="text-sm text-muted-foreground mb-2">
+                                    {tableType.maxGuests && <span>{tableType.maxGuests} ospiti max • </span>}
+                                    <span className={available > 0 ? 'text-emerald-400' : 'text-rose-400'}>
+                                      {available} disponibili
+                                    </span> / {tableType.totalQuantity} totali
+                                  </div>
+                                  <Progress value={100 - availablePercent} className="h-1.5" />
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <div className="text-center py-8">
+                            <Armchair className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
+                            <h3 className="font-semibold mb-2">Nessuna Tipologia</h3>
+                            <p className="text-sm text-muted-foreground mb-4">
+                              Crea le tipologie di tavoli per questo evento
+                            </p>
+                            <Button onClick={() => setShowCreateTableTypeDialog(true)} data-testid="btn-create-first-table-type">
+                              <Plus className="h-4 w-4 mr-2" />
+                              Crea Tipologia
+                            </Button>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+
+                    {pendingReservations.length > 0 && (
+                      <Card className="glass-card border-amber-500/30">
+                        <CardHeader>
+                          <CardTitle className="flex items-center gap-2 text-amber-400">
+                            <Clock className="h-5 w-5" />
+                            Prenotazioni in Attesa ({pendingReservations.length})
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="space-y-3">
+                            {pendingReservations.map((reservation: any) => (
+                              <div 
+                                key={reservation.id}
+                                className="flex items-center justify-between gap-4 p-4 rounded-lg bg-amber-500/10 border border-amber-500/20"
+                                data-testid={`pending-reservation-${reservation.id}`}
+                              >
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="font-medium">{reservation.customerName}</span>
+                                    <Badge variant="secondary">{reservation.tableTypeName || reservation.tableType}</Badge>
+                                  </div>
+                                  <div className="text-sm text-muted-foreground mt-1">
+                                    {reservation.guestsCount} ospiti • {reservation.phone || reservation.email || 'N/D'}
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <Button 
+                                    size="sm"
+                                    onClick={() => approveReservationMutation.mutate(reservation.id)}
+                                    disabled={approveReservationMutation.isPending}
+                                    data-testid={`btn-approve-${reservation.id}`}
+                                  >
+                                    {approveReservationMutation.isPending ? (
+                                      <Loader2 className="h-4 w-4 animate-spin" />
+                                    ) : (
+                                      <CheckCircle2 className="h-4 w-4 mr-1" />
+                                    )}
+                                    Approva
+                                  </Button>
+                                  <Button 
+                                    variant="outline" 
+                                    size="sm"
+                                    onClick={() => rejectReservationMutation.mutate({ reservationId: reservation.id })}
+                                    disabled={rejectReservationMutation.isPending}
+                                    data-testid={`btn-reject-${reservation.id}`}
+                                  >
+                                    <X className="h-4 w-4 mr-1" />
+                                    Rifiuta
+                                  </Button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
+
+                    {approvedReservations.length > 0 && (
+                      <Card className="glass-card">
+                        <CardHeader>
+                          <CardTitle className="flex items-center gap-2">
+                            <CheckCircle2 className="h-5 w-5 text-emerald-400" />
+                            Prenotazioni Confermate ({approvedReservations.length})
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="space-y-3">
+                            {approvedReservations.slice(0, 5).map((reservation: any) => (
+                              <div 
+                                key={reservation.id}
+                                className="flex items-center justify-between gap-4 p-3 rounded-lg bg-background/50 border"
+                                data-testid={`approved-reservation-${reservation.id}`}
+                              >
+                                <div>
+                                  <span className="font-medium">{reservation.customerName}</span>
+                                  <span className="text-sm text-muted-foreground ml-2">
+                                    {reservation.guestsCount} ospiti • {reservation.tableTypeName || reservation.tableType}
+                                  </span>
+                                </div>
+                                <Badge className="bg-emerald-500/20 text-emerald-400">Confermata</Badge>
+                              </div>
+                            ))}
+                            {approvedReservations.length > 5 && (
+                              <Button variant="ghost" className="w-full" onClick={() => navigate(`/pr/tables?eventId=${id}`)}>
+                                Vedi tutte ({approvedReservations.length})
+                              </Button>
+                            )}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
+                  </>
+                );
+              })()}
+            </div>
           </TabsContent>
 
           <TabsContent value="staff">
-            <Card className="glass-card">
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle className="flex items-center gap-2">
-                    <Users className="h-5 w-5 text-teal-400" />
-                    Staff Assegnato
-                  </CardTitle>
-                  <Button onClick={() => navigate(`/pr/staff?eventId=${id}`)} variant="outline" size="sm">
-                    Gestisci <ChevronRight className="h-4 w-4 ml-1" />
-                  </Button>
+            <div className="space-y-6">
+              {/* Stats Grid */}
+              <div className="grid grid-cols-3 gap-4">
+                <div className="p-4 rounded-lg bg-teal-500/10 border border-teal-500/30" data-testid="stat-staff-count">
+                  <div className="text-2xl font-bold text-teal-400">{e4uStaff.length}</div>
+                  <div className="text-sm text-muted-foreground">Staff Attivi</div>
                 </div>
-              </CardHeader>
-              <CardContent>
-                <div className="grid md:grid-cols-2 gap-6">
-                  <div>
-                    <h4 className="font-medium mb-3 flex items-center gap-2">
-                      <MapPin className="h-4 w-4" />
-                      Postazioni ({eventStations.length})
-                    </h4>
-                    {eventStations.length > 0 ? (
-                      <div className="space-y-2">
-                        {eventStations.map(station => {
-                          const bartenders = users.filter(u => station.bartenderIds?.includes(u.id));
-                          return (
-                            <div key={station.id} className="p-3 rounded-lg bg-background/50 border">
-                              <div className="font-medium">{station.name}</div>
-                              <div className="text-sm text-muted-foreground">
-                                {bartenders.length > 0 
-                                  ? bartenders.map(b => `${b.firstName} ${b.lastName}`).join(', ')
-                                  : 'Nessun barista assegnato'
-                                }
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    ) : (
-                      <p className="text-sm text-muted-foreground">Nessuna postazione configurata</p>
-                    )}
+                <div className="p-4 rounded-lg bg-orange-500/10 border border-orange-500/30" data-testid="stat-pr-count">
+                  <div className="text-2xl font-bold text-orange-400">{e4uPr.length}</div>
+                  <div className="text-sm text-muted-foreground">PR Attivi</div>
+                </div>
+                <div className="p-4 rounded-lg bg-emerald-500/10 border border-emerald-500/30" data-testid="stat-scanner-count">
+                  <div className="text-2xl font-bold text-emerald-400">{e4uScanners.length}</div>
+                  <div className="text-sm text-muted-foreground">Scanner Attivi</div>
+                </div>
+              </div>
+
+              {/* Staff Section */}
+              <Card className="glass-card">
+                <CardHeader>
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <CardTitle className="flex items-center gap-2">
+                      <Users className="h-5 w-5 text-teal-400" />
+                      Staff
+                    </CardTitle>
+                    <Button 
+                      onClick={() => setShowAssignStaffDialog(true)} 
+                      size="sm"
+                      data-testid="btn-assign-staff"
+                    >
+                      <Plus className="h-4 w-4 mr-1" />
+                      Assegna Staff
+                    </Button>
                   </div>
-                  <div>
-                    <h4 className="font-medium mb-3 flex items-center gap-2">
-                      <Users className="h-4 w-4" />
-                      Baristi Assegnati
-                    </h4>
-                    {(() => {
-                      const assignedBartenderIds = new Set(eventStations.flatMap(s => s.bartenderIds || []));
-                      const assignedBartenders = users.filter(u => assignedBartenderIds.has(u.id));
-                      
-                      return assignedBartenders.length > 0 ? (
-                        <div className="space-y-2">
-                          {assignedBartenders.map(bartender => (
-                            <div key={bartender.id} className="flex items-center gap-3 p-3 rounded-lg bg-background/50 border">
-                              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-teal-500 to-cyan-600 flex items-center justify-center text-white font-medium">
-                                {bartender.firstName?.[0]}{bartender.lastName?.[0]}
+                </CardHeader>
+                <CardContent>
+                  {e4uStaff.length > 0 ? (
+                    <div className="space-y-3">
+                      {e4uStaff.map((staff: any) => {
+                        const staffUser = users.find(u => u.id === staff.userId);
+                        const staffPrs = e4uPr.filter((pr: any) => pr.staffUserId === staff.userId);
+                        
+                        return (
+                          <div 
+                            key={staff.id} 
+                            className="p-4 rounded-lg bg-background/50 border hover:border-teal-500/50 transition-colors"
+                            data-testid={`staff-item-${staff.id}`}
+                          >
+                            <div className="flex items-start justify-between gap-4">
+                              <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-teal-500 to-cyan-600 flex items-center justify-center text-white font-medium">
+                                  {staffUser?.firstName?.[0]}{staffUser?.lastName?.[0]}
+                                </div>
+                                <div>
+                                  <div className="font-medium">
+                                    {staffUser ? `${staffUser.firstName} ${staffUser.lastName}` : 'Utente sconosciuto'}
+                                  </div>
+                                  <div className="flex items-center gap-1 mt-1 flex-wrap">
+                                    {staff.canManageLists && (
+                                      <Badge variant="secondary" className="text-xs">Liste</Badge>
+                                    )}
+                                    {staff.canManageTables && (
+                                      <Badge variant="secondary" className="text-xs">Tavoli</Badge>
+                                    )}
+                                    {staff.canCreatePr && (
+                                      <Badge variant="secondary" className="text-xs bg-orange-500/20 text-orange-400">Crea PR</Badge>
+                                    )}
+                                    {staff.canApproveTables && (
+                                      <Badge variant="secondary" className="text-xs bg-purple-500/20 text-purple-400">Approva Tavoli</Badge>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                              <Button 
+                                variant="ghost" 
+                                size="icon"
+                                onClick={() => removeStaffMutation.mutate(staff.id)}
+                                disabled={removeStaffMutation.isPending}
+                                data-testid={`btn-remove-staff-${staff.id}`}
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </div>
+                            
+                            {/* PR under this staff */}
+                            {staffPrs.length > 0 && (
+                              <div className="mt-3 ml-12 space-y-2">
+                                <div className="text-xs text-muted-foreground flex items-center gap-1">
+                                  <Megaphone className="h-3 w-3" />
+                                  PR gestiti ({staffPrs.length})
+                                </div>
+                                {staffPrs.map((pr: any) => {
+                                  const prUser = users.find(u => u.id === pr.userId);
+                                  return (
+                                    <div 
+                                      key={pr.id}
+                                      className="flex items-center justify-between gap-2 p-2 rounded-md bg-orange-500/5 border border-orange-500/20"
+                                      data-testid={`staff-pr-${pr.id}`}
+                                    >
+                                      <span className="text-sm">
+                                        {prUser ? `${prUser.firstName} ${prUser.lastName}` : 'PR sconosciuto'}
+                                      </span>
+                                      <div className="flex items-center gap-1">
+                                        {pr.canAddToLists && <Badge variant="outline" className="text-xs">Liste</Badge>}
+                                        {pr.canProposeTables && <Badge variant="outline" className="text-xs">Tavoli</Badge>}
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8">
+                      <Users className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
+                      <h3 className="font-semibold mb-2">Nessuno Staff</h3>
+                      <p className="text-sm text-muted-foreground mb-4">
+                        Assegna membri dello staff a questo evento
+                      </p>
+                      <Button onClick={() => setShowAssignStaffDialog(true)} data-testid="btn-assign-first-staff">
+                        <Plus className="h-4 w-4 mr-2" />
+                        Assegna Staff
+                      </Button>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* PR Section */}
+              <Card className="glass-card">
+                <CardHeader>
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <CardTitle className="flex items-center gap-2">
+                      <Megaphone className="h-5 w-5 text-orange-400" />
+                      PR
+                    </CardTitle>
+                    <Button 
+                      onClick={() => setShowAssignPrDialog(true)} 
+                      size="sm"
+                      data-testid="btn-assign-pr"
+                    >
+                      <Plus className="h-4 w-4 mr-1" />
+                      Assegna PR
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {e4uPr.length > 0 ? (
+                    <div className="space-y-3">
+                      {e4uPr.map((pr: any) => {
+                        const prUser = users.find(u => u.id === pr.userId);
+                        const supervisorUser = pr.staffUserId ? users.find(u => u.id === pr.staffUserId) : null;
+                        
+                        return (
+                          <div 
+                            key={pr.id} 
+                            className="flex items-center justify-between gap-4 p-4 rounded-lg bg-background/50 border hover:border-orange-500/50 transition-colors"
+                            data-testid={`pr-item-${pr.id}`}
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-orange-500 to-amber-600 flex items-center justify-center text-white font-medium">
+                                {prUser?.firstName?.[0]}{prUser?.lastName?.[0]}
                               </div>
                               <div>
-                                <div className="font-medium">{bartender.firstName} {bartender.lastName}</div>
-                                <div className="text-xs text-muted-foreground">{bartender.email}</div>
+                                <div className="font-medium">
+                                  {prUser ? `${prUser.firstName} ${prUser.lastName}` : 'Utente sconosciuto'}
+                                </div>
+                                {supervisorUser && (
+                                  <div className="text-xs text-muted-foreground">
+                                    Supervisore: {supervisorUser.firstName} {supervisorUser.lastName}
+                                  </div>
+                                )}
+                                <div className="flex items-center gap-1 mt-1 flex-wrap">
+                                  {pr.canAddToLists && (
+                                    <Badge variant="secondary" className="text-xs">Liste</Badge>
+                                  )}
+                                  {pr.canProposeTables && (
+                                    <Badge variant="secondary" className="text-xs">Tavoli</Badge>
+                                  )}
+                                </div>
                               </div>
                             </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <p className="text-sm text-muted-foreground">Nessun barista assegnato</p>
-                      );
-                    })()}
+                            <Button 
+                              variant="ghost" 
+                              size="icon"
+                              onClick={() => removePrMutation.mutate(pr.id)}
+                              disabled={removePrMutation.isPending}
+                              data-testid={`btn-remove-pr-${pr.id}`}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8">
+                      <Megaphone className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
+                      <h3 className="font-semibold mb-2">Nessun PR</h3>
+                      <p className="text-sm text-muted-foreground mb-4">
+                        Assegna PR a questo evento
+                      </p>
+                      <Button onClick={() => setShowAssignPrDialog(true)} data-testid="btn-assign-first-pr">
+                        <Plus className="h-4 w-4 mr-2" />
+                        Assegna PR
+                      </Button>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Scanner Section */}
+              <Card className="glass-card">
+                <CardHeader>
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <CardTitle className="flex items-center gap-2">
+                      <QrCode className="h-5 w-5 text-emerald-400" />
+                      Scanner
+                    </CardTitle>
+                    <Button 
+                      onClick={() => setShowAssignScannerDialog(true)} 
+                      size="sm"
+                      data-testid="btn-assign-scanner"
+                    >
+                      <Plus className="h-4 w-4 mr-1" />
+                      Assegna Scanner
+                    </Button>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
+                </CardHeader>
+                <CardContent>
+                  {e4uScanners.length > 0 ? (
+                    <div className="space-y-3">
+                      {e4uScanners.map((scanner: any) => {
+                        const scannerUser = users.find(u => u.id === scanner.userId);
+                        
+                        return (
+                          <div 
+                            key={scanner.id} 
+                            className="flex items-center justify-between gap-4 p-4 rounded-lg bg-background/50 border hover:border-emerald-500/50 transition-colors"
+                            data-testid={`scanner-item-${scanner.id}`}
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-500 to-green-600 flex items-center justify-center text-white font-medium">
+                                {scannerUser?.firstName?.[0]}{scannerUser?.lastName?.[0]}
+                              </div>
+                              <div>
+                                <div className="font-medium">
+                                  {scannerUser ? `${scannerUser.firstName} ${scannerUser.lastName}` : 'Utente sconosciuto'}
+                                </div>
+                                <div className="flex items-center gap-1 mt-1 flex-wrap">
+                                  {scanner.canScanLists && (
+                                    <Badge variant="secondary" className="text-xs bg-cyan-500/20 text-cyan-400">Liste</Badge>
+                                  )}
+                                  {scanner.canScanTables && (
+                                    <Badge variant="secondary" className="text-xs bg-purple-500/20 text-purple-400">Tavoli</Badge>
+                                  )}
+                                  {scanner.canScanTickets && (
+                                    <Badge variant="secondary" className="text-xs bg-amber-500/20 text-amber-400">Biglietti</Badge>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                            <Button 
+                              variant="ghost" 
+                              size="icon"
+                              onClick={() => removeScannerMutation.mutate(scanner.id)}
+                              disabled={removeScannerMutation.isPending}
+                              data-testid={`btn-remove-scanner-${scanner.id}`}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8">
+                      <QrCode className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
+                      <h3 className="font-semibold mb-2">Nessuno Scanner</h3>
+                      <p className="text-sm text-muted-foreground mb-4">
+                        Assegna addetti scanner a questo evento
+                      </p>
+                      <Button onClick={() => setShowAssignScannerDialog(true)} data-testid="btn-assign-first-scanner">
+                        <Plus className="h-4 w-4 mr-2" />
+                        Assegna Scanner
+                      </Button>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
 
           <TabsContent value="inventory">
@@ -2088,6 +2739,288 @@ export default function EventHub() {
                     Apri Report
                   </Button>
                 </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="report" className="space-y-6">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <div 
+                className="p-4 rounded-lg bg-gradient-to-br from-amber-500/20 to-orange-500/20 border border-amber-500/30"
+                data-testid="stats-total-checkins"
+              >
+                <div className="text-3xl font-bold text-amber-400">
+                  {e4uReport?.overview?.totalCheckIns || 0}
+                </div>
+                <div className="text-sm text-muted-foreground">Totale Ingressi</div>
+              </div>
+              <div 
+                className="p-4 rounded-lg bg-gradient-to-br from-orange-500/20 to-red-500/20 border border-orange-500/30"
+                data-testid="stats-checkin-rate"
+              >
+                <div className="text-3xl font-bold text-orange-400">
+                  {e4uReport?.overview?.checkInRate || 0}%
+                </div>
+                <div className="text-sm text-muted-foreground">Tasso Check-in</div>
+              </div>
+              <div 
+                className="p-4 rounded-lg bg-background/50 border"
+                data-testid="stats-list-revenue"
+              >
+                <div className="text-2xl font-bold text-cyan-400">
+                  €{(e4uReport?.overview?.listRevenue || 0).toFixed(0)}
+                </div>
+                <div className="text-sm text-muted-foreground">Incasso Liste</div>
+              </div>
+              <div 
+                className="p-4 rounded-lg bg-background/50 border"
+                data-testid="stats-table-revenue"
+              >
+                <div className="text-2xl font-bold text-purple-400">
+                  €{(e4uReport?.overview?.tableRevenue || 0).toFixed(0)}
+                </div>
+                <div className="text-sm text-muted-foreground">Incasso Tavoli</div>
+              </div>
+            </div>
+
+            <div className="grid lg:grid-cols-2 gap-6">
+              <Card className="glass-card" data-testid="table-staff-performance">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Users className="h-5 w-5 text-amber-400" />
+                    Performance Staff
+                  </CardTitle>
+                  <CardDescription>Statistiche per ogni staff assegnato</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {e4uReport?.staffPerformance && e4uReport.staffPerformance.length > 0 ? (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b border-border">
+                            <th className="text-left py-2 px-2 font-medium text-muted-foreground">Staff</th>
+                            <th className="text-center py-2 px-2 font-medium text-muted-foreground">Liste</th>
+                            <th className="text-center py-2 px-2 font-medium text-muted-foreground">Persone</th>
+                            <th className="text-center py-2 px-2 font-medium text-muted-foreground">Tavoli Prop.</th>
+                            <th className="text-center py-2 px-2 font-medium text-muted-foreground">Tavoli Appr.</th>
+                            <th className="text-center py-2 px-2 font-medium text-muted-foreground">Check-in PR</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {e4uReport.staffPerformance.map((staff: any) => (
+                            <tr key={staff.staffId} className="border-b border-border/50 hover:bg-white/5">
+                              <td className="py-2 px-2 font-medium">{staff.staffName}</td>
+                              <td className="text-center py-2 px-2">
+                                <Badge variant="secondary" className="bg-cyan-500/20 text-cyan-400">
+                                  {staff.listsCreated}
+                                </Badge>
+                              </td>
+                              <td className="text-center py-2 px-2">
+                                <Badge variant="secondary" className="bg-blue-500/20 text-blue-400">
+                                  {staff.entriesAdded}
+                                </Badge>
+                              </td>
+                              <td className="text-center py-2 px-2">
+                                <Badge variant="secondary" className="bg-purple-500/20 text-purple-400">
+                                  {staff.tablesProposed}
+                                </Badge>
+                              </td>
+                              <td className="text-center py-2 px-2">
+                                <Badge variant="secondary" className="bg-emerald-500/20 text-emerald-400">
+                                  {staff.tablesApproved}
+                                </Badge>
+                              </td>
+                              <td className="text-center py-2 px-2">
+                                <Badge variant="secondary" className="bg-amber-500/20 text-amber-400">
+                                  {staff.prCheckIns}
+                                </Badge>
+                              </td>
+                            </tr>
+                          ))}
+                          <tr className="bg-white/5 font-semibold">
+                            <td className="py-2 px-2">Totale</td>
+                            <td className="text-center py-2 px-2">
+                              <Badge className="bg-cyan-500/30 text-cyan-300">
+                                {e4uReport.staffPerformance.reduce((acc: number, s: any) => acc + s.listsCreated, 0)}
+                              </Badge>
+                            </td>
+                            <td className="text-center py-2 px-2">
+                              <Badge className="bg-blue-500/30 text-blue-300">
+                                {e4uReport.staffPerformance.reduce((acc: number, s: any) => acc + s.entriesAdded, 0)}
+                              </Badge>
+                            </td>
+                            <td className="text-center py-2 px-2">
+                              <Badge className="bg-purple-500/30 text-purple-300">
+                                {e4uReport.staffPerformance.reduce((acc: number, s: any) => acc + s.tablesProposed, 0)}
+                              </Badge>
+                            </td>
+                            <td className="text-center py-2 px-2">
+                              <Badge className="bg-emerald-500/30 text-emerald-300">
+                                {e4uReport.staffPerformance.reduce((acc: number, s: any) => acc + s.tablesApproved, 0)}
+                              </Badge>
+                            </td>
+                            <td className="text-center py-2 px-2">
+                              <Badge className="bg-amber-500/30 text-amber-300">
+                                {e4uReport.staffPerformance.reduce((acc: number, s: any) => acc + s.prCheckIns, 0)}
+                              </Badge>
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <div className="text-center py-8">
+                      <Users className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
+                      <p className="text-sm text-muted-foreground">Nessuno staff assegnato</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card className="glass-card" data-testid="table-pr-performance">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Megaphone className="h-5 w-5 text-orange-400" />
+                    Performance PR
+                  </CardTitle>
+                  <CardDescription>Statistiche per ogni PR assegnato</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {e4uReport?.prPerformance && e4uReport.prPerformance.length > 0 ? (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b border-border">
+                            <th className="text-left py-2 px-2 font-medium text-muted-foreground">PR</th>
+                            <th className="text-left py-2 px-2 font-medium text-muted-foreground">Staff</th>
+                            <th className="text-center py-2 px-2 font-medium text-muted-foreground">In Lista</th>
+                            <th className="text-center py-2 px-2 font-medium text-muted-foreground">Ingressi</th>
+                            <th className="text-center py-2 px-2 font-medium text-muted-foreground">Tavoli Prop.</th>
+                            <th className="text-center py-2 px-2 font-medium text-muted-foreground">Tavoli Appr.</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {e4uReport.prPerformance.map((pr: any) => (
+                            <tr key={pr.prId} className="border-b border-border/50 hover:bg-white/5">
+                              <td className="py-2 px-2 font-medium">{pr.prName}</td>
+                              <td className="py-2 px-2 text-muted-foreground text-xs">{pr.staffName}</td>
+                              <td className="text-center py-2 px-2">
+                                <Badge variant="secondary" className="bg-cyan-500/20 text-cyan-400">
+                                  {pr.entriesAdded}
+                                </Badge>
+                              </td>
+                              <td className="text-center py-2 px-2">
+                                <Badge variant="secondary" className="bg-emerald-500/20 text-emerald-400">
+                                  {pr.checkIns}
+                                </Badge>
+                              </td>
+                              <td className="text-center py-2 px-2">
+                                <Badge variant="secondary" className="bg-purple-500/20 text-purple-400">
+                                  {pr.tablesProposed}
+                                </Badge>
+                              </td>
+                              <td className="text-center py-2 px-2">
+                                <Badge variant="secondary" className="bg-amber-500/20 text-amber-400">
+                                  {pr.tablesApproved}
+                                </Badge>
+                              </td>
+                            </tr>
+                          ))}
+                          <tr className="bg-white/5 font-semibold">
+                            <td className="py-2 px-2">Totale</td>
+                            <td className="py-2 px-2">-</td>
+                            <td className="text-center py-2 px-2">
+                              <Badge className="bg-cyan-500/30 text-cyan-300">
+                                {e4uReport.prPerformance.reduce((acc: number, p: any) => acc + p.entriesAdded, 0)}
+                              </Badge>
+                            </td>
+                            <td className="text-center py-2 px-2">
+                              <Badge className="bg-emerald-500/30 text-emerald-300">
+                                {e4uReport.prPerformance.reduce((acc: number, p: any) => acc + p.checkIns, 0)}
+                              </Badge>
+                            </td>
+                            <td className="text-center py-2 px-2">
+                              <Badge className="bg-purple-500/30 text-purple-300">
+                                {e4uReport.prPerformance.reduce((acc: number, p: any) => acc + p.tablesProposed, 0)}
+                              </Badge>
+                            </td>
+                            <td className="text-center py-2 px-2">
+                              <Badge className="bg-amber-500/30 text-amber-300">
+                                {e4uReport.prPerformance.reduce((acc: number, p: any) => acc + p.tablesApproved, 0)}
+                              </Badge>
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <div className="text-center py-8">
+                      <Megaphone className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
+                      <p className="text-sm text-muted-foreground">Nessun PR assegnato</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+
+            <Card className="glass-card">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <TrendingUp className="h-5 w-5 text-amber-400" />
+                  Check-in per Ora
+                </CardTitle>
+                <CardDescription>Distribuzione degli ingressi durante l'evento</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {e4uReport?.hourlyCheckIns && e4uReport.hourlyCheckIns.length > 0 ? (
+                  <div className="h-[200px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart data={e4uReport.hourlyCheckIns} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                        <defs>
+                          <linearGradient id="checkInsGradient" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.3} />
+                            <stop offset="95%" stopColor="#f59e0b" stopOpacity={0} />
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} />
+                        <XAxis 
+                          dataKey="hour" 
+                          stroke="hsl(var(--muted-foreground))" 
+                          fontSize={11}
+                          tickLine={false}
+                        />
+                        <YAxis 
+                          stroke="hsl(var(--muted-foreground))" 
+                          fontSize={11}
+                          tickLine={false}
+                          axisLine={false}
+                        />
+                        <Tooltip
+                          contentStyle={{
+                            backgroundColor: 'hsl(var(--card))',
+                            border: '1px solid hsl(var(--border))',
+                            borderRadius: '8px',
+                            fontSize: '12px',
+                          }}
+                          labelStyle={{ color: 'hsl(var(--foreground))' }}
+                        />
+                        <Area
+                          type="monotone"
+                          dataKey="checkIns"
+                          stroke="#f59e0b"
+                          strokeWidth={2}
+                          fill="url(#checkInsGradient)"
+                          name="Check-in"
+                        />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <TrendingUp className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
+                    <p className="text-sm text-muted-foreground">Nessun dato sui check-in disponibile</p>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -2355,6 +3288,512 @@ export default function EventHub() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setReportDialogOpen(false)} data-testid="btn-close-report">
               Chiudi
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showCreateListDialog} onOpenChange={setShowCreateListDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5 text-cyan-400" />
+              Nuova Lista Ospiti
+            </DialogTitle>
+            <DialogDescription>
+              Crea una nuova lista ospiti per questo evento
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="list-name">Nome Lista *</Label>
+              <Input
+                id="list-name"
+                placeholder="es. Lista VIP, Lista PR Marco..."
+                value={newListData.name}
+                onChange={(e) => setNewListData(prev => ({ ...prev, name: e.target.value }))}
+                data-testid="input-list-name"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="list-capacity">Capienza Max</Label>
+                <Input
+                  id="list-capacity"
+                  type="number"
+                  placeholder="es. 100"
+                  value={newListData.maxCapacity}
+                  onChange={(e) => setNewListData(prev => ({ ...prev, maxCapacity: e.target.value }))}
+                  data-testid="input-list-capacity"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="list-price">Prezzo Ingresso</Label>
+                <Input
+                  id="list-price"
+                  placeholder="es. 15.00"
+                  value={newListData.price}
+                  onChange={(e) => setNewListData(prev => ({ ...prev, price: e.target.value }))}
+                  data-testid="input-list-price"
+                />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setShowCreateListDialog(false);
+                setNewListData({ name: '', maxCapacity: '', price: '' });
+              }}
+              data-testid="btn-cancel-create-list"
+            >
+              Annulla
+            </Button>
+            <Button 
+              onClick={() => {
+                if (!newListData.name.trim()) {
+                  toast({ title: "Errore", description: "Il nome della lista è obbligatorio", variant: "destructive" });
+                  return;
+                }
+                createListMutation.mutate({
+                  name: newListData.name,
+                  maxCapacity: newListData.maxCapacity ? parseInt(newListData.maxCapacity) : undefined,
+                  price: newListData.price || undefined,
+                });
+              }}
+              disabled={createListMutation.isPending}
+              data-testid="btn-confirm-create-list"
+            >
+              {createListMutation.isPending ? (
+                <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Creazione...</>
+              ) : (
+                'Crea Lista'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showCreateTableTypeDialog} onOpenChange={setShowCreateTableTypeDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Armchair className="h-5 w-5 text-purple-400" />
+              Nuova Tipologia Tavolo
+            </DialogTitle>
+            <DialogDescription>
+              Crea una nuova tipologia di tavoli per questo evento
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="table-type-name">Nome Tipologia *</Label>
+              <Input
+                id="table-type-name"
+                placeholder="es. VIP, Privé, Standard..."
+                value={newTableTypeData.name}
+                onChange={(e) => setNewTableTypeData(prev => ({ ...prev, name: e.target.value }))}
+                data-testid="input-table-type-name"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="table-type-price">Prezzo *</Label>
+                <Input
+                  id="table-type-price"
+                  placeholder="es. 500.00"
+                  value={newTableTypeData.price}
+                  onChange={(e) => setNewTableTypeData(prev => ({ ...prev, price: e.target.value }))}
+                  data-testid="input-table-type-price"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="table-type-guests">Ospiti Max *</Label>
+                <Input
+                  id="table-type-guests"
+                  type="number"
+                  placeholder="es. 8"
+                  value={newTableTypeData.maxGuests}
+                  onChange={(e) => setNewTableTypeData(prev => ({ ...prev, maxGuests: e.target.value }))}
+                  data-testid="input-table-type-guests"
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="table-type-quantity">Quantità Totale *</Label>
+              <Input
+                id="table-type-quantity"
+                type="number"
+                placeholder="es. 10"
+                value={newTableTypeData.totalQuantity}
+                onChange={(e) => setNewTableTypeData(prev => ({ ...prev, totalQuantity: e.target.value }))}
+                data-testid="input-table-type-quantity"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setShowCreateTableTypeDialog(false);
+                setNewTableTypeData({ name: '', price: '', maxGuests: '', totalQuantity: '' });
+              }}
+              data-testid="btn-cancel-create-table-type"
+            >
+              Annulla
+            </Button>
+            <Button 
+              onClick={() => {
+                if (!newTableTypeData.name.trim() || !newTableTypeData.price || !newTableTypeData.maxGuests || !newTableTypeData.totalQuantity) {
+                  toast({ title: "Errore", description: "Tutti i campi sono obbligatori", variant: "destructive" });
+                  return;
+                }
+                createTableTypeMutation.mutate({
+                  name: newTableTypeData.name,
+                  price: newTableTypeData.price,
+                  maxGuests: parseInt(newTableTypeData.maxGuests),
+                  totalQuantity: parseInt(newTableTypeData.totalQuantity),
+                });
+              }}
+              disabled={createTableTypeMutation.isPending}
+              data-testid="btn-confirm-create-table-type"
+            >
+              {createTableTypeMutation.isPending ? (
+                <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Creazione...</>
+              ) : (
+                'Crea Tipologia'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Assign Staff Dialog */}
+      <Dialog open={showAssignStaffDialog} onOpenChange={setShowAssignStaffDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5 text-teal-400" />
+              Assegna Staff
+            </DialogTitle>
+            <DialogDescription>
+              Seleziona un membro dello staff da assegnare a questo evento
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="staff-user">Seleziona Utente *</Label>
+              <select
+                id="staff-user"
+                className="w-full h-10 px-3 rounded-md border bg-background"
+                value={newStaffData.userId}
+                onChange={(e) => setNewStaffData(prev => ({ ...prev, userId: e.target.value }))}
+                data-testid="select-staff-user"
+              >
+                <option value="">Seleziona un utente...</option>
+                {users
+                  .filter(u => ['staff', 'capo_staff', 'admin', 'super_admin'].includes(u.role))
+                  .filter(u => !e4uStaff.some((s: any) => s.userId === u.id))
+                  .map(u => (
+                    <option key={u.id} value={u.id}>
+                      {u.firstName} {u.lastName} ({u.role})
+                    </option>
+                  ))}
+              </select>
+            </div>
+            <div className="space-y-3">
+              <Label>Permessi</Label>
+              <div className="flex items-center justify-between p-3 rounded-lg bg-background/50 border">
+                <div>
+                  <div className="font-medium text-sm">Gestione Liste</div>
+                  <div className="text-xs text-muted-foreground">Può gestire le liste ospiti</div>
+                </div>
+                <Switch
+                  checked={newStaffData.canManageLists}
+                  onCheckedChange={(checked) => setNewStaffData(prev => ({ ...prev, canManageLists: checked }))}
+                  data-testid="switch-staff-lists"
+                />
+              </div>
+              <div className="flex items-center justify-between p-3 rounded-lg bg-background/50 border">
+                <div>
+                  <div className="font-medium text-sm">Gestione Tavoli</div>
+                  <div className="text-xs text-muted-foreground">Può gestire i tavoli</div>
+                </div>
+                <Switch
+                  checked={newStaffData.canManageTables}
+                  onCheckedChange={(checked) => setNewStaffData(prev => ({ ...prev, canManageTables: checked }))}
+                  data-testid="switch-staff-tables"
+                />
+              </div>
+              <div className="flex items-center justify-between p-3 rounded-lg bg-background/50 border">
+                <div>
+                  <div className="font-medium text-sm">Crea PR</div>
+                  <div className="text-xs text-muted-foreground">Può creare e gestire PR</div>
+                </div>
+                <Switch
+                  checked={newStaffData.canCreatePr}
+                  onCheckedChange={(checked) => setNewStaffData(prev => ({ ...prev, canCreatePr: checked }))}
+                  data-testid="switch-staff-create-pr"
+                />
+              </div>
+              <div className="flex items-center justify-between p-3 rounded-lg bg-background/50 border">
+                <div>
+                  <div className="font-medium text-sm">Approva Tavoli</div>
+                  <div className="text-xs text-muted-foreground">Può approvare prenotazioni tavoli</div>
+                </div>
+                <Switch
+                  checked={newStaffData.canApproveTables}
+                  onCheckedChange={(checked) => setNewStaffData(prev => ({ ...prev, canApproveTables: checked }))}
+                  data-testid="switch-staff-approve-tables"
+                />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setShowAssignStaffDialog(false);
+                setNewStaffData({ userId: '', canManageLists: true, canManageTables: true, canCreatePr: false, canApproveTables: false });
+              }}
+              data-testid="btn-cancel-assign-staff"
+            >
+              Annulla
+            </Button>
+            <Button 
+              onClick={() => {
+                if (!newStaffData.userId) {
+                  toast({ title: "Errore", description: "Seleziona un utente", variant: "destructive" });
+                  return;
+                }
+                assignStaffMutation.mutate(newStaffData);
+              }}
+              disabled={assignStaffMutation.isPending}
+              data-testid="btn-confirm-assign-staff"
+            >
+              {assignStaffMutation.isPending ? (
+                <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Assegnazione...</>
+              ) : (
+                'Assegna Staff'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Assign PR Dialog */}
+      <Dialog open={showAssignPrDialog} onOpenChange={setShowAssignPrDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Megaphone className="h-5 w-5 text-orange-400" />
+              Assegna PR
+            </DialogTitle>
+            <DialogDescription>
+              Seleziona un PR da assegnare a questo evento
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="pr-user">Seleziona PR *</Label>
+              <select
+                id="pr-user"
+                className="w-full h-10 px-3 rounded-md border bg-background"
+                value={newPrData.userId}
+                onChange={(e) => setNewPrData(prev => ({ ...prev, userId: e.target.value }))}
+                data-testid="select-pr-user"
+              >
+                <option value="">Seleziona un utente...</option>
+                {users
+                  .filter(u => u.role === 'pr' || u.role === 'staff' || u.role === 'capo_staff')
+                  .filter(u => !e4uPr.some((p: any) => p.userId === u.id))
+                  .map(u => (
+                    <option key={u.id} value={u.id}>
+                      {u.firstName} {u.lastName} ({u.role})
+                    </option>
+                  ))}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="pr-supervisor">Supervisore Staff (opzionale)</Label>
+              <select
+                id="pr-supervisor"
+                className="w-full h-10 px-3 rounded-md border bg-background"
+                value={newPrData.staffUserId}
+                onChange={(e) => setNewPrData(prev => ({ ...prev, staffUserId: e.target.value }))}
+                data-testid="select-pr-supervisor"
+              >
+                <option value="">Nessun supervisore</option>
+                {e4uStaff.map((staff: any) => {
+                  const staffUser = users.find(u => u.id === staff.userId);
+                  return (
+                    <option key={staff.id} value={staff.userId}>
+                      {staffUser ? `${staffUser.firstName} ${staffUser.lastName}` : 'Staff sconosciuto'}
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
+            <div className="space-y-3">
+              <Label>Permessi</Label>
+              <div className="flex items-center justify-between p-3 rounded-lg bg-background/50 border">
+                <div>
+                  <div className="font-medium text-sm">Aggiungere alle Liste</div>
+                  <div className="text-xs text-muted-foreground">Può aggiungere ospiti alle liste</div>
+                </div>
+                <Switch
+                  checked={newPrData.canAddToLists}
+                  onCheckedChange={(checked) => setNewPrData(prev => ({ ...prev, canAddToLists: checked }))}
+                  data-testid="switch-pr-lists"
+                />
+              </div>
+              <div className="flex items-center justify-between p-3 rounded-lg bg-background/50 border">
+                <div>
+                  <div className="font-medium text-sm">Proporre Tavoli</div>
+                  <div className="text-xs text-muted-foreground">Può proporre prenotazioni tavoli</div>
+                </div>
+                <Switch
+                  checked={newPrData.canProposeTables}
+                  onCheckedChange={(checked) => setNewPrData(prev => ({ ...prev, canProposeTables: checked }))}
+                  data-testid="switch-pr-tables"
+                />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setShowAssignPrDialog(false);
+                setNewPrData({ userId: '', staffUserId: '', canAddToLists: true, canProposeTables: false });
+              }}
+              data-testid="btn-cancel-assign-pr"
+            >
+              Annulla
+            </Button>
+            <Button 
+              onClick={() => {
+                if (!newPrData.userId) {
+                  toast({ title: "Errore", description: "Seleziona un utente", variant: "destructive" });
+                  return;
+                }
+                assignPrMutation.mutate({
+                  userId: newPrData.userId,
+                  staffUserId: newPrData.staffUserId || undefined,
+                  canAddToLists: newPrData.canAddToLists,
+                  canProposeTables: newPrData.canProposeTables,
+                });
+              }}
+              disabled={assignPrMutation.isPending}
+              data-testid="btn-confirm-assign-pr"
+            >
+              {assignPrMutation.isPending ? (
+                <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Assegnazione...</>
+              ) : (
+                'Assegna PR'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Assign Scanner Dialog */}
+      <Dialog open={showAssignScannerDialog} onOpenChange={setShowAssignScannerDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <QrCode className="h-5 w-5 text-emerald-400" />
+              Assegna Scanner
+            </DialogTitle>
+            <DialogDescription>
+              Seleziona un addetto scanner per questo evento
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="scanner-user">Seleziona Utente *</Label>
+              <select
+                id="scanner-user"
+                className="w-full h-10 px-3 rounded-md border bg-background"
+                value={newScannerData.userId}
+                onChange={(e) => setNewScannerData(prev => ({ ...prev, userId: e.target.value }))}
+                data-testid="select-scanner-user"
+              >
+                <option value="">Seleziona un utente...</option>
+                {users
+                  .filter(u => !e4uScanners.some((s: any) => s.userId === u.id))
+                  .map(u => (
+                    <option key={u.id} value={u.id}>
+                      {u.firstName} {u.lastName} ({u.role})
+                    </option>
+                  ))}
+              </select>
+            </div>
+            <div className="space-y-3">
+              <Label>Permessi di Scansione</Label>
+              <div className="flex items-center justify-between p-3 rounded-lg bg-background/50 border">
+                <div>
+                  <div className="font-medium text-sm">Scansione Liste</div>
+                  <div className="text-xs text-muted-foreground">Può scansionare ospiti delle liste</div>
+                </div>
+                <Switch
+                  checked={newScannerData.canScanLists}
+                  onCheckedChange={(checked) => setNewScannerData(prev => ({ ...prev, canScanLists: checked }))}
+                  data-testid="switch-scanner-lists"
+                />
+              </div>
+              <div className="flex items-center justify-between p-3 rounded-lg bg-background/50 border">
+                <div>
+                  <div className="font-medium text-sm">Scansione Tavoli</div>
+                  <div className="text-xs text-muted-foreground">Può scansionare prenotazioni tavoli</div>
+                </div>
+                <Switch
+                  checked={newScannerData.canScanTables}
+                  onCheckedChange={(checked) => setNewScannerData(prev => ({ ...prev, canScanTables: checked }))}
+                  data-testid="switch-scanner-tables"
+                />
+              </div>
+              <div className="flex items-center justify-between p-3 rounded-lg bg-background/50 border">
+                <div>
+                  <div className="font-medium text-sm">Scansione Biglietti</div>
+                  <div className="text-xs text-muted-foreground">Può scansionare biglietti SIAE</div>
+                </div>
+                <Switch
+                  checked={newScannerData.canScanTickets}
+                  onCheckedChange={(checked) => setNewScannerData(prev => ({ ...prev, canScanTickets: checked }))}
+                  data-testid="switch-scanner-tickets"
+                />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setShowAssignScannerDialog(false);
+                setNewScannerData({ userId: '', canScanLists: true, canScanTables: true, canScanTickets: true });
+              }}
+              data-testid="btn-cancel-assign-scanner"
+            >
+              Annulla
+            </Button>
+            <Button 
+              onClick={() => {
+                if (!newScannerData.userId) {
+                  toast({ title: "Errore", description: "Seleziona un utente", variant: "destructive" });
+                  return;
+                }
+                assignScannerMutation.mutate(newScannerData);
+              }}
+              disabled={assignScannerMutation.isPending}
+              data-testid="btn-confirm-assign-scanner"
+            >
+              {assignScannerMutation.isPending ? (
+                <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Assegnazione...</>
+              ) : (
+                'Assegna Scanner'
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
