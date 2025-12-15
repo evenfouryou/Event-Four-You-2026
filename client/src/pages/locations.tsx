@@ -27,7 +27,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
-import { Plus, MapPin, Edit, Users, Clock, Globe, Image as ImageIcon } from "lucide-react";
+import { Plus, MapPin, Edit, Users, Clock, Globe, Image as ImageIcon, Ticket } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { insertLocationSchema, type Location, type InsertLocation } from "@shared/schema";
@@ -49,6 +49,7 @@ export default function Locations() {
       city: '',
       capacity: undefined,
       notes: '',
+      siaeLocationCode: '',
       heroImageUrl: '',
       shortDescription: '',
       openingHours: '',
@@ -136,6 +137,7 @@ export default function Locations() {
       city: location.city || '',
       capacity: location.capacity || undefined,
       notes: location.notes || '',
+      siaeLocationCode: location.siaeLocationCode || '',
       heroImageUrl: location.heroImageUrl || '',
       shortDescription: location.shortDescription || '',
       openingHours: location.openingHours || '',
@@ -255,6 +257,35 @@ export default function Locations() {
                     </FormItem>
                   )}
                 />
+
+                <div className="border-t pt-4 mt-4">
+                  <p className="text-sm font-medium mb-4 text-muted-foreground flex items-center gap-2">
+                    <Ticket className="w-4 h-4" />
+                    Impostazioni SIAE
+                  </p>
+
+                  <FormField
+                    control={form.control}
+                    name="siaeLocationCode"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Codice Locale SIAE</FormLabel>
+                        <FormControl>
+                          <Input 
+                            {...field} 
+                            value={field.value || ''} 
+                            placeholder="es. 12345678"
+                            data-testid="input-siae-location-code" 
+                          />
+                        </FormControl>
+                        <p className="text-xs text-muted-foreground">
+                          Codice identificativo del locale rilasciato dalla SIAE
+                        </p>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
 
                 <div className="border-t pt-4 mt-4">
                   <p className="text-sm font-medium mb-4 text-muted-foreground flex items-center gap-2">

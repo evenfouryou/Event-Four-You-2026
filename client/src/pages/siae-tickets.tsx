@@ -169,6 +169,8 @@ export default function SiaeTicketsPage() {
 
   const selectedEventForForm = form.watch("ticketedEventId");
   const selectedSectorId = form.watch("sectorId");
+  const selectedTicketType = form.watch("ticketTypeCode");
+  const selectedQuantity = form.watch("quantity");
 
   const { data: formSectors } = useQuery<SiaeEventSector[]>({
     queryKey: ['/api/siae/ticketed-events', selectedEventForForm, 'sectors'],
@@ -176,6 +178,26 @@ export default function SiaeTicketsPage() {
   });
 
   const selectedSector = formSectors?.find(s => s.id === selectedSectorId);
+  
+  // Get selected event details to check if nominative is required
+  const selectedEventDetails = ticketedEvents?.find(e => e.id === selectedEventForForm);
+  const isNominativeRequired = selectedEventDetails?.requiresNominative || false;
+  
+  // Calculate prices
+  const getTicketPrice = () => {
+    if (!selectedSector || !selectedTicketType) return 0;
+    switch (selectedTicketType) {
+      case 'INT': return Number(selectedSector.priceIntero) || 0;
+      case 'RID': return Number(selectedSector.priceRidotto) || 0;
+      case 'OMA': return 0;
+      default: return 0;
+    }
+  };
+  
+  const ticketPrice = getTicketPrice();
+  const prevenditaPrice = selectedSector ? Number(selectedSector.prevendita) || 0 : 0;
+  const totalPerTicket = ticketPrice + prevenditaPrice;
+  const totalPrice = totalPerTicket * (selectedQuantity || 1);
 
   useEffect(() => {
     if (!isEmissionDialogOpen) {
@@ -290,6 +312,17 @@ export default function SiaeTicketsPage() {
   });
 
   const onSubmit = (data: EmissionFormData) => {
+    // Validate nominative fields if required
+    if (isNominativeRequired) {
+      if (!data.participantFirstName?.trim() || !data.participantLastName?.trim()) {
+        toast({
+          title: "Dati mancanti",
+          description: "Nome e cognome del partecipante sono obbligatori per questo evento",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
     emitTicketMutation.mutate(data);
   };
 
@@ -711,13 +744,17 @@ export default function SiaeTicketsPage() {
                 )}
               />
 
+              {/* Participant Name - Required if nominative event */}
               <div className="grid grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
                   name="participantFirstName"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Nome Partecipante</FormLabel>
+                      <FormLabel>
+                        Nome Partecipante
+                        {isNominativeRequired && <span className="text-destructive ml-1">*</span>}
+                      </FormLabel>
                       <FormControl>
                         <Input {...field} placeholder="Nome" data-testid="input-first-name" />
                       </FormControl>
@@ -731,7 +768,10 @@ export default function SiaeTicketsPage() {
                   name="participantLastName"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Cognome Partecipante</FormLabel>
+                      <FormLabel>
+                        Cognome Partecipante
+                        {isNominativeRequired && <span className="text-destructive ml-1">*</span>}
+                      </FormLabel>
                       <FormControl>
                         <Input {...field} placeholder="Cognome" data-testid="input-last-name" />
                       </FormControl>
@@ -740,6 +780,65 @@ export default function SiaeTicketsPage() {
                   )}
                 />
               </div>
+
+              {isNominativeRequired && (
+                <p className="text-xs text-amber-500 flex items-center gap-1">
+                  <AlertTriangle className="w-3 h-3" />
+                  Questo evento richiede biglietti nominativi
+                </p>
+              )}
+
+              {/* Quantity */}
+              <FormField
+                control={form.control}
+                name="quantity"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Quantità</FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="number" 
+                        min={1} 
+                        max={10}
+                        value={field.value || 1}
+                        onChange={(e) => {
+                          const val = parseInt(e.target.value, 10);
+                          field.onChange(isNaN(val) || val < 1 ? 1 : Math.min(val, 10));
+                        }}
+                        data-testid="input-quantity" 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Price Summary */}
+              {selectedSector && selectedTicketType && (
+                <div className="rounded-lg border border-white/10 bg-white/5 p-4 space-y-2">
+                  <p className="text-sm font-medium text-muted-foreground mb-3">Riepilogo Prezzo</p>
+                  <div className="flex justify-between text-sm">
+                    <span>Prezzo biglietto:</span>
+                    <span>€{ticketPrice.toFixed(2)}</span>
+                  </div>
+                  {prevenditaPrice > 0 && (
+                    <div className="flex justify-between text-sm">
+                      <span>Diritto di prevendita (DDP):</span>
+                      <span>€{prevenditaPrice.toFixed(2)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between text-sm border-t border-white/10 pt-2 mt-2">
+                    <span>Totale per biglietto:</span>
+                    <span className="font-medium">€{totalPerTicket.toFixed(2)}</span>
+                  </div>
+                  {(selectedQuantity || 1) > 1 && (
+                    <div className="flex justify-between text-sm font-bold text-[#FFD700]">
+                      <span>Totale ({selectedQuantity} biglietti):</span>
+                      <span>€{totalPrice.toFixed(2)}</span>
+                    </div>
+                  )}
+                </div>
+              )}
 
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => setIsEmissionDialogOpen(false)}>
