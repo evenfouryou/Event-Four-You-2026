@@ -90,11 +90,11 @@ export function MobileBottomNav() {
       { icon: QrCode, label: "Scanner", href: "/scanner" },
     ];
   } else if (isCapoStaff) {
-    // Menu specifico per Capo Staff
+    // Menu specifico per Capo Staff (senza scanner)
     navItems = [
       { icon: Home, label: "Home", href: "/staff-pr-home" },
       { icon: Calendar, label: "Eventi", href: "/staff-pr-home" },
-      { icon: QrCode, label: "Scanner", href: "/scanner", isFab: true },
+      { icon: ListChecks, label: "Ospiti", href: "/pr/guest-lists", isFab: true },
       { icon: Users, label: "Team", href: "/pr/staff" },
       { icon: User, label: "Profilo", href: "/settings" },
     ];
