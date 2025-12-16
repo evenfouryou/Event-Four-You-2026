@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
@@ -7,6 +7,21 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { type SiaeTicketedEvent, type SiaeEventSector, type SiaeTicket, type SiaeCashierAllocation } from "@shared/schema";
 import { useSmartCardStatus } from "@/lib/smart-card-service";
+
+interface CashierEventAllocation {
+  allocationId: string;
+  eventId: string;
+  eventName: string;
+  eventDate: string | null;
+  eventTime: string | null;
+  venueName: string | null;
+  sectorId: string | null;
+  sectorName: string;
+  quotaQuantity: number;
+  quotaUsed: number;
+  quotaRemaining: number;
+  isActive: boolean;
+}
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -91,6 +106,7 @@ export default function CassaBigliettiPage() {
   const companyId = user?.companyId;
   const isGestore = user?.role === "gestore" || user?.role === "admin" || user?.role === "super_admin";
   const isSuperAdmin = user?.role === "super_admin";
+  const isCassiere = user?.role === "cassiere";
   
   // Bridge status for fiscal seal emission
   // IMPORTANTE: cardInserted deve essere true, non solo readerDetected
@@ -100,15 +116,36 @@ export default function CassaBigliettiPage() {
   const cardReady = cardInserted && readerDetected;
   const canEmitTickets = bridgeConnected && cardReady;
 
+  // Per cassieri: recupera le allocazioni assegnate
+  const { data: myAllocations, isLoading: myAllocationsLoading } = useQuery<CashierEventAllocation[]>({
+    queryKey: ["/api/cashier/my-events"],
+    enabled: isCassiere,
+  });
+
   const { data: events, isLoading: eventsLoading } = useQuery<SiaeTicketedEvent[]>({
     queryKey: ["/api/siae/ticketed-events"],
-    enabled: !!companyId,
+    enabled: !!companyId && !isCassiere, // Gestori vedono tutti gli eventi
   });
 
   // Include eventi in corso, programmati e bozze - escludi solo quelli chiusi
   const activeEvents = events?.filter(e => 
     e.status === "ongoing" || e.status === "scheduled" || e.status === "draft" || e.status === "active"
   ) || [];
+
+  // Auto-select event and sector for cashiers
+  useEffect(() => {
+    if (isCassiere && myAllocations && myAllocations.length > 0 && !selectedEventId) {
+      // Se c'è una sola allocazione, selezionala automaticamente
+      const firstAllocation = myAllocations[0];
+      setSelectedEventId(firstAllocation.eventId);
+      if (firstAllocation.sectorId) {
+        setSelectedSectorId(firstAllocation.sectorId);
+      }
+    }
+  }, [isCassiere, myAllocations, selectedEventId]);
+
+  // Get current allocation for selected event
+  const currentAllocation = myAllocations?.find(a => a.eventId === selectedEventId);
 
   const { data: allocation, isLoading: allocationLoading } = useQuery<SiaeCashierAllocation>({
     queryKey: ["/api/cashiers/events", selectedEventId, "allocation"],
@@ -119,6 +156,16 @@ export default function CassaBigliettiPage() {
     queryKey: ["/api/siae/ticketed-events", selectedEventId, "sectors"],
     enabled: !!selectedEventId,
   });
+
+  // Auto-select sector from allocation when sectors are loaded
+  useEffect(() => {
+    if (isCassiere && currentAllocation?.sectorId && sectors && sectors.length > 0 && !selectedSectorId) {
+      setSelectedSectorId(currentAllocation.sectorId);
+    } else if (sectors && sectors.length === 1 && !selectedSectorId) {
+      // Se c'è un solo settore, selezionalo automaticamente
+      setSelectedSectorId(sectors[0].id);
+    }
+  }, [isCassiere, currentAllocation, sectors, selectedSectorId]);
 
   const { data: todayTickets, isLoading: ticketsLoading } = useQuery<SiaeTicket[]>({
     queryKey: ["/api/cashiers/events", selectedEventId, "today-tickets"],
@@ -343,18 +390,56 @@ export default function CassaBigliettiPage() {
             )}
           </div>
 
-          <Select value={selectedEventId} onValueChange={setSelectedEventId}>
-            <SelectTrigger className="w-[280px]" data-testid="select-event">
-              <SelectValue placeholder="Seleziona evento..." />
-            </SelectTrigger>
-            <SelectContent>
-              {activeEvents.map((event) => (
-                <SelectItem key={event.id} value={event.id}>
-                  {event.eventName} - {format(new Date(event.eventDate), "dd/MM/yyyy", { locale: it })}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          {/* Per cassieri mostra le loro allocazioni, per gestori tutti gli eventi */}
+          {isCassiere ? (
+            myAllocations && myAllocations.length === 1 ? (
+              // Se c'è una sola allocazione, mostra solo il nome evento senza dropdown
+              <div className="flex items-center gap-2 px-3 py-2 bg-muted/30 rounded-md border">
+                <Ticket className="w-4 h-4 text-[#FFD700]" />
+                <span className="font-medium">{myAllocations[0].eventName}</span>
+                {myAllocations[0].eventDate && (
+                  <Badge variant="outline" className="text-xs">
+                    {format(new Date(myAllocations[0].eventDate), "dd/MM/yyyy", { locale: it })}
+                  </Badge>
+                )}
+              </div>
+            ) : (
+              <Select value={selectedEventId} onValueChange={(value) => {
+                setSelectedEventId(value);
+                // Reset sector when changing event
+                const alloc = myAllocations?.find(a => a.eventId === value);
+                if (alloc?.sectorId) {
+                  setSelectedSectorId(alloc.sectorId);
+                } else {
+                  setSelectedSectorId("");
+                }
+              }}>
+                <SelectTrigger className="w-[280px]" data-testid="select-event">
+                  <SelectValue placeholder="Seleziona evento..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {myAllocations?.map((alloc) => (
+                    <SelectItem key={alloc.eventId} value={alloc.eventId}>
+                      {alloc.eventName} - {alloc.eventDate ? format(new Date(alloc.eventDate), "dd/MM/yyyy", { locale: it }) : 'N/A'}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )
+          ) : (
+            <Select value={selectedEventId} onValueChange={setSelectedEventId}>
+              <SelectTrigger className="w-[280px]" data-testid="select-event">
+                <SelectValue placeholder="Seleziona evento..." />
+              </SelectTrigger>
+              <SelectContent>
+                {activeEvents.map((event) => (
+                  <SelectItem key={event.id} value={event.id}>
+                    {event.eventName} - {format(new Date(event.eventDate), "dd/MM/yyyy", { locale: it })}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
 
           {isGestore && selectedEventId && (
             <Button variant="outline" onClick={() => setIsC1DialogOpen(true)} data-testid="button-c1-report">
@@ -453,18 +538,33 @@ export default function CassaBigliettiPage() {
               <CardContent className="space-y-4">
                 <div className="space-y-2">
                   <Label>Settore</Label>
-                  <Select value={selectedSectorId} onValueChange={setSelectedSectorId}>
-                    <SelectTrigger data-testid="select-sector">
-                      <SelectValue placeholder="Seleziona settore..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {sectors?.map((sector) => (
-                        <SelectItem key={sector.id} value={sector.id}>
-                          {sector.name} - €{Number(sector.price).toFixed(2)} ({sector.availableSeats} disp.)
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  {/* Se cassiere ha settore assegnato o c'è un solo settore, mostra info statica */}
+                  {(isCassiere && currentAllocation?.sectorId && sectors?.length === 1) || (!isCassiere && sectors?.length === 1) ? (
+                    <div className="flex items-center gap-2 px-3 py-2 bg-muted/30 rounded-md border text-sm">
+                      <Store className="w-4 h-4 text-[#FFD700]" />
+                      <span className="font-medium">
+                        {sectors?.[0]?.name || currentAllocation?.sectorName}
+                      </span>
+                      {sectors?.[0] && (
+                        <Badge variant="outline" className="ml-auto">
+                          €{Number(sectors[0].price).toFixed(2)}
+                        </Badge>
+                      )}
+                    </div>
+                  ) : (
+                    <Select value={selectedSectorId} onValueChange={setSelectedSectorId}>
+                      <SelectTrigger data-testid="select-sector">
+                        <SelectValue placeholder="Seleziona settore..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {sectors?.map((sector) => (
+                          <SelectItem key={sector.id} value={sector.id}>
+                            {sector.name} - €{Number(sector.price).toFixed(2)} ({sector.availableSeats} disp.)
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
                 </div>
 
                 <div className="space-y-2">
