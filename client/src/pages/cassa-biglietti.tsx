@@ -102,7 +102,10 @@ export default function CassaBigliettiPage() {
     enabled: !!companyId,
   });
 
-  const activeEvents = events?.filter(e => e.status === "active" || e.status === "draft") || [];
+  // Include eventi in corso, programmati e bozze - escludi solo quelli chiusi
+  const activeEvents = events?.filter(e => 
+    e.status === "ongoing" || e.status === "scheduled" || e.status === "draft" || e.status === "active"
+  ) || [];
 
   const { data: allocation, isLoading: allocationLoading } = useQuery<SiaeCashierAllocation>({
     queryKey: ["/api/cashiers/events", selectedEventId, "allocation"],
