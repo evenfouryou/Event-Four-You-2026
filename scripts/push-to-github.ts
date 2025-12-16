@@ -130,7 +130,7 @@ async function main() {
     
     // Create commit
     console.log('📝 Creating commit...');
-    const commitMessage = 'v3.11: Scan card files to discover structure\n\n- Scan multiple file IDs to find what exists on card\n- Log existing files vs not found\n- Test DF SIAE, EF PIN, telecom files etc\n\nSee BUILD_INSTRUCTIONS.md for details.';
+    const commitMessage = 'v3.12: Try PIN after selecting each existing EF\n\n- Select each found EF (0x2F01, 0x2F02, 0x0000) before PIN verify\n- Test multiple nPIN values per EF\n- Better logging for PIN discovery\n\nSee BUILD_INSTRUCTIONS.md for details.';
     
     const { data: commit } = await octokit.git.createCommit({
       owner,

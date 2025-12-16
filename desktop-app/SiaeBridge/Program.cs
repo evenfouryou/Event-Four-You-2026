@@ -478,44 +478,44 @@ namespace SiaeBridge
                 }
                 Log($"  --- Fine scan ---");
                 
-                // Riseleziona MF prima di verificare PIN
-                LibSiae.SelectML(0x3F00, _slot);
-
-                // nPIN = identificatore PIN (provare diversi valori)
-                // Dalla documentazione SIAE test.c: pVerifyPINML(1, pin, slot)
-                // Errore 0x6A88 = "Referenced data not found" = nPIN sbagliato
-                // Errore 0xFFFF = Errore generico
-                
-                // Valori nPIN da provare in ordine - espanso con più possibilità
-                int[] nPinValues = { 1, 0, 2, 3, 0x11, 0x21, 0x81, 0x82 };
+                // Prova a selezionare i file trovati e verificare PIN dopo ognuno
+                ushort[] existingFiles = { 0x2F01, 0x2F02, 0x0000, 0x3F00 };
+                int[] nPinValues = { 1, 0, 2, 0x80, 0x81 };
                 int pinResult = -1;
                 int successfulNPin = -1;
+                bool foundPin = false;
                 
-                foreach (int nPin in nPinValues)
+                foreach (ushort ef in existingFiles)
                 {
-                    pinResult = VerifyPINML(nPin, pin, _slot);
-                    Log($"  VerifyPINML(nPIN={nPin} (0x{nPin:X2}), pin=***, slot={_slot}) = {pinResult} (0x{pinResult:X4})");
+                    int selEf = LibSiae.SelectML(ef, _slot);
+                    Log($"  --- Provo PIN dopo SelectML(0x{ef:X4}) = {selEf} ---");
                     
-                    if (pinResult == 0)
+                    foreach (int nPin in nPinValues)
                     {
-                        // Successo! Ricorda quale nPIN ha funzionato
-                        successfulNPin = nPin;
-                        Log($"  ✓ PIN VERIFICATO con nPIN={nPin}!");
-                        break;
+                        pinResult = VerifyPINML(nPin, pin, _slot);
+                        Log($"  VerifyPINML(nPIN={nPin}, pin=***) = {pinResult} (0x{pinResult:X4})");
+                        
+                        if (pinResult == 0)
+                        {
+                            successfulNPin = nPin;
+                            Log($"  ✓ PIN VERIFICATO con EF=0x{ef:X4}, nPIN={nPin}!");
+                            foundPin = true;
+                            break;
+                        }
+                        else if (pinResult >= 0x63C0 && pinResult <= 0x63CF)
+                        {
+                            Log($"  PIN errato ma nPIN corretto! (tentativi: {pinResult & 0x0F})");
+                            foundPin = true; // Trovato il nPIN giusto, PIN sbagliato
+                            break;
+                        }
+                        else if (pinResult == 0x6983)
+                        {
+                            Log($"  PIN BLOCCATO!");
+                            foundPin = true;
+                            break;
+                        }
                     }
-                    else if (pinResult == 0x63C0 || pinResult == 0x63C1 || pinResult == 0x63C2 || pinResult == 0x63C3)
-                    {
-                        // PIN sbagliato ma nPIN corretto - non continuare a provare altri nPIN
-                        Log($"  PIN errato (tentativi rimasti: {pinResult & 0x0F})");
-                        break;
-                    }
-                    else if (pinResult == 0x6983)
-                    {
-                        // PIN bloccato
-                        Log($"  PIN BLOCCATO!");
-                        break;
-                    }
-                    // Per altri errori (0x6A88, 0xFFFF, ecc.), continua a provare il prossimo nPIN
+                    if (foundPin) break;
                 }
 
                 if (pinResult == 0)
