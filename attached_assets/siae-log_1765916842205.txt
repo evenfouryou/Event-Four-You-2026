@@ -1,0 +1,299 @@
+  slot: 0,
+  cardState: 'PRESENT',
+  initResult: 3,
+  message: 'Carta SIAE rilevata e pronta!'
+}
+[2025-12-16 21:27:00.109] [debug] Card inserted but PIN locked - skipping data read
+[2025-12-16 21:27:00.599] [info]  >> Command: CHECK_READER
+[2025-12-16 21:27:00.610] [info]  [Bridge] {"success":true,"readerConnected":true,"cardPresent":true,"slot":0,"cardState":"PRESENT","initResult":3,"message":"Carta SIAE rilevata e pronta!"}
+[2025-12-16 21:27:00.611] [info]  << Response: {
+  success: true,
+  readerConnected: true,
+  cardPresent: true,
+  slot: 0,
+  cardState: 'PRESENT',
+  initResult: 3,
+  message: 'Carta SIAE rilevata e pronta!'
+}
+[2025-12-16 21:27:00.612] [debug] Card inserted but PIN locked - skipping data read
+[2025-12-16 21:27:00.866] [info]  IPC: pin:verify
+[2025-12-16 21:27:00.867] [info]  >> Command: VERIFY_PIN:75399990
+[2025-12-16 21:27:00.903] [info]  [Bridge] {"success":true,"verified":false,"error":"Errore verifica PIN: 0x6A88","errorCode":27272}
+[2025-12-16 21:27:00.903] [info]  << Response: {
+  success: true,
+  verified: false,
+  error: 'Errore verifica PIN: 0x6A88',
+  errorCode: 27272
+}
+[2025-12-16 21:27:00.904] [info]  PIN verification result: {
+  success: true,
+  verified: false,
+  error: 'Errore verifica PIN: 0x6A88',
+  errorCode: 27272
+}
+[2025-12-16 21:27:00.905] [warn]  SIAE: PIN errato - Errore verifica PIN: 0x6A88
+[2025-12-16 21:27:01.113] [info]  >> Command: CHECK_READER
+[2025-12-16 21:27:01.132] [info]  [Bridge] {"success":true,"readerConnected":true,"cardPresent":true,"slot":0,"cardState":"PRESENT","initResult":3,"message":"Carta SIAE rilevata e pronta!"}
+[2025-12-16 21:27:01.133] [info]  << Response: {
+  success: true,
+  readerConnected: true,
+  cardPresent: true,
+  slot: 0,
+  cardState: 'PRESENT',
+  initResult: 3,
+  message: 'Carta SIAE rilevata e pronta!'
+}
+[2025-12-16 21:27:01.135] [debug] Card inserted but PIN locked - skipping data read
+[2025-12-16 21:27:01.628] [info]  >> Command: CHECK_READER
+[2025-12-16 21:27:01.643] [info]  [Bridge] {"success":true,"readerConnected":true,"cardPresent":true,"slot":0,"cardState":"PRESENT","initResult":3,"message":"Carta SIAE rilevata e pronta!"}
+[2025-12-16 21:27:01.644] [info]  << Response: {
+  success: true,
+  readerConnected: true,
+  cardPresent: true,
+  slot: 0,
+  cardState: 'PRESENT',
+  initResult: 3,
+  message: 'Carta SIAE rilevata e pronta!'
+}
+[2025-12-16 21:27:01.645] [debug] Card inserted but PIN locked - skipping data read
+[2025-12-16 21:27:02.129] [info]  >> Command: CHECK_READER
+[2025-12-16 21:27:02.139] [info]  [Bridge] {"success":true,"readerConnected":true,"cardPresent":true,"slot":0,"cardState":"PRESENT","initResult":3,"message":"Carta SIAE rilevata e pronta!"}
+[2025-12-16 21:27:02.140] [info]  << Response: {
+  success: true,
+  readerConnected: true,
+  cardPresent: true,
+  slot: 0,
+  cardState: 'PRESENT',
+  initResult: 3,
+  message: 'Carta SIAE rilevata e pronta!'
+}
+[2025-12-16 21:27:02.141] [debug] Card inserted but PIN locked - skipping data read
+[2025-12-16 21:27:02.631] [info]  >> Command: CHECK_READER
+[2025-12-16 21:27:02.650] [info]  [Bridge] {"success":true,"readerConnected":true,"cardPresent":true,"slot":0,"cardState":"PRESENT","initResult":3,"message":"Carta SIAE rilevata e pronta!"}
+[2025-12-16 21:27:02.651] [info]  << Response: {
+  success: true,
+  readerConnected: true,
+  cardPresent: true,
+  slot: 0,
+  cardState: 'PRESENT',
+  initResult: 3,
+  message: 'Carta SIAE rilevata e pronta!'
+}
+[2025-12-16 21:27:02.653] [debug] Card inserted but PIN locked - skipping data read
+[2025-12-16 21:27:02.725] [info]  IPC: checkReader
+[2025-12-16 21:27:02.725] [info]  >> Command: CHECK_READER
+[2025-12-16 21:27:02.730] [info]  [Bridge] {"success":true,"readerConnected":true,"cardPresent":true,"slot":0,"cardState":"PRESENT","initResult":3,"message":"Carta SIAE rilevata e pronta!"}
+[2025-12-16 21:27:02.731] [info]  << Response: {
+  success: true,
+  readerConnected: true,
+  cardPresent: true,
+  slot: 0,
+  cardState: 'PRESENT',
+  initResult: 3,
+  message: 'Carta SIAE rilevata e pronta!'
+}
+[2025-12-16 21:27:03.141] [info]  >> Command: CHECK_READER
+[2025-12-16 21:27:03.148] [info]  [Bridge] {"success":true,"readerConnected":true,"cardPresent":true,"slot":0,"cardState":"PRESENT","initResult":3,"message":"Carta SIAE rilevata e pronta!"}
+[2025-12-16 21:27:03.149] [info]  << Response: {
+  success: true,
+  readerConnected: true,
+  cardPresent: true,
+  slot: 0,
+  cardState: 'PRESENT',
+  initResult: 3,
+  message: 'Carta SIAE rilevata e pronta!'
+}
+[2025-12-16 21:27:03.149] [debug] Card inserted but PIN locked - skipping data read
+[2025-12-16 21:27:03.656] [info]  >> Command: CHECK_READER
+[2025-12-16 21:27:03.679] [info]  [Bridge] {"success":true,"readerConnected":true,"cardPresent":true,"slot":0,"cardState":"PRESENT","initResult":3,"message":"Carta SIAE rilevata e pronta!"}
+[2025-12-16 21:27:03.680] [info]  << Response: {
+  success: true,
+  readerConnected: true,
+  cardPresent: true,
+  slot: 0,
+  cardState: 'PRESENT',
+  initResult: 3,
+  message: 'Carta SIAE rilevata e pronta!'
+}
+[2025-12-16 21:27:03.681] [debug] Card inserted but PIN locked - skipping data read
+[2025-12-16 21:27:04.172] [info]  >> Command: CHECK_READER
+[2025-12-16 21:27:04.187] [info]  [Bridge] {"success":true,"readerConnected":true,"cardPresent":true,"slot":0,"cardState":"PRESENT","initResult":3,"message":"Carta SIAE rilevata e pronta!"}
+[2025-12-16 21:27:04.188] [info]  << Response: {
+  success: true,
+  readerConnected: true,
+  cardPresent: true,
+  slot: 0,
+  cardState: 'PRESENT',
+  initResult: 3,
+  message: 'Carta SIAE rilevata e pronta!'
+}
+[2025-12-16 21:27:04.189] [debug] Card inserted but PIN locked - skipping data read
+[2025-12-16 21:27:04.673] [info]  >> Command: CHECK_READER
+[2025-12-16 21:27:04.691] [info]  [Bridge] {"success":true,"readerConnected":true,"cardPresent":true,"slot":0,"cardState":"PRESENT","initResult":3,"message":"Carta SIAE rilevata e pronta!"}
+[2025-12-16 21:27:04.693] [info]  << Response: {
+  success: true,
+  readerConnected: true,
+  cardPresent: true,
+  slot: 0,
+  cardState: 'PRESENT',
+  initResult: 3,
+  message: 'Carta SIAE rilevata e pronta!'
+}
+[2025-12-16 21:27:04.694] [debug] Card inserted but PIN locked - skipping data read
+[2025-12-16 21:27:05.177] [info]  >> Command: CHECK_READER
+[2025-12-16 21:27:05.192] [info]  [Bridge] {"success":true,"readerConnected":true,"cardPresent":true,"slot":0,"cardState":"PRESENT","initResult":3,"message":"Carta SIAE rilevata e pronta!"}
+[2025-12-16 21:27:05.194] [info]  << Response: {
+  success: true,
+  readerConnected: true,
+  cardPresent: true,
+  slot: 0,
+  cardState: 'PRESENT',
+  initResult: 3,
+  message: 'Carta SIAE rilevata e pronta!'
+}
+[2025-12-16 21:27:05.195] [debug] Card inserted but PIN locked - skipping data read
+[2025-12-16 21:27:05.691] [info]  >> Command: CHECK_READER
+[2025-12-16 21:27:05.712] [info]  [Bridge] {"success":true,"readerConnected":true,"cardPresent":true,"slot":0,"cardState":"PRESENT","initResult":3,"message":"Carta SIAE rilevata e pronta!"}
+[2025-12-16 21:27:05.713] [info]  << Response: {
+  success: true,
+  readerConnected: true,
+  cardPresent: true,
+  slot: 0,
+  cardState: 'PRESENT',
+  initResult: 3,
+  message: 'Carta SIAE rilevata e pronta!'
+}
+[2025-12-16 21:27:05.715] [debug] Card inserted but PIN locked - skipping data read
+[2025-12-16 21:27:05.742] [info]  IPC: checkReader
+[2025-12-16 21:27:05.743] [info]  >> Command: CHECK_READER
+[2025-12-16 21:27:05.748] [info]  [Bridge] {"success":true,"readerConnected":true,"cardPresent":true,"slot":0,"cardState":"PRESENT","initResult":3,"message":"Carta SIAE rilevata e pronta!"}
+[2025-12-16 21:27:05.748] [info]  << Response: {
+  success: true,
+  readerConnected: true,
+  cardPresent: true,
+  slot: 0,
+  cardState: 'PRESENT',
+  initResult: 3,
+  message: 'Carta SIAE rilevata e pronta!'
+}
+[2025-12-16 21:27:06.204] [info]  >> Command: CHECK_READER
+[2025-12-16 21:27:06.221] [info]  [Bridge] {"success":true,"readerConnected":true,"cardPresent":true,"slot":0,"cardState":"PRESENT","initResult":3,"message":"Carta SIAE rilevata e pronta!"}
+[2025-12-16 21:27:06.222] [info]  << Response: {
+  success: true,
+  readerConnected: true,
+  cardPresent: true,
+  slot: 0,
+  cardState: 'PRESENT',
+  initResult: 3,
+  message: 'Carta SIAE rilevata e pronta!'
+}
+[2025-12-16 21:27:06.223] [debug] Card inserted but PIN locked - skipping data read
+[2025-12-16 21:27:06.433] [info]  Relay message received: ping
+[2025-12-16 21:27:06.715] [info]  >> Command: CHECK_READER
+[2025-12-16 21:27:06.733] [info]  [Bridge] {"success":true,"readerConnected":true,"cardPresent":true,"slot":0,"cardState":"PRESENT","initResult":3,"message":"Carta SIAE rilevata e pronta!"}
+[2025-12-16 21:27:06.734] [info]  << Response: {
+  success: true,
+  readerConnected: true,
+  cardPresent: true,
+  slot: 0,
+  cardState: 'PRESENT',
+  initResult: 3,
+  message: 'Carta SIAE rilevata e pronta!'
+}
+[2025-12-16 21:27:06.735] [debug] Card inserted but PIN locked - skipping data read
+[2025-12-16 21:27:07.230] [info]  >> Command: CHECK_READER
+[2025-12-16 21:27:07.253] [info]  [Bridge] {"success":true,"readerConnected":true,"cardPresent":true,"slot":0,"cardState":"PRESENT","initResult":3,"message":"Carta SIAE rilevata e pronta!"}
+[2025-12-16 21:27:07.254] [info]  << Response: {
+  success: true,
+  readerConnected: true,
+  cardPresent: true,
+  slot: 0,
+  cardState: 'PRESENT',
+  initResult: 3,
+  message: 'Carta SIAE rilevata e pronta!'
+}
+[2025-12-16 21:27:07.255] [debug] Card inserted but PIN locked - skipping data read
+[2025-12-16 21:27:07.742] [info]  >> Command: CHECK_READER
+[2025-12-16 21:27:07.757] [info]  [Bridge] {"success":true,"readerConnected":true,"cardPresent":true,"slot":0,"cardState":"PRESENT","initResult":3,"message":"Carta SIAE rilevata e pronta!"}
+[2025-12-16 21:27:07.758] [info]  << Response: {
+  success: true,
+  readerConnected: true,
+  cardPresent: true,
+  slot: 0,
+  cardState: 'PRESENT',
+  initResult: 3,
+  message: 'Carta SIAE rilevata e pronta!'
+}
+[2025-12-16 21:27:07.759] [debug] Card inserted but PIN locked - skipping data read
+[2025-12-16 21:27:08.244] [info]  >> Command: CHECK_READER
+[2025-12-16 21:27:08.261] [info]  [Bridge] {"success":true,"readerConnected":true,"cardPresent":true,"slot":0,"cardState":"PRESENT","initResult":3,"message":"Carta SIAE rilevata e pronta!"}
+[2025-12-16 21:27:08.262] [info]  << Response: {
+  success: true,
+  readerConnected: true,
+  cardPresent: true,
+  slot: 0,
+  cardState: 'PRESENT',
+  initResult: 3,
+  message: 'Carta SIAE rilevata e pronta!'
+}
+[2025-12-16 21:27:08.263] [debug] Card inserted but PIN locked - skipping data read
+[2025-12-16 21:27:08.730] [info]  IPC: checkReader
+[2025-12-16 21:27:08.732] [info]  >> Command: CHECK_READER
+[2025-12-16 21:27:08.753] [info]  >> Command: CHECK_READER
+[2025-12-16 21:27:08.754] [info]  [Bridge] {"success":true,"readerConnected":true,"cardPresent":true,"slot":0,"cardState":"PRESENT","initResult":3,"message":"Carta SIAE rilevata e pronta!"}
+[2025-12-16 21:27:08.755] [info]  << Response: {
+  success: true,
+  readerConnected: true,
+  cardPresent: true,
+  slot: 0,
+  cardState: 'PRESENT',
+  initResult: 3,
+  message: 'Carta SIAE rilevata e pronta!'
+}
+[2025-12-16 21:27:08.756] [info]  << Response: {
+  success: true,
+  readerConnected: true,
+  cardPresent: true,
+  slot: 0,
+  cardState: 'PRESENT',
+  initResult: 3,
+  message: 'Carta SIAE rilevata e pronta!'
+}
+[2025-12-16 21:27:08.757] [debug] Card inserted but PIN locked - skipping data read
+[2025-12-16 21:27:08.762] [info]  [Bridge] {"success":true,"readerConnected":true,"cardPresent":true,"slot":0,"cardState":"PRESENT","initResult":3,"message":"Carta SIAE rilevata e pronta!"}
+[2025-12-16 21:27:09.259] [info]  >> Command: CHECK_READER
+[2025-12-16 21:27:09.269] [info]  [Bridge] {"success":true,"readerConnected":true,"cardPresent":true,"slot":0,"cardState":"PRESENT","initResult":3,"message":"Carta SIAE rilevata e pronta!"}
+[2025-12-16 21:27:09.270] [info]  << Response: {
+  success: true,
+  readerConnected: true,
+  cardPresent: true,
+  slot: 0,
+  cardState: 'PRESENT',
+  initResult: 3,
+  message: 'Carta SIAE rilevata e pronta!'
+}
+[2025-12-16 21:27:09.271] [debug] Card inserted but PIN locked - skipping data read
+[2025-12-16 21:27:09.772] [info]  >> Command: CHECK_READER
+[2025-12-16 21:27:09.783] [info]  [Bridge] {"success":true,"readerConnected":true,"cardPresent":true,"slot":0,"cardState":"PRESENT","initResult":3,"message":"Carta SIAE rilevata e pronta!"}
+[2025-12-16 21:27:09.784] [info]  << Response: {
+  success: true,
+  readerConnected: true,
+  cardPresent: true,
+  slot: 0,
+  cardState: 'PRESENT',
+  initResult: 3,
+  message: 'Carta SIAE rilevata e pronta!'
+}
+[2025-12-16 21:27:09.785] [debug] Card inserted but PIN locked - skipping data read
+[2025-12-16 21:27:10.287] [info]  >> Command: CHECK_READER
+[2025-12-16 21:27:10.306] [info]  [Bridge] {"success":true,"readerConnected":true,"cardPresent":true,"slot":0,"cardState":"PRESENT","initResult":3,"message":"Carta SIAE rilevata e pronta!"}
+[2025-12-16 21:27:10.307] [info]  << Response: {
+  success: true,
+  readerConnected: true,
+  cardPresent: true,
+  slot: 0,
+  cardState: 'PRESENT',
+  initResult: 3,
+  message: 'Carta SIAE rilevata e pronta!'
+}
+[2025-12-16 21:27:10.308] [debug] Card inserted but PIN locked - skipping data read
