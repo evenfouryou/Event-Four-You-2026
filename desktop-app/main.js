@@ -759,10 +759,12 @@ function startStatusPolling() {
       cardWasInserted = cardCurrentlyInserted;
       
       // Auto-read card data when card is inserted
+      // NOTE: Read card data ALWAYS when card is present, regardless of PIN status
+      // PIN is only required for emitting tickets (ComputeSigillo), not for reading
       let cardData = {};
-      if (cardCurrentlyInserted && !pinLocked) {
+      if (cardCurrentlyInserted) {
         try {
-          log.info('Auto-reading card data...');
+          log.info('Auto-reading card data (PIN not required for reading)...');
           const readResult = await sendBridgeCommand('READ_CARD');
           log.info('READ_CARD result:', JSON.stringify(readResult));
           
@@ -781,8 +783,6 @@ function startStatusPolling() {
         } catch (e) {
           log.error('Card read failed:', e.message);
         }
-      } else if (cardCurrentlyInserted && pinLocked) {
-        log.debug('Card inserted but PIN locked - skipping data read');
       }
       
       const newStatus = {
