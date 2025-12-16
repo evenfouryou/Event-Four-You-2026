@@ -532,6 +532,21 @@ router.delete("/api/siae/customers/:id", requireAuth, requireGestore, async (req
       return res.status(404).json({ message: "Cliente non trovato" });
     }
     
+    // Verifica se ci sono record collegati che impedirebbero l'eliminazione
+    const [hasTickets] = await db.select({ count: sql<number>`count(*)` })
+      .from(siaeTickets)
+      .where(eq(siaeTickets.customerId, req.params.id));
+    
+    const [hasTransactions] = await db.select({ count: sql<number>`count(*)` })
+      .from(siaeTransactions)
+      .where(eq(siaeTransactions.customerId, req.params.id));
+    
+    if (Number(hasTickets?.count) > 0 || Number(hasTransactions?.count) > 0) {
+      return res.status(409).json({ 
+        message: "Impossibile eliminare il cliente: ha biglietti o transazioni associate. Disattivalo invece di eliminarlo." 
+      });
+    }
+    
     const deleted = await siaeStorage.deleteSiaeCustomer(req.params.id);
     if (!deleted) {
       return res.status(500).json({ message: "Errore durante l'eliminazione" });
@@ -539,6 +554,12 @@ router.delete("/api/siae/customers/:id", requireAuth, requireGestore, async (req
     
     res.json({ message: "Cliente eliminato con successo" });
   } catch (error: any) {
+    // Gestisci errori di vincolo FK
+    if (error.code === '23503') { // PostgreSQL foreign key violation
+      return res.status(409).json({ 
+        message: "Impossibile eliminare il cliente: ha record associati nel sistema. Disattivalo invece di eliminarlo." 
+      });
+    }
     res.status(500).json({ message: error.message });
   }
 });
