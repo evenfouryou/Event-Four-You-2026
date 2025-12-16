@@ -1,5 +1,22 @@
 # 🔧 ISTRUZIONI DI BUILD - Event Four You SIAE Lettore
 
+## ✅ BUG FIX v3.5 (Dicembre 2024)
+
+**Problema:** Errore PIN 0x6A88 "Referenced data not found" anche con PIN corretto
+
+### Correzioni applicate v3.5:
+
+1. **Auto-rilevamento nPIN:**
+   - L'errore 0x6A88 indica che il riferimento PIN (nPIN) non esiste sulla carta
+   - Ora prova automaticamente nPIN = 1, 0, 2, 0x81 fino a trovare quello corretto
+   - Log dettagliato di ogni tentativo per debug
+
+2. **Logging migliorato:**
+   - Ogni tentativo PIN viene loggato con risultato
+   - Il bridge.log mostra esattamente quale nPIN funziona
+
+---
+
 ## ✅ BUG FIX v3.4 (Dicembre 2024)
 
 **Problema:** I dati della carta SIAE (seriale, counter, balance, keyId) non venivano inviati al web

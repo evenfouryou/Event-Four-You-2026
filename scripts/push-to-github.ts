@@ -130,7 +130,7 @@ async function main() {
     
     // Create commit
     console.log('📝 Creating commit...');
-    const commitMessage = 'v3.4: Enhanced card data logging and error reporting\n\n- Added detailed logging for card read operations (GetSNML, ReadCounterML, ReadBalanceML, GetKeyIDML)\n- Improved error handling with error codes in response\n- Added status broadcast logging for debugging\n- Counter and balance return null if read fails (with error code)\n\nSee BUILD_INSTRUCTIONS.md for details.';
+    const commitMessage = 'v3.5: Auto-detect PIN reference (nPIN) to fix 0x6A88 error\n\n- PIN verification now tries nPIN = 1, 0, 2, 0x81 automatically\n- Fixes "Referenced data not found" error when PIN is correct but nPIN is wrong\n- Detailed logging for each PIN attempt\n\nSee BUILD_INSTRUCTIONS.md for details.';
     
     const { data: commit } = await octokit.git.createCommit({
       owner,

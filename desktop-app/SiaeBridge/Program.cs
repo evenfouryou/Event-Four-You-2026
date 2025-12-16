@@ -427,11 +427,37 @@ namespace SiaeBridge
                 Log($"  BeginTransactionML = {txResult}");
                 tx = (txResult == 0);
 
-                // nPIN = 1 (identificatore PIN utente, NON la lunghezza!)
+                // nPIN = identificatore PIN (provare 0, 1, 2 se uno fallisce)
                 // Dalla documentazione SIAE test.c: pVerifyPINML(1, pin, slot)
-                const int USER_PIN_REFERENCE = 1;
-                int pinResult = VerifyPINML(USER_PIN_REFERENCE, pin, _slot);
-                Log($"  VerifyPINML(nPIN={USER_PIN_REFERENCE}, pin=***, slot={_slot}) = {pinResult} (0x{pinResult:X4})");
+                // Errore 0x6A88 = "Referenced data not found" = nPIN sbagliato
+                
+                // Prima proviamo nPIN=1 (standard)
+                int pinResult = VerifyPINML(1, pin, _slot);
+                Log($"  VerifyPINML(nPIN=1, pin=***, slot={_slot}) = {pinResult} (0x{pinResult:X4})");
+                
+                // Se fallisce con 0x6A88, proviamo nPIN=0
+                if (pinResult == 0x6A88)
+                {
+                    Log("  nPIN=1 failed with 0x6A88, trying nPIN=0...");
+                    pinResult = VerifyPINML(0, pin, _slot);
+                    Log($"  VerifyPINML(nPIN=0, pin=***, slot={_slot}) = {pinResult} (0x{pinResult:X4})");
+                }
+                
+                // Se ancora fallisce con 0x6A88, proviamo nPIN=2
+                if (pinResult == 0x6A88)
+                {
+                    Log("  nPIN=0 failed with 0x6A88, trying nPIN=2...");
+                    pinResult = VerifyPINML(2, pin, _slot);
+                    Log($"  VerifyPINML(nPIN=2, pin=***, slot={_slot}) = {pinResult} (0x{pinResult:X4})");
+                }
+                
+                // Se ancora fallisce con 0x6A88, proviamo nPIN=0x81 (alcune carte usano questo)
+                if (pinResult == 0x6A88)
+                {
+                    Log("  nPIN=2 failed with 0x6A88, trying nPIN=0x81...");
+                    pinResult = VerifyPINML(0x81, pin, _slot);
+                    Log($"  VerifyPINML(nPIN=0x81, pin=***, slot={_slot}) = {pinResult} (0x{pinResult:X4})");
+                }
 
                 if (pinResult == 0)
                 {
