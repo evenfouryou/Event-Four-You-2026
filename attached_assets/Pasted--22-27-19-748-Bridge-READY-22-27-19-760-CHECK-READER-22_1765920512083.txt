@@ -1,0 +1,170 @@
+[22:27:19.748] Bridge READY
+[22:27:19.760] >> CHECK_READER
+[22:27:19.792] Windows readers: False
+[22:27:20.187] << {"success":true,"readerConnected":false,"cardPresent":false,"message":"Nessun lettore rilevato"}
+[22:27:20.267] >> CHECK_READER
+[22:27:20.273] Windows readers: False
+[22:27:20.274] << {"success":true,"readerConnected":false,"cardPresent":false,"message":"Nessun lettore rilevato"}
+[22:27:20.767] >> CHECK_READER
+[22:27:20.770] Windows readers: False
+[22:27:20.770] << {"success":true,"readerConnected":false,"cardPresent":false,"message":"Nessun lettore rilevato"}
+[22:27:21.268] >> CHECK_READER
+[22:27:21.271] Windows readers: False
+[22:27:21.272] << {"success":true,"readerConnected":false,"cardPresent":false,"message":"Nessun lettore rilevato"}
+[22:27:21.783] >> CHECK_READER
+[22:27:21.785] Windows readers: False
+[22:27:21.786] << {"success":true,"readerConnected":false,"cardPresent":false,"message":"Nessun lettore rilevato"}
+[22:27:22.284] >> CHECK_READER
+[22:27:22.287] Windows readers: False
+[22:27:22.287] << {"success":true,"readerConnected":false,"cardPresent":false,"message":"Nessun lettore rilevato"}
+[22:27:22.764] >> CHECK_READER
+[22:27:22.767] Windows readers: False
+[22:27:22.767] << {"success":true,"readerConnected":false,"cardPresent":false,"message":"Nessun lettore rilevato"}
+[22:27:22.795] >> CHECK_READER
+[22:27:22.797] Windows readers: False
+[22:27:22.798] << {"success":true,"readerConnected":false,"cardPresent":false,"message":"Nessun lettore rilevato"}
+[22:27:23.295] >> CHECK_READER
+[22:27:23.298] Windows readers: False
+[22:27:23.298] << {"success":true,"readerConnected":false,"cardPresent":false,"message":"Nessun lettore rilevato"}
+[22:27:23.796] >> CHECK_READER
+[22:27:23.798] Windows readers: False
+[22:27:23.799] << {"success":true,"readerConnected":false,"cardPresent":false,"message":"Nessun lettore rilevato"}
+[22:27:24.309] >> CHECK_READER
+[22:27:24.311] Windows readers: False
+[22:27:24.311] << {"success":true,"readerConnected":false,"cardPresent":false,"message":"Nessun lettore rilevato"}
+[22:27:24.825] >> CHECK_READER
+[22:27:24.829] Windows readers: False
+[22:27:24.829] << {"success":true,"readerConnected":false,"cardPresent":false,"message":"Nessun lettore rilevato"}
+[22:27:25.335] >> CHECK_READER
+[22:27:25.338] Windows readers: False
+[22:27:25.339] << {"success":true,"readerConnected":false,"cardPresent":false,"message":"Nessun lettore rilevato"}
+[22:27:25.775] >> CHECK_READER
+[22:27:25.777] Windows readers: False
+[22:27:25.777] << {"success":true,"readerConnected":false,"cardPresent":false,"message":"Nessun lettore rilevato"}
+[22:27:25.836] >> CHECK_READER
+[22:27:25.840] Windows readers: False
+[22:27:25.840] << {"success":true,"readerConnected":false,"cardPresent":false,"message":"Nessun lettore rilevato"}
+[22:27:26.336] >> CHECK_READER
+[22:27:26.339] Windows readers: False
+[22:27:26.339] << {"success":true,"readerConnected":false,"cardPresent":false,"message":"Nessun lettore rilevato"}
+[22:27:26.837] >> CHECK_READER
+[22:27:26.839] Windows readers: False
+[22:27:26.840] << {"success":true,"readerConnected":false,"cardPresent":false,"message":"Nessun lettore rilevato"}
+[22:27:27.349] >> CHECK_READER
+[22:27:27.352] Windows readers: False
+[22:27:27.353] << {"success":true,"readerConnected":false,"cardPresent":false,"message":"Nessun lettore rilevato"}
+[22:27:27.863] >> CHECK_READER
+[22:27:27.865] Windows readers: False
+[22:27:27.865] << {"success":true,"readerConnected":false,"cardPresent":false,"message":"Nessun lettore rilevato"}
+[22:27:28.377] >> CHECK_READER
+[22:27:28.380] Windows readers: False
+[22:27:28.380] << {"success":true,"readerConnected":false,"cardPresent":false,"message":"Nessun lettore rilevato"}
+[22:27:28.769] >> CHECK_READER
+[22:27:28.772] Windows readers: False
+[22:27:28.772] << {"success":true,"readerConnected":false,"cardPresent":false,"message":"Nessun lettore rilevato"}
+[22:27:28.879] >> CHECK_READER
+[22:27:28.881] Windows readers: False
+[22:27:28.881] << {"success":true,"readerConnected":false,"cardPresent":false,"message":"Nessun lettore rilevato"}
+[22:27:29.393] >> CHECK_READER
+[22:27:29.395] Windows readers: False
+[22:27:29.395] << {"success":true,"readerConnected":false,"cardPresent":false,"message":"Nessun lettore rilevato"}
+[22:27:29.907] >> CHECK_READER
+[22:27:29.909] Windows readers: False
+[22:27:29.909] << {"success":true,"readerConnected":false,"cardPresent":false,"message":"Nessun lettore rilevato"}
+[22:27:30.420] >> CHECK_READER
+[22:27:30.422] Windows readers: False
+[22:27:30.422] << {"success":true,"readerConnected":false,"cardPresent":false,"message":"Nessun lettore rilevato"}
+[22:27:30.922] >> CHECK_READER
+[22:27:30.925] Windows readers: False
+[22:27:30.926] << {"success":true,"readerConnected":false,"cardPresent":false,"message":"Nessun lettore rilevato"}
+[22:27:31.435] >> CHECK_READER
+[22:27:31.437] Windows readers: False
+[22:27:31.437] << {"success":true,"readerConnected":false,"cardPresent":false,"message":"Nessun lettore rilevato"}
+[22:27:31.764] >> CHECK_READER
+[22:27:31.767] Windows readers: False
+[22:27:31.767] << {"success":true,"readerConnected":false,"cardPresent":false,"message":"Nessun lettore rilevato"}
+[22:27:31.936] >> CHECK_READER
+[22:27:31.944] Windows readers: False
+[22:27:31.944] << {"success":true,"readerConnected":false,"cardPresent":false,"message":"Nessun lettore rilevato"}
+[22:27:32.452] >> CHECK_READER
+[22:27:32.457] Windows readers: False
+[22:27:32.457] << {"success":true,"readerConnected":false,"cardPresent":false,"message":"Nessun lettore rilevato"}
+[22:27:32.963] >> CHECK_READER
+[22:27:32.965] Windows readers: False
+[22:27:32.966] << {"success":true,"readerConnected":false,"cardPresent":false,"message":"Nessun lettore rilevato"}
+[22:27:33.476] >> CHECK_READER
+[22:27:33.479] Windows readers: False
+[22:27:33.479] << {"success":true,"readerConnected":false,"cardPresent":false,"message":"Nessun lettore rilevato"}
+[22:27:33.981] >> CHECK_READER
+[22:27:33.983] Windows readers: False
+[22:27:33.983] << {"success":true,"readerConnected":false,"cardPresent":false,"message":"Nessun lettore rilevato"}
+[22:27:34.484] >> CHECK_READER
+[22:27:34.488] Windows readers: False
+[22:27:34.488] << {"success":true,"readerConnected":false,"cardPresent":false,"message":"Nessun lettore rilevato"}
+[22:27:34.761] >> CHECK_READER
+[22:27:34.763] Windows readers: False
+[22:27:34.763] << {"success":true,"readerConnected":false,"cardPresent":false,"message":"Nessun lettore rilevato"}
+[22:27:34.999] >> CHECK_READER
+[22:27:35.006] Windows readers: False
+[22:27:35.006] << {"success":true,"readerConnected":false,"cardPresent":false,"message":"Nessun lettore rilevato"}
+[22:27:35.499] >> CHECK_READER
+[22:27:35.502] Windows readers: False
+[22:27:35.502] << {"success":true,"readerConnected":false,"cardPresent":false,"message":"Nessun lettore rilevato"}
+[22:27:36.000] >> CHECK_READER
+[22:27:36.006] Windows readers: False
+[22:27:36.006] << {"success":true,"readerConnected":false,"cardPresent":false,"message":"Nessun lettore rilevato"}
+[22:27:36.501] >> CHECK_READER
+[22:27:36.503] Windows readers: False
+[22:27:36.503] << {"success":true,"readerConnected":false,"cardPresent":false,"message":"Nessun lettore rilevato"}
+[22:27:37.001] >> CHECK_READER
+[22:27:37.003] Windows readers: False
+[22:27:37.003] << {"success":true,"readerConnected":false,"cardPresent":false,"message":"Nessun lettore rilevato"}
+[22:27:37.514] >> CHECK_READER
+[22:27:37.548] Windows readers: False
+[22:27:37.548] << {"success":true,"readerConnected":false,"cardPresent":false,"message":"Nessun lettore rilevato"}
+[22:27:37.764] >> CHECK_READER
+[22:27:37.767] Windows readers: False
+[22:27:37.767] << {"success":true,"readerConnected":false,"cardPresent":false,"message":"Nessun lettore rilevato"}
+[22:27:38.027] >> CHECK_READER
+[22:27:38.028] Windows readers: False
+[22:27:38.029] << {"success":true,"readerConnected":false,"cardPresent":false,"message":"Nessun lettore rilevato"}
+[22:27:38.541] >> CHECK_READER
+[22:27:38.543] Windows readers: False
+[22:27:38.543] << {"success":true,"readerConnected":false,"cardPresent":false,"message":"Nessun lettore rilevato"}
+[22:27:39.041] >> CHECK_READER
+[22:27:39.043] Windows readers: False
+[22:27:39.043] << {"success":true,"readerConnected":false,"cardPresent":false,"message":"Nessun lettore rilevato"}
+[22:27:39.555] >> CHECK_READER
+[22:27:39.558] Windows readers: False
+[22:27:39.558] << {"success":true,"readerConnected":false,"cardPresent":false,"message":"Nessun lettore rilevato"}
+[22:27:40.069] >> CHECK_READER
+[22:27:40.071] Windows readers: False
+[22:27:40.072] << {"success":true,"readerConnected":false,"cardPresent":false,"message":"Nessun lettore rilevato"}
+[22:27:40.585] >> CHECK_READER
+[22:27:40.589] Windows readers: False
+[22:27:40.589] << {"success":true,"readerConnected":false,"cardPresent":false,"message":"Nessun lettore rilevato"}
+[22:27:40.767] >> CHECK_READER
+[22:27:40.769] Windows readers: False
+[22:27:40.769] << {"success":true,"readerConnected":false,"cardPresent":false,"message":"Nessun lettore rilevato"}
+[22:27:41.087] >> CHECK_READER
+[22:27:41.090] Windows readers: False
+[22:27:41.090] << {"success":true,"readerConnected":false,"cardPresent":false,"message":"Nessun lettore rilevato"}
+[22:27:41.601] >> CHECK_READER
+[22:27:41.604] Windows readers: False
+[22:27:41.604] << {"success":true,"readerConnected":false,"cardPresent":false,"message":"Nessun lettore rilevato"}
+[22:27:41.681] >> CHECK_READER
+[22:27:41.683] Windows readers: False
+[22:27:41.683] << {"success":true,"readerConnected":false,"cardPresent":false,"message":"Nessun lettore rilevato"}
+[22:27:42.101] >> CHECK_READER
+[22:27:42.143] Windows readers: False
+[22:27:42.143] << {"success":true,"readerConnected":false,"cardPresent":false,"message":"Nessun lettore rilevato"}
+[22:27:42.614] >> CHECK_READER
+[22:27:42.616] Windows readers: False
+[22:27:42.616] << {"success":true,"readerConnected":false,"cardPresent":false,"message":"Nessun lettore rilevato"}
+[22:27:43.127] >> CHECK_READER
+[22:27:43.131] Windows readers: False
+[22:27:43.131] << {"success":true,"readerConnected":false,"cardPresent":false,"message":"Nessun lettore rilevato"}
+[22:27:43.641] >> CHECK_READER
+[22:27:43.644] Windows readers: False
+[22:27:43.644] << {"success":true,"readerConnected":false,"cardPresent":false,"message":"Nessun lettore rilevato"}
+[22:27:43.760] >> CHECK_READER
