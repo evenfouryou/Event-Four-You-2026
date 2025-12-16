@@ -2,6 +2,9 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
+import multer from "multer";
+import sharp from "sharp";
+import { ObjectStorageService } from "./objectStorage";
 // Replit Auth disabled - using classic email/password login
 // import { setupAuth, isAuthenticated } from "./replitAuth";
 import { getSession } from "./replitAuth";
@@ -116,6 +119,87 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Health check endpoint for Replit Deploy
   app.get('/api/health', (_req, res) => {
     res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+  });
+
+  // Public objects route - serves uploaded images from object storage (no auth required)
+  app.get("/public-objects/:filePath(*)", async (req, res) => {
+    const filePath = req.params.filePath;
+    const objectStorageService = new ObjectStorageService();
+    try {
+      const file = await objectStorageService.searchPublicObject(filePath);
+      if (!file) {
+        return res.status(404).json({ error: "File not found" });
+      }
+      objectStorageService.downloadObject(file, res);
+    } catch (error) {
+      console.error("Error searching for public object:", error);
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Multer configuration for event image uploads (5MB limit, memory storage)
+  const eventImageUpload = multer({
+    storage: multer.memoryStorage(),
+    limits: {
+      fileSize: 5 * 1024 * 1024, // 5MB
+    },
+    fileFilter: (_req, file, cb) => {
+      const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/webp'];
+      if (allowedMimeTypes.includes(file.mimetype)) {
+        cb(null, true);
+      } else {
+        cb(new Error('Only JPEG, PNG, and WebP images are allowed'));
+      }
+    },
+  });
+
+  // Event image upload endpoint - resizes to 1080x1080 square and converts to WebP
+  app.post('/api/events/upload-image', eventImageUpload.single('image'), async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: 'No image file provided' });
+      }
+
+      // Process image with Sharp: center crop to square 1080x1080, convert to WebP
+      const processedBuffer = await sharp(req.file.buffer)
+        .resize(1080, 1080, {
+          fit: 'cover',
+          position: 'center',
+        })
+        .webp({ quality: 85 })
+        .toBuffer();
+
+      // Generate unique filename
+      const timestamp = Date.now();
+      const randomId = crypto.randomBytes(8).toString('hex');
+      const fileName = `events/${timestamp}-${randomId}.webp`;
+
+      // Upload to object storage public directory
+      const objectStorageService = new ObjectStorageService();
+      const publicUrl = await objectStorageService.uploadToPublicDirectory(
+        processedBuffer,
+        fileName,
+        'image/webp'
+      );
+
+      res.json({
+        success: true,
+        url: publicUrl,
+        message: 'Image uploaded successfully',
+      });
+    } catch (error) {
+      console.error('Error uploading event image:', error);
+      if (error instanceof multer.MulterError) {
+        if (error.code === 'LIMIT_FILE_SIZE') {
+          return res.status(400).json({ error: 'File size exceeds 5MB limit' });
+        }
+        return res.status(400).json({ error: error.message });
+      }
+      if (error instanceof Error) {
+        return res.status(400).json({ error: error.message });
+      }
+      return res.status(500).json({ error: 'Failed to upload image' });
+    }
   });
 
   // Email transporter setup
