@@ -274,6 +274,56 @@ export interface ISiaeStorage {
   updateSiaeNumberedSeat(id: string, seat: Partial<SiaeNumberedSeat>): Promise<SiaeNumberedSeat | undefined>;
   deleteSiaeNumberedSeat(id: string): Promise<boolean>;
   
+  // ==================== Cashier Allocations ====================
+  
+  getCashierAllocationsByEvent(eventId: string): Promise<SiaeCashierAllocation[]>;
+  getCashierAllocationsByUser(userId: string): Promise<SiaeCashierAllocation[]>;
+  getCashierAllocationByUserAndEvent(userId: string, eventId: string): Promise<SiaeCashierAllocation | undefined>;
+  getCashierAllocation(id: string): Promise<SiaeCashierAllocation | undefined>;
+  createCashierAllocation(data: InsertSiaeCashierAllocation): Promise<SiaeCashierAllocation>;
+  updateCashierAllocation(id: string, data: Partial<SiaeCashierAllocation>): Promise<SiaeCashierAllocation | undefined>;
+  deleteCashierAllocation(id: string): Promise<boolean>;
+  incrementCashierQuotaUsed(id: string): Promise<SiaeCashierAllocation | undefined>;
+  decrementCashierQuotaUsed(id: string): Promise<SiaeCashierAllocation | undefined>;
+  
+  // ==================== Ticket Audit ====================
+  
+  createTicketAudit(data: InsertSiaeTicketAudit): Promise<SiaeTicketAudit>;
+  getTicketAuditByTicket(ticketId: string): Promise<SiaeTicketAudit[]>;
+  getTicketAuditByCompany(companyId: string, limit?: number): Promise<SiaeTicketAudit[]>;
+  getTicketAuditByUser(userId: string, limit?: number): Promise<SiaeTicketAudit[]>;
+  getTodayTicketsByUser(userId: string, eventId: string): Promise<SiaeTicket[]>;
+  
+  // ==================== Atomic Transaction Methods ====================
+  
+  emitTicketWithAtomicQuota(params: {
+    allocationId: string;
+    eventId: string;
+    sectorId: string;
+    ticketCode: string;
+    ticketType: string;
+    ticketPrice: number;
+    customerId: string | null;
+    issuedByUserId: string;
+    participantFirstName: string | null;
+    participantLastName: string | null;
+    isComplimentary: boolean;
+    paymentMethod: string;
+    currentTicketsSold: number;
+    currentTotalRevenue: number;
+    currentAvailableSeats: number;
+  }): Promise<{ success: boolean; ticket?: SiaeTicket; error?: string }>;
+  
+  cancelTicketWithAtomicQuotaRestore(params: {
+    ticketId: string;
+    cancelledByUserId: string;
+    cancellationReason: string;
+    issuedByUserId: string | null;
+    ticketedEventId: string;
+    sectorId: string;
+    ticketPrice: number;
+  }): Promise<{ success: boolean; ticket?: SiaeTicket; error?: string }>;
+  
   // ==================== Seed Functions ====================
   
   seedSiaeTables(): Promise<void>;
@@ -1525,6 +1575,24 @@ export class SiaeStorage implements ISiaeStorage {
       .where(eq(siaeCashierAllocations.id, id))
       .returning();
     return allocation;
+  }
+
+  async getCashierAllocationsByUser(userId: string): Promise<SiaeCashierAllocation[]> {
+    return await db
+      .select()
+      .from(siaeCashierAllocations)
+      .where(and(
+        eq(siaeCashierAllocations.userId, userId),
+        eq(siaeCashierAllocations.isActive, true)
+      ))
+      .orderBy(desc(siaeCashierAllocations.createdAt));
+  }
+
+  async deleteCashierAllocation(id: string): Promise<boolean> {
+    const result = await db
+      .delete(siaeCashierAllocations)
+      .where(eq(siaeCashierAllocations.id, id));
+    return true;
   }
 
   // ==================== Ticket Audit ====================

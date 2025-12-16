@@ -1,6 +1,7 @@
 // SIAE Module API Routes
 import { Router, Request, Response, NextFunction } from "express";
 import { siaeStorage } from "./siae-storage";
+import { storage } from "./storage";
 import { db } from "./db";
 import { events } from "@shared/schema";
 import { eq } from "drizzle-orm";
@@ -2928,6 +2929,771 @@ router.patch("/api/siae/tickets/:id/cancel", requireAuth, async (req: Request, r
       ...result.ticket,
       fiscalCancellationRegistered
     });
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// ==================== MODULO CASSA BIGLIETTI ====================
+
+// Middleware to check if user is a cashier
+function requireCashier(req: Request, res: Response, next: NextFunction) {
+  const user = req.user as any;
+  if (!user || user.role !== 'cassiere') {
+    return res.status(403).json({ message: "Accesso riservato ai Cassieri" });
+  }
+  next();
+}
+
+// ==================== CASHIER MANAGEMENT (Gestore Only) ====================
+
+// GET /api/cashiers - List all cashiers for company
+router.get("/api/cashiers", requireAuth, requireGestore, async (req: Request, res: Response) => {
+  try {
+    const user = req.user as any;
+    if (!user.companyId) {
+      return res.status(400).json({ message: "Utente non associato a nessuna azienda" });
+    }
+    const cashiers = await storage.getCashiersByCompany(user.companyId);
+    res.json(cashiers);
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// POST /api/cashiers - Create cashier user with password
+router.post("/api/cashiers", requireAuth, requireGestore, async (req: Request, res: Response) => {
+  try {
+    const user = req.user as any;
+    if (!user.companyId) {
+      return res.status(400).json({ message: "Utente non associato a nessuna azienda" });
+    }
+    
+    const { email, password, firstName, lastName, defaultPrinterAgentId } = req.body;
+    
+    if (!email || !password || !firstName || !lastName) {
+      return res.status(400).json({ message: "Email, password, nome e cognome sono obbligatori" });
+    }
+    
+    // Check if email already exists
+    const existingUser = await storage.getUserByEmail(email);
+    if (existingUser) {
+      return res.status(400).json({ message: "Email già in uso" });
+    }
+    
+    // Hash password
+    const bcrypt = require('bcryptjs');
+    const passwordHash = await bcrypt.hash(password, 10);
+    
+    const cashier = await storage.createUser({
+      email,
+      passwordHash,
+      firstName,
+      lastName,
+      role: 'cassiere',
+      companyId: user.companyId,
+      defaultPrinterAgentId: defaultPrinterAgentId || null,
+      isActive: true,
+      emailVerified: true // Created by admin, no verification needed
+    });
+    
+    // Audit log
+    await siaeStorage.createAuditLog({
+      companyId: user.companyId,
+      userId: user.id,
+      action: 'cashier_created',
+      entityType: 'user',
+      entityId: cashier.id,
+      description: `Creato cassiere: ${firstName} ${lastName} (${email})`,
+      ipAddress: (req.ip || '').substring(0, 45),
+      userAgent: (req.get('user-agent') || '').substring(0, 500)
+    });
+    
+    // Return without passwordHash
+    const { passwordHash: _, ...cashierData } = cashier;
+    res.status(201).json(cashierData);
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// PATCH /api/cashiers/:id - Update cashier
+router.patch("/api/cashiers/:id", requireAuth, requireGestore, async (req: Request, res: Response) => {
+  try {
+    const user = req.user as any;
+    const { id } = req.params;
+    
+    const cashier = await storage.getUser(id);
+    if (!cashier) {
+      return res.status(404).json({ message: "Cassiere non trovato" });
+    }
+    
+    if (cashier.companyId !== user.companyId && user.role !== 'super_admin') {
+      return res.status(403).json({ message: "Non autorizzato a modificare questo cassiere" });
+    }
+    
+    if (cashier.role !== 'cassiere') {
+      return res.status(400).json({ message: "L'utente non è un cassiere" });
+    }
+    
+    const { firstName, lastName, defaultPrinterAgentId, isActive, password } = req.body;
+    
+    const updateData: any = {};
+    if (firstName !== undefined) updateData.firstName = firstName;
+    if (lastName !== undefined) updateData.lastName = lastName;
+    if (defaultPrinterAgentId !== undefined) updateData.defaultPrinterAgentId = defaultPrinterAgentId;
+    if (isActive !== undefined) updateData.isActive = isActive;
+    
+    if (password) {
+      const bcrypt = require('bcryptjs');
+      updateData.passwordHash = await bcrypt.hash(password, 10);
+    }
+    
+    const updated = await storage.updateUser(id, updateData);
+    
+    // Audit log
+    await siaeStorage.createAuditLog({
+      companyId: user.companyId,
+      userId: user.id,
+      action: 'cashier_updated',
+      entityType: 'user',
+      entityId: id,
+      description: `Modificato cassiere: ${cashier.firstName} ${cashier.lastName}`,
+      ipAddress: (req.ip || '').substring(0, 45),
+      userAgent: (req.get('user-agent') || '').substring(0, 500)
+    });
+    
+    if (updated) {
+      const { passwordHash: _, ...cashierData } = updated;
+      res.json(cashierData);
+    } else {
+      res.status(500).json({ message: "Errore durante l'aggiornamento" });
+    }
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// DELETE /api/cashiers/:id - Deactivate cashier
+router.delete("/api/cashiers/:id", requireAuth, requireGestore, async (req: Request, res: Response) => {
+  try {
+    const user = req.user as any;
+    const { id } = req.params;
+    
+    const cashier = await storage.getUser(id);
+    if (!cashier) {
+      return res.status(404).json({ message: "Cassiere non trovato" });
+    }
+    
+    if (cashier.companyId !== user.companyId && user.role !== 'super_admin') {
+      return res.status(403).json({ message: "Non autorizzato a disattivare questo cassiere" });
+    }
+    
+    if (cashier.role !== 'cassiere') {
+      return res.status(400).json({ message: "L'utente non è un cassiere" });
+    }
+    
+    // Deactivate instead of delete to preserve audit trail
+    await storage.updateUser(id, { isActive: false });
+    
+    // Audit log
+    await siaeStorage.createAuditLog({
+      companyId: user.companyId,
+      userId: user.id,
+      action: 'cashier_deactivated',
+      entityType: 'user',
+      entityId: id,
+      description: `Disattivato cassiere: ${cashier.firstName} ${cashier.lastName}`,
+      ipAddress: (req.ip || '').substring(0, 45),
+      userAgent: (req.get('user-agent') || '').substring(0, 500)
+    });
+    
+    res.json({ success: true, message: "Cassiere disattivato" });
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// ==================== EVENT CASHIER ALLOCATIONS (Gestore Only) ====================
+
+// GET /api/events/:eventId/cashier-allocations - List all allocations for event
+router.get("/api/events/:eventId/cashier-allocations", requireAuth, requireGestore, async (req: Request, res: Response) => {
+  try {
+    const user = req.user as any;
+    const { eventId } = req.params;
+    
+    const event = await siaeStorage.getSiaeTicketedEvent(eventId);
+    if (!event) {
+      return res.status(404).json({ message: "Evento non trovato" });
+    }
+    
+    if (event.companyId !== user.companyId && user.role !== 'super_admin') {
+      return res.status(403).json({ message: "Non autorizzato ad accedere a questo evento" });
+    }
+    
+    const allocations = await siaeStorage.getCashierAllocationsByEvent(eventId);
+    
+    // Enrich with user info
+    const enrichedAllocations = await Promise.all(allocations.map(async (alloc) => {
+      const cashier = await storage.getUser(alloc.userId);
+      const sector = alloc.sectorId ? await siaeStorage.getSiaeEventSector(alloc.sectorId) : null;
+      return {
+        ...alloc,
+        cashierName: cashier ? `${cashier.firstName} ${cashier.lastName}` : 'N/A',
+        cashierEmail: cashier?.email || 'N/A',
+        sectorName: sector?.name || 'Tutti i settori',
+        quotaRemaining: alloc.quotaQuantity - alloc.quotaUsed
+      };
+    }));
+    
+    res.json(enrichedAllocations);
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// POST /api/events/:eventId/cashier-allocations - Assign cashier to event
+router.post("/api/events/:eventId/cashier-allocations", requireAuth, requireGestore, async (req: Request, res: Response) => {
+  try {
+    const user = req.user as any;
+    const { eventId } = req.params;
+    const { userId, sectorId, quotaQuantity } = req.body;
+    
+    if (!userId || quotaQuantity === undefined) {
+      return res.status(400).json({ message: "userId e quotaQuantity sono obbligatori" });
+    }
+    
+    const event = await siaeStorage.getSiaeTicketedEvent(eventId);
+    if (!event) {
+      return res.status(404).json({ message: "Evento non trovato" });
+    }
+    
+    if (event.companyId !== user.companyId && user.role !== 'super_admin') {
+      return res.status(403).json({ message: "Non autorizzato ad accedere a questo evento" });
+    }
+    
+    // Check if cashier exists and belongs to company
+    const cashier = await storage.getUser(userId);
+    if (!cashier || cashier.role !== 'cassiere') {
+      return res.status(400).json({ message: "Cassiere non trovato" });
+    }
+    
+    if (cashier.companyId !== user.companyId && user.role !== 'super_admin') {
+      return res.status(403).json({ message: "Cassiere non appartiene alla tua azienda" });
+    }
+    
+    // Check if allocation already exists
+    const existingAllocation = await siaeStorage.getCashierAllocationByUserAndEvent(userId, eventId);
+    if (existingAllocation) {
+      return res.status(400).json({ message: "Allocazione già esistente per questo cassiere/evento" });
+    }
+    
+    const allocation = await siaeStorage.createCashierAllocation({
+      companyId: user.companyId,
+      eventId,
+      userId,
+      sectorId: sectorId || null,
+      quotaQuantity: parseInt(quotaQuantity),
+      quotaUsed: 0,
+      isActive: true
+    });
+    
+    // Audit log
+    await siaeStorage.createAuditLog({
+      companyId: user.companyId,
+      userId: user.id,
+      action: 'cashier_allocation_created',
+      entityType: 'cashier_allocation',
+      entityId: allocation.id,
+      description: `Assegnato cassiere ${cashier.firstName} ${cashier.lastName} a evento ${event.eventName} con quota ${quotaQuantity}`,
+      ipAddress: (req.ip || '').substring(0, 45),
+      userAgent: (req.get('user-agent') || '').substring(0, 500)
+    });
+    
+    res.status(201).json(allocation);
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// PATCH /api/cashier-allocations/:id - Update quota
+router.patch("/api/cashier-allocations/:id", requireAuth, requireGestore, async (req: Request, res: Response) => {
+  try {
+    const user = req.user as any;
+    const { id } = req.params;
+    const { quotaQuantity, isActive } = req.body;
+    
+    const allocation = await siaeStorage.getCashierAllocation(id);
+    if (!allocation) {
+      return res.status(404).json({ message: "Allocazione non trovata" });
+    }
+    
+    if (allocation.companyId !== user.companyId && user.role !== 'super_admin') {
+      return res.status(403).json({ message: "Non autorizzato a modificare questa allocazione" });
+    }
+    
+    const updateData: any = {};
+    if (quotaQuantity !== undefined) {
+      if (parseInt(quotaQuantity) < allocation.quotaUsed) {
+        return res.status(400).json({ 
+          message: `La quota non può essere inferiore ai biglietti già emessi (${allocation.quotaUsed})` 
+        });
+      }
+      updateData.quotaQuantity = parseInt(quotaQuantity);
+    }
+    if (isActive !== undefined) updateData.isActive = isActive;
+    
+    const updated = await siaeStorage.updateCashierAllocation(id, updateData);
+    
+    // Audit log
+    await siaeStorage.createAuditLog({
+      companyId: user.companyId,
+      userId: user.id,
+      action: 'cashier_allocation_updated',
+      entityType: 'cashier_allocation',
+      entityId: id,
+      description: `Modificata allocazione cassiere: quota ${quotaQuantity || 'invariata'}`,
+      ipAddress: (req.ip || '').substring(0, 45),
+      userAgent: (req.get('user-agent') || '').substring(0, 500)
+    });
+    
+    res.json(updated);
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// DELETE /api/cashier-allocations/:id - Remove allocation
+router.delete("/api/cashier-allocations/:id", requireAuth, requireGestore, async (req: Request, res: Response) => {
+  try {
+    const user = req.user as any;
+    const { id } = req.params;
+    
+    const allocation = await siaeStorage.getCashierAllocation(id);
+    if (!allocation) {
+      return res.status(404).json({ message: "Allocazione non trovata" });
+    }
+    
+    if (allocation.companyId !== user.companyId && user.role !== 'super_admin') {
+      return res.status(403).json({ message: "Non autorizzato a eliminare questa allocazione" });
+    }
+    
+    if (allocation.quotaUsed > 0) {
+      return res.status(400).json({ 
+        message: `Impossibile eliminare allocazione con biglietti già emessi (${allocation.quotaUsed}). Disattivarla invece.` 
+      });
+    }
+    
+    await siaeStorage.deleteCashierAllocation(id);
+    
+    // Audit log
+    await siaeStorage.createAuditLog({
+      companyId: user.companyId,
+      userId: user.id,
+      action: 'cashier_allocation_deleted',
+      entityType: 'cashier_allocation',
+      entityId: id,
+      description: `Eliminata allocazione cassiere`,
+      ipAddress: (req.ip || '').substring(0, 45),
+      userAgent: (req.get('user-agent') || '').substring(0, 500)
+    });
+    
+    res.json({ success: true, message: "Allocazione eliminata" });
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// ==================== CASHIER OPERATIONS (Cassiere Role) ====================
+
+// GET /api/cashier/my-events - Get events assigned to logged-in cashier
+router.get("/api/cashier/my-events", requireAuth, requireCashier, async (req: Request, res: Response) => {
+  try {
+    const user = req.user as any;
+    
+    const allocations = await siaeStorage.getCashierAllocationsByUser(user.id);
+    
+    const events = await Promise.all(allocations.map(async (alloc) => {
+      const event = await siaeStorage.getSiaeTicketedEvent(alloc.eventId);
+      const sector = alloc.sectorId ? await siaeStorage.getSiaeEventSector(alloc.sectorId) : null;
+      return {
+        allocationId: alloc.id,
+        eventId: alloc.eventId,
+        eventName: event?.eventName || 'N/A',
+        eventDate: event?.eventDate,
+        eventTime: event?.eventTime,
+        venueName: event?.venueName,
+        sectorId: alloc.sectorId,
+        sectorName: sector?.name || 'Tutti i settori',
+        quotaQuantity: alloc.quotaQuantity,
+        quotaUsed: alloc.quotaUsed,
+        quotaRemaining: alloc.quotaQuantity - alloc.quotaUsed,
+        isActive: alloc.isActive
+      };
+    }));
+    
+    // Filter only active allocations with active events
+    const activeEvents = events.filter(e => e.isActive && e.eventName !== 'N/A');
+    
+    res.json(activeEvents);
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// GET /api/cashier/events/:eventId/quotas - Get remaining quotas for event
+router.get("/api/cashier/events/:eventId/quotas", requireAuth, requireCashier, async (req: Request, res: Response) => {
+  try {
+    const user = req.user as any;
+    const { eventId } = req.params;
+    
+    const allocation = await siaeStorage.getCashierAllocationByUserAndEvent(user.id, eventId);
+    if (!allocation) {
+      return res.status(404).json({ message: "Non hai allocazione per questo evento" });
+    }
+    
+    const event = await siaeStorage.getSiaeTicketedEvent(eventId);
+    const sectors = await siaeStorage.getSiaeEventSectorsByEvent(eventId);
+    const sector = allocation.sectorId ? await siaeStorage.getSiaeEventSector(allocation.sectorId) : null;
+    
+    // Get today's tickets by this cashier
+    const todayTickets = await siaeStorage.getTodayTicketsByUser(user.id, eventId);
+    
+    res.json({
+      eventId,
+      eventName: event?.eventName,
+      eventDate: event?.eventDate,
+      sectorId: allocation.sectorId,
+      sectorName: sector?.name || 'Tutti i settori',
+      quotaQuantity: allocation.quotaQuantity,
+      quotaUsed: allocation.quotaUsed,
+      quotaRemaining: allocation.quotaQuantity - allocation.quotaUsed,
+      todayEmissions: todayTickets.length,
+      todayRevenue: todayTickets.reduce((sum, t) => sum + Number(t.ticketPrice || 0), 0),
+      availableSectors: sectors.map(s => ({
+        id: s.id,
+        name: s.name,
+        availableSeats: s.availableSeats,
+        ticketPrice: s.ticketPrice
+      }))
+    });
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// POST /api/cashier/events/:eventId/emit-ticket - Emit ticket with fiscal seal
+router.post("/api/cashier/events/:eventId/emit-ticket", requireAuth, requireCashier, async (req: Request, res: Response) => {
+  try {
+    const user = req.user as any;
+    const { eventId } = req.params;
+    const { sectorId, ticketType, ticketPrice, participantFirstName, participantLastName, paymentMethod, isComplimentary } = req.body;
+    
+    if (!sectorId || !ticketType || ticketPrice === undefined) {
+      return res.status(400).json({ message: "sectorId, ticketType e ticketPrice sono obbligatori" });
+    }
+    
+    // Check cashier allocation
+    const allocation = await siaeStorage.getCashierAllocationByUserAndEvent(user.id, eventId);
+    if (!allocation) {
+      return res.status(403).json({ message: "Non hai allocazione per questo evento" });
+    }
+    
+    if (!allocation.isActive) {
+      return res.status(403).json({ message: "La tua allocazione per questo evento è stata disattivata" });
+    }
+    
+    // Check sector restriction
+    if (allocation.sectorId && allocation.sectorId !== sectorId) {
+      return res.status(403).json({ message: "Non sei autorizzato a emettere biglietti per questo settore" });
+    }
+    
+    // Check quota
+    if (allocation.quotaUsed >= allocation.quotaQuantity) {
+      return res.status(403).json({ 
+        message: "Quota biglietti esaurita",
+        errorCode: "QUOTA_EXCEEDED",
+        quotaUsed: allocation.quotaUsed,
+        quotaQuantity: allocation.quotaQuantity
+      });
+    }
+    
+    const event = await siaeStorage.getSiaeTicketedEvent(eventId);
+    if (!event) {
+      return res.status(404).json({ message: "Evento non trovato" });
+    }
+    
+    const sector = await siaeStorage.getSiaeEventSector(sectorId);
+    if (!sector) {
+      return res.status(404).json({ message: "Settore non trovato" });
+    }
+    
+    // Check seat availability
+    if (sector.availableSeats !== null && sector.availableSeats <= 0) {
+      return res.status(400).json({ message: "Nessun posto disponibile in questo settore" });
+    }
+    
+    // Generate ticket code
+    const ticketCode = `${event.eventCode || 'TKT'}-${Date.now().toString(36).toUpperCase()}`;
+    
+    // Try to get fiscal seal from bridge (optional - box office can work offline)
+    let fiscalSeal = null;
+    let fiscalSealCode = null;
+    
+    try {
+      if (isBridgeConnected() && isCardReadyForSeals().ready) {
+        const priceInCents = Math.round(Number(ticketPrice) * 100);
+        const sealData = await requestFiscalSeal(priceInCents);
+        fiscalSeal = sealData;
+        fiscalSealCode = sealData?.sealNumber;
+      }
+    } catch (sealError: any) {
+      console.log(`[Cashier] Fiscal seal not available: ${sealError.message}`);
+      // Continue without fiscal seal - will be registered later
+    }
+    
+    // Atomic ticket emission with quota management
+    const result = await siaeStorage.emitTicketWithAtomicQuota({
+      allocationId: allocation.id,
+      eventId,
+      sectorId,
+      ticketCode,
+      ticketType,
+      ticketPrice: Number(ticketPrice),
+      customerId: null,
+      issuedByUserId: user.id,
+      participantFirstName: participantFirstName || null,
+      participantLastName: participantLastName || null,
+      isComplimentary: isComplimentary || false,
+      paymentMethod: paymentMethod || 'cash',
+      currentTicketsSold: event.ticketsSold || 0,
+      currentTotalRevenue: Number(event.totalRevenue || 0),
+      currentAvailableSeats: sector.availableSeats || 0
+    });
+    
+    if (!result.success) {
+      return res.status(400).json({ 
+        message: result.error || "Errore durante l'emissione del biglietto",
+        errorCode: "EMISSION_FAILED"
+      });
+    }
+    
+    // Update ticket with fiscal seal if available
+    if (fiscalSealCode && result.ticket) {
+      await siaeStorage.updateSiaeTicket(result.ticket.id, {
+        fiscalSealCode,
+        fiscalSeal: JSON.stringify(fiscalSeal)
+      });
+    }
+    
+    // Create ticket audit
+    await siaeStorage.createTicketAudit({
+      companyId: user.companyId,
+      ticketId: result.ticket!.id,
+      operationType: 'emission',
+      performedBy: user.id,
+      reason: null,
+      metadata: {
+        ticketCode,
+        ticketType,
+        ticketPrice,
+        sectorName: sector.name,
+        eventName: event.eventName,
+        fiscalSealCode,
+        paymentMethod: paymentMethod || 'cash',
+        emittedBy: `${user.firstName} ${user.lastName}`
+      }
+    });
+    
+    // Audit log
+    await siaeStorage.createAuditLog({
+      companyId: user.companyId,
+      userId: user.id,
+      action: 'ticket_emitted',
+      entityType: 'ticket',
+      entityId: result.ticket!.id,
+      description: `Emesso biglietto ${ticketCode} - ${ticketType} - €${ticketPrice}`,
+      ipAddress: (req.ip || '').substring(0, 45),
+      userAgent: (req.get('user-agent') || '').substring(0, 500)
+    });
+    
+    res.status(201).json({
+      ...result.ticket,
+      fiscalSealCode,
+      sectorName: sector.name,
+      eventName: event.eventName,
+      quotaRemaining: allocation.quotaQuantity - allocation.quotaUsed - 1
+    });
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// POST /api/cashier/tickets/:ticketId/annul - Annul ticket (SIAE fiscal annulment)
+router.post("/api/cashier/tickets/:ticketId/annul", requireAuth, requireCashier, async (req: Request, res: Response) => {
+  try {
+    const user = req.user as any;
+    const { ticketId } = req.params;
+    const { reason } = req.body;
+    
+    if (!reason) {
+      return res.status(400).json({ message: "Motivo annullamento obbligatorio" });
+    }
+    
+    const ticket = await siaeStorage.getSiaeTicket(ticketId);
+    if (!ticket) {
+      return res.status(404).json({ message: "Biglietto non trovato" });
+    }
+    
+    if (ticket.status === 'cancelled') {
+      return res.status(400).json({ message: "Biglietto già annullato" });
+    }
+    
+    if (ticket.status === 'used') {
+      return res.status(400).json({ message: "Impossibile annullare un biglietto già utilizzato" });
+    }
+    
+    // Verify cashier has allocation for this event
+    const allocation = await siaeStorage.getCashierAllocationByUserAndEvent(user.id, ticket.ticketedEventId);
+    if (!allocation) {
+      return res.status(403).json({ message: "Non hai allocazione per questo evento" });
+    }
+    
+    // Verify ticket was issued by this cashier (for security)
+    if (ticket.issuedByUserId !== user.id) {
+      // Allow annulment if cashier has same sector or all-sector allocation
+      if (allocation.sectorId && allocation.sectorId !== ticket.sectorId) {
+        return res.status(403).json({ message: "Non sei autorizzato ad annullare questo biglietto" });
+      }
+    }
+    
+    // Atomic cancellation with quota restore
+    const result = await siaeStorage.cancelTicketWithAtomicQuotaRestore({
+      ticketId,
+      cancelledByUserId: user.id,
+      cancellationReason: reason,
+      issuedByUserId: ticket.issuedByUserId,
+      ticketedEventId: ticket.ticketedEventId,
+      sectorId: ticket.sectorId,
+      ticketPrice: Number(ticket.ticketPrice || 0)
+    });
+    
+    if (!result.success) {
+      return res.status(400).json({ 
+        message: result.error || "Errore durante l'annullamento",
+        errorCode: "ANNULMENT_FAILED"
+      });
+    }
+    
+    // Create ticket audit
+    await siaeStorage.createTicketAudit({
+      companyId: user.companyId,
+      ticketId,
+      operationType: 'cancellation',
+      performedBy: user.id,
+      reason,
+      metadata: {
+        ticketCode: ticket.ticketCode,
+        originalPrice: ticket.ticketPrice,
+        cancelledBy: `${user.firstName} ${user.lastName}`
+      }
+    });
+    
+    // Audit log
+    await siaeStorage.createAuditLog({
+      companyId: user.companyId,
+      userId: user.id,
+      action: 'ticket_annulled_by_cashier',
+      entityType: 'ticket',
+      entityId: ticketId,
+      description: `Annullato biglietto ${ticket.ticketCode} - Motivo: ${reason}`,
+      ipAddress: (req.ip || '').substring(0, 45),
+      userAgent: (req.get('user-agent') || '').substring(0, 500)
+    });
+    
+    // Get updated quota
+    const updatedAllocation = await siaeStorage.getCashierAllocation(allocation.id);
+    
+    res.json({
+      ...result.ticket,
+      quotaRemaining: updatedAllocation ? updatedAllocation.quotaQuantity - updatedAllocation.quotaUsed : null
+    });
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// GET /api/cashier/events/:eventId/c1-report - Generate C1 report for cashier session
+router.get("/api/cashier/events/:eventId/c1-report", requireAuth, requireCashier, async (req: Request, res: Response) => {
+  try {
+    const user = req.user as any;
+    const { eventId } = req.params;
+    
+    const allocation = await siaeStorage.getCashierAllocationByUserAndEvent(user.id, eventId);
+    if (!allocation) {
+      return res.status(404).json({ message: "Non hai allocazione per questo evento" });
+    }
+    
+    const event = await siaeStorage.getSiaeTicketedEvent(eventId);
+    if (!event) {
+      return res.status(404).json({ message: "Evento non trovato" });
+    }
+    
+    // Get today's tickets by this cashier for this event
+    const todayTickets = await siaeStorage.getTodayTicketsByUser(user.id, eventId);
+    
+    // Aggregate by ticket type
+    const byType = new Map<string, { count: number; amount: number }>();
+    for (const ticket of todayTickets) {
+      const type = ticket.ticketType || 'intero';
+      const current = byType.get(type) || { count: 0, amount: 0 };
+      current.count++;
+      current.amount += Number(ticket.ticketPrice || 0);
+      byType.set(type, current);
+    }
+    
+    const activeTickets = todayTickets.filter(t => t.status !== 'cancelled');
+    const cancelledTickets = todayTickets.filter(t => t.status === 'cancelled');
+    
+    const totalRevenue = activeTickets.reduce((sum, t) => sum + Number(t.ticketPrice || 0), 0);
+    
+    const report = {
+      eventId,
+      eventName: event.eventName,
+      eventDate: event.eventDate,
+      cashierName: `${user.firstName} ${user.lastName}`,
+      cashierEmail: user.email,
+      reportDate: new Date(),
+      allocation: {
+        quotaQuantity: allocation.quotaQuantity,
+        quotaUsed: allocation.quotaUsed,
+        quotaRemaining: allocation.quotaQuantity - allocation.quotaUsed
+      },
+      session: {
+        totalEmitted: todayTickets.length,
+        activeTickets: activeTickets.length,
+        cancelledTickets: cancelledTickets.length,
+        totalRevenue,
+        byTicketType: Object.fromEntries(byType),
+        paymentBreakdown: {
+          cash: activeTickets.filter(t => t.paymentMethod === 'cash').reduce((sum, t) => sum + Number(t.ticketPrice || 0), 0),
+          card: activeTickets.filter(t => t.paymentMethod === 'card').reduce((sum, t) => sum + Number(t.ticketPrice || 0), 0),
+          other: activeTickets.filter(t => !['cash', 'card'].includes(t.paymentMethod || '')).reduce((sum, t) => sum + Number(t.ticketPrice || 0), 0)
+        }
+      },
+      tickets: todayTickets.map(t => ({
+        id: t.id,
+        ticketCode: t.ticketCode,
+        ticketType: t.ticketType,
+        ticketPrice: t.ticketPrice,
+        status: t.status,
+        emissionDate: t.emissionDate,
+        fiscalSealCode: t.fiscalSealCode,
+        paymentMethod: t.paymentMethod
+      }))
+    };
+    
+    res.json(report);
   } catch (error: any) {
     res.status(500).json({ message: error.message });
   }

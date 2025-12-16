@@ -62,6 +62,7 @@ export const users = pgTable("users", {
   resetPasswordToken: varchar("reset_password_token"), // Token for password reset
   resetPasswordExpires: timestamp("reset_password_expires"), // Token expiration time
   isActive: boolean("is_active").notNull().default(true), // User account active status
+  defaultPrinterAgentId: varchar("default_printer_agent_id"), // For cassiere: assigned printer agent
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
