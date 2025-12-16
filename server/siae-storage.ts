@@ -251,6 +251,7 @@ export interface ISiaeStorage {
   
   getSiaeBoxOfficeSessions(channelId: string): Promise<SiaeBoxOfficeSession[]>;
   getAllSiaeBoxOfficeSessions(): Promise<SiaeBoxOfficeSession[]>;
+  getAllSiaeBoxOfficeSessionsAdmin(): Promise<any[]>;
   getActiveSiaeBoxOfficeSession(userId: string): Promise<SiaeBoxOfficeSession | undefined>;
   getSiaeBoxOfficeSession(id: string): Promise<SiaeBoxOfficeSession | undefined>;
   createSiaeBoxOfficeSession(session: InsertSiaeBoxOfficeSession): Promise<SiaeBoxOfficeSession>;
@@ -1144,6 +1145,39 @@ export class SiaeStorage implements ISiaeStorage {
   async getAllSiaeBoxOfficeSessions(): Promise<SiaeBoxOfficeSession[]> {
     return await db.select().from(siaeBoxOfficeSessions)
       .orderBy(desc(siaeBoxOfficeSessions.openedAt));
+  }
+  
+  async getAllSiaeBoxOfficeSessionsAdmin(): Promise<any[]> {
+    // Use users table as primary source for company info (more reliable than emission channels)
+    const results = await db
+      .select({
+        id: siaeBoxOfficeSessions.id,
+        userId: siaeBoxOfficeSessions.userId,
+        emissionChannelId: siaeBoxOfficeSessions.emissionChannelId,
+        locationId: siaeBoxOfficeSessions.locationId,
+        openedAt: siaeBoxOfficeSessions.openedAt,
+        closedAt: siaeBoxOfficeSessions.closedAt,
+        cashTotal: siaeBoxOfficeSessions.cashTotal,
+        cardTotal: siaeBoxOfficeSessions.cardTotal,
+        ticketsSold: siaeBoxOfficeSessions.ticketsSold,
+        ticketsCancelled: siaeBoxOfficeSessions.ticketsCancelled,
+        expectedCash: siaeBoxOfficeSessions.expectedCash,
+        actualCash: siaeBoxOfficeSessions.actualCash,
+        difference: siaeBoxOfficeSessions.difference,
+        status: siaeBoxOfficeSessions.status,
+        notes: siaeBoxOfficeSessions.notes,
+        createdAt: siaeBoxOfficeSessions.createdAt,
+        updatedAt: siaeBoxOfficeSessions.updatedAt,
+        companyName: sql<string>`COALESCE(${companies.name}, 'Organizzatore Sconosciuto')`,
+        companyId: sql<string>`COALESCE(${companies.id}, ${users.companyId}, 'unknown')`,
+        userName: sql<string>`COALESCE(NULLIF(TRIM(${users.firstName} || ' ' || ${users.lastName}), ''), ${users.email}, 'Operatore')`,
+      })
+      .from(siaeBoxOfficeSessions)
+      .leftJoin(users, eq(siaeBoxOfficeSessions.userId, users.id))
+      .leftJoin(companies, eq(users.companyId, companies.id))
+      .orderBy(sql`COALESCE(${companies.name}, 'ZZZ')`, desc(siaeBoxOfficeSessions.openedAt));
+    
+    return results;
   }
   
   async getActiveSiaeBoxOfficeSession(userId: string): Promise<SiaeBoxOfficeSession | undefined> {

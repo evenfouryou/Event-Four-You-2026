@@ -1229,6 +1229,15 @@ router.get("/api/siae/emission-channels/:channelId/sessions", requireAuth, async
   }
 });
 
+router.get("/api/siae/admin/box-office/sessions", requireAuth, requireSuperAdmin, async (req: Request, res: Response) => {
+  try {
+    const sessions = await siaeStorage.getAllSiaeBoxOfficeSessionsAdmin();
+    res.json(sessions);
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
 router.get("/api/siae/box-office/sessions", requireAuth, async (req: Request, res: Response) => {
   try {
     const sessions = await siaeStorage.getAllSiaeBoxOfficeSessions();
