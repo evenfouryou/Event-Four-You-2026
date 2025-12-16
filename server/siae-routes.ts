@@ -2660,11 +2660,15 @@ router.patch("/api/cashiers/allocations/:id", requireAuth, requireGestore, async
 // POST /api/cashiers/events/:eventId/tickets - Emit ticket from cashier
 // Uses atomic transaction to prevent race conditions on quota
 // REQUIRES: Bridge SIAE connected for fiscal seal generation
+// Supports quantity parameter for emitting multiple anonymous tickets at once
 router.post("/api/cashiers/events/:eventId/tickets", requireAuth, async (req: Request, res: Response) => {
   try {
     const user = req.user as any;
     const { eventId } = req.params;
-    const { sectorId, ticketType, price, participantFirstName, participantLastName, participantPhone, participantEmail, paymentMethod, skipFiscalSeal } = req.body;
+    const { sectorId, ticketType, price, participantFirstName, participantLastName, participantPhone, participantEmail, paymentMethod, skipFiscalSeal, quantity = 1 } = req.body;
+    
+    // Validate quantity (max 50 at once for safety)
+    const ticketQuantity = Math.min(Math.max(1, parseInt(quantity) || 1), 50);
     
     // Check if bridge is connected (REQUIRED for fiscal seal emission)
     // Super admin can skip fiscal seal for testing purposes
@@ -2722,11 +2726,20 @@ router.post("/api/cashiers/events/:eventId/tickets", requireAuth, async (req: Re
       return res.status(404).json({ message: "Settore non trovato" });
     }
     
-    // Check sector availability
-    if (sector.availableSeats <= 0) {
+    // Check sector availability for requested quantity
+    if (sector.availableSeats < ticketQuantity) {
       return res.status(400).json({ 
-        message: "Posti esauriti per questo settore",
+        message: `Posti insufficienti: disponibili ${sector.availableSeats}, richiesti ${ticketQuantity}`,
         errorCode: "NO_SEATS_AVAILABLE"
+      });
+    }
+    
+    // Check quota for requested quantity
+    const quotaRemaining = allocation.quotaQuantity - allocation.quotaUsed;
+    if (quotaRemaining < ticketQuantity) {
+      return res.status(400).json({ 
+        message: `Quota insufficiente: disponibili ${quotaRemaining}, richiesti ${ticketQuantity}`,
+        errorCode: "QUOTA_EXCEEDED"
       });
     }
     
@@ -2740,41 +2753,7 @@ router.post("/api/cashiers/events/:eventId/tickets", requireAuth, async (req: Re
     const ticketPrice = price || Number(sector.price) || 0;
     const priceInCents = Math.round(ticketPrice * 100);
     
-    // Request fiscal seal from bridge BEFORE creating ticket (only if not skipped)
-    // This is a HARD STOP - no DB operations until seal is confirmed
-    let fiscalSealData: any = null;
-    if (!canSkipSeal) {
-      try {
-        console.log(`[CashierTicket] Requesting fiscal seal for €${ticketPrice}...`);
-        fiscalSealData = await requestFiscalSeal(priceInCents);
-        console.log(`[CashierTicket] Fiscal seal obtained: counter=${fiscalSealData.counter}, sealNumber=${fiscalSealData.sealNumber}`);
-      } catch (sealError: any) {
-        console.error(`[CashierTicket] Failed to obtain fiscal seal:`, sealError.message);
-        
-        // Audit log per tentativo fallito (prima di restituire errore)
-        try {
-          await siaeStorage.createAuditLog({
-            companyId: user.companyId,
-            userId: user.id,
-            action: 'ticket_emission_failed',
-            entityType: 'ticket',
-            entityId: eventId,
-            description: `Tentativo emissione biglietto fallito - Sigillo fiscale non ottenuto: ${sealError.message}`,
-            ipAddress: (req.ip || '').substring(0, 45),
-            userAgent: (req.get('user-agent') || '').substring(0, 500)
-          });
-        } catch (auditError: any) {
-          console.warn(`[CashierTicket] Failed to create audit log for failed emission:`, auditError.message);
-        }
-        
-        return res.status(503).json({ 
-          message: `Impossibile ottenere sigillo fiscale: ${sealError.message}`,
-          errorCode: "SEAL_GENERATION_FAILED"
-        });
-      }
-    }
-    
-    // Get or create customer if participant data provided
+    // Get or create customer if participant data provided (only for nominative tickets)
     let customerId: string | null = null;
     if (participantPhone || participantEmail) {
       let customer = participantPhone 
@@ -2803,75 +2782,151 @@ router.post("/api/cashiers/events/:eventId/tickets", requireAuth, async (req: Re
       }
     }
     
-    // Generate ticket code including fiscal seal info if available
-    const sealSuffix = fiscalSealData ? `-${fiscalSealData.counter}` : '';
-    const ticketCode = `${event.eventCode || 'TK'}-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}${sealSuffix}`;
+    // For multiple tickets, emit them in a loop
+    const emittedTickets: any[] = [];
+    let currentTicketsSold = event.ticketsSold || 0;
+    let currentTotalRevenue = Number(event.totalRevenue) || 0;
+    let currentAvailableSeats = sector.availableSeats;
     
-    const result = await siaeStorage.emitTicketWithAtomicQuota({
-      allocationId: allocation.id,
-      eventId,
-      sectorId: finalSectorId,
-      ticketCode,
-      ticketType: ticketType || 'intero',
-      ticketPrice,
-      customerId,
-      issuedByUserId: user.id,
-      participantFirstName: participantFirstName || null,
-      participantLastName: participantLastName || null,
-      isComplimentary: ticketType === 'omaggio',
-      paymentMethod: paymentMethod || 'cash',
-      currentTicketsSold: event.ticketsSold || 0,
-      currentTotalRevenue: Number(event.totalRevenue) || 0,
-      currentAvailableSeats: sector.availableSeats
-    });
-    
-    if (!result.success) {
-      return res.status(400).json({ 
-        message: result.error || "Quota biglietti esaurita. Contatta il gestore per aumentare la quota.",
-        errorCode: "QUOTA_EXCEEDED"
+    for (let i = 0; i < ticketQuantity; i++) {
+      // Request fiscal seal from bridge BEFORE creating ticket (only if not skipped)
+      let fiscalSealData: any = null;
+      if (!canSkipSeal) {
+        try {
+          console.log(`[CashierTicket] Requesting fiscal seal ${i + 1}/${ticketQuantity} for €${ticketPrice}...`);
+          fiscalSealData = await requestFiscalSeal(priceInCents);
+          console.log(`[CashierTicket] Fiscal seal obtained: counter=${fiscalSealData.counter}, sealNumber=${fiscalSealData.sealNumber}`);
+        } catch (sealError: any) {
+          console.error(`[CashierTicket] Failed to obtain fiscal seal:`, sealError.message);
+          
+          // If we already emitted some tickets, return partial success
+          if (emittedTickets.length > 0) {
+            return res.status(207).json({
+              message: `Emessi ${emittedTickets.length}/${ticketQuantity} biglietti. Errore sigillo fiscale al biglietto ${i + 1}: ${sealError.message}`,
+              emittedCount: emittedTickets.length,
+              requestedCount: ticketQuantity,
+              tickets: emittedTickets,
+              errorCode: "PARTIAL_EMISSION"
+            });
+          }
+          
+          // Audit log per tentativo fallito (prima di restituire errore)
+          try {
+            await siaeStorage.createAuditLog({
+              companyId: user.companyId,
+              userId: user.id,
+              action: 'ticket_emission_failed',
+              entityType: 'ticket',
+              entityId: eventId,
+              description: `Tentativo emissione biglietto fallito - Sigillo fiscale non ottenuto: ${sealError.message}`,
+              ipAddress: (req.ip || '').substring(0, 45),
+              userAgent: (req.get('user-agent') || '').substring(0, 500)
+            });
+          } catch (auditError: any) {
+            console.warn(`[CashierTicket] Failed to create audit log for failed emission:`, auditError.message);
+          }
+          
+          return res.status(503).json({ 
+            message: `Impossibile ottenere sigillo fiscale: ${sealError.message}`,
+            errorCode: "SEAL_GENERATION_FAILED"
+          });
+        }
+      }
+      
+      // Generate unique ticket code for each ticket
+      const sealSuffix = fiscalSealData ? `-${fiscalSealData.counter}` : '';
+      const ticketCode = `${event.eventCode || 'TK'}-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}${sealSuffix}`;
+      
+      const result = await siaeStorage.emitTicketWithAtomicQuota({
+        allocationId: allocation.id,
+        eventId,
+        sectorId: finalSectorId,
+        ticketCode,
+        ticketType: ticketType || 'intero',
+        ticketPrice,
+        customerId: ticketQuantity === 1 ? customerId : null, // Only link customer for single ticket
+        issuedByUserId: user.id,
+        participantFirstName: ticketQuantity === 1 ? (participantFirstName || null) : null,
+        participantLastName: ticketQuantity === 1 ? (participantLastName || null) : null,
+        isComplimentary: ticketType === 'omaggio',
+        paymentMethod: paymentMethod || 'cash',
+        currentTicketsSold,
+        currentTotalRevenue,
+        currentAvailableSeats
+      });
+      
+      if (!result.success) {
+        // If we already emitted some tickets, return partial success
+        if (emittedTickets.length > 0) {
+          return res.status(207).json({
+            message: `Emessi ${emittedTickets.length}/${ticketQuantity} biglietti. Quota esaurita.`,
+            emittedCount: emittedTickets.length,
+            requestedCount: ticketQuantity,
+            tickets: emittedTickets,
+            errorCode: "PARTIAL_EMISSION"
+          });
+        }
+        return res.status(400).json({ 
+          message: result.error || "Quota biglietti esaurita. Contatta il gestore per aumentare la quota.",
+          errorCode: "QUOTA_EXCEEDED"
+        });
+      }
+      
+      // Update counters for next iteration
+      currentTicketsSold++;
+      currentTotalRevenue += ticketPrice;
+      currentAvailableSeats--;
+      
+      // Create ticket audit entry (outside transaction, not critical)
+      await siaeStorage.createTicketAudit({
+        companyId: user.companyId,
+        ticketId: result.ticket!.id,
+        operationType: 'emission',
+        performedBy: user.id,
+        reason: null,
+        metadata: { 
+          paymentMethod, 
+          ticketType, 
+          price: ticketPrice,
+          batchIndex: ticketQuantity > 1 ? i + 1 : undefined,
+          batchTotal: ticketQuantity > 1 ? ticketQuantity : undefined,
+          fiscalSeal: fiscalSealData ? {
+            sealNumber: fiscalSealData.sealNumber,
+            sealCode: fiscalSealData.sealCode,
+            serialNumber: fiscalSealData.serialNumber,
+            counter: fiscalSealData.counter,
+            mac: fiscalSealData.mac,
+            dateTime: fiscalSealData.dateTime
+          } : null
+        }
+      });
+      
+      // General audit log
+      const sealInfo = fiscalSealData ? ` (Sigillo: ${fiscalSealData.counter})` : '';
+      const batchInfo = ticketQuantity > 1 ? ` [${i + 1}/${ticketQuantity}]` : '';
+      await siaeStorage.createAuditLog({
+        companyId: user.companyId,
+        userId: user.id,
+        action: 'ticket_emitted',
+        entityType: 'ticket',
+        entityId: result.ticket!.id,
+        description: `Emesso biglietto ${ticketCode} - €${ticketPrice}${sealInfo}${batchInfo}`,
+        ipAddress: (req.ip || '').substring(0, 45),
+        userAgent: (req.get('user-agent') || '').substring(0, 500)
+      });
+      
+      emittedTickets.push({
+        ...result.ticket,
+        fiscalSeal: fiscalSealData || null
       });
     }
     
-    // Create ticket audit entry (outside transaction, not critical)
-    await siaeStorage.createTicketAudit({
-      companyId: user.companyId,
-      ticketId: result.ticket!.id,
-      operationType: 'emission',
-      performedBy: user.id,
-      reason: null,
-      metadata: { 
-        paymentMethod, 
-        ticketType, 
-        price: ticketPrice,
-        fiscalSeal: fiscalSealData ? {
-          sealNumber: fiscalSealData.sealNumber,
-          sealCode: fiscalSealData.sealCode,
-          serialNumber: fiscalSealData.serialNumber,
-          counter: fiscalSealData.counter,
-          mac: fiscalSealData.mac,
-          dateTime: fiscalSealData.dateTime
-        } : null
-      }
-    });
-    
-    // General audit log
-    const sealInfo = fiscalSealData ? ` (Sigillo: ${fiscalSealData.counter})` : '';
-    await siaeStorage.createAuditLog({
-      companyId: user.companyId,
-      userId: user.id,
-      action: 'ticket_emitted',
-      entityType: 'ticket',
-      entityId: result.ticket!.id,
-      description: `Emesso biglietto ${ticketCode} - €${ticketPrice}${sealInfo}`,
-      ipAddress: (req.ip || '').substring(0, 45),
-      userAgent: (req.get('user-agent') || '').substring(0, 500)
-    });
-    
-    // Return ticket with fiscal seal data
-    res.status(201).json({
-      ...result.ticket,
-      fiscalSeal: fiscalSealData || null
-    });
+    // Return results - single ticket or array for multiple
+    if (ticketQuantity === 1) {
+      res.status(201).json(emittedTickets[0]);
+    } else {
+      res.status(201).json(emittedTickets);
+    }
   } catch (error: any) {
     res.status(500).json({ message: error.message });
   }

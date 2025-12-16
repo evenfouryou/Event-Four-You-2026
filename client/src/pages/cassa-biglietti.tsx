@@ -37,6 +37,7 @@ import {
 } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -84,6 +85,8 @@ export default function CassaBigliettiPage() {
   const [ticketToCancel, setTicketToCancel] = useState<SiaeTicket | null>(null);
   const [cancelReason, setCancelReason] = useState<string>("");
   const [isC1DialogOpen, setIsC1DialogOpen] = useState(false);
+  const [isNominative, setIsNominative] = useState<boolean>(false);
+  const [ticketQuantity, setTicketQuantity] = useState<number>(1);
 
   const companyId = user?.companyId;
   const isGestore = user?.role === "gestore" || user?.role === "admin" || user?.role === "super_admin";
@@ -132,16 +135,21 @@ export default function CassaBigliettiPage() {
       const response = await apiRequest("POST", `/api/cashiers/events/${selectedEventId}/tickets`, data);
       return response.json();
     },
-    onSuccess: (ticket) => {
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ["/api/cashiers/events", selectedEventId] });
       setParticipantFirstName("");
       setParticipantLastName("");
       setParticipantPhone("");
       setParticipantEmail("");
       setCustomPrice("");
+      setTicketQuantity(1);
+      
+      const emittedCount = Array.isArray(result) ? result.length : 1;
       toast({
-        title: "Biglietto Emesso",
-        description: `Biglietto ${ticket.ticketCode} emesso con successo.`,
+        title: emittedCount > 1 ? `${emittedCount} Biglietti Emessi` : "Biglietto Emesso",
+        description: emittedCount > 1 
+          ? `${emittedCount} biglietti emessi con successo.`
+          : `Biglietto ${result.ticketCode || ''} emesso con successo.`,
       });
     },
     onError: (error: any) => {
@@ -247,10 +255,21 @@ export default function CassaBigliettiPage() {
       return;
     }
     
-    if (quotaRemaining <= 0) {
+    const qty = isNominative ? 1 : ticketQuantity;
+    
+    if (quotaRemaining < qty) {
       toast({
-        title: "Quota Esaurita",
-        description: "La tua quota biglietti è esaurita. Contatta il gestore per aumentarla.",
+        title: "Quota Insufficiente",
+        description: `Hai solo ${quotaRemaining} biglietti disponibili, ma stai cercando di emetterne ${qty}.`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (isNominative && (!participantFirstName.trim() || !participantLastName.trim())) {
+      toast({
+        title: "Dati Mancanti",
+        description: "Nome e cognome sono obbligatori per biglietti nominativi.",
         variant: "destructive",
       });
       return;
@@ -263,11 +282,12 @@ export default function CassaBigliettiPage() {
       sectorId: selectedSectorId || undefined,
       ticketType,
       price: ticketType === "omaggio" ? 0 : price,
-      participantFirstName: participantFirstName || undefined,
-      participantLastName: participantLastName || undefined,
-      participantPhone: participantPhone || undefined,
-      participantEmail: participantEmail || undefined,
+      participantFirstName: isNominative ? participantFirstName : undefined,
+      participantLastName: isNominative ? participantLastName : undefined,
+      participantPhone: isNominative ? participantPhone : undefined,
+      participantEmail: isNominative ? participantEmail : undefined,
       paymentMethod,
+      quantity: qty,
     });
   };
 
@@ -496,37 +516,104 @@ export default function CassaBigliettiPage() {
                   </div>
                 )}
 
-                <div className="border-t pt-4 mt-4">
-                  <p className="text-xs text-muted-foreground mb-3">Dati Partecipante (opzionali)</p>
-                  <div className="grid grid-cols-2 gap-2">
-                    <Input
-                      placeholder="Nome"
-                      value={participantFirstName}
-                      onChange={(e) => setParticipantFirstName(e.target.value)}
-                      data-testid="input-first-name"
-                    />
-                    <Input
-                      placeholder="Cognome"
-                      value={participantLastName}
-                      onChange={(e) => setParticipantLastName(e.target.value)}
-                      data-testid="input-last-name"
+                <div className="border-t pt-4 mt-4 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex flex-col">
+                      <Label className="flex items-center gap-2">
+                        <Users className="w-4 h-4" />
+                        Biglietto Nominativo
+                      </Label>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {isNominative ? "Con dati partecipante" : "Senza dati (emissione rapida)"}
+                      </p>
+                    </div>
+                    <Switch 
+                      checked={isNominative} 
+                      onCheckedChange={(checked) => {
+                        setIsNominative(checked);
+                        if (!checked) {
+                          setParticipantFirstName("");
+                          setParticipantLastName("");
+                          setParticipantPhone("");
+                          setParticipantEmail("");
+                        }
+                      }}
+                      data-testid="switch-nominative"
                     />
                   </div>
-                  <Input
-                    placeholder="Telefono"
-                    value={participantPhone}
-                    onChange={(e) => setParticipantPhone(e.target.value)}
-                    className="mt-2"
-                    data-testid="input-phone"
-                  />
-                  <Input
-                    placeholder="Email"
-                    type="email"
-                    value={participantEmail}
-                    onChange={(e) => setParticipantEmail(e.target.value)}
-                    className="mt-2"
-                    data-testid="input-email"
-                  />
+
+                  {!isNominative && (
+                    <div className="space-y-2">
+                      <Label>Quantità Biglietti</Label>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          onClick={() => setTicketQuantity(Math.max(1, ticketQuantity - 1))}
+                          disabled={ticketQuantity <= 1}
+                          data-testid="button-quantity-minus"
+                        >
+                          -
+                        </Button>
+                        <Input
+                          type="number"
+                          min="1"
+                          max={Math.min(quotaRemaining, 50)}
+                          value={ticketQuantity}
+                          onChange={(e) => setTicketQuantity(Math.max(1, Math.min(50, parseInt(e.target.value) || 1)))}
+                          className="w-20 text-center"
+                          data-testid="input-quantity"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          onClick={() => setTicketQuantity(Math.min(quotaRemaining, 50, ticketQuantity + 1))}
+                          disabled={ticketQuantity >= Math.min(quotaRemaining, 50)}
+                          data-testid="button-quantity-plus"
+                        >
+                          +
+                        </Button>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Max {Math.min(quotaRemaining, 50)} biglietti per emissione
+                      </p>
+                    </div>
+                  )}
+
+                  {isNominative && (
+                    <div className="space-y-2">
+                      <p className="text-xs text-muted-foreground mb-2">Dati Partecipante</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        <Input
+                          placeholder="Nome *"
+                          value={participantFirstName}
+                          onChange={(e) => setParticipantFirstName(e.target.value)}
+                          data-testid="input-first-name"
+                        />
+                        <Input
+                          placeholder="Cognome *"
+                          value={participantLastName}
+                          onChange={(e) => setParticipantLastName(e.target.value)}
+                          data-testid="input-last-name"
+                        />
+                      </div>
+                      <Input
+                        placeholder="Telefono"
+                        value={participantPhone}
+                        onChange={(e) => setParticipantPhone(e.target.value)}
+                        data-testid="input-phone"
+                      />
+                      <Input
+                        placeholder="Email"
+                        type="email"
+                        value={participantEmail}
+                        onChange={(e) => setParticipantEmail(e.target.value)}
+                        data-testid="input-email"
+                      />
+                    </div>
+                  )}
                 </div>
 
                 <Button
@@ -544,7 +631,12 @@ export default function CassaBigliettiPage() {
                   ) : (
                     <>
                       <Ticket className="w-4 h-4 mr-2" />
-                      Emetti Biglietto
+                      {isNominative 
+                        ? "Emetti Biglietto Nominativo" 
+                        : ticketQuantity > 1 
+                          ? `Emetti ${ticketQuantity} Biglietti`
+                          : "Emetti Biglietto"
+                      }
                     </>
                   )}
                 </Button>
