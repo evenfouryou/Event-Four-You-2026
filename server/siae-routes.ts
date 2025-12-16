@@ -2674,8 +2674,14 @@ router.post("/api/cashiers/events/:eventId/tickets", requireAuth, async (req: Re
     // Super admin can skip fiscal seal for testing purposes
     const canSkipSeal = user.role === 'super_admin' && skipFiscalSeal === true;
     
+    // Debug logging
+    const bridgeStatus = getCachedBridgeStatus();
+    const bridgeConnected = isBridgeConnected();
+    console.log(`[CashierTicket] Bridge check: connected=${bridgeConnected}, status=`, JSON.stringify(bridgeStatus));
+    
     if (!canSkipSeal) {
-      if (!isBridgeConnected()) {
+      if (!bridgeConnected) {
+        console.log(`[CashierTicket] Rejecting: bridge not connected`);
         return res.status(503).json({ 
           message: "Bridge SIAE non connesso. Avviare l'applicazione desktop Event4U per emettere biglietti con sigillo fiscale.",
           errorCode: "BRIDGE_NOT_CONNECTED"
@@ -2684,6 +2690,7 @@ router.post("/api/cashiers/events/:eventId/tickets", requireAuth, async (req: Re
       
       // Check if card is ready for seal emission
       const cardReady = isCardReadyForSeals();
+      console.log(`[CashierTicket] Card check: ready=${cardReady.ready}, error=${cardReady.error}`);
       if (!cardReady.ready) {
         return res.status(503).json({ 
           message: cardReady.error || "Smart Card SIAE non pronta. Verificare che la carta sia inserita nel lettore.",
