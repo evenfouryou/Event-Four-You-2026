@@ -2846,18 +2846,30 @@ router.post("/api/cashiers/events/:eventId/tickets", requireAuth, async (req: Re
       const sealSuffix = fiscalSealData ? `-${fiscalSealData.counter}` : '';
       const ticketCode = `${event.eventCode || 'TK'}-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}${sealSuffix}`;
       
+      // Map ticketType to SIAE ticketTypeCode
+      const finalTicketType = ticketType || 'intero';
+      const ticketTypeCodeMap: Record<string, string> = {
+        'intero': 'INT',
+        'ridotto': 'RID',
+        'omaggio': 'OMG',
+        'abbonamento': 'ABB'
+      };
+      const ticketTypeCode = ticketTypeCodeMap[finalTicketType] || 'INT';
+      
       const result = await siaeStorage.emitTicketWithAtomicQuota({
         allocationId: allocation.id,
         eventId,
         sectorId: finalSectorId,
+        sectorCode: sector.sectorCode,
         ticketCode,
-        ticketType: ticketType || 'intero',
+        ticketType: finalTicketType,
+        ticketTypeCode,
         ticketPrice,
         customerId: ticketQuantity === 1 ? customerId : null, // Only link customer for single ticket
         issuedByUserId: user.id,
         participantFirstName: ticketQuantity === 1 ? (participantFirstName || null) : null,
         participantLastName: ticketQuantity === 1 ? (participantLastName || null) : null,
-        isComplimentary: ticketType === 'omaggio',
+        isComplimentary: finalTicketType === 'omaggio',
         paymentMethod: paymentMethod || 'cash',
         currentTicketsSold,
         currentTotalRevenue,

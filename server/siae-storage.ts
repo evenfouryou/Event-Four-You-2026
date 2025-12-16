@@ -1810,8 +1810,10 @@ export class SiaeStorage implements ISiaeStorage {
     allocationId: string;
     eventId: string;
     sectorId: string;
+    sectorCode: string;
     ticketCode: string;
     ticketType: string;
+    ticketTypeCode: string;
     ticketPrice: number;
     customerId: string | null;
     issuedByUserId: string;
@@ -1857,10 +1859,13 @@ export class SiaeStorage implements ISiaeStorage {
           .values({
             ticketedEventId: params.eventId,
             sectorId: params.sectorId,
+            sectorCode: params.sectorCode,
             ticketCode: params.ticketCode,
             progressiveNumber,
+            ticketTypeCode: params.ticketTypeCode,
             ticketType: params.ticketType,
             ticketPrice: params.ticketPrice.toString(),
+            grossAmount: params.ticketPrice.toString(),
             emissionDate: new Date(),
             status: 'active',
             issuedByUserId: params.issuedByUserId,
