@@ -1,10 +1,8 @@
-import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
 import { useAuth } from "@/hooks/useAuth";
 import { Link } from "wouter";
-import type { SiaeTicketedEvent, SiaeCashierAllocation, SiaeEventSector } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -14,23 +12,31 @@ import {
   Calendar,
   Ticket,
   Store,
-  MapPin,
   Clock,
   ChevronRight,
   AlertCircle,
+  MapPin,
 } from "lucide-react";
 
-interface MyEventAllocation {
-  event: SiaeTicketedEvent;
-  allocations: (SiaeCashierAllocation & { sector?: SiaeEventSector })[];
-  totalQuota: number;
-  usedQuota: number;
+interface CashierEventAllocation {
+  allocationId: string;
+  eventId: string;
+  eventName: string;
+  eventDate: string;
+  eventTime: string;
+  venueName: string;
+  sectorId: string | null;
+  sectorName: string;
+  quotaQuantity: number;
+  quotaUsed: number;
+  quotaRemaining: number;
+  isActive: boolean;
 }
 
 export default function CashierDashboardPage() {
   const { user } = useAuth();
 
-  const { data: myEvents, isLoading } = useQuery<MyEventAllocation[]>({
+  const { data: myEvents, isLoading } = useQuery<CashierEventAllocation[]>({
     queryKey: ["/api/cashier/my-events"],
     enabled: !!user?.id,
   });
@@ -38,21 +44,6 @@ export default function CashierDashboardPage() {
   const getQuotaPercentage = (used: number, total: number) => {
     if (total === 0) return 0;
     return Math.round((used / total) * 100);
-  };
-
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "active":
-        return <Badge className="bg-emerald-500/20 text-emerald-400">Attivo</Badge>;
-      case "draft":
-        return <Badge variant="secondary">Bozza</Badge>;
-      case "completed":
-        return <Badge variant="outline">Completato</Badge>;
-      case "cancelled":
-        return <Badge className="bg-red-500/20 text-red-400">Annullato</Badge>;
-      default:
-        return <Badge variant="outline">{status}</Badge>;
-    }
   };
 
   return (
@@ -100,34 +91,39 @@ export default function CashierDashboardPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {myEvents.map((eventData) => {
-            const percentage = getQuotaPercentage(eventData.usedQuota, eventData.totalQuota);
-            const remaining = eventData.totalQuota - eventData.usedQuota;
-            const isEventActive = eventData.event.status === "active" || eventData.event.status === "draft";
+            const percentage = getQuotaPercentage(eventData.quotaUsed, eventData.quotaQuantity);
+            const remaining = eventData.quotaRemaining;
 
             return (
               <Card 
-                key={eventData.event.id} 
+                key={eventData.allocationId} 
                 className="glass-card hover-elevate transition-all"
-                data-testid={`card-event-${eventData.event.id}`}
+                data-testid={`card-event-${eventData.eventId}`}
               >
                 <CardHeader className="pb-2">
                   <div className="flex items-start justify-between gap-2">
                     <CardTitle className="text-lg line-clamp-2">
-                      {eventData.event.eventName}
+                      {eventData.eventName}
                     </CardTitle>
-                    {getStatusBadge(eventData.event.status)}
+                    <Badge className="bg-emerald-500/20 text-emerald-400">Attivo</Badge>
                   </div>
                   <CardDescription className="flex items-center gap-2">
                     <Calendar className="w-3 h-3" />
-                    {format(new Date(eventData.event.eventDate), "EEEE d MMMM yyyy", { locale: it })}
+                    {eventData.eventDate ? format(new Date(eventData.eventDate), "EEEE d MMMM yyyy", { locale: it }) : "Data non specificata"}
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <Clock className="w-4 h-4" />
-                    {eventData.event.eventTime || "Orario non specificato"}
-                    {eventData.event.endTime && ` - ${eventData.event.endTime}`}
+                    {eventData.eventTime || "Orario non specificato"}
                   </div>
+                  
+                  {eventData.venueName && (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <MapPin className="w-4 h-4" />
+                      {eventData.venueName}
+                    </div>
+                  )}
 
                   <div className="space-y-2">
                     <div className="flex items-center justify-between text-sm">
@@ -135,8 +131,8 @@ export default function CashierDashboardPage() {
                         <Ticket className="w-4 h-4 text-muted-foreground" />
                         Quota Biglietti
                       </span>
-                      <span className={`font-medium ${remaining <= 5 ? "text-yellow-500" : remaining <= 0 ? "text-red-500" : "text-emerald-400"}`}>
-                        {eventData.usedQuota} / {eventData.totalQuota}
+                      <span className={`font-medium ${remaining <= 5 && remaining > 0 ? "text-yellow-500" : remaining <= 0 ? "text-red-500" : "text-emerald-400"}`}>
+                        {eventData.quotaUsed} / {eventData.quotaQuantity}
                       </span>
                     </div>
                     <Progress 
@@ -148,21 +144,12 @@ export default function CashierDashboardPage() {
                     </div>
                   </div>
 
-                  {eventData.allocations.length > 0 && (
+                  {eventData.sectorName && (
                     <div className="space-y-1">
-                      <p className="text-xs text-muted-foreground">Settori assegnati:</p>
-                      <div className="flex flex-wrap gap-1">
-                        {eventData.allocations.slice(0, 3).map((alloc) => (
-                          <Badge key={alloc.id} variant="outline" className="text-xs">
-                            {alloc.sector?.name || "Settore"}
-                          </Badge>
-                        ))}
-                        {eventData.allocations.length > 3 && (
-                          <Badge variant="outline" className="text-xs">
-                            +{eventData.allocations.length - 3}
-                          </Badge>
-                        )}
-                      </div>
+                      <p className="text-xs text-muted-foreground">Settore assegnato:</p>
+                      <Badge variant="outline" className="text-xs">
+                        {eventData.sectorName}
+                      </Badge>
                     </div>
                   )}
 
@@ -173,19 +160,17 @@ export default function CashierDashboardPage() {
                     </div>
                   )}
 
-                  {isEventActive && (
-                    <Link href="/cassa-biglietti">
-                      <Button 
-                        className="w-full" 
-                        disabled={remaining <= 0}
-                        data-testid={`button-emit-tickets-${eventData.event.id}`}
-                      >
-                        <Ticket className="w-4 h-4 mr-2" />
-                        Emetti Biglietti
-                        <ChevronRight className="w-4 h-4 ml-auto" />
-                      </Button>
-                    </Link>
-                  )}
+                  <Link href={`/cassa-biglietti?eventId=${eventData.eventId}`}>
+                    <Button 
+                      className="w-full" 
+                      disabled={remaining <= 0}
+                      data-testid={`button-emit-tickets-${eventData.eventId}`}
+                    >
+                      <Ticket className="w-4 h-4 mr-2" />
+                      Emetti Biglietti
+                      <ChevronRight className="w-4 h-4 ml-auto" />
+                    </Button>
+                  </Link>
                 </CardContent>
               </Card>
             );

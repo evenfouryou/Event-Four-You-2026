@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { Home, Calendar, Wine, Warehouse, User, Plus, Package, BarChart3 } from "lucide-react";
+import { Home, Calendar, Wine, Warehouse, User, Plus, Package, BarChart3, Ticket, Store } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
@@ -20,6 +20,7 @@ export function MobileBottomNav() {
   const isAdmin = user?.role === 'gestore';
   const isWarehouse = user?.role === 'warehouse';
   const isBartender = user?.role === 'bartender';
+  const isCassiere = user?.role === 'cassiere';
 
   // Fetch user features for navigation filtering
   const { data: userFeatures } = useQuery<UserFeatures>({
@@ -67,6 +68,13 @@ export function MobileBottomNav() {
       { icon: Calendar, label: "Attivi", href: "/beverage" },
       { icon: Plus, label: "Servizio", href: "/beverage", isFab: true },
       { icon: Wine, label: "Prodotti", href: "/products" },
+      { icon: User, label: "Profilo", href: "/settings" },
+    ];
+  } else if (isCassiere) {
+    // Menu specifico per cassieri SIAE
+    navItems = [
+      { icon: Store, label: "I Miei Eventi", href: "/cashier/dashboard" },
+      { icon: Ticket, label: "Emetti", href: "/cassa-biglietti", isFab: true },
       { icon: User, label: "Profilo", href: "/settings" },
     ];
   } else {

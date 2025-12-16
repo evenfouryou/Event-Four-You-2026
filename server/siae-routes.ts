@@ -2424,7 +2424,12 @@ router.get("/api/cashiers/events/:eventId/allocation", requireAuth, async (req: 
     const user = req.user as any;
     const { eventId } = req.params;
     
-    const allocation = await siaeStorage.getCashierAllocationByUserAndEvent(user.id, eventId);
+    // Usa helper per supportare sia nuove che vecchie sessioni cassiere
+    const cashierId = getSiaeCashierId(user);
+    if (!cashierId) {
+      return res.status(400).json({ message: "ID cassiere non trovato nella sessione" });
+    }
+    const allocation = await siaeStorage.getCashierAllocationByCashierAndEvent(cashierId, eventId);
     
     if (!allocation) {
       return res.status(404).json({ message: "Nessuna allocazione trovata per questo evento" });
@@ -2453,14 +2458,16 @@ router.get("/api/cashiers/events/:eventId/allocations", requireAuth, requireGest
 router.post("/api/cashiers/allocations", requireAuth, requireGestore, async (req: Request, res: Response) => {
   try {
     const user = req.user as any;
-    const { eventId, userId, sectorId, quotaQuantity } = req.body;
+    // Accetta sia cashierId (nuovo) che userId (legacy) per compatibilità
+    const { eventId, cashierId, userId, sectorId, quotaQuantity } = req.body;
+    const finalCashierId = cashierId || userId;
     
-    if (!eventId || !userId || quotaQuantity === undefined) {
-      return res.status(400).json({ message: "Dati mancanti: eventId, userId e quotaQuantity sono richiesti" });
+    if (!eventId || !finalCashierId || quotaQuantity === undefined) {
+      return res.status(400).json({ message: "Dati mancanti: eventId, cashierId e quotaQuantity sono richiesti" });
     }
     
     // Check if allocation already exists
-    const existing = await siaeStorage.getCashierAllocationByUserAndEvent(userId, eventId);
+    const existing = await siaeStorage.getCashierAllocationByCashierAndEvent(finalCashierId, eventId);
     if (existing) {
       return res.status(409).json({ message: "Esiste già un'allocazione per questo cassiere per l'evento" });
     }
@@ -2468,7 +2475,7 @@ router.post("/api/cashiers/allocations", requireAuth, requireGestore, async (req
     const allocation = await siaeStorage.createCashierAllocation({
       companyId: user.companyId,
       eventId,
-      userId,
+      cashierId: finalCashierId,
       sectorId: sectorId || null,
       quotaQuantity: Number(quotaQuantity),
       quotaUsed: 0,
@@ -2564,7 +2571,8 @@ router.post("/api/cashiers/events/:eventId/tickets", requireAuth, async (req: Re
     // Check for active box office session (cassiere role check)
     const isCashierRole = user.role === 'cassiere';
     if (isCashierRole) {
-      const activeSession = await siaeStorage.getActiveSiaeBoxOfficeSession(user.id);
+      const cashierIdForSession = getSiaeCashierId(user);
+      const activeSession = cashierIdForSession ? await siaeStorage.getActiveSiaeBoxOfficeSession(cashierIdForSession) : null;
       if (!activeSession) {
         return res.status(403).json({ 
           message: "Nessuna sessione cassa attiva. Apri una sessione prima di emettere biglietti.",
@@ -2573,8 +2581,9 @@ router.post("/api/cashiers/events/:eventId/tickets", requireAuth, async (req: Re
       }
     }
     
-    // Get cashier allocation
-    const allocation = await siaeStorage.getCashierAllocationByUserAndEvent(user.id, eventId);
+    // Usa helper per supportare sia nuove che vecchie sessioni cassiere
+    const cashierId = getSiaeCashierId(user);
+    const allocation = cashierId ? await siaeStorage.getCashierAllocationByCashierAndEvent(cashierId, eventId) : null;
     if (!allocation) {
       return res.status(403).json({ 
         message: "Non sei autorizzato a emettere biglietti per questo evento",
@@ -2754,7 +2763,9 @@ router.get("/api/cashiers/events/:eventId/today-tickets", requireAuth, async (re
     const user = req.user as any;
     const { eventId } = req.params;
     
-    const tickets = await siaeStorage.getTodayTicketsByUser(user.id, eventId);
+    // Per cassieri SIAE usa cashierId, per altri utenti usa user.id
+    const userId = user.role === 'cassiere' ? (getSiaeCashierId(user) || user.id) : user.id;
+    const tickets = await siaeStorage.getTodayTicketsByUser(userId, eventId);
     
     res.json(tickets);
   } catch (error: any) {
@@ -2790,7 +2801,9 @@ router.patch("/api/siae/tickets/:id/cancel", requireAuth, async (req: Request, r
     
     // Check authorization: cassiere can only cancel own tickets, gestore/admin/super_admin can cancel any
     const isGestoreOrHigher = ['gestore', 'admin', 'super_admin'].includes(user.role);
-    if (!isGestoreOrHigher && ticket.issuedByUserId !== user.id) {
+    // Per cassieri SIAE usa cashierId per il controllo
+    const userIdForCheck = user.role === 'cassiere' ? (getSiaeCashierId(user) || user.id) : user.id;
+    if (!isGestoreOrHigher && ticket.issuedByUserId !== userIdForCheck) {
       return res.status(403).json({ 
         message: "Non sei autorizzato ad annullare questo biglietto. Solo il cassiere che ha emesso il biglietto può annullarlo.",
         errorCode: "UNAUTHORIZED_CANCELLATION"
@@ -2808,7 +2821,7 @@ router.patch("/api/siae/tickets/:id/cancel", requireAuth, async (req: Request, r
         try {
           await siaeStorage.createAuditLog({
             companyId: user.companyId,
-            userId: user.id,
+            userId: userIdForCheck,
             action: 'ticket_cancellation_blocked',
             entityType: 'ticket',
             entityId: id,
@@ -2853,7 +2866,7 @@ router.patch("/api/siae/tickets/:id/cancel", requireAuth, async (req: Request, r
         try {
           await siaeStorage.createAuditLog({
             companyId: user.companyId,
-            userId: user.id,
+            userId: userIdForCheck,
             action: 'ticket_cancellation_failed',
             entityType: 'ticket',
             entityId: id,
@@ -2874,10 +2887,13 @@ router.patch("/api/siae/tickets/:id/cancel", requireAuth, async (req: Request, r
       console.log(`[TicketCancel] Super admin bypassing fiscal cancellation for ticket ${ticket.ticketCode}`);
     }
     
+    // Per cassieri SIAE usa cashierId, per altri utenti usa user.id
+    const userIdForCancellation = user.role === 'cassiere' ? (getSiaeCashierId(user) || user.id) : user.id;
+    
     // ATOMIC TRANSACTION: Cancel ticket and restore quota
     const result = await siaeStorage.cancelTicketWithAtomicQuotaRestore({
       ticketId: id,
-      cancelledByUserId: user.id,
+      cancelledByUserId: userIdForCancellation,
       cancellationReason: reason,
       issuedByUserId: ticket.issuedByUserId,
       ticketedEventId: ticket.ticketedEventId,
@@ -2897,11 +2913,11 @@ router.patch("/api/siae/tickets/:id/cancel", requireAuth, async (req: Request, r
       companyId: user.companyId,
       ticketId: id,
       operationType: 'cancellation',
-      performedBy: user.id,
+      performedBy: userIdForCancellation,
       reason,
       metadata: { 
         originalPrice: ticket.ticketPrice, 
-        cancelledBy: user.fullName || user.username,
+        cancelledBy: user.fullName || user.username || user.claims?.username || 'Utente',
         originalTicketCode: ticket.ticketCode,
         fiscalCancellation: fiscalCancellationData ? {
           registered: true,
@@ -2917,7 +2933,7 @@ router.patch("/api/siae/tickets/:id/cancel", requireAuth, async (req: Request, r
     const fiscalInfo = fiscalCancellationRegistered ? ' (Registrato fiscalmente)' : '';
     await siaeStorage.createAuditLog({
       companyId: user.companyId,
-      userId: user.id,
+      userId: userIdForCancellation,
       action: 'ticket_cancelled',
       entityType: 'ticket',
       entityId: id,
@@ -2936,6 +2952,13 @@ router.patch("/api/siae/tickets/:id/cancel", requireAuth, async (req: Request, r
 });
 
 // ==================== MODULO CASSA BIGLIETTI ====================
+
+// Helper per ottenere l'ID del cassiere SIAE (supporta sia nuove che vecchie sessioni)
+function getSiaeCashierId(user: any): string | undefined {
+  // Nuove sessioni: id = siaeCashiers.id
+  // Vecchie sessioni: cashierId = siaeCashiers.id
+  return user?.id || user?.cashierId;
+}
 
 // Middleware to check if user is a cashier
 function requireCashier(req: Request, res: Response, next: NextFunction) {
@@ -3145,7 +3168,9 @@ router.post("/api/cashiers/login", async (req: Request, res: Response) => {
     }
     
     // Create session for cashier
+    // id = cashier.id per garantire che req.user.id corrisponda a siaeCashiers.id
     (req as any).login({ 
+      id: cashier.id,
       claims: { sub: cashier.id, username: cashier.username },
       role: 'cassiere',
       companyId: cashier.companyId,
@@ -3374,7 +3399,12 @@ router.get("/api/cashier/my-events", requireAuth, requireCashier, async (req: Re
   try {
     const user = req.user as any;
     
-    const allocations = await siaeStorage.getCashierAllocationsByUser(user.id);
+    // Usa helper per supportare sia nuove che vecchie sessioni cassiere
+    const cashierId = getSiaeCashierId(user);
+    if (!cashierId) {
+      return res.status(400).json({ message: "ID cassiere non trovato nella sessione" });
+    }
+    const allocations = await siaeStorage.getCashierAllocationsByCashier(cashierId);
     
     const events = await Promise.all(allocations.map(async (alloc) => {
       const event = await siaeStorage.getSiaeTicketedEvent(alloc.eventId);
@@ -3410,7 +3440,12 @@ router.get("/api/cashier/events/:eventId/quotas", requireAuth, requireCashier, a
     const user = req.user as any;
     const { eventId } = req.params;
     
-    const allocation = await siaeStorage.getCashierAllocationByUserAndEvent(user.id, eventId);
+    // Usa helper per supportare sia nuove che vecchie sessioni cassiere
+    const cashierId = getSiaeCashierId(user);
+    if (!cashierId) {
+      return res.status(400).json({ message: "ID cassiere non trovato nella sessione" });
+    }
+    const allocation = await siaeStorage.getCashierAllocationByCashierAndEvent(cashierId, eventId);
     if (!allocation) {
       return res.status(404).json({ message: "Non hai allocazione per questo evento" });
     }
@@ -3419,8 +3454,8 @@ router.get("/api/cashier/events/:eventId/quotas", requireAuth, requireCashier, a
     const sectors = await siaeStorage.getSiaeEventSectorsByEvent(eventId);
     const sector = allocation.sectorId ? await siaeStorage.getSiaeEventSector(allocation.sectorId) : null;
     
-    // Get today's tickets by this cashier
-    const todayTickets = await siaeStorage.getTodayTicketsByUser(user.id, eventId);
+    // Get today's tickets by this cashier (issuedByUserId = cashier.id for SIAE cashiers)
+    const todayTickets = await siaeStorage.getTodayTicketsByUser(cashierId, eventId);
     
     res.json({
       eventId,
@@ -3456,8 +3491,12 @@ router.post("/api/cashier/events/:eventId/emit-ticket", requireAuth, requireCash
       return res.status(400).json({ message: "sectorId, ticketType e ticketPrice sono obbligatori" });
     }
     
-    // Check cashier allocation
-    const allocation = await siaeStorage.getCashierAllocationByUserAndEvent(user.id, eventId);
+    // Usa helper per supportare sia nuove che vecchie sessioni cassiere
+    const cashierId = getSiaeCashierId(user);
+    if (!cashierId) {
+      return res.status(400).json({ message: "ID cassiere non trovato nella sessione" });
+    }
+    const allocation = await siaeStorage.getCashierAllocationByCashierAndEvent(cashierId, eventId);
     if (!allocation) {
       return res.status(403).json({ message: "Non hai allocazione per questo evento" });
     }
@@ -3524,7 +3563,7 @@ router.post("/api/cashier/events/:eventId/emit-ticket", requireAuth, requireCash
       ticketType,
       ticketPrice: Number(ticketPrice),
       customerId: null,
-      issuedByUserId: user.id,
+      issuedByUserId: cashierId,
       participantFirstName: participantFirstName || null,
       participantLastName: participantLastName || null,
       isComplimentary: isComplimentary || false,
@@ -3554,7 +3593,7 @@ router.post("/api/cashier/events/:eventId/emit-ticket", requireAuth, requireCash
       companyId: user.companyId,
       ticketId: result.ticket!.id,
       operationType: 'emission',
-      performedBy: user.id,
+      performedBy: cashierId,
       reason: null,
       metadata: {
         ticketCode,
@@ -3564,14 +3603,14 @@ router.post("/api/cashier/events/:eventId/emit-ticket", requireAuth, requireCash
         eventName: event.eventName,
         fiscalSealCode,
         paymentMethod: paymentMethod || 'cash',
-        emittedBy: `${user.firstName} ${user.lastName}`
+        emittedBy: user.username || user.claims?.username || 'Cassiere'
       }
     });
     
     // Audit log
     await siaeStorage.createAuditLog({
       companyId: user.companyId,
-      userId: user.id,
+      userId: cashierId,
       action: 'ticket_emitted',
       entityType: 'ticket',
       entityId: result.ticket!.id,
@@ -3616,14 +3655,18 @@ router.post("/api/cashier/tickets/:ticketId/annul", requireAuth, requireCashier,
       return res.status(400).json({ message: "Impossibile annullare un biglietto già utilizzato" });
     }
     
-    // Verify cashier has allocation for this event
-    const allocation = await siaeStorage.getCashierAllocationByUserAndEvent(user.id, ticket.ticketedEventId);
+    // Usa helper per supportare sia nuove che vecchie sessioni cassiere
+    const cashierId = getSiaeCashierId(user);
+    if (!cashierId) {
+      return res.status(400).json({ message: "ID cassiere non trovato nella sessione" });
+    }
+    const allocation = await siaeStorage.getCashierAllocationByCashierAndEvent(cashierId, ticket.ticketedEventId);
     if (!allocation) {
       return res.status(403).json({ message: "Non hai allocazione per questo evento" });
     }
     
     // Verify ticket was issued by this cashier (for security)
-    if (ticket.issuedByUserId !== user.id) {
+    if (ticket.issuedByUserId !== cashierId) {
       // Allow annulment if cashier has same sector or all-sector allocation
       if (allocation.sectorId && allocation.sectorId !== ticket.sectorId) {
         return res.status(403).json({ message: "Non sei autorizzato ad annullare questo biglietto" });
@@ -3633,7 +3676,7 @@ router.post("/api/cashier/tickets/:ticketId/annul", requireAuth, requireCashier,
     // Atomic cancellation with quota restore
     const result = await siaeStorage.cancelTicketWithAtomicQuotaRestore({
       ticketId,
-      cancelledByUserId: user.id,
+      cancelledByUserId: cashierId,
       cancellationReason: reason,
       issuedByUserId: ticket.issuedByUserId,
       ticketedEventId: ticket.ticketedEventId,
@@ -3653,19 +3696,19 @@ router.post("/api/cashier/tickets/:ticketId/annul", requireAuth, requireCashier,
       companyId: user.companyId,
       ticketId,
       operationType: 'cancellation',
-      performedBy: user.id,
+      performedBy: cashierId,
       reason,
       metadata: {
         ticketCode: ticket.ticketCode,
         originalPrice: ticket.ticketPrice,
-        cancelledBy: `${user.firstName} ${user.lastName}`
+        cancelledBy: user.username || user.claims?.username || 'Cassiere'
       }
     });
     
     // Audit log
     await siaeStorage.createAuditLog({
       companyId: user.companyId,
-      userId: user.id,
+      userId: cashierId,
       action: 'ticket_annulled_by_cashier',
       entityType: 'ticket',
       entityId: ticketId,
@@ -3692,7 +3735,12 @@ router.get("/api/cashier/events/:eventId/c1-report", requireAuth, requireCashier
     const user = req.user as any;
     const { eventId } = req.params;
     
-    const allocation = await siaeStorage.getCashierAllocationByUserAndEvent(user.id, eventId);
+    // Usa helper per supportare sia nuove che vecchie sessioni cassiere
+    const cashierId = getSiaeCashierId(user);
+    if (!cashierId) {
+      return res.status(400).json({ message: "ID cassiere non trovato nella sessione" });
+    }
+    const allocation = await siaeStorage.getCashierAllocationByCashierAndEvent(cashierId, eventId);
     if (!allocation) {
       return res.status(404).json({ message: "Non hai allocazione per questo evento" });
     }
@@ -3703,7 +3751,7 @@ router.get("/api/cashier/events/:eventId/c1-report", requireAuth, requireCashier
     }
     
     // Get today's tickets by this cashier for this event
-    const todayTickets = await siaeStorage.getTodayTicketsByUser(user.id, eventId);
+    const todayTickets = await siaeStorage.getTodayTicketsByUser(cashierId, eventId);
     
     // Aggregate by ticket type
     const byType = new Map<string, { count: number; amount: number }>();
