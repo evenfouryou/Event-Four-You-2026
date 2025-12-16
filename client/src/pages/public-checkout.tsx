@@ -207,7 +207,7 @@ function CheckoutContent() {
     },
     onError: (error: any) => {
       if (error.message?.includes("autenticato")) {
-        navigate("/login-acquisto?redirect=/checkout");
+        navigate("/login?redirect=/checkout");
       } else {
         toast({
           title: "Errore",
@@ -245,7 +245,7 @@ function CheckoutContent() {
         <p className="text-slate-400 mb-6">
           Per completare l'acquisto devi accedere al tuo account o registrarti.
         </p>
-        <Link href="/login-acquisto?redirect=/checkout">
+        <Link href="/login?redirect=/checkout">
           <Button className="bg-yellow-500 hover:bg-yellow-400 text-black font-semibold" data-testid="button-login">
             Accedi o Registrati
           </Button>

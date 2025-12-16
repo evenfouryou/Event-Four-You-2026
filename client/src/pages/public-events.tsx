@@ -195,7 +195,7 @@ export default function PublicEventsPage() {
                   Carrello
                 </Button>
               </Link>
-              <Link href="/login-acquisto">
+              <Link href="/login">
                 <Button size="sm" className="bg-yellow-500 hover:bg-yellow-400 text-black font-semibold" data-testid="button-login">
                   Accedi
                 </Button>

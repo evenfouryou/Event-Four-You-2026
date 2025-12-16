@@ -1084,6 +1084,7 @@ export const siaeSystemConfigRelations = relations(siaeSystemConfig, ({ one }) =
 // Clienti Biglietteria (Ticket Customers) - Allegato A 3.3
 export const siaeCustomers = pgTable("siae_customers", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id), // Collegamento all'utente unificato
   uniqueCode: varchar("unique_code", { length: 50 }).notNull().unique(), // Codice univoco per log (NO dati anagrafici)
   email: varchar("email", { length: 255 }).notNull().unique(),
   phone: varchar("phone", { length: 20 }).notNull().unique(), // Con prefisso internazionale
@@ -1111,7 +1112,11 @@ export const siaeCustomers = pgTable("siae_customers", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-export const siaeCustomersRelations = relations(siaeCustomers, ({ many }) => ({
+export const siaeCustomersRelations = relations(siaeCustomers, ({ one, many }) => ({
+  user: one(users, {
+    fields: [siaeCustomers.userId],
+    references: [users.id],
+  }),
   transactions: many(siaeTransactions),
   tickets: many(siaeTickets),
   otpAttempts: many(siaeOtpAttempts),

@@ -148,6 +148,7 @@ export interface ISiaeStorage {
   getSiaeCustomerByPhone(phone: string): Promise<SiaeCustomer | undefined>;
   getSiaeCustomerByEmail(email: string): Promise<SiaeCustomer | undefined>;
   getSiaeCustomerByUniqueCode(uniqueCode: string): Promise<SiaeCustomer | undefined>;
+  getSiaeCustomerByUserId(userId: string): Promise<SiaeCustomer | undefined>;
   createSiaeCustomer(customer: InsertSiaeCustomer): Promise<SiaeCustomer>;
   updateSiaeCustomer(id: string, customer: Partial<SiaeCustomer>): Promise<SiaeCustomer | undefined>;
   deleteSiaeCustomer(id: string): Promise<boolean>;
@@ -581,6 +582,11 @@ export class SiaeStorage implements ISiaeStorage {
   
   async getSiaeCustomerByUniqueCode(uniqueCode: string): Promise<SiaeCustomer | undefined> {
     const [customer] = await db.select().from(siaeCustomers).where(eq(siaeCustomers.uniqueCode, uniqueCode));
+    return customer;
+  }
+  
+  async getSiaeCustomerByUserId(userId: string): Promise<SiaeCustomer | undefined> {
+    const [customer] = await db.select().from(siaeCustomers).where(eq(siaeCustomers.userId, userId));
     return customer;
   }
   

@@ -71,8 +71,37 @@ function getOrCreateSessionId(req: any, res: any): string {
   return sessionId;
 }
 
-// Verifica autenticazione cliente
+// Verifica autenticazione cliente - supporta sia sessione Passport che Bearer token legacy
 async function getAuthenticatedCustomer(req: any): Promise<any | null> {
+  // Prima prova con la sessione Passport (login unificato)
+  if (req.user && req.isAuthenticated && req.isAuthenticated()) {
+    // Utente loggato tramite sessione Passport
+    // Cerca il profilo cliente SIAE collegato all'utente
+    const [customer] = await db
+      .select()
+      .from(siaeCustomers)
+      .where(eq(siaeCustomers.userId, req.user.id));
+    
+    if (customer) {
+      return customer;
+    }
+    
+    // Se non esiste un profilo SIAE, restituisci i dati base dell'utente
+    // per permettere la creazione on-demand durante il checkout
+    return {
+      id: null,
+      userId: req.user.id,
+      email: req.user.email,
+      firstName: req.user.firstName || '',
+      lastName: req.user.lastName || '',
+      phone: req.user.phone || null,
+      phoneVerified: false,
+      isActive: true,
+      _isUserWithoutSiaeProfile: true,
+    };
+  }
+  
+  // Fallback: prova con Bearer token (legacy)
   const authHeader = req.headers.authorization;
   if (!authHeader?.startsWith("Bearer ")) return null;
 
@@ -592,10 +621,13 @@ router.get("/api/public/customers/me", async (req, res) => {
 
     res.json({
       id: customer.id,
+      userId: customer.userId || null,
       email: customer.email,
       firstName: customer.firstName,
       lastName: customer.lastName,
       phone: customer.phone,
+      phoneVerified: customer.phoneVerified || false,
+      _isUserWithoutSiaeProfile: customer._isUserWithoutSiaeProfile || false,
     });
   } catch (error: any) {
     console.error("[PUBLIC] Profile error:", error);

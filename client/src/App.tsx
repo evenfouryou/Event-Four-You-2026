@@ -69,7 +69,6 @@ import PublicEventDetail from "@/pages/public-event-detail";
 import PublicCart from "@/pages/public-cart";
 import PublicCheckout from "@/pages/public-checkout";
 import PublicCheckoutSuccess from "@/pages/public-checkout-success";
-import PublicLogin from "@/pages/public-login";
 import PublicVenues from "@/pages/public-venues";
 import PublicVenueDetail from "@/pages/public-venue-detail";
 import PrGuestLists from "@/pages/pr-guest-lists";
@@ -133,7 +132,6 @@ function Router() {
         <Route path="/carrello" component={PublicCart} />
         <Route path="/checkout/success" component={PublicCheckoutSuccess} />
         <Route path="/checkout" component={PublicCheckout} />
-        <Route path="/login-acquisto" component={PublicLogin} />
         <Route path="/locali/:id" component={PublicVenueDetail} />
         <Route path="/locali" component={PublicVenues} />
         <Route path="/download-smart-card" component={DownloadSmartCardApp} />
