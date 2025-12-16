@@ -1,5 +1,5 @@
 /**
- * Script per fare push del Print Agent su GitHub
+ * Script per fare push del SIAE Lettore su GitHub
  * Usa l'integrazione GitHub di Replit
  */
 
@@ -43,10 +43,10 @@ async function getAccessToken() {
 }
 
 async function main() {
-  console.log('🚀 Push Event4U Print Agent su GitHub\n');
+  console.log('🚀 Push Event4U SIAE Lettore v3.4 su GitHub\n');
   
   const owner = 'evenfouryou';
-  const repo = 'event4u-print-agent';
+  const repo = 'event-four-you-siae-lettore';
   
   try {
     const accessToken = await getAccessToken();
@@ -56,15 +56,19 @@ async function main() {
     const { data: user } = await octokit.users.getAuthenticated();
     console.log(`✅ Connesso come: ${user.login}`);
     
-    // Files da pushare
+    // Files da pushare - SIAE Lettore
     const files = [
-      { path: 'main.js', localPath: 'print-agent/main.js' },
-      { path: 'index.html', localPath: 'print-agent/index.html' },
-      { path: 'package.json', localPath: 'print-agent/package.json' },
-      { path: 'preload.js', localPath: 'print-agent/preload.js' },
-      { path: 'renderer.js', localPath: 'print-agent/renderer.js' },
-      { path: 'styles.css', localPath: 'print-agent/styles.css' },
-      { path: 'README.md', localPath: 'print-agent/README.md' }
+      { path: 'main.js', localPath: 'desktop-app/main.js' },
+      { path: 'index.html', localPath: 'desktop-app/index.html' },
+      { path: 'package.json', localPath: 'desktop-app/package.json' },
+      { path: 'preload.js', localPath: 'desktop-app/preload.js' },
+      { path: 'renderer.js', localPath: 'desktop-app/renderer.js' },
+      { path: 'styles.css', localPath: 'desktop-app/styles.css' },
+      { path: 'README.md', localPath: 'desktop-app/README.md' },
+      { path: 'BUILD_INSTRUCTIONS.md', localPath: 'desktop-app/BUILD_INSTRUCTIONS.md' },
+      { path: 'SiaeBridge/Program.cs', localPath: 'desktop-app/SiaeBridge/Program.cs' },
+      { path: 'SiaeBridge/LibSiae.cs', localPath: 'desktop-app/SiaeBridge/LibSiae.cs' },
+      { path: 'SiaeBridge/SiaeBridge.csproj', localPath: 'desktop-app/SiaeBridge/SiaeBridge.csproj' }
     ];
     
     console.log(`📂 Target: https://github.com/${owner}/${repo}`);
@@ -126,7 +130,7 @@ async function main() {
     
     // Create commit
     console.log('📝 Creating commit...');
-    const commitMessage = 'Aggiunto supporto orientamento stampa v1.5.0\n\n- Nuovo parametro orientation (portrait/landscape) dal server\n- Stampante ora rispetta il verso impostato nel template\n- Versione 1.5.0';
+    const commitMessage = 'v3.4: Enhanced card data logging and error reporting\n\n- Added detailed logging for card read operations (GetSNML, ReadCounterML, ReadBalanceML, GetKeyIDML)\n- Improved error handling with error codes in response\n- Added status broadcast logging for debugging\n- Counter and balance return null if read fails (with error code)\n\nSee BUILD_INSTRUCTIONS.md for details.';
     
     const { data: commit } = await octokit.git.createCommit({
       owner,
