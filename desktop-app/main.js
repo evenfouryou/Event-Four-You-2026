@@ -545,6 +545,18 @@ function updateStatus(newData) {
 function broadcastStatus() {
   const message = JSON.stringify({ type: 'status', data: currentStatus });
   
+  // Log status being broadcast for debugging
+  log.info('Broadcasting status:', JSON.stringify({
+    bridgeConnected: currentStatus.bridgeConnected,
+    readerConnected: currentStatus.readerConnected,
+    cardInserted: currentStatus.cardInserted,
+    cardSerial: currentStatus.cardSerial,
+    cardCounter: currentStatus.cardCounter,
+    cardBalance: currentStatus.cardBalance,
+    cardKeyId: currentStatus.cardKeyId,
+    pinLocked: currentStatus.pinLocked
+  }));
+  
   // Broadcast to local WebSocket clients
   wsClients.forEach(client => {
     if (client.readyState === WebSocket.OPEN) {
@@ -560,6 +572,7 @@ function broadcastStatus() {
   if (relayWs && relayWs.readyState === WebSocket.OPEN) {
     try {
       relayWs.send(message);
+      log.debug('Sent status to relay');
     } catch (e) {
       log.error('Error broadcasting to relay:', e.message);
     }
@@ -749,7 +762,10 @@ function startStatusPolling() {
       let cardData = {};
       if (cardCurrentlyInserted && !pinLocked) {
         try {
+          log.info('Auto-reading card data...');
           const readResult = await sendBridgeCommand('READ_CARD');
+          log.info('READ_CARD result:', JSON.stringify(readResult));
+          
           if (readResult.success) {
             cardData = {
               cardSerial: readResult.serialNumber,
@@ -758,11 +774,15 @@ function startStatusPolling() {
               cardKeyId: readResult.keyId,  // Codice Sistema
               cardSlot: readResult.slot
             };
-            log.debug('Card data read:', cardData);
+            log.info('Card data extracted:', JSON.stringify(cardData));
+          } else {
+            log.warn('READ_CARD returned success=false:', readResult.error);
           }
         } catch (e) {
-          // Card read failed, continue with basic status
+          log.error('Card read failed:', e.message);
         }
+      } else if (cardCurrentlyInserted && pinLocked) {
+        log.debug('Card inserted but PIN locked - skipping data read');
       }
       
       const newStatus = {

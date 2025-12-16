@@ -1,10 +1,24 @@
 # 🔧 ISTRUZIONI DI BUILD - Event Four You SIAE Lettore
 
-## ✅ BUG FIX v3.3 (Dicembre 2024)
+## ✅ BUG FIX v3.4 (Dicembre 2024)
 
-**Problema:** PIN mostrato come errato anche quando corretto
+**Problema:** I dati della carta SIAE (seriale, counter, balance, keyId) non venivano inviati al web
 
-### Correzioni applicate:
+### Correzioni applicate v3.4:
+
+1. **Logging completo lettura carta:**
+   - Aggiunto log per ogni operazione: GetSNML, ReadCounterML, ReadBalanceML, GetKeyIDML
+   - Log dettagliati per ogni errore con codice esadecimale
+
+2. **Gestione errori migliorata:**
+   - Counter e balance ritornano null se la lettura fallisce
+   - Inclusi codici errore nella risposta per debug
+
+3. **Log status broadcast:**
+   - Ogni invio status al relay viene loggato con tutti i valori
+   - Log separati per lettura carta automatica
+
+### Correzioni precedenti v3.3:
 
 1. **Parametro `nPIN` corretto:**
    - Prima: `VerifyPINML(pin.Length, pin, slot)` - passava 4-8 (lunghezza)

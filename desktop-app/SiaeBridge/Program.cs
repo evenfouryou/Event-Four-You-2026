@@ -88,7 +88,7 @@ namespace SiaeBridge
             try { _log = new StreamWriter(logPath, true) { AutoFlush = true }; } catch { }
 
             Log("═══════════════════════════════════════════════════════");
-            Log("SiaeBridge v3.3 - PIN marshalling fix + input sanitization");
+            Log("SiaeBridge v3.4 - Enhanced card data logging + error reporting");
             Log($"Time: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
             Log($"Dir: {AppDomain.CurrentDomain.BaseDirectory}");
             Log($"32-bit Process: {!Environment.Is64BitProcess}");
@@ -350,19 +350,27 @@ namespace SiaeBridge
 
                 uint cnt = 0, bal = 0;
                 int cntResult = ReadCounterML(ref cnt, _slot);
+                Log($"  ReadCounterML = {cntResult} (0x{cntResult:X4}), cnt = {cnt}");
+                
                 int balResult = ReadBalanceML(ref bal, _slot);
+                Log($"  ReadBalanceML = {balResult} (0x{balResult:X4}), bal = {bal}");
+                
                 byte key = GetKeyIDML(_slot);
+                Log($"  GetKeyIDML = {key}");
 
-                Log($"  Counter = {cnt}, Balance = {bal}, KeyID = {key}");
+                Log($"  FINAL: Counter = {cnt}, Balance = {bal}, KeyID = {key}");
 
+                // Anche se counter/balance falliscono, ritorniamo comunque i dati che abbiamo
                 return JsonConvert.SerializeObject(new
                 {
                     success = true,
                     serialNumber = BitConverter.ToString(sn).Replace("-", ""),
-                    counter = cnt,
-                    balance = bal,
+                    counter = cntResult == 0 ? (uint?)cnt : null,
+                    balance = balResult == 0 ? (uint?)bal : null,
                     keyId = (int)key,
-                    slot = _slot
+                    slot = _slot,
+                    counterError = cntResult != 0 ? $"0x{cntResult:X4}" : null,
+                    balanceError = balResult != 0 ? $"0x{balResult:X4}" : null
                 });
             }
             catch (Exception ex)
