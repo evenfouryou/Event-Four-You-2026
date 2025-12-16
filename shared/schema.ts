@@ -1293,6 +1293,8 @@ export const siaeTickets = pgTable("siae_tickets", {
   // Nominatività
   participantFirstName: varchar("participant_first_name", { length: 100 }),
   participantLastName: varchar("participant_last_name", { length: 100 }),
+  // Emissione
+  issuedByUserId: varchar("issued_by_user_id"), // ID cassiere/utente che ha emesso il biglietto
   // Stato
   status: varchar("status", { length: 20 }).notNull().default('valid'), // valid, used, cancelled
   usedAt: timestamp("used_at"), // Quando è stato usato per entrare
