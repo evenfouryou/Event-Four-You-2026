@@ -161,6 +161,12 @@ export default function EventWizard() {
     }
   });
 
+  // Load existing SIAE ticketing info if editing (includes ticketed event + sectors)
+  const { data: existingSiaeData } = useQuery<any>({
+    queryKey: ['/api/siae/events', draftId, 'ticketing'],
+    enabled: !!draftId,
+  });
+
   const form = useForm<InsertEvent>({
     resolver: zodResolver(insertEventSchema),
     defaultValues: {
@@ -201,6 +207,52 @@ export default function EventWizard() {
       }
     }
   }, [existingEvent]);
+
+  // Load existing SIAE data when editing an event with ticketing
+  useEffect(() => {
+    if (existingSiaeData) {
+      // Enable SIAE mode
+      setSiaeEnabled(true);
+      
+      // Set ticketed event properties
+      setSiaeGenreCode(existingSiaeData.genreCode || '');
+      setSiaeTaxType(existingSiaeData.taxType || 'S');
+      setSiaeRequiresNominative(existingSiaeData.requiresNominative ?? true);
+      setSiaeMaxTicketsPerUser(existingSiaeData.maxTicketsPerUser || 10);
+      
+      // Convert sectors to wizard format
+      if (existingSiaeData.sectors && Array.isArray(existingSiaeData.sectors)) {
+        const convertedSectors: SectorConfig[] = existingSiaeData.sectors.map((sector: any) => {
+          // Determine ticket type based on prices
+          let ticketType: 'INT' | 'RID' | 'OMA' = 'INT';
+          let price = '0';
+          
+          if (parseFloat(sector.priceRidotto || '0') > 0) {
+            ticketType = 'RID';
+            price = sector.priceRidotto;
+          } else if (parseFloat(sector.priceIntero || '0') > 0) {
+            ticketType = 'INT';
+            price = sector.priceIntero;
+          } else {
+            ticketType = 'OMA';
+            price = '0';
+          }
+          
+          return {
+            id: sector.id,
+            name: sector.name || '',
+            ticketType,
+            price,
+            ddp: sector.prevendita || '0',
+            sectorCode: sector.sectorCode || 'PU',
+            isNumbered: sector.isNumbered ?? false,
+            quantity: sector.capacity || 0,
+          };
+        });
+        setSiaeSectors(convertedSectors);
+      }
+    }
+  }, [existingSiaeData]);
 
   // Auto-save disabled - events are only saved when user clicks "Pubblica Evento"
   // This prevents unwanted draft creation during wizard completion
