@@ -16,7 +16,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDes
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { Calendar, MapPin, Clock, Repeat, FileText, Save, CheckCircle2, ArrowLeft, ArrowRight, Ticket, Users, Euro, Plus, Trash2 } from "lucide-react";
+import { Calendar, MapPin, Clock, Repeat, FileText, Save, CheckCircle2, ArrowLeft, ArrowRight, Ticket, Users, Euro, Plus, Trash2, Upload, X, ImageIcon, Loader2 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Label } from "@/components/ui/label";
 
@@ -111,6 +111,11 @@ export default function EventWizard() {
   const [selectedDates, setSelectedDates] = useState<Set<string>>(new Set());
   const [previewVersion, setPreviewVersion] = useState<string>('');
   const [userEditedSelection, setUserEditedSelection] = useState(false);
+  
+  // Image upload state
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const imageInputRef = useRef<HTMLInputElement>(null);
   
   // SIAE state
   const [siaeEnabled, setSiaeEnabled] = useState(false);
@@ -614,40 +619,195 @@ export default function EventWizard() {
                 <FormField
                   control={form.control}
                   name="imageUrl"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Immagine Evento (opzionale)</FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="https://esempio.com/immagine.jpg"
-                          {...field}
-                          value={field.value || ''}
-                          data-testid="input-image-url"
-                        />
-                      </FormControl>
-                      <FormDescription>
-                        URL dell'immagine che verrà mostrata nella pagina pubblica dell'evento
-                      </FormDescription>
-                      <FormMessage />
-                      {field.value && (
-                        <div className="mt-2">
-                          <img
-                            key={field.value}
-                            src={field.value}
-                            alt="Anteprima evento"
-                            className="max-w-xs max-h-48 rounded-lg border object-cover"
-                            onError={(e) => {
-                              (e.target as HTMLImageElement).style.opacity = '0';
-                            }}
-                            onLoad={(e) => {
-                              (e.target as HTMLImageElement).style.opacity = '1';
-                            }}
-                            style={{ opacity: 0, transition: 'opacity 0.2s' }}
-                          />
-                        </div>
-                      )}
-                    </FormItem>
-                  )}
+                  render={({ field }) => {
+                    const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      
+                      const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+                      if (!allowedTypes.includes(file.type)) {
+                        toast({
+                          title: "Formato non supportato",
+                          description: "Carica un'immagine JPG, PNG o WebP",
+                          variant: "destructive",
+                        });
+                        return;
+                      }
+                      
+                      if (file.size > 10 * 1024 * 1024) {
+                        toast({
+                          title: "File troppo grande",
+                          description: "L'immagine deve essere inferiore a 10MB",
+                          variant: "destructive",
+                        });
+                        return;
+                      }
+                      
+                      setIsUploadingImage(true);
+                      setUploadProgress(0);
+                      
+                      try {
+                        const formData = new FormData();
+                        formData.append('image', file);
+                        
+                        const xhr = new XMLHttpRequest();
+                        
+                        xhr.upload.addEventListener('progress', (event) => {
+                          if (event.lengthComputable) {
+                            const percentComplete = Math.round((event.loaded / event.total) * 100);
+                            setUploadProgress(percentComplete);
+                          }
+                        });
+                        
+                        const uploadPromise = new Promise<string>((resolve, reject) => {
+                          xhr.onload = () => {
+                            if (xhr.status >= 200 && xhr.status < 300) {
+                              try {
+                                const response = JSON.parse(xhr.responseText);
+                                resolve(response.url);
+                              } catch {
+                                reject(new Error('Risposta non valida dal server'));
+                              }
+                            } else {
+                              reject(new Error('Upload fallito'));
+                            }
+                          };
+                          xhr.onerror = () => reject(new Error('Errore di rete'));
+                        });
+                        
+                        xhr.open('POST', '/api/events/upload-image');
+                        xhr.send(formData);
+                        
+                        const imageUrl = await uploadPromise;
+                        field.onChange(imageUrl);
+                        
+                        toast({
+                          title: "Immagine caricata",
+                          description: "L'immagine è stata caricata con successo",
+                        });
+                      } catch (error) {
+                        toast({
+                          title: "Errore upload",
+                          description: error instanceof Error ? error.message : "Impossibile caricare l'immagine",
+                          variant: "destructive",
+                        });
+                      } finally {
+                        setIsUploadingImage(false);
+                        setUploadProgress(0);
+                        if (imageInputRef.current) {
+                          imageInputRef.current.value = '';
+                        }
+                      }
+                    };
+                    
+                    const handleRemoveImage = () => {
+                      field.onChange('');
+                      if (imageInputRef.current) {
+                        imageInputRef.current.value = '';
+                      }
+                    };
+                    
+                    return (
+                      <FormItem>
+                        <FormLabel>Immagine Evento (opzionale)</FormLabel>
+                        <FormControl>
+                          <div className="space-y-3">
+                            <input
+                              ref={imageInputRef}
+                              type="file"
+                              accept="image/jpeg,image/png,image/webp"
+                              onChange={handleFileSelect}
+                              className="hidden"
+                              data-testid="input-image-file"
+                            />
+                            
+                            {!field.value && !isUploadingImage && (
+                              <div
+                                onClick={() => imageInputRef.current?.click()}
+                                onDragOver={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                }}
+                                onDrop={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  const file = e.dataTransfer.files?.[0];
+                                  if (file && imageInputRef.current) {
+                                    const dataTransfer = new DataTransfer();
+                                    dataTransfer.items.add(file);
+                                    imageInputRef.current.files = dataTransfer.files;
+                                    imageInputRef.current.dispatchEvent(new Event('change', { bubbles: true }));
+                                  }
+                                }}
+                                className="border-2 border-dashed rounded-lg p-6 text-center cursor-pointer hover-elevate transition-colors"
+                                data-testid="dropzone-image"
+                              >
+                                <ImageIcon className="h-10 w-10 mx-auto text-muted-foreground mb-2" />
+                                <p className="text-sm font-medium">Clicca o trascina un'immagine</p>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  JPG, PNG o WebP (max 10MB)
+                                </p>
+                              </div>
+                            )}
+                            
+                            {isUploadingImage && (
+                              <div className="border rounded-lg p-4 space-y-3" data-testid="upload-progress-container">
+                                <div className="flex items-center gap-2">
+                                  <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                                  <span className="text-sm">Caricamento in corso...</span>
+                                </div>
+                                <Progress value={uploadProgress} className="h-2" data-testid="upload-progress" />
+                                <p className="text-xs text-muted-foreground text-right">{uploadProgress}%</p>
+                              </div>
+                            )}
+                            
+                            {field.value && !isUploadingImage && (
+                              <div className="relative inline-block" data-testid="image-preview-container">
+                                <div className="w-32 h-32 rounded-lg border overflow-hidden bg-muted">
+                                  <img
+                                    key={field.value}
+                                    src={field.value}
+                                    alt="Anteprima evento"
+                                    className="w-full h-full object-cover"
+                                    onError={(e) => {
+                                      (e.target as HTMLImageElement).style.display = 'none';
+                                    }}
+                                    data-testid="image-preview"
+                                  />
+                                </div>
+                                <div className="absolute -top-2 -right-2 flex gap-1">
+                                  <Button
+                                    type="button"
+                                    size="icon"
+                                    variant="secondary"
+                                    className="h-7 w-7 rounded-full shadow-md"
+                                    onClick={() => imageInputRef.current?.click()}
+                                    data-testid="button-replace-image"
+                                  >
+                                    <Upload className="h-3 w-3" />
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    size="icon"
+                                    variant="destructive"
+                                    className="h-7 w-7 rounded-full shadow-md"
+                                    onClick={handleRemoveImage}
+                                    data-testid="button-remove-image"
+                                  >
+                                    <X className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </FormControl>
+                        <FormDescription>
+                          Immagine che verrà mostrata nella pagina pubblica dell'evento (formato quadrato 1:1)
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    );
+                  }}
                 />
 
                 {/* SIAE Ticketing Toggle */}
