@@ -2699,21 +2699,8 @@ router.post("/api/cashiers/events/:eventId/tickets", requireAuth, async (req: Re
       }
     }
     
-    // Check for active box office session (only strict for cassiere role)
-    // Gestore, organizer, and super_admin can emit without opening a formal session
-    const isCashierRole = user.role === 'cassiere';
-    const canBypassSession = ['super_admin', 'gestore', 'organizer'].includes(user.role);
-    
-    if (isCashierRole && !canBypassSession) {
-      const cashierIdForSession = getSiaeCashierId(user);
-      const activeSession = cashierIdForSession ? await siaeStorage.getActiveSiaeBoxOfficeSession(cashierIdForSession) : null;
-      if (!activeSession) {
-        return res.status(403).json({ 
-          message: "Nessuna sessione cassa attiva. Apri una sessione prima di emettere biglietti.",
-          errorCode: "NO_ACTIVE_SESSION"
-        });
-      }
-    }
+    // Session check removed - all authorized users can emit tickets directly
+    // The quota and allocation system already provides sufficient access control
     
     // Usa helper per supportare sia nuove che vecchie sessioni cassiere
     const cashierId = getSiaeCashierId(user);
