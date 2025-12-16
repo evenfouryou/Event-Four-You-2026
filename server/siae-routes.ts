@@ -3,7 +3,7 @@ import { Router, Request, Response, NextFunction } from "express";
 import { siaeStorage } from "./siae-storage";
 import { storage } from "./storage";
 import { db } from "./db";
-import { events, siaeCashiers } from "@shared/schema";
+import { events, siaeCashiers, siaeTickets, siaeTransactions, siaeSubscriptions } from "@shared/schema";
 import { eq, and } from "drizzle-orm";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
@@ -541,9 +541,13 @@ router.delete("/api/siae/customers/:id", requireAuth, requireGestore, async (req
       .from(siaeTransactions)
       .where(eq(siaeTransactions.customerId, req.params.id));
     
-    if (Number(hasTickets?.count) > 0 || Number(hasTransactions?.count) > 0) {
+    const [hasSubscriptions] = await db.select({ count: sql<number>`count(*)` })
+      .from(siaeSubscriptions)
+      .where(eq(siaeSubscriptions.customerId, req.params.id));
+    
+    if (Number(hasTickets?.count) > 0 || Number(hasTransactions?.count) > 0 || Number(hasSubscriptions?.count) > 0) {
       return res.status(409).json({ 
-        message: "Impossibile eliminare il cliente: ha biglietti o transazioni associate. Disattivalo invece di eliminarlo." 
+        message: "Impossibile eliminare il cliente: ha biglietti, transazioni o abbonamenti associati. Disattivalo invece di eliminarlo." 
       });
     }
     
