@@ -56,25 +56,18 @@ function EventCard({ event, index }: { event: PublicEvent; index: number }) {
             </div>
             {isToday && (
               <Badge
-                className="absolute top-4 left-4 bg-teal-500/90 text-white border-0 px-3 py-1"
+                className="absolute top-4 left-4 bg-emerald-500/90 text-white border-0 px-3 py-1 shadow-lg shadow-emerald-500/25"
                 data-testid={`badge-today-${event.id}`}
               >
                 <span className="animate-pulse mr-1">●</span> Stasera
               </Badge>
             )}
-            {isSoldOut ? (
+            {isSoldOut && (
               <Badge
                 className="absolute top-4 right-4 bg-red-500/90 text-white border-0"
                 data-testid={`badge-soldout-${event.id}`}
               >
                 Sold Out
-              </Badge>
-            ) : (
-              <Badge
-                className="absolute top-4 right-4 bg-yellow-500/90 text-black border-0 font-semibold"
-                data-testid={`badge-available-${event.id}`}
-              >
-                {event.totalAvailable} disponibili
               </Badge>
             )}
           </div>

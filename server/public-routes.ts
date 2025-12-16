@@ -29,7 +29,7 @@ import {
   locations,
   insertPublicCartItemSchema,
 } from "@shared/schema";
-import { eq, and, gt, lt, desc, sql, gte, lte } from "drizzle-orm";
+import { eq, and, gt, lt, desc, sql, gte, lte, or, isNull } from "drizzle-orm";
 import { getUncachableStripeClient, getStripePublishableKey } from "./stripeClient";
 
 const router = Router();
@@ -131,8 +131,8 @@ router.get("/api/public/events", async (req, res) => {
         and(
           eq(siaeTicketedEvents.ticketingStatus, "active"),
           gt(events.startDatetime, now),
-          lte(siaeTicketedEvents.saleStartDate, now),
-          gte(siaeTicketedEvents.saleEndDate, now)
+          or(isNull(siaeTicketedEvents.saleStartDate), lte(siaeTicketedEvents.saleStartDate, now)),
+          or(isNull(siaeTicketedEvents.saleEndDate), gte(siaeTicketedEvents.saleEndDate, now))
         )
       )
       .orderBy(events.startDatetime)
