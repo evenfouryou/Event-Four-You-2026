@@ -25,6 +25,7 @@ interface PublicEvent {
   eventName: string;
   eventStart: Date;
   eventEnd: Date;
+  eventImageUrl: string | null;
   locationId: number;
   locationName: string;
   locationAddress: string;
@@ -49,14 +50,23 @@ function EventCard({ event, index }: { event: PublicEvent; index: number }) {
           className="group relative overflow-hidden rounded-2xl border-0 cursor-pointer transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl hover:shadow-yellow-500/10"
           data-testid={`card-event-${event.id}`}
         >
-          <div className="relative aspect-[16/10] bg-gradient-to-br from-indigo-900/50 via-purple-900/40 to-pink-900/30">
-            <div className="absolute inset-0 bg-gradient-to-t from-[#0a0e17] via-transparent to-transparent" />
-            <div className="absolute inset-0 flex items-center justify-center opacity-20">
-              <Sparkles className="w-32 h-32 text-yellow-500" />
-            </div>
+          <div className="relative aspect-square bg-gradient-to-br from-indigo-900/50 via-purple-900/40 to-pink-900/30">
+            {event.eventImageUrl ? (
+              <img
+                src={event.eventImageUrl}
+                alt={event.eventName}
+                className="absolute inset-0 w-full h-full object-cover"
+                data-testid={`img-event-${event.id}`}
+              />
+            ) : (
+              <div className="absolute inset-0 flex items-center justify-center opacity-20">
+                <Sparkles className="w-32 h-32 text-yellow-500" />
+              </div>
+            )}
+            <div className="absolute inset-0 bg-gradient-to-t from-[#0a0e17] via-[#0a0e17]/40 to-transparent" />
             {isToday && (
               <Badge
-                className="absolute top-4 left-4 bg-emerald-500/90 text-white border-0 px-3 py-1 shadow-lg shadow-emerald-500/25"
+                className="absolute top-4 left-4 bg-emerald-500/90 text-white border-0 px-3 py-1 shadow-lg shadow-emerald-500/25 z-10"
                 data-testid={`badge-today-${event.id}`}
               >
                 <span className="animate-pulse mr-1">●</span> Stasera
@@ -64,7 +74,7 @@ function EventCard({ event, index }: { event: PublicEvent; index: number }) {
             )}
             {isSoldOut && (
               <Badge
-                className="absolute top-4 right-4 bg-red-500/90 text-white border-0"
+                className="absolute top-4 right-4 bg-red-500/90 text-white border-0 z-10"
                 data-testid={`badge-soldout-${event.id}`}
               >
                 Sold Out
@@ -125,7 +135,7 @@ function EventCard({ event, index }: { event: PublicEvent; index: number }) {
 function EventCardSkeleton() {
   return (
     <Card className="overflow-hidden rounded-2xl border-0">
-      <Skeleton className="aspect-[16/10]" />
+      <Skeleton className="aspect-square" />
       <div className="p-6 space-y-3">
         <Skeleton className="h-7 w-3/4" />
         <Skeleton className="h-4 w-1/2" />

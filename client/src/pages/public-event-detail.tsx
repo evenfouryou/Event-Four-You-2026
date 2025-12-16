@@ -397,7 +397,7 @@ export default function PublicEventDetailPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-[#0a0e17] flex items-center justify-center p-4">
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -418,8 +418,8 @@ export default function PublicEventDetailPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950">
-      <header className="sticky top-0 z-50 backdrop-blur-xl bg-slate-950/80 border-b border-white/5">
+    <div className="min-h-screen bg-[#0a0e17]">
+      <header className="sticky top-0 z-50 backdrop-blur-xl bg-[#0a0e17]/80 border-b border-white/5">
         <div className="max-w-7xl mx-auto px-4 py-3">
           <div className="flex items-center justify-between gap-4">
             <Link href="/acquista">
@@ -473,22 +473,24 @@ export default function PublicEventDetailPage() {
             className="space-y-8"
           >
             <Card className="relative overflow-hidden rounded-3xl border-0 bg-gradient-to-br from-indigo-900/60 via-purple-900/50 to-pink-900/40">
-              {event.eventImageUrl ? (
-                <img
-                  src={event.eventImageUrl}
-                  alt={event.eventName}
-                  className="absolute inset-0 w-full h-full object-cover"
-                  data-testid="img-event-cover"
-                />
-              ) : (
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <Music className="w-32 h-32 text-white/10" />
-                </div>
-              )}
-              <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/60 to-transparent" />
-              <div className="absolute inset-0 bg-gradient-to-r from-slate-950/50 to-transparent" />
+              <div className="relative aspect-square md:aspect-[2/1]">
+                {event.eventImageUrl ? (
+                  <img
+                    src={event.eventImageUrl}
+                    alt={event.eventName}
+                    className="absolute inset-0 w-full h-full object-cover"
+                    data-testid="img-event-cover"
+                  />
+                ) : (
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <Music className="w-32 h-32 text-white/10" />
+                  </div>
+                )}
+                <div className="absolute inset-0 bg-gradient-to-t from-[#0a0e17] via-[#0a0e17]/60 to-transparent" />
+                <div className="absolute inset-0 bg-gradient-to-r from-[#0a0e17]/50 to-transparent" />
+              </div>
               
-              <CardContent className="relative p-6 md:p-10 min-h-[320px] flex flex-col justify-end">
+              <CardContent className="absolute bottom-0 left-0 right-0 p-6 md:p-10">
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
