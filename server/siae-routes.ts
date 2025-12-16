@@ -504,10 +504,16 @@ router.post("/api/siae/customers/:id/verify-manual", requireAuth, requireGestore
       return res.status(404).json({ message: "Cliente non trovato" });
     }
     
+    // Aggiorna il cliente come verificato
     const updated = await siaeStorage.updateSiaeCustomer(req.params.id, {
       phoneVerified: true,
       isActive: true,
     });
+    
+    // Pulisci tutti gli OTP pendenti per questo telefono
+    if (customer.phone) {
+      await siaeStorage.markSiaeOtpVerifiedByPhone(customer.phone);
+    }
     
     res.json({ 
       message: "Cliente verificato manualmente con successo",

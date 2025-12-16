@@ -157,6 +157,7 @@ export interface ISiaeStorage {
   createSiaeOtpAttempt(attempt: InsertSiaeOtpAttempt): Promise<SiaeOtpAttempt>;
   getSiaeOtpAttempt(phone: string, otpCode: string): Promise<SiaeOtpAttempt | undefined>;
   markSiaeOtpVerified(id: string): Promise<void>;
+  markSiaeOtpVerifiedByPhone(phone: string): Promise<void>;
   cleanupExpiredOtps(): Promise<void>;
   
   // ==================== Ticketed Events ====================
@@ -625,6 +626,15 @@ export class SiaeStorage implements ISiaeStorage {
     await db.update(siaeOtpAttempts)
       .set({ status: 'verified', verifiedAt: new Date() })
       .where(eq(siaeOtpAttempts.id, id));
+  }
+  
+  async markSiaeOtpVerifiedByPhone(phone: string): Promise<void> {
+    await db.update(siaeOtpAttempts)
+      .set({ status: 'verified', verifiedAt: new Date() })
+      .where(and(
+        eq(siaeOtpAttempts.phone, phone),
+        eq(siaeOtpAttempts.status, 'pending')
+      ));
   }
   
   async cleanupExpiredOtps(): Promise<void> {
