@@ -115,6 +115,22 @@ import {
   Cell,
 } from "recharts";
 import { EventCashierAllocations } from "./event-cashier-allocations";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import type {
   Event,
   Station,
@@ -125,6 +141,7 @@ import type {
   SiaeTicketedEvent,
   SiaeEventSector,
   SiaeTransaction,
+  SiaeTicket,
   User,
   Product,
   Location as LocationType,
@@ -609,6 +626,15 @@ export default function EventHub() {
   const [newPrData, setNewPrData] = useState({ userId: '', staffUserId: '', canAddToLists: true, canProposeTables: false });
   const [newScannerData, setNewScannerData] = useState({ userId: '', canScanLists: true, canScanTables: true, canScanTickets: true });
 
+  // Biglietti Emessi state
+  const [ticketSectorFilter, setTicketSectorFilter] = useState<string>("all");
+  const [ticketStatusFilter, setTicketStatusFilter] = useState<string>("all");
+  const [ticketsDisplayLimit, setTicketsDisplayLimit] = useState(20);
+  const [cancelTicketDialogOpen, setCancelTicketDialogOpen] = useState(false);
+  const [ticketToCancel, setTicketToCancel] = useState<SiaeTicket | null>(null);
+  const [cancelReason, setCancelReason] = useState("01");
+  const [cancelNote, setCancelNote] = useState("");
+
   const { data: event, isLoading: eventLoading } = useQuery<Event>({
     queryKey: ['/api/events', id],
   });
@@ -650,6 +676,12 @@ export default function EventHub() {
 
   const { data: siaeTransactions = [] } = useQuery<SiaeTransaction[]>({
     queryKey: ['/api/siae/ticketed-events', ticketedEvent?.id, 'transactions'],
+    enabled: !!ticketedEvent?.id,
+  });
+
+  // Biglietti Emessi query
+  const { data: siaeTickets = [], isLoading: ticketsLoading, refetch: refetchTickets } = useQuery<SiaeTicket[]>({
+    queryKey: ['/api/siae/ticketed-events', ticketedEvent?.id, 'tickets'],
     enabled: !!ticketedEvent?.id,
   });
 
@@ -953,6 +985,74 @@ export default function EventHub() {
       toast({ title: "Errore", description: error?.message || "Impossibile rimuovere lo scanner", variant: "destructive" });
     },
   });
+
+  // Cancel ticket mutation
+  const cancelTicketMutation = useMutation({
+    mutationFn: async ({ ticketId, reason }: { ticketId: string; reason: string }) => {
+      return apiRequest('POST', `/api/siae/tickets/${ticketId}/cancel`, { reasonCode: reason });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/siae/ticketed-events', ticketedEvent?.id, 'tickets'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/siae/events', id, 'ticketing'] });
+      setCancelTicketDialogOpen(false);
+      setTicketToCancel(null);
+      setCancelReason("01");
+      setCancelNote("");
+      toast({ title: "Biglietto Annullato", description: "Il biglietto è stato annullato con successo." });
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: "Errore Annullamento", 
+        description: error?.message || "Impossibile annullare il biglietto", 
+        variant: "destructive" 
+      });
+    },
+  });
+
+  // Helper to get filtered tickets
+  const filteredTickets = useMemo(() => {
+    let filtered = siaeTickets;
+    if (ticketSectorFilter !== "all") {
+      filtered = filtered.filter(t => t.sectorId === ticketSectorFilter);
+    }
+    if (ticketStatusFilter !== "all") {
+      filtered = filtered.filter(t => t.status === ticketStatusFilter);
+    }
+    return filtered;
+  }, [siaeTickets, ticketSectorFilter, ticketStatusFilter]);
+
+  const displayedTickets = filteredTickets.slice(0, ticketsDisplayLimit);
+
+  const getSectorName = useCallback((sectorId: string) => {
+    const sector = ticketedEvent?.sectors?.find(s => s.id === sectorId);
+    return sector?.name || "Settore Sconosciuto";
+  }, [ticketedEvent?.sectors]);
+
+  const getTicketStatusBadge = (status: string) => {
+    switch (status) {
+      case 'valid':
+        return <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30">Valido</Badge>;
+      case 'used':
+        return <Badge className="bg-blue-500/20 text-blue-400 border-blue-500/30">Usato</Badge>;
+      case 'cancelled':
+        return <Badge className="bg-red-500/20 text-red-400 border-red-500/30">Annullato</Badge>;
+      default:
+        return <Badge variant="secondary">{status}</Badge>;
+    }
+  };
+
+  const handleCancelTicket = (ticket: SiaeTicket) => {
+    setTicketToCancel(ticket);
+    setCancelTicketDialogOpen(true);
+  };
+
+  const confirmCancelTicket = () => {
+    if (!ticketToCancel) return;
+    cancelTicketMutation.mutate({ 
+      ticketId: ticketToCancel.id, 
+      reason: cancelNote ? `${cancelReason}: ${cancelNote}` : cancelReason 
+    });
+  };
 
   const handleReportC1 = async () => {
     if (!ticketedEvent?.id) {
@@ -2032,6 +2132,217 @@ export default function EventHub() {
                 siaeEventId={ticketedEvent?.id}
               />
             )}
+
+            {/* Biglietti Emessi Section */}
+            {ticketedEvent && (
+              <Card className="glass-card" data-testid="card-biglietti-emessi">
+                <CardHeader>
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <CardTitle className="flex items-center gap-2">
+                      <Ticket className="h-5 w-5 text-amber-400" />
+                      Biglietti Emessi
+                    </CardTitle>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Select value={ticketSectorFilter} onValueChange={setTicketSectorFilter}>
+                        <SelectTrigger className="w-[160px]" data-testid="select-sector-filter">
+                          <SelectValue placeholder="Tutti i Settori" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Tutti i Settori</SelectItem>
+                          {ticketedEvent.sectors?.map((sector) => (
+                            <SelectItem key={sector.id} value={sector.id}>
+                              {sector.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Select value={ticketStatusFilter} onValueChange={setTicketStatusFilter}>
+                        <SelectTrigger className="w-[140px]" data-testid="select-status-filter">
+                          <SelectValue placeholder="Tutti gli Stati" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Tutti gli Stati</SelectItem>
+                          <SelectItem value="valid">Valido</SelectItem>
+                          <SelectItem value="used">Usato</SelectItem>
+                          <SelectItem value="cancelled">Annullato</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Button 
+                        variant="outline" 
+                        size="icon" 
+                        onClick={() => refetchTickets()}
+                        data-testid="button-refresh-tickets"
+                      >
+                        <RefreshCw className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                  <CardDescription>
+                    {filteredTickets.length} bigliett{filteredTickets.length === 1 ? 'o' : 'i'} 
+                    {ticketSectorFilter !== "all" || ticketStatusFilter !== "all" ? " (filtrati)" : " totali"}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {ticketsLoading ? (
+                    <div className="space-y-3">
+                      {[1, 2, 3, 4, 5].map((i) => (
+                        <div key={i} className="flex items-center gap-4">
+                          <Skeleton className="h-4 w-24" />
+                          <Skeleton className="h-4 w-20" />
+                          <Skeleton className="h-4 w-16" />
+                          <Skeleton className="h-4 w-20" />
+                          <Skeleton className="h-4 w-16" />
+                        </div>
+                      ))}
+                    </div>
+                  ) : filteredTickets.length === 0 ? (
+                    <div className="text-center py-8">
+                      <Ticket className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
+                      <h3 className="font-semibold mb-2">Nessun Biglietto</h3>
+                      <p className="text-sm text-muted-foreground">
+                        {ticketSectorFilter !== "all" || ticketStatusFilter !== "all" 
+                          ? "Nessun biglietto corrisponde ai filtri selezionati"
+                          : "Non ci sono biglietti emessi per questo evento"}
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Codice Biglietto</TableHead>
+                            <TableHead>Settore</TableHead>
+                            <TableHead>Tipo</TableHead>
+                            <TableHead>Prezzo</TableHead>
+                            <TableHead>Data Emissione</TableHead>
+                            <TableHead>Stato</TableHead>
+                            <TableHead>Canale</TableHead>
+                            <TableHead className="text-right">Azioni</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {displayedTickets.map((ticket) => (
+                            <TableRow key={ticket.id} data-testid={`ticket-row-${ticket.id}`}>
+                              <TableCell className="font-mono text-sm" data-testid={`ticket-code-${ticket.id}`}>
+                                {ticket.fiscalSealCode || ticket.progressiveNumber || ticket.id.slice(0, 8)}
+                              </TableCell>
+                              <TableCell>{getSectorName(ticket.sectorId)}</TableCell>
+                              <TableCell>
+                                <Badge variant="secondary" className="text-xs">
+                                  {ticket.ticketTypeCode === 'INT' || ticket.ticketTypeCode === '01' ? 'Intero' : 
+                                   ticket.ticketTypeCode === 'RID' || ticket.ticketTypeCode === '02' ? 'Ridotto' : 
+                                   ticket.ticketTypeCode}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="font-medium">
+                                €{Number(ticket.grossAmount || 0).toFixed(2)}
+                              </TableCell>
+                              <TableCell className="text-sm text-muted-foreground">
+                                {ticket.emissionDate ? format(new Date(ticket.emissionDate), 'dd/MM/yyyy HH:mm', { locale: it }) : 'N/A'}
+                              </TableCell>
+                              <TableCell data-testid={`ticket-status-${ticket.id}`}>
+                                {getTicketStatusBadge(ticket.status)}
+                              </TableCell>
+                              <TableCell className="text-sm text-muted-foreground">
+                                {ticket.emissionChannelCode || ticket.cardCode || "N/A"}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                {ticket.status === 'valid' && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleCancelTicket(ticket)}
+                                    className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                                    data-testid={`button-cancel-ticket-${ticket.id}`}
+                                  >
+                                    <X className="h-4 w-4 mr-1" />
+                                    Annulla
+                                  </Button>
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                      
+                      {filteredTickets.length > ticketsDisplayLimit && (
+                        <div className="flex justify-center mt-4">
+                          <Button
+                            variant="outline"
+                            onClick={() => setTicketsDisplayLimit(prev => prev + 20)}
+                            data-testid="button-load-more-tickets"
+                          >
+                            Carica altri ({filteredTickets.length - ticketsDisplayLimit} rimanenti)
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Cancel Ticket Dialog */}
+            <AlertDialog open={cancelTicketDialogOpen} onOpenChange={setCancelTicketDialogOpen}>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Annulla Biglietto</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Stai per annullare il biglietto{' '}
+                    <span className="font-mono font-semibold">
+                      {ticketToCancel?.fiscalSealCode || ticketToCancel?.progressiveNumber || ticketToCancel?.id.slice(0, 8)}
+                    </span>.
+                    Questa azione non può essere annullata.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <div className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="cancel-reason">Causale Annullamento</Label>
+                    <Select value={cancelReason} onValueChange={setCancelReason}>
+                      <SelectTrigger data-testid="select-cancel-reason">
+                        <SelectValue placeholder="Seleziona causale" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="01">01 - Richiesta cliente</SelectItem>
+                        <SelectItem value="02">02 - Errore emissione</SelectItem>
+                        <SelectItem value="03">03 - Evento annullato</SelectItem>
+                        <SelectItem value="04">04 - Duplicato</SelectItem>
+                        <SelectItem value="99">99 - Altro</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="cancel-note">Note aggiuntive (opzionale)</Label>
+                    <Textarea
+                      id="cancel-note"
+                      value={cancelNote}
+                      onChange={(e) => setCancelNote(e.target.value)}
+                      placeholder="Descrivi il motivo dell'annullamento..."
+                      className="resize-none"
+                      data-testid="input-cancel-note"
+                    />
+                  </div>
+                </div>
+                <AlertDialogFooter>
+                  <AlertDialogCancel data-testid="button-cancel-dialog-close">Annulla</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={confirmCancelTicket}
+                    className="bg-red-600 hover:bg-red-700"
+                    disabled={cancelTicketMutation.isPending}
+                    data-testid="button-confirm-cancel-ticket"
+                  >
+                    {cancelTicketMutation.isPending ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Annullamento...
+                      </>
+                    ) : (
+                      'Conferma Annullamento'
+                    )}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </TabsContent>
 
           <TabsContent value="guests">
