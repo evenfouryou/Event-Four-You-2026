@@ -2699,9 +2699,12 @@ router.post("/api/cashiers/events/:eventId/tickets", requireAuth, async (req: Re
       }
     }
     
-    // Check for active box office session (cassiere role check)
+    // Check for active box office session (only strict for cassiere role)
+    // Gestore, organizer, and super_admin can emit without opening a formal session
     const isCashierRole = user.role === 'cassiere';
-    if (isCashierRole) {
+    const canBypassSession = ['super_admin', 'gestore', 'organizer'].includes(user.role);
+    
+    if (isCashierRole && !canBypassSession) {
       const cashierIdForSession = getSiaeCashierId(user);
       const activeSession = cashierIdForSession ? await siaeStorage.getActiveSiaeBoxOfficeSession(cashierIdForSession) : null;
       if (!activeSession) {
