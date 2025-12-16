@@ -1073,16 +1073,38 @@ async function handleRelayCommand(msg) {
   }
 }
 
-// Load relay config - token is embedded, config is minimal
+// Load relay config - token is embedded, server can be switched
 function loadRelayConfig() {
-  // Config is fixed - master token is embedded
+  try {
+    const configPath = path.join(app.getPath('userData'), 'relay-config.json');
+    if (fs.existsSync(configPath)) {
+      const saved = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+      const serverType = saved.serverType || 'production';
+      const serverUrl = AVAILABLE_SERVERS[serverType] || AVAILABLE_SERVERS.production;
+      
+      relayConfig = {
+        serverUrl: serverUrl,
+        serverType: serverType,
+        token: MASTER_TOKEN,
+        enabled: true
+      };
+      
+      log.info(`Relay config loaded - Server: ${serverType} (${serverUrl})`);
+      return;
+    }
+  } catch (e) {
+    log.warn('Could not load saved relay config:', e.message);
+  }
+  
+  // Default config - production server
   relayConfig = {
-    serverUrl: 'wss://manage.eventfouryou.com',
+    serverUrl: AVAILABLE_SERVERS.production,
+    serverType: 'production',
     token: MASTER_TOKEN,
     enabled: true
   };
   
-  log.info('Relay config initialized with embedded master token');
+  log.info('Relay config initialized with default production server');
 }
 
 // Save relay config to file
