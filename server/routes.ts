@@ -61,7 +61,8 @@ import bcrypt from "bcryptjs";
 import { z } from "zod";
 import nodemailer from "nodemailer";
 import { db } from "./db";
-import { eq, and, or, inArray, desc, isNull } from "drizzle-orm";
+import { eq, and, or, inArray, desc, isNull, like } from "drizzle-orm";
+import { events } from "@shared/schema";
 import crypto from "crypto";
 import QRCode from "qrcode";
 import { 
@@ -1173,6 +1174,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ===== EVENTS =====
+  
+  // Short link resolver - public endpoint
+  app.get('/api/events/short/:shortId', async (req: any, res) => {
+    try {
+      const { shortId } = req.params;
+      if (!shortId || shortId.length < 8) {
+        return res.status(400).json({ message: "Link non valido" });
+      }
+      
+      // Find event by the first 8 characters of its ID using LIKE prefix match
+      const matchingEvents = await db.select()
+        .from(events)
+        .where(like(events.id, `${shortId}%`))
+        .limit(1);
+      
+      const event = matchingEvents[0];
+      
+      if (!event) {
+        return res.status(404).json({ message: "Evento non trovato" });
+      }
+      
+      // Check if event is public
+      if (!event.isPublic) {
+        return res.status(403).json({ message: "Evento non disponibile" });
+      }
+      
+      res.json({ id: event.id, name: event.name });
+    } catch (error) {
+      console.error("Error resolving short link:", error);
+      res.status(500).json({ message: "Errore nel caricamento dell'evento" });
+    }
+  });
+
   app.get('/api/events', isAuthenticated, async (req: any, res) => {
     try {
       const companyId = await getUserCompanyId(req);

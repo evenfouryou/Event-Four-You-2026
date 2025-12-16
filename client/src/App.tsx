@@ -94,6 +94,7 @@ import StaffPrEventPanel from "@/pages/staff-pr-event-panel";
 import CassaBiglietti from "@/pages/cassa-biglietti";
 import CashierManagement from "@/pages/cashier-management";
 import CashierDashboard from "@/pages/cashier-dashboard";
+import EventShortLink from "@/pages/event-short-link";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -124,6 +125,7 @@ function Router() {
         <Route path="/verify-email" component={VerifyEmail} />
         <Route path="/forgot-password" component={ForgotPassword} />
         <Route path="/reset-password" component={ResetPassword} />
+        <Route path="/e/:shortId" component={EventShortLink} />
         <Route path="/acquista/:id" component={PublicEventDetail} />
         <Route path="/acquista" component={PublicEvents} />
         <Route path="/carrello" component={PublicCart} />
