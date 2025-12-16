@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,27 +9,36 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Cookie, FileText, Settings, Save, Loader2 } from "lucide-react";
+import { Cookie, FileText, Settings, Save, Loader2, AlertCircle } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface SiteSettings {
-  cookie_consent_enabled: boolean;
-  cookie_consent_text: string;
-  privacy_policy_url: string;
-  terms_of_service_url: string;
-  contact_email: string;
-  support_phone: string;
+  cookie_consent_enabled?: boolean;
+  cookie_consent_text?: string;
+  privacy_policy_url?: string;
+  terms_of_service_url?: string;
+  contact_email?: string;
+  support_phone?: string;
 }
 
 export default function AdminSiteSettings() {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("cookies");
 
-  const { data: settings, isLoading } = useQuery<SiteSettings>({
+  const { data: settings, isLoading, error } = useQuery<SiteSettings>({
     queryKey: ["/api/admin/site-settings"],
   });
 
   const [formData, setFormData] = useState<Partial<SiteSettings>>({});
+  const [hasChanges, setHasChanges] = useState(false);
+
+  useEffect(() => {
+    if (settings) {
+      setFormData({});
+      setHasChanges(false);
+    }
+  }, [settings]);
 
   const updateMutation = useMutation({
     mutationFn: async (data: Partial<SiteSettings>) => {
@@ -38,6 +47,8 @@ export default function AdminSiteSettings() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/site-settings"] });
       queryClient.invalidateQueries({ queryKey: ["/api/public/cookie-settings"] });
+      setFormData({});
+      setHasChanges(false);
       toast({
         title: "Impostazioni Salvate",
         description: "Le impostazioni del sito sono state aggiornate con successo.",
@@ -64,7 +75,21 @@ export default function AdminSiteSettings() {
 
   const setValue = (key: keyof SiteSettings, value: any) => {
     setFormData(prev => ({ ...prev, [key]: value }));
+    setHasChanges(true);
   };
+
+  if (error) {
+    return (
+      <div className="p-6" data-testid="page-admin-site-settings">
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            Errore nel caricamento delle impostazioni. Verifica di avere i permessi necessari.
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (
@@ -92,7 +117,7 @@ export default function AdminSiteSettings() {
         </div>
         <Button
           onClick={handleSave}
-          disabled={updateMutation.isPending || Object.keys(formData).length === 0}
+          disabled={updateMutation.isPending || !hasChanges}
           data-testid="button-save-settings"
         >
           {updateMutation.isPending ? (

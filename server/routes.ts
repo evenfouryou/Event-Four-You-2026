@@ -6350,21 +6350,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ==================== SITE SETTINGS (Super Admin Only) ====================
   
-  // GET /api/admin/site-settings - Get all site settings
+  // Whitelist of allowed site settings keys (non-sensitive)
+  const ALLOWED_SITE_SETTINGS = [
+    'cookie_consent_enabled',
+    'cookie_consent_text',
+    'privacy_policy_url',
+    'terms_of_service_url',
+    'contact_email',
+    'support_phone'
+  ] as const;
+  
+  // GET /api/admin/site-settings - Get site settings (filtered by whitelist)
   app.get('/api/admin/site-settings', isAuthenticated, async (req: any, res) => {
     try {
       if (req.user?.role !== 'super_admin') {
         return res.status(403).json({ message: "Accesso non autorizzato" });
       }
       
-      const settings = await db.select().from(systemSettings);
+      const settings = await db.select().from(systemSettings)
+        .where(inArray(systemSettings.key, [...ALLOWED_SITE_SETTINGS]));
+      
       const settingsMap: Record<string, any> = {};
       
       for (const setting of settings) {
-        try {
-          settingsMap[setting.key] = JSON.parse(setting.value || 'null');
-        } catch {
-          settingsMap[setting.key] = setting.value;
+        if (setting.key === 'cookie_consent_enabled') {
+          settingsMap[setting.key] = setting.value === 'true';
+        } else {
+          settingsMap[setting.key] = setting.value || '';
         }
       }
       
@@ -6375,7 +6387,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // PATCH /api/admin/site-settings - Update site settings
+  // PATCH /api/admin/site-settings - Update site settings (validated against whitelist)
   app.patch('/api/admin/site-settings', isAuthenticated, async (req: any, res) => {
     try {
       if (req.user?.role !== 'super_admin') {
@@ -6386,7 +6398,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user.claims.sub;
       
       for (const [key, value] of Object.entries(updates)) {
-        const stringValue = typeof value === 'object' ? JSON.stringify(value) : String(value);
+        // Only allow whitelisted keys
+        if (!ALLOWED_SITE_SETTINGS.includes(key as any)) {
+          continue;
+        }
+        
+        // Validate and sanitize value
+        let stringValue: string;
+        if (key === 'cookie_consent_enabled') {
+          stringValue = value === true || value === 'true' ? 'true' : 'false';
+        } else if (typeof value === 'string') {
+          stringValue = value.trim().slice(0, 2000); // Max 2000 chars
+        } else {
+          stringValue = '';
+        }
         
         // Upsert setting
         const existing = await db.select().from(systemSettings).where(eq(systemSettings.key, key));
