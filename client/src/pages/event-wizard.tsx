@@ -365,10 +365,9 @@ export default function EventWizard() {
     },
     onSuccess: async (savedEvent: any) => {
       isPublishingRef.current = false;
-      // If SIAE is enabled, create the SIAE ticketed event and sectors
+      // If SIAE is enabled, create or update the SIAE ticketed event and sectors
       if (siaeEnabled && savedEvent?.id) {
         try {
-          // Create SIAE ticketed event
           const siaeEventData = {
             eventId: savedEvent.id,
             companyId: user?.companyId,
@@ -380,57 +379,128 @@ export default function EventWizard() {
             ticketingStatus: 'draft',
           };
           
-          const siaeEventResponse = await apiRequest('POST', '/api/siae/ticketed-events', siaeEventData);
-          const siaeEvent = await siaeEventResponse.json();
+          let siaeEvent;
           
-          // Create sectors for the SIAE event
-          if (siaeEvent?.id && siaeSectors.length > 0) {
-            // Get IVA rate from selected genre
-            const selectedGenre = siaeGenres?.find(g => g.code === siaeGenreCode);
-            const genreVatRate = selectedGenre?.vatRate || '22';
+          // Check if SIAE ticketed event already exists (editing mode)
+          if (existingSiaeData?.id) {
+            // Update existing SIAE ticketed event
+            const siaeEventResponse = await apiRequest('PATCH', `/api/siae/ticketed-events/${existingSiaeData.id}`, siaeEventData);
+            siaeEvent = await siaeEventResponse.json();
             
-            for (const ticket of siaeSectors) {
-              // Map new ticket format to backend sector format
-              const priceValue = ticket.price || '0';
-              await apiRequest('POST', '/api/siae/event-sectors', {
-                ticketedEventId: siaeEvent.id,
-                sectorCode: ticket.sectorCode || 'PU', // Default to Posto Unico if not specified
-                name: ticket.name,
-                capacity: ticket.quantity,
-                availableSeats: ticket.quantity,
-                isNumbered: ticket.isNumbered,
-                // Map price based on ticket type
-                priceIntero: ticket.ticketType === 'INT' ? priceValue : '0',
-                priceRidotto: ticket.ticketType === 'RID' ? priceValue : '0',
-                priceOmaggio: ticket.ticketType === 'OMA' ? '0' : '0',
-                prevendita: ticket.ddp || '0',
-                // Apply IVA rate from selected genre
-                ivaRate: genreVatRate,
-              });
+            // Use the returned siaeEvent.id for all operations
+            const ticketedEventId = siaeEvent?.id || existingSiaeData.id;
+            
+            // Update existing sectors or create new ones
+            if (siaeSectors.length > 0) {
+              const selectedGenre = siaeGenres?.find(g => g.code === siaeGenreCode);
+              const genreVatRate = selectedGenre?.vatRate || '22';
+              
+              // Track existing sector IDs from the database (normalize to strings for comparison)
+              const existingSectorIds = new Set<string>(
+                existingSiaeData.sectors?.map((s: any) => String(s.id)) || []
+              );
+              
+              for (const ticket of siaeSectors) {
+                const priceValue = ticket.price || '0';
+                const sectorData = {
+                  ticketedEventId: ticketedEventId,
+                  sectorCode: ticket.sectorCode || 'PU',
+                  name: ticket.name,
+                  capacity: ticket.quantity,
+                  availableSeats: ticket.quantity,
+                  isNumbered: ticket.isNumbered,
+                  priceIntero: ticket.ticketType === 'INT' ? priceValue : '0',
+                  priceRidotto: ticket.ticketType === 'RID' ? priceValue : '0',
+                  priceOmaggio: ticket.ticketType === 'OMA' ? '0' : '0',
+                  prevendita: ticket.ddp || '0',
+                  ivaRate: genreVatRate,
+                };
+                
+                // Normalize ticket.id to string for comparison
+                const ticketIdStr = ticket.id ? String(ticket.id) : null;
+                
+                // Check if this sector already exists in the database
+                if (ticketIdStr && existingSectorIds.has(ticketIdStr)) {
+                  // Update existing sector
+                  await apiRequest('PATCH', `/api/siae/event-sectors/${ticket.id}`, sectorData);
+                } else {
+                  // Create new sector (ticket.id is either missing or a temp ID)
+                  await apiRequest('POST', '/api/siae/event-sectors', sectorData);
+                }
+              }
+              
+              // Delete sectors that were removed
+              // Only delete sectors that existed in database and are no longer in wizard
+              const currentSectorIds = new Set<string>(
+                siaeSectors
+                  .filter(s => s.id && existingSectorIds.has(String(s.id)))
+                  .map(s => String(s.id))
+              );
+              
+              if (existingSiaeData.sectors) {
+                for (const existingSector of existingSiaeData.sectors) {
+                  if (!currentSectorIds.has(String(existingSector.id))) {
+                    await apiRequest('DELETE', `/api/siae/event-sectors/${existingSector.id}`);
+                  }
+                }
+              }
             }
+            
+            toast({
+              title: "Successo",
+              description: "Evento con biglietteria SIAE aggiornato con successo",
+            });
+          } else {
+            // Create new SIAE ticketed event
+            const siaeEventResponse = await apiRequest('POST', '/api/siae/ticketed-events', siaeEventData);
+            siaeEvent = await siaeEventResponse.json();
+            
+            // Create sectors for the new SIAE event
+            if (siaeEvent?.id && siaeSectors.length > 0) {
+              const selectedGenre = siaeGenres?.find(g => g.code === siaeGenreCode);
+              const genreVatRate = selectedGenre?.vatRate || '22';
+              
+              for (const ticket of siaeSectors) {
+                const priceValue = ticket.price || '0';
+                await apiRequest('POST', '/api/siae/event-sectors', {
+                  ticketedEventId: siaeEvent.id,
+                  sectorCode: ticket.sectorCode || 'PU',
+                  name: ticket.name,
+                  capacity: ticket.quantity,
+                  availableSeats: ticket.quantity,
+                  isNumbered: ticket.isNumbered,
+                  priceIntero: ticket.ticketType === 'INT' ? priceValue : '0',
+                  priceRidotto: ticket.ticketType === 'RID' ? priceValue : '0',
+                  priceOmaggio: ticket.ticketType === 'OMA' ? '0' : '0',
+                  prevendita: ticket.ddp || '0',
+                  ivaRate: genreVatRate,
+                });
+              }
+            }
+            
+            toast({
+              title: "Successo",
+              description: "Evento con biglietteria SIAE creato con successo",
+            });
           }
-          
-          toast({
-            title: "Successo",
-            description: "Evento con biglietteria SIAE creato con successo",
-          });
         } catch (error) {
-          console.error('Error creating SIAE ticketed event:', error);
+          console.error('Error saving SIAE ticketed event:', error);
           toast({
             title: "Attenzione",
-            description: "Evento creato ma errore nella configurazione SIAE. Configura la biglietteria manualmente.",
+            description: "Evento salvato ma errore nella configurazione SIAE. Verifica la biglietteria manualmente.",
             variant: "destructive",
           });
         }
       } else {
         toast({
           title: "Successo",
-          description: "Evento creato con successo",
+          description: draftIdRef.current ? "Evento aggiornato con successo" : "Evento creato con successo",
         });
       }
       
       queryClient.invalidateQueries({ queryKey: ['/api/events'] });
       queryClient.invalidateQueries({ queryKey: ['/api/siae/ticketed-events'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/siae/events', draftId, 'ticketing'] });
       navigate('/events');
     },
     onError: () => {
