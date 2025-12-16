@@ -130,7 +130,7 @@ async function main() {
     
     // Create commit
     console.log('📝 Creating commit...');
-    const commitMessage = 'v3.16: Improved Genera Sigillo history with guards\n\n- Fix: Guard against invalid datetime in sigillo history\n- Fix: Use escapeHtml for MAC display\n- Each entry shows: MAC, counter, time, price with fallbacks\n- PIN verification only on card reinsertion (not removal)\n\nSee BUILD_INSTRUCTIONS.md for details.';
+    const commitMessage = 'v3.17: Server-controlled seal generation + fixes\n\n- Hide manual seal generation form (server controls it)\n- Add sigillo:generated event for server-requested seals\n- Fix: cachedBridgeStatus reads .data instead of .payload\n- Sigilli history shows seals from both manual and server\n- Panel shows \"Sigilli Fiscali Generati\" with description\n\nSee BUILD_INSTRUCTIONS.md for details.';
     
     const { data: commit } = await octokit.git.createCommit({
       owner,

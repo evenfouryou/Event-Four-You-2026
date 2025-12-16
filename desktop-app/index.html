@@ -109,10 +109,13 @@
         </div>
       </section>
 
-      <!-- Sigillo Panel -->
+      <!-- Sigillo Panel - Solo visualizzazione, generazione comandata dal server -->
       <section class="panel sigillo-panel" id="sigillo-panel" style="display: none;">
-        <h2>Genera Sigillo Fiscale</h2>
-        <form id="sigillo-form">
+        <h2>Sigilli Fiscali Generati</h2>
+        <p class="panel-description">I sigilli vengono generati automaticamente quando un cassiere emette un biglietto dal sito web.</p>
+        
+        <!-- Form nascosto per generazione test (solo debug) -->
+        <form id="sigillo-form" style="display: none;">
           <div class="form-row">
             <div class="form-group">
               <label for="input-price">Importo (€)</label>
@@ -129,11 +132,10 @@
           </div>
         </form>
         
-        <!-- Sigilli History - simple list -->
+        <!-- Sigilli History - lista dei sigilli generati -->
         <div id="sigilli-history" class="sigilli-history">
-          <h3>Sigilli Generati</h3>
           <div id="sigilli-list" class="sigilli-list">
-            <div class="sigilli-empty">Nessun sigillo generato</div>
+            <div class="sigilli-empty">In attesa di emissione biglietti...</div>
           </div>
         </div>
       </section>

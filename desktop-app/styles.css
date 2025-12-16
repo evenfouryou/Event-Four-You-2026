@@ -105,8 +105,13 @@ body {
 .panel h2 {
   font-size: 16px;
   font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.panel-description {
+  font-size: 13px;
+  color: var(--text-secondary);
   margin-bottom: 16px;
-  color: var(--text-primary);
 }
 
 /* Status Panel */

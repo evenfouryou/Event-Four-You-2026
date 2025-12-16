@@ -537,7 +537,8 @@ export function isCardReadyForSeals(): { ready: boolean; error: string | null } 
     return { ready: false, error: 'App desktop Event4U non connessa' };
   }
   
-  const status = cachedBridgeStatus?.payload || cachedBridgeStatus;
+  // Desktop app sends { type: 'status', data: {...} }
+  const status = cachedBridgeStatus?.data || cachedBridgeStatus?.payload || cachedBridgeStatus;
   if (!status) {
     return { ready: false, error: 'Stato lettore sconosciuto' };
   }
