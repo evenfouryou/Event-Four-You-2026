@@ -870,10 +870,35 @@ router.get("/api/public/stripe-key", async (req, res) => {
 router.post("/api/public/checkout/create-payment-intent", async (req, res) => {
   try {
     const sessionId = getOrCreateSessionId(req, res);
-    const customer = await getAuthenticatedCustomer(req);
+    let customer = await getAuthenticatedCustomer(req);
 
     if (!customer) {
       return res.status(401).json({ message: "Devi essere autenticato per procedere al pagamento" });
+    }
+
+    // Se l'utente non ha un profilo SIAE, crealo automaticamente
+    if (customer._isUserWithoutSiaeProfile && customer.userId) {
+      const uniqueCode = `CL${Date.now().toString(36).toUpperCase()}`;
+      const [newCustomer] = await db
+        .insert(siaeCustomers)
+        .values({
+          uniqueCode,
+          userId: customer.userId,
+          email: customer.email,
+          firstName: customer.firstName || '',
+          lastName: customer.lastName || '',
+          phone: customer.phone || null,
+          phoneVerified: !!customer.phone, // Se ha telefono, consideralo verificato
+          emailVerified: true, // Email già verificata durante registrazione
+          registrationCompleted: true,
+          isActive: true,
+          authenticationType: 'unified',
+          registrationIp: req.ip,
+        })
+        .returning();
+      
+      customer = newCustomer;
+      console.log(`[PUBLIC] Auto-created SIAE profile for user ${customer.userId}: ${newCustomer.id}`);
     }
 
     // Carica carrello
