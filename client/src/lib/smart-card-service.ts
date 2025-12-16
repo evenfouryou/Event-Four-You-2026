@@ -175,9 +175,9 @@ class SmartCardService {
           console.log('[DEBUG SC] Parsed message type:', msg.type);
           
           if (msg && typeof msg.type === 'string') {
-            if (msg.type === 'status' && msg.data) {
+            if (msg.type === 'status' && (msg.data || msg.payload)) {
               console.log('[DEBUG SC] Handling status message');
-              this.handleWebSocketStatus(msg.data);
+              this.handleWebSocketStatus(msg.data || msg.payload);
             } else if (msg.type === 'bridge_status' || msg.type === 'connection_status') {
               console.log('[DEBUG SC] Handling bridge/connection status:', msg.type, msg);
               this.handleBridgeStatus(msg);
