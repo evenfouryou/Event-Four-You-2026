@@ -556,13 +556,21 @@ export function isCardReadyForSeals(): { ready: boolean; error: string | null } 
 
 // Request a fiscal seal from the desktop bridge
 export async function requestFiscalSeal(priceInCents: number): Promise<FiscalSealData> {
+  console.log(`[Bridge] requestFiscalSeal called with priceInCents=${priceInCents}`);
+  console.log(`[Bridge] globalBridge exists: ${!!globalBridge}`);
+  if (globalBridge) {
+    console.log(`[Bridge] globalBridge.ws.readyState: ${globalBridge.ws.readyState} (OPEN=1)`);
+  }
+  
   // Check if bridge is connected
   if (!globalBridge || globalBridge.ws.readyState !== WebSocket.OPEN) {
+    console.log(`[Bridge] ERROR: Bridge not connected or not open`);
     throw new Error('SEAL_BRIDGE_OFFLINE: App desktop Event4U non connessa. Impossibile generare sigillo fiscale.');
   }
   
   // Check if card is ready
   const cardReady = isCardReadyForSeals();
+  console.log(`[Bridge] Card ready check: ${JSON.stringify(cardReady)}`);
   if (!cardReady.ready) {
     throw new Error(`SEAL_CARD_NOT_READY: ${cardReady.error}`);
   }
@@ -570,7 +578,7 @@ export async function requestFiscalSeal(priceInCents: number): Promise<FiscalSea
   const requestId = generateRequestId();
   const price = priceInCents / 100;
   
-  console.log(`[Bridge] Requesting fiscal seal: requestId=${requestId}, price=${price}`);
+  console.log(`[Bridge] Requesting fiscal seal: requestId=${requestId}, price=${price}, sending to bridge...`);
   
   return new Promise<FiscalSealData>((resolve, reject) => {
     // Set timeout
@@ -590,15 +598,19 @@ export async function requestFiscalSeal(priceInCents: number): Promise<FiscalSea
     
     // Send request to bridge
     try {
-      globalBridge!.ws.send(JSON.stringify({
+      const sealMessage = {
         type: 'REQUEST_FISCAL_SEAL',
         requestId,
         payload: {
           price,
           timestamp: new Date().toISOString()
         }
-      }));
-    } catch (sendError) {
+      };
+      console.log(`[Bridge] Sending seal request to bridge: ${JSON.stringify(sealMessage)}`);
+      globalBridge!.ws.send(JSON.stringify(sealMessage));
+      console.log(`[Bridge] Seal request sent successfully, waiting for response...`);
+    } catch (sendError: any) {
+      console.log(`[Bridge] ERROR sending seal request: ${sendError.message}`);
       clearTimeout(timeout);
       pendingSealRequests.delete(requestId);
       reject(new Error('SEAL_SEND_ERROR: Errore invio richiesta sigillo'));
