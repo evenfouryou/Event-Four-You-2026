@@ -1,5 +1,20 @@
 # 🔧 ISTRUZIONI DI BUILD - Event Four You SIAE Lettore
 
+## ✅ BUG FIX v3.8 (Dicembre 2024)
+
+**Problema:** Errore 0x6A88 "Referenced data not found" anche con Initialize = 0
+
+### Correzioni applicate v3.8:
+
+1. **SelectML prima del PIN:**
+   - Chiama `SelectML` con diversi file ID (0x3F00, 0x5000, 0x0000) per selezionare l'applicazione corretta
+   - L'errore 0x6A88 può significare che non è selezionato il file/DF corretto sulla carta
+
+2. **nPIN espanso:**
+   - Prova più valori nPIN: 1, 0, 2, 3, 0x11, 0x21, 0x81, 0x82
+
+---
+
 ## ✅ BUG FIX v3.7 (Dicembre 2024)
 
 **Problema:** Initialize ritorna 3 invece di 0, causando errore 0x6A88 nella verifica PIN

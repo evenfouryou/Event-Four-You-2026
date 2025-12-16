@@ -130,7 +130,7 @@ async function main() {
     
     // Create commit
     console.log('📝 Creating commit...');
-    const commitMessage = 'v3.7: Reset card state before PIN verification\n\n- Call FinalizeML before Initialize to reset card state\n- If Initialize returns non-zero, retry Finalize+Initialize\n- Fixes "Referenced data not found" (0x6A88) error\n\nSee BUILD_INSTRUCTIONS.md for details.';
+    const commitMessage = 'v3.8: SelectML before PIN verification\n\n- Call SelectML with file IDs (0x3F00, 0x5000, 0x0000) before PIN\n- Expanded nPIN values: 1, 0, 2, 3, 0x11, 0x21, 0x81, 0x82\n- Fixes "Referenced data not found" (0x6A88) error\n\nSee BUILD_INSTRUCTIONS.md for details.';
     
     const { data: commit } = await octokit.git.createCommit({
       owner,

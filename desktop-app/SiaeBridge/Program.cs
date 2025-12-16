@@ -442,13 +442,27 @@ namespace SiaeBridge
                 Log($"  BeginTransactionML = {txResult}");
                 tx = (txResult == 0);
 
+                // Prova a selezionare diversi file/applicazioni sulla carta
+                // L'errore 0x6A88 potrebbe significare che non è selezionata l'applicazione corretta
+                ushort[] fileIds = { 0x3F00, 0x5000, 0x0000 }; // MF, DF SIAE, root
+                foreach (ushort fid in fileIds)
+                {
+                    int selRes = SelectML(fid, _slot);
+                    Log($"  SelectML(0x{fid:X4}) = {selRes} (0x{selRes:X4})");
+                    if (selRes == 0)
+                    {
+                        Log($"  ✓ File 0x{fid:X4} selezionato!");
+                        break;
+                    }
+                }
+
                 // nPIN = identificatore PIN (provare diversi valori)
                 // Dalla documentazione SIAE test.c: pVerifyPINML(1, pin, slot)
                 // Errore 0x6A88 = "Referenced data not found" = nPIN sbagliato
                 // Errore 0xFFFF = Errore generico
                 
-                // Valori nPIN da provare in ordine
-                int[] nPinValues = { 1, 0, 2, 0x81, 0x82, 0x01, 0x00 };
+                // Valori nPIN da provare in ordine - espanso con più possibilità
+                int[] nPinValues = { 1, 0, 2, 3, 0x11, 0x21, 0x81, 0x82 };
                 int pinResult = -1;
                 int successfulNPin = -1;
                 
