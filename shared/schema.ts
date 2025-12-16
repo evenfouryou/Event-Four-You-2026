@@ -3974,7 +3974,7 @@ export const siaeCashierAllocations = pgTable("siae_cashier_allocations", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   companyId: varchar("company_id").notNull().references(() => companies.id),
   eventId: varchar("event_id").notNull().references(() => siaeTicketedEvents.id),
-  userId: varchar("user_id").notNull().references(() => users.id),
+  cashierId: varchar("cashier_id").notNull().references(() => siaeCashiers.id),
   sectorId: varchar("sector_id").references(() => siaeEventSectors.id),
   quotaQuantity: integer("quota_quantity").notNull().default(0),
   quotaUsed: integer("quota_used").notNull().default(0),
@@ -3992,9 +3992,9 @@ export const siaeCashierAllocationsRelations = relations(siaeCashierAllocations,
     fields: [siaeCashierAllocations.eventId],
     references: [siaeTicketedEvents.id],
   }),
-  user: one(users, {
-    fields: [siaeCashierAllocations.userId],
-    references: [users.id],
+  cashier: one(siaeCashiers, {
+    fields: [siaeCashierAllocations.cashierId],
+    references: [siaeCashiers.id],
   }),
   sector: one(siaeEventSectors, {
     fields: [siaeCashierAllocations.sectorId],
@@ -4035,7 +4035,7 @@ export const insertSiaeCashierAllocationSchema = createInsertSchema(siaeCashierA
   createdAt: true,
   updatedAt: true,
 });
-export const updateSiaeCashierAllocationSchema = insertSiaeCashierAllocationSchema.partial().omit({ companyId: true, eventId: true, userId: true });
+export const updateSiaeCashierAllocationSchema = insertSiaeCashierAllocationSchema.partial().omit({ companyId: true, eventId: true, cashierId: true });
 
 export const insertSiaeTicketAuditSchema = createInsertSchema(siaeTicketAudit).omit({
   id: true,

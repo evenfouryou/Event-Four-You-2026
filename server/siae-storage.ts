@@ -277,8 +277,8 @@ export interface ISiaeStorage {
   // ==================== Cashier Allocations ====================
   
   getCashierAllocationsByEvent(eventId: string): Promise<SiaeCashierAllocation[]>;
-  getCashierAllocationsByUser(userId: string): Promise<SiaeCashierAllocation[]>;
-  getCashierAllocationByUserAndEvent(userId: string, eventId: string): Promise<SiaeCashierAllocation | undefined>;
+  getCashierAllocationsByCashier(cashierId: string): Promise<SiaeCashierAllocation[]>;
+  getCashierAllocationByCashierAndEvent(cashierId: string, eventId: string): Promise<SiaeCashierAllocation | undefined>;
   getCashierAllocation(id: string): Promise<SiaeCashierAllocation | undefined>;
   createCashierAllocation(data: InsertSiaeCashierAllocation): Promise<SiaeCashierAllocation>;
   updateCashierAllocation(id: string, data: Partial<SiaeCashierAllocation>): Promise<SiaeCashierAllocation | undefined>;
@@ -1516,12 +1516,12 @@ export class SiaeStorage implements ISiaeStorage {
       .orderBy(desc(siaeCashierAllocations.createdAt));
   }
 
-  async getCashierAllocationByUserAndEvent(userId: string, eventId: string): Promise<SiaeCashierAllocation | undefined> {
+  async getCashierAllocationByCashierAndEvent(cashierId: string, eventId: string): Promise<SiaeCashierAllocation | undefined> {
     const [allocation] = await db
       .select()
       .from(siaeCashierAllocations)
       .where(and(
-        eq(siaeCashierAllocations.userId, userId),
+        eq(siaeCashierAllocations.cashierId, cashierId),
         eq(siaeCashierAllocations.eventId, eventId),
         eq(siaeCashierAllocations.isActive, true)
       ));
@@ -1577,12 +1577,12 @@ export class SiaeStorage implements ISiaeStorage {
     return allocation;
   }
 
-  async getCashierAllocationsByUser(userId: string): Promise<SiaeCashierAllocation[]> {
+  async getCashierAllocationsByCashier(cashierId: string): Promise<SiaeCashierAllocation[]> {
     return await db
       .select()
       .from(siaeCashierAllocations)
       .where(and(
-        eq(siaeCashierAllocations.userId, userId),
+        eq(siaeCashierAllocations.cashierId, cashierId),
         eq(siaeCashierAllocations.isActive, true)
       ))
       .orderBy(desc(siaeCashierAllocations.createdAt));

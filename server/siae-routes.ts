@@ -3191,7 +3191,7 @@ router.get("/api/events/:eventId/cashier-allocations", requireAuth, requireGesto
     // Enrich with cashier info from siaeCashiers table
     const enrichedAllocations = await Promise.all(allocations.map(async (alloc) => {
       const [cashier] = await db.select().from(siaeCashiers)
-        .where(eq(siaeCashiers.id, alloc.userId));
+        .where(eq(siaeCashiers.id, alloc.cashierId));
       const sector = alloc.sectorId ? await siaeStorage.getSiaeEventSector(alloc.sectorId) : null;
       return {
         ...alloc,
@@ -3213,10 +3213,12 @@ router.post("/api/events/:eventId/cashier-allocations", requireAuth, requireGest
   try {
     const user = req.user as any;
     const { eventId } = req.params;
-    const { userId, sectorId, quotaQuantity } = req.body;
+    // Accept both cashierId (new) and userId (legacy) for backwards compatibility
+    const cashierId = req.body.cashierId || req.body.userId;
+    const { sectorId, quotaQuantity } = req.body;
     
-    if (!userId || quotaQuantity === undefined) {
-      return res.status(400).json({ message: "userId e quotaQuantity sono obbligatori" });
+    if (!cashierId || quotaQuantity === undefined) {
+      return res.status(400).json({ message: "cashierId e quotaQuantity sono obbligatori" });
     }
     
     const event = await siaeStorage.getSiaeTicketedEvent(eventId);
@@ -3231,7 +3233,7 @@ router.post("/api/events/:eventId/cashier-allocations", requireAuth, requireGest
     // Check if cashier exists and belongs to company (from siaeCashiers table)
     const [cashier] = await db.select().from(siaeCashiers)
       .where(and(
-        eq(siaeCashiers.id, userId),
+        eq(siaeCashiers.id, cashierId),
         eq(siaeCashiers.isActive, true)
       ));
     
@@ -3244,7 +3246,7 @@ router.post("/api/events/:eventId/cashier-allocations", requireAuth, requireGest
     }
     
     // Check if allocation already exists
-    const existingAllocation = await siaeStorage.getCashierAllocationByUserAndEvent(userId, eventId);
+    const existingAllocation = await siaeStorage.getCashierAllocationByCashierAndEvent(cashierId, eventId);
     if (existingAllocation) {
       return res.status(400).json({ message: "Allocazione già esistente per questo cassiere/evento" });
     }
@@ -3252,7 +3254,7 @@ router.post("/api/events/:eventId/cashier-allocations", requireAuth, requireGest
     const allocation = await siaeStorage.createCashierAllocation({
       companyId: user.companyId,
       eventId,
-      userId,
+      cashierId,
       sectorId: sectorId || null,
       quotaQuantity: parseInt(quotaQuantity),
       quotaUsed: 0,
