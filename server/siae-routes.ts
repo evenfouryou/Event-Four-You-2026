@@ -3170,8 +3170,9 @@ router.patch("/api/cashiers/:id", requireAuth, requireGestore, async (req: Reque
       .where(eq(siaeCashiers.id, id))
       .returning();
     
+    // Use cashier's companyId for audit log (more reliable than user's for super_admin)
     await siaeStorage.createAuditLog({
-      companyId: user.companyId,
+      companyId: cashier.companyId,
       userId: user.id,
       action: 'cashier_updated',
       entityType: 'siae_cashier',
@@ -3211,8 +3212,9 @@ router.delete("/api/cashiers/:id", requireAuth, requireGestore, async (req: Requ
       .set({ isActive: false, updatedAt: new Date() })
       .where(eq(siaeCashiers.id, id));
     
+    // Use cashier's companyId for audit log (more reliable than user's for super_admin)
     await siaeStorage.createAuditLog({
-      companyId: user.companyId,
+      companyId: cashier.companyId,
       userId: user.id,
       action: 'cashier_deactivated',
       entityType: 'siae_cashier',
