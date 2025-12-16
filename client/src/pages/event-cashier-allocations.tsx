@@ -6,7 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import type { User, SiaeEventSector, SiaeCashierAllocation } from "@shared/schema";
+import type { SiaeEventSector, SiaeCashierAllocation, SiaeCashier } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -67,8 +67,10 @@ import {
 } from "lucide-react";
 
 interface CashierAllocationWithDetails extends SiaeCashierAllocation {
-  user?: User;
-  sector?: SiaeEventSector;
+  cashierName?: string;
+  cashierUsername?: string;
+  sectorName?: string;
+  quotaRemaining?: number;
 }
 
 const allocationFormSchema = z.object({
@@ -99,7 +101,7 @@ export function EventCashierAllocations({ eventId, siaeEventId }: EventCashierAl
     enabled: !!targetEventId,
   });
 
-  const { data: cashiers } = useQuery<User[]>({
+  const { data: cashiers } = useQuery<SiaeCashier[]>({
     queryKey: ["/api/cashiers"],
     enabled: !!user?.companyId,
   });
@@ -226,7 +228,7 @@ export function EventCashierAllocations({ eventId, siaeEventId }: EventCashierAl
 
   const getCashierName = (userId: string) => {
     const cashier = cashiers?.find(c => c.id === userId);
-    return cashier ? `${cashier.firstName} ${cashier.lastName}` : "Sconosciuto";
+    return cashier ? cashier.name : "Sconosciuto";
   };
 
   const getSectorName = (sectorId: string) => {
@@ -239,7 +241,7 @@ export function EventCashierAllocations({ eventId, siaeEventId }: EventCashierAl
     return Math.round((used / total) * 100);
   };
 
-  const activeCashiers = cashiers?.filter(c => c.isActive && c.role === "cassiere") || [];
+  const activeCashiers = cashiers?.filter(c => c.isActive) || [];
 
   return (
     <Card className="glass-card" data-testid="card-cashier-allocations">
@@ -302,13 +304,11 @@ export function EventCashierAllocations({ eventId, siaeEventId }: EventCashierAl
                 return (
                   <TableRow key={allocation.id} data-testid={`row-allocation-${allocation.id}`}>
                     <TableCell className="font-medium">
-                      {allocation.user 
-                        ? `${allocation.user.firstName} ${allocation.user.lastName}`
-                        : getCashierName(allocation.userId)}
+                      {allocation.cashierName || getCashierName(allocation.userId)}
                     </TableCell>
                     <TableCell>
                       <Badge variant="outline">
-                        {allocation.sector?.name || getSectorName(allocation.sectorId)}
+                        {allocation.sectorName || getSectorName(allocation.sectorId)}
                       </Badge>
                     </TableCell>
                     <TableCell>
@@ -397,7 +397,7 @@ export function EventCashierAllocations({ eventId, siaeEventId }: EventCashierAl
                           <SelectContent>
                             {activeCashiers.map((cashier) => (
                               <SelectItem key={cashier.id} value={cashier.id}>
-                                {cashier.firstName} {cashier.lastName}
+                                {cashier.name} ({cashier.username})
                               </SelectItem>
                             ))}
                           </SelectContent>

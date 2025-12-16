@@ -3188,14 +3188,15 @@ router.get("/api/events/:eventId/cashier-allocations", requireAuth, requireGesto
     
     const allocations = await siaeStorage.getCashierAllocationsByEvent(eventId);
     
-    // Enrich with user info
+    // Enrich with cashier info from siaeCashiers table
     const enrichedAllocations = await Promise.all(allocations.map(async (alloc) => {
-      const cashier = await storage.getUser(alloc.userId);
+      const [cashier] = await db.select().from(siaeCashiers)
+        .where(eq(siaeCashiers.id, alloc.userId));
       const sector = alloc.sectorId ? await siaeStorage.getSiaeEventSector(alloc.sectorId) : null;
       return {
         ...alloc,
-        cashierName: cashier ? `${cashier.firstName} ${cashier.lastName}` : 'N/A',
-        cashierEmail: cashier?.email || 'N/A',
+        cashierName: cashier?.name || 'N/A',
+        cashierUsername: cashier?.username || 'N/A',
         sectorName: sector?.name || 'Tutti i settori',
         quotaRemaining: alloc.quotaQuantity - alloc.quotaUsed
       };
@@ -3227,9 +3228,14 @@ router.post("/api/events/:eventId/cashier-allocations", requireAuth, requireGest
       return res.status(403).json({ message: "Non autorizzato ad accedere a questo evento" });
     }
     
-    // Check if cashier exists and belongs to company
-    const cashier = await storage.getUser(userId);
-    if (!cashier || cashier.role !== 'cassiere') {
+    // Check if cashier exists and belongs to company (from siaeCashiers table)
+    const [cashier] = await db.select().from(siaeCashiers)
+      .where(and(
+        eq(siaeCashiers.id, userId),
+        eq(siaeCashiers.isActive, true)
+      ));
+    
+    if (!cashier) {
       return res.status(400).json({ message: "Cassiere non trovato" });
     }
     
@@ -3260,7 +3266,7 @@ router.post("/api/events/:eventId/cashier-allocations", requireAuth, requireGest
       action: 'cashier_allocation_created',
       entityType: 'cashier_allocation',
       entityId: allocation.id,
-      description: `Assegnato cassiere ${cashier.firstName} ${cashier.lastName} a evento ${event.eventName} con quota ${quotaQuantity}`,
+      description: `Assegnato cassiere ${cashier.name} a evento ${event.eventName} con quota ${quotaQuantity}`,
       ipAddress: (req.ip || '').substring(0, 45),
       userAgent: (req.get('user-agent') || '').substring(0, 500)
     });
