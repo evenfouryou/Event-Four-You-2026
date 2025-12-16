@@ -475,9 +475,11 @@ export function getCachedBridgeStatus(): any {
   
   // Return cached status or default if no status received yet
   if (cachedBridgeStatus) {
+    // Desktop app sends { type: 'status', data: {...} }
+    const statusData = cachedBridgeStatus.data || cachedBridgeStatus.payload || {};
     return {
       bridgeConnected: true,
-      ...cachedBridgeStatus.payload
+      ...statusData
     };
   }
   
