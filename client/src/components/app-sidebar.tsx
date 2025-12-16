@@ -284,6 +284,12 @@ export function AppSidebar() {
 
     menuItems.push(
       {
+        title: "Cassa Biglietti",
+        icon: Store,
+        url: "/cassa-biglietti",
+        group: "Gestione",
+      },
+      {
         title: "Location",
         icon: MapPin,
         url: "/locations",
@@ -382,12 +388,6 @@ export function AppSidebar() {
             title: "Posti Numerati",
             icon: Grid3X3,
             url: "/siae/numbered-seats",
-            group: "Biglietteria SIAE",
-          },
-          {
-            title: "Cassa Biglietti",
-            icon: Store,
-            url: "/cassa-biglietti",
             group: "Biglietteria SIAE",
           }
       );
