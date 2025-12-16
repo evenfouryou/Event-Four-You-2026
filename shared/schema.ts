@@ -1293,8 +1293,13 @@ export const siaeTickets = pgTable("siae_tickets", {
   // Nominatività
   participantFirstName: varchar("participant_first_name", { length: 100 }),
   participantLastName: varchar("participant_last_name", { length: 100 }),
-  // Emissione
+  // Emissione cassiere
+  ticketCode: varchar("ticket_code", { length: 50 }), // Codice univoco biglietto
+  ticketType: varchar("ticket_type", { length: 30 }), // Tipo biglietto (intero, ridotto, omaggio)
+  ticketPrice: decimal("ticket_price", { precision: 10, scale: 2 }), // Prezzo biglietto
   issuedByUserId: varchar("issued_by_user_id"), // ID cassiere/utente che ha emesso il biglietto
+  isComplimentary: boolean("is_complimentary").default(false), // Biglietto omaggio
+  paymentMethod: varchar("payment_method", { length: 30 }), // Metodo pagamento (cash, card, etc.)
   // Stato
   status: varchar("status", { length: 20 }).notNull().default('valid'), // valid, used, cancelled
   usedAt: timestamp("used_at"), // Quando è stato usato per entrare
