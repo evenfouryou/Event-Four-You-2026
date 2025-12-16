@@ -26,7 +26,7 @@ import {
 } from "@shared/schema";
 
 // Helper to create validated partial schemas for PATCH operations
-function makePatchSchema<T extends z.ZodTypeAny>(schema: T) {
+function makePatchSchema<T extends z.ZodRawShape>(schema: z.ZodObject<T>) {
   return schema.partial().strict().refine(
     (obj: Record<string, unknown>) => Object.keys(obj).length > 0,
     { message: "Payload vuoto non permesso" }
@@ -1037,6 +1037,44 @@ router.post("/api/e4u/events/:eventId/scanners", requireAuth, requireGestore, as
   }
 });
 
+// PATCH /api/e4u/scanners/:id/access - Update scanner sector access
+router.patch("/api/e4u/scanners/:id/access", requireAuth, requireGestore, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const user = req.user as any;
+    const { allowedSectorIds } = req.body;
+    
+    // Verify the scanner exists and belongs to user's company
+    const [existingScanner] = await db.select()
+      .from(eventScanners)
+      .where(eq(eventScanners.id, id));
+    
+    if (!existingScanner) {
+      return res.status(404).json({ message: "Scanner non trovato" });
+    }
+    
+    // Verify scanner belongs to user's company
+    if (existingScanner.companyId !== user.companyId && user.role !== 'super_admin') {
+      return res.status(403).json({ message: "Non autorizzato a modificare questo scanner" });
+    }
+    
+    // Validate allowedSectorIds is an array
+    if (!Array.isArray(allowedSectorIds)) {
+      return res.status(400).json({ message: "allowedSectorIds deve essere un array" });
+    }
+    
+    // Update the scanner with new sector access
+    const [updated] = await db.update(eventScanners)
+      .set({ allowedSectorIds })
+      .where(eq(eventScanners.id, id))
+      .returning();
+    
+    res.json(updated);
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
 // DELETE /api/e4u/scanners/:id - Remove scanner
 router.delete("/api/e4u/scanners/:id", requireAuth, requireGestore, async (req: Request, res: Response) => {
   try {
@@ -1381,8 +1419,8 @@ router.get("/api/e4u/events/:eventId/report", requireAuth, async (req: Request, 
     const staffPerformance = staffAssignments.map(({ assignment, user }) => {
       const staffUserId = assignment.userId;
       
-      // Count lists created by this staff (we'll check lists created by staff's PRs)
-      const staffLists = allLists.filter(l => l.createdBy === staffUserId);
+      // Count lists - eventLists doesn't have createdBy, so we skip this metric
+      const staffLists: typeof allLists = [];
       
       // Count entries added by this staff
       const staffEntries = allEntries.filter(e => e.createdBy === staffUserId);

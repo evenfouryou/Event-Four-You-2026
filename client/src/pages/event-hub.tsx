@@ -621,6 +621,10 @@ export default function EventHub() {
   const [showAssignStaffDialog, setShowAssignStaffDialog] = useState(false);
   const [showAssignPrDialog, setShowAssignPrDialog] = useState(false);
   const [showAssignScannerDialog, setShowAssignScannerDialog] = useState(false);
+  const [showScannerAccessDialog, setShowScannerAccessDialog] = useState(false);
+  const [selectedScannerForAccess, setSelectedScannerForAccess] = useState<any>(null);
+  const [scannerAccessAllSectors, setScannerAccessAllSectors] = useState(true);
+  const [scannerAccessSelectedSectors, setScannerAccessSelectedSectors] = useState<string[]>([]);
   const [selectedStaffForPr, setSelectedStaffForPr] = useState<string | null>(null);
   const [newStaffData, setNewStaffData] = useState({ userId: '', canManageLists: true, canManageTables: true, canCreatePr: false, canApproveTables: false });
   const [newPrData, setNewPrData] = useState({ userId: '', staffUserId: '', canAddToLists: true, canProposeTables: false });
@@ -985,6 +989,67 @@ export default function EventHub() {
       toast({ title: "Errore", description: error?.message || "Impossibile rimuovere lo scanner", variant: "destructive" });
     },
   });
+
+  // Update Scanner Access mutation
+  const updateScannerAccessMutation = useMutation({
+    mutationFn: async ({ scannerId, allowedSectorIds }: { scannerId: string; allowedSectorIds: string[] }) => {
+      return apiRequest('PATCH', `/api/e4u/scanners/${scannerId}/access`, { allowedSectorIds });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/e4u/events', id, 'scanners'] });
+      toast({ title: "Accesso Scanner Aggiornato", description: "Le restrizioni di settore sono state salvate." });
+      setShowScannerAccessDialog(false);
+      setSelectedScannerForAccess(null);
+    },
+    onError: (error: any) => {
+      toast({ title: "Errore", description: error?.message || "Impossibile aggiornare l'accesso dello scanner", variant: "destructive" });
+    },
+  });
+
+  // Open scanner access dialog
+  const openScannerAccessDialog = (scanner: any) => {
+    setSelectedScannerForAccess(scanner);
+    const allowedSectors = scanner.scanner?.allowedSectorIds || scanner.allowedSectorIds || [];
+    const hasAllSectors = !allowedSectors || allowedSectors.length === 0;
+    setScannerAccessAllSectors(hasAllSectors);
+    setScannerAccessSelectedSectors(hasAllSectors ? [] : allowedSectors);
+    setShowScannerAccessDialog(true);
+  };
+
+  // Handle save scanner access
+  const handleSaveScannerAccess = () => {
+    if (!selectedScannerForAccess) return;
+    const scannerId = selectedScannerForAccess.scanner?.id || selectedScannerForAccess.id;
+    const allowedSectorIds = scannerAccessAllSectors ? [] : scannerAccessSelectedSectors;
+    updateScannerAccessMutation.mutate({ scannerId, allowedSectorIds });
+  };
+
+  // Toggle sector selection
+  const toggleSectorSelection = (sectorId: string) => {
+    setScannerAccessSelectedSectors(prev => 
+      prev.includes(sectorId) 
+        ? prev.filter(id => id !== sectorId)
+        : [...prev, sectorId]
+    );
+  };
+
+  // Select/Deselect all sectors
+  const toggleAllSectors = (selectAll: boolean) => {
+    if (selectAll && ticketedEvent?.sectors) {
+      setScannerAccessSelectedSectors(ticketedEvent.sectors.map(s => s.id));
+    } else {
+      setScannerAccessSelectedSectors([]);
+    }
+  };
+
+  // Get scanner sector count display
+  const getScannerSectorDisplay = (scanner: any) => {
+    const allowedSectors = scanner.scanner?.allowedSectorIds || scanner.allowedSectorIds || [];
+    if (!allowedSectors || allowedSectors.length === 0) {
+      return { label: 'Tutti i settori', color: 'bg-emerald-500/20 text-emerald-400' };
+    }
+    return { label: `${allowedSectors.length} settori`, color: 'bg-amber-500/20 text-amber-400' };
+  };
 
   // Cancel ticket mutation
   const cancelTicketMutation = useMutation({
@@ -2911,13 +2976,15 @@ export default function EventHub() {
                   {e4uScanners.length > 0 ? (
                     <div className="space-y-3">
                       {e4uScanners.map((scanner: any) => {
-                        const scannerUser = users.find(u => u.id === scanner.userId);
+                        const scannerUser = scanner.user || users.find(u => u.id === (scanner.scanner?.userId || scanner.userId));
+                        const scannerData = scanner.scanner || scanner;
+                        const sectorDisplay = getScannerSectorDisplay(scanner);
                         
                         return (
                           <div 
-                            key={scanner.id} 
+                            key={scannerData.id} 
                             className="flex items-center justify-between gap-4 p-4 rounded-lg bg-background/50 border hover:border-emerald-500/50 transition-colors"
-                            data-testid={`scanner-item-${scanner.id}`}
+                            data-testid={`scanner-item-${scannerData.id}`}
                           >
                             <div className="flex items-center gap-3">
                               <div className="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-500 to-green-600 flex items-center justify-center text-white font-medium">
@@ -2928,27 +2995,52 @@ export default function EventHub() {
                                   {scannerUser ? `${scannerUser.firstName} ${scannerUser.lastName}` : 'Utente sconosciuto'}
                                 </div>
                                 <div className="flex items-center gap-1 mt-1 flex-wrap">
-                                  {scanner.canScanLists && (
+                                  {scannerData.canScanLists && (
                                     <Badge variant="secondary" className="text-xs bg-cyan-500/20 text-cyan-400">Liste</Badge>
                                   )}
-                                  {scanner.canScanTables && (
+                                  {scannerData.canScanTables && (
                                     <Badge variant="secondary" className="text-xs bg-purple-500/20 text-purple-400">Tavoli</Badge>
                                   )}
-                                  {scanner.canScanTickets && (
+                                  {scannerData.canScanTickets && (
                                     <Badge variant="secondary" className="text-xs bg-amber-500/20 text-amber-400">Biglietti</Badge>
                                   )}
                                 </div>
+                                {scannerData.canScanTickets && ticketedEvent?.sectors && ticketedEvent.sectors.length > 0 && (
+                                  <div className="mt-2">
+                                    <Badge 
+                                      variant="outline" 
+                                      className={`text-xs cursor-pointer ${sectorDisplay.color}`}
+                                      onClick={() => openScannerAccessDialog(scanner)}
+                                      data-testid={`badge-scanner-sectors-${scannerData.id}`}
+                                    >
+                                      {sectorDisplay.label}
+                                    </Badge>
+                                  </div>
+                                )}
                               </div>
                             </div>
-                            <Button 
-                              variant="ghost" 
-                              size="icon"
-                              onClick={() => removeScannerMutation.mutate(scanner.id)}
-                              disabled={removeScannerMutation.isPending}
-                              data-testid={`btn-remove-scanner-${scanner.id}`}
-                            >
-                              <X className="h-4 w-4" />
-                            </Button>
+                            <div className="flex items-center gap-2">
+                              {scannerData.canScanTickets && ticketedEvent?.sectors && ticketedEvent.sectors.length > 0 && (
+                                <Button 
+                                  variant="outline" 
+                                  size="sm"
+                                  onClick={() => openScannerAccessDialog(scanner)}
+                                  data-testid={`button-configure-scanner-access-${scannerData.id}`}
+                                >
+                                  <Settings className="h-4 w-4 mr-1" />
+                                  Configura Accesso
+                                </Button>
+                              )}
+                              <Button 
+                                variant="ghost" 
+                                size="icon"
+                                onClick={() => removeScannerMutation.mutate(scannerData.id)}
+                                disabled={removeScannerMutation.isPending}
+                                data-testid={`btn-remove-scanner-${scannerData.id}`}
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </div>
                           </div>
                         );
                       })}
@@ -4123,6 +4215,134 @@ export default function EventHub() {
                 <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Assegnazione...</>
               ) : (
                 'Assegna Scanner'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Scanner Access Configuration Dialog */}
+      <Dialog open={showScannerAccessDialog} onOpenChange={setShowScannerAccessDialog}>
+        <DialogContent data-testid="dialog-scanner-access">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Settings className="h-5 w-5 text-emerald-400" />
+              Configura Accesso Scanner
+            </DialogTitle>
+            <DialogDescription>
+              {selectedScannerForAccess && (
+                <>
+                  Configura i settori che{' '}
+                  <span className="font-medium">
+                    {selectedScannerForAccess.user?.firstName || ''} {selectedScannerForAccess.user?.lastName || ''}
+                  </span>{' '}
+                  può scansionare
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="flex items-center justify-between p-3 rounded-lg bg-background/50 border">
+              <div>
+                <div className="font-medium text-sm">Accesso a tutti i settori</div>
+                <div className="text-xs text-muted-foreground">
+                  Può scansionare biglietti di tutti i settori
+                </div>
+              </div>
+              <Switch
+                checked={scannerAccessAllSectors}
+                onCheckedChange={(checked) => {
+                  setScannerAccessAllSectors(checked);
+                  if (checked) {
+                    setScannerAccessSelectedSectors([]);
+                  }
+                }}
+                data-testid="switch-all-sectors"
+              />
+            </div>
+            
+            {!scannerAccessAllSectors && ticketedEvent?.sectors && ticketedEvent.sectors.length > 0 && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm font-medium">Seleziona i settori autorizzati</Label>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => toggleAllSectors(true)}
+                      className="text-xs"
+                    >
+                      Seleziona tutti
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => toggleAllSectors(false)}
+                      className="text-xs"
+                    >
+                      Deseleziona
+                    </Button>
+                  </div>
+                </div>
+                <div className="space-y-2 max-h-60 overflow-y-auto">
+                  {ticketedEvent.sectors.map((sector) => (
+                    <div
+                      key={sector.id}
+                      className="flex items-center gap-3 p-3 rounded-lg bg-background/50 border cursor-pointer hover:bg-background/70 transition-colors"
+                      onClick={() => toggleSectorSelection(sector.id)}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={scannerAccessSelectedSectors.includes(sector.id)}
+                        onChange={() => toggleSectorSelection(sector.id)}
+                        className="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                        data-testid={`checkbox-sector-${sector.id}`}
+                      />
+                      <div className="flex-1">
+                        <div className="font-medium text-sm">{sector.name}</div>
+                        {sector.price && (
+                          <div className="text-xs text-muted-foreground">
+                            €{Number(sector.price).toFixed(2)}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                {scannerAccessSelectedSectors.length > 0 && (
+                  <div className="text-xs text-muted-foreground pt-2">
+                    {scannerAccessSelectedSectors.length} settori selezionati
+                  </div>
+                )}
+              </div>
+            )}
+            
+            {!scannerAccessAllSectors && (!ticketedEvent?.sectors || ticketedEvent.sectors.length === 0) && (
+              <div className="text-center py-4 text-muted-foreground">
+                <p className="text-sm">Nessun settore configurato per questo evento.</p>
+                <p className="text-xs mt-1">Configura i settori nella sezione Biglietti per abilitare le restrizioni.</p>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowScannerAccessDialog(false);
+                setSelectedScannerForAccess(null);
+              }}
+            >
+              Annulla
+            </Button>
+            <Button
+              onClick={handleSaveScannerAccess}
+              disabled={updateScannerAccessMutation.isPending || (!scannerAccessAllSectors && scannerAccessSelectedSectors.length === 0)}
+              data-testid="button-save-scanner-access"
+            >
+              {updateScannerAccessMutation.isPending ? (
+                <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Salvataggio...</>
+              ) : (
+                'Salva'
               )}
             </Button>
           </DialogFooter>

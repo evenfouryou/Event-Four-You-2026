@@ -3688,6 +3688,7 @@ export const eventScanners = pgTable("event_scanners", {
   canScanLists: boolean("can_scan_lists").notNull().default(true),
   canScanTables: boolean("can_scan_tables").notNull().default(true),
   canScanTickets: boolean("can_scan_tickets").notNull().default(true),
+  allowedSectorIds: text().array().default(sql`ARRAY[]::text[]`), // Empty array = all sectors allowed
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow(),
 });
