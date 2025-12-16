@@ -3,8 +3,8 @@ import { Router, Request, Response, NextFunction } from "express";
 import { siaeStorage } from "./siae-storage";
 import { storage } from "./storage";
 import { db } from "./db";
-import { events } from "@shared/schema";
-import { eq } from "drizzle-orm";
+import { events, siaeCashiers } from "@shared/schema";
+import { eq, and } from "drizzle-orm";
 import { z } from "zod";
 import { requestFiscalSeal, isCardReadyForSeals, isBridgeConnected } from "./bridge-relay";
 import {
@@ -2954,14 +2954,17 @@ router.get("/api/cashiers", requireAuth, requireGestore, async (req: Request, re
     if (!user.companyId) {
       return res.status(400).json({ message: "Utente non associato a nessuna azienda" });
     }
-    const cashiers = await storage.getCashiersByCompany(user.companyId);
-    res.json(cashiers);
+    const cashiers = await db.select().from(siaeCashiers)
+      .where(eq(siaeCashiers.companyId, user.companyId));
+    
+    const cashiersWithoutPassword = cashiers.map(({ passwordHash, ...rest }) => rest);
+    res.json(cashiersWithoutPassword);
   } catch (error: any) {
     res.status(500).json({ message: error.message });
   }
 });
 
-// POST /api/cashiers - Create cashier user with password
+// POST /api/cashiers - Create cashier with username/password
 router.post("/api/cashiers", requireAuth, requireGestore, async (req: Request, res: Response) => {
   try {
     const user = req.user as any;
@@ -2969,47 +2972,50 @@ router.post("/api/cashiers", requireAuth, requireGestore, async (req: Request, r
       return res.status(400).json({ message: "Utente non associato a nessuna azienda" });
     }
     
-    const { email, password, firstName, lastName, defaultPrinterAgentId } = req.body;
+    const { username, password, name, defaultPrinterAgentId } = req.body;
     
-    if (!email || !password || !firstName || !lastName) {
-      return res.status(400).json({ message: "Email, password, nome e cognome sono obbligatori" });
+    if (!username || !password || !name) {
+      return res.status(400).json({ message: "Username, password e nome sono obbligatori" });
     }
     
-    // Check if email already exists
-    const existingUser = await storage.getUserByEmail(email);
-    if (existingUser) {
-      return res.status(400).json({ message: "Email già in uso" });
+    const existing = await db.select().from(siaeCashiers)
+      .where(and(
+        eq(siaeCashiers.companyId, user.companyId),
+        eq(siaeCashiers.username, username)
+      ));
+    
+    if (existing.length > 0) {
+      return res.status(400).json({ message: "Username già in uso" });
     }
     
-    // Hash password
     const bcrypt = require('bcryptjs');
     const passwordHash = await bcrypt.hash(password, 10);
     
-    const cashier = await storage.createUser({
-      email,
-      passwordHash,
-      firstName,
-      lastName,
-      role: 'cassiere',
-      companyId: user.companyId,
-      defaultPrinterAgentId: defaultPrinterAgentId || null,
-      isActive: true,
-      emailVerified: true // Created by admin, no verification needed
-    });
+    // Normalize "none" sentinel value to null for printer
+    const normalizedPrinterId = defaultPrinterAgentId && defaultPrinterAgentId !== "none" 
+      ? defaultPrinterAgentId 
+      : null;
     
-    // Audit log
+    const [cashier] = await db.insert(siaeCashiers).values({
+      companyId: user.companyId,
+      username,
+      passwordHash,
+      name,
+      defaultPrinterAgentId: normalizedPrinterId,
+      isActive: true,
+    }).returning();
+    
     await siaeStorage.createAuditLog({
       companyId: user.companyId,
       userId: user.id,
       action: 'cashier_created',
-      entityType: 'user',
+      entityType: 'siae_cashier',
       entityId: cashier.id,
-      description: `Creato cassiere: ${firstName} ${lastName} (${email})`,
+      description: `Creato cassiere: ${name} (${username})`,
       ipAddress: (req.ip || '').substring(0, 45),
       userAgent: (req.get('user-agent') || '').substring(0, 500)
     });
     
-    // Return without passwordHash
     const { passwordHash: _, ...cashierData } = cashier;
     res.status(201).json(cashierData);
   } catch (error: any) {
@@ -3023,7 +3029,7 @@ router.patch("/api/cashiers/:id", requireAuth, requireGestore, async (req: Reque
     const user = req.user as any;
     const { id } = req.params;
     
-    const cashier = await storage.getUser(id);
+    const [cashier] = await db.select().from(siaeCashiers).where(eq(siaeCashiers.id, id));
     if (!cashier) {
       return res.status(404).json({ message: "Cassiere non trovato" });
     }
@@ -3032,16 +3038,17 @@ router.patch("/api/cashiers/:id", requireAuth, requireGestore, async (req: Reque
       return res.status(403).json({ message: "Non autorizzato a modificare questo cassiere" });
     }
     
-    if (cashier.role !== 'cassiere') {
-      return res.status(400).json({ message: "L'utente non è un cassiere" });
+    const { name, username, defaultPrinterAgentId, isActive, password } = req.body;
+    
+    const updateData: any = { updatedAt: new Date() };
+    if (name !== undefined) updateData.name = name;
+    if (username !== undefined) updateData.username = username;
+    // Normalize "none" sentinel value to null for printer
+    if (defaultPrinterAgentId !== undefined) {
+      updateData.defaultPrinterAgentId = defaultPrinterAgentId && defaultPrinterAgentId !== "none" 
+        ? defaultPrinterAgentId 
+        : null;
     }
-    
-    const { firstName, lastName, defaultPrinterAgentId, isActive, password } = req.body;
-    
-    const updateData: any = {};
-    if (firstName !== undefined) updateData.firstName = firstName;
-    if (lastName !== undefined) updateData.lastName = lastName;
-    if (defaultPrinterAgentId !== undefined) updateData.defaultPrinterAgentId = defaultPrinterAgentId;
     if (isActive !== undefined) updateData.isActive = isActive;
     
     if (password) {
@@ -3049,16 +3056,18 @@ router.patch("/api/cashiers/:id", requireAuth, requireGestore, async (req: Reque
       updateData.passwordHash = await bcrypt.hash(password, 10);
     }
     
-    const updated = await storage.updateUser(id, updateData);
+    const [updated] = await db.update(siaeCashiers)
+      .set(updateData)
+      .where(eq(siaeCashiers.id, id))
+      .returning();
     
-    // Audit log
     await siaeStorage.createAuditLog({
       companyId: user.companyId,
       userId: user.id,
       action: 'cashier_updated',
-      entityType: 'user',
+      entityType: 'siae_cashier',
       entityId: id,
-      description: `Modificato cassiere: ${cashier.firstName} ${cashier.lastName}`,
+      description: `Modificato cassiere: ${cashier.name}`,
       ipAddress: (req.ip || '').substring(0, 45),
       userAgent: (req.get('user-agent') || '').substring(0, 500)
     });
@@ -3080,7 +3089,7 @@ router.delete("/api/cashiers/:id", requireAuth, requireGestore, async (req: Requ
     const user = req.user as any;
     const { id } = req.params;
     
-    const cashier = await storage.getUser(id);
+    const [cashier] = await db.select().from(siaeCashiers).where(eq(siaeCashiers.id, id));
     if (!cashier) {
       return res.status(404).json({ message: "Cassiere non trovato" });
     }
@@ -3089,27 +3098,77 @@ router.delete("/api/cashiers/:id", requireAuth, requireGestore, async (req: Requ
       return res.status(403).json({ message: "Non autorizzato a disattivare questo cassiere" });
     }
     
-    if (cashier.role !== 'cassiere') {
-      return res.status(400).json({ message: "L'utente non è un cassiere" });
-    }
+    await db.update(siaeCashiers)
+      .set({ isActive: false, updatedAt: new Date() })
+      .where(eq(siaeCashiers.id, id));
     
-    // Deactivate instead of delete to preserve audit trail
-    await storage.updateUser(id, { isActive: false });
-    
-    // Audit log
     await siaeStorage.createAuditLog({
       companyId: user.companyId,
       userId: user.id,
       action: 'cashier_deactivated',
-      entityType: 'user',
+      entityType: 'siae_cashier',
       entityId: id,
-      description: `Disattivato cassiere: ${cashier.firstName} ${cashier.lastName}`,
+      description: `Disattivato cassiere: ${cashier.name}`,
       ipAddress: (req.ip || '').substring(0, 45),
       userAgent: (req.get('user-agent') || '').substring(0, 500)
     });
     
     res.json({ success: true, message: "Cassiere disattivato" });
   } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// POST /api/cashiers/login - Cashier login with username/password
+router.post("/api/cashiers/login", async (req: Request, res: Response) => {
+  try {
+    const { companyId, username, password } = req.body;
+    
+    if (!companyId || !username || !password) {
+      return res.status(400).json({ message: "CompanyId, username e password sono obbligatori" });
+    }
+    
+    const [cashier] = await db.select().from(siaeCashiers)
+      .where(and(
+        eq(siaeCashiers.companyId, companyId),
+        eq(siaeCashiers.username, username)
+      ));
+    
+    if (!cashier) {
+      return res.status(401).json({ message: "Credenziali non valide" });
+    }
+    
+    if (!cashier.isActive) {
+      return res.status(403).json({ message: "Account disattivato" });
+    }
+    
+    const bcrypt = require('bcryptjs');
+    const isValidPassword = await bcrypt.compare(password, cashier.passwordHash);
+    if (!isValidPassword) {
+      return res.status(401).json({ message: "Credenziali non valide" });
+    }
+    
+    // Create session for cashier
+    (req as any).login({ 
+      claims: { sub: cashier.id, username: cashier.username },
+      role: 'cassiere',
+      companyId: cashier.companyId,
+      cashierId: cashier.id,
+      cashierType: 'siae'
+    }, (err: any) => {
+      if (err) {
+        console.error("Cashier session creation error:", err);
+        return res.status(500).json({ message: "Login failed" });
+      }
+      
+      const { passwordHash: _, ...cashierData } = cashier;
+      res.json({ 
+        message: "Login successful",
+        cashier: cashierData
+      });
+    });
+  } catch (error: any) {
+    console.error("Cashier login error:", error);
     res.status(500).json({ message: error.message });
   }
 });

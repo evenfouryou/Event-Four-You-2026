@@ -6,7 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import type { User } from "@shared/schema";
+import type { SiaeCashier } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -76,9 +76,8 @@ interface PrinterAgent {
 }
 
 const cashierFormSchema = z.object({
-  firstName: z.string().min(1, "Nome obbligatorio"),
-  lastName: z.string().min(1, "Cognome obbligatorio"),
-  email: z.string().email("Email non valida"),
+  name: z.string().min(1, "Nome obbligatorio"),
+  username: z.string().min(1, "Username obbligatorio"),
   password: z.string().optional(),
   defaultPrinterAgentId: z.string().optional(),
   isActive: z.boolean().default(true),
@@ -95,12 +94,12 @@ export default function CashierManagementPage() {
   const { toast } = useToast();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [editingCashier, setEditingCashier] = useState<User | null>(null);
-  const [cashierToDelete, setCashierToDelete] = useState<User | null>(null);
+  const [editingCashier, setEditingCashier] = useState<SiaeCashier | null>(null);
+  const [cashierToDelete, setCashierToDelete] = useState<SiaeCashier | null>(null);
 
   const isGestore = user?.role === "gestore" || user?.role === "super_admin";
 
-  const { data: cashiers, isLoading: cashiersLoading } = useQuery<User[]>({
+  const { data: cashiers, isLoading: cashiersLoading } = useQuery<SiaeCashier[]>({
     queryKey: ["/api/cashiers"],
     enabled: !!user?.companyId && isGestore,
   });
@@ -113,11 +112,10 @@ export default function CashierManagementPage() {
   const form = useForm<CashierFormValues>({
     resolver: zodResolver(editingCashier ? cashierFormSchema : createCashierFormSchema),
     defaultValues: {
-      firstName: "",
-      lastName: "",
-      email: "",
+      name: "",
+      username: "",
       password: "",
-      defaultPrinterAgentId: "",
+      defaultPrinterAgentId: "none",
       isActive: true,
     },
   });
@@ -192,25 +190,23 @@ export default function CashierManagementPage() {
     },
   });
 
-  const handleOpenDialog = (cashier?: User) => {
+  const handleOpenDialog = (cashier?: SiaeCashier) => {
     if (cashier) {
       setEditingCashier(cashier);
       form.reset({
-        firstName: cashier.firstName || "",
-        lastName: cashier.lastName || "",
-        email: cashier.email || "",
+        name: cashier.name || "",
+        username: cashier.username || "",
         password: "",
-        defaultPrinterAgentId: cashier.defaultPrinterAgentId || "",
+        defaultPrinterAgentId: cashier.defaultPrinterAgentId || "none",
         isActive: cashier.isActive,
       });
     } else {
       setEditingCashier(null);
       form.reset({
-        firstName: "",
-        lastName: "",
-        email: "",
+        name: "",
+        username: "",
         password: "",
-        defaultPrinterAgentId: "",
+        defaultPrinterAgentId: "none",
         isActive: true,
       });
     }
@@ -218,14 +214,19 @@ export default function CashierManagementPage() {
   };
 
   const handleSubmit = (values: CashierFormValues) => {
+    const processedValues = {
+      ...values,
+      defaultPrinterAgentId: values.defaultPrinterAgentId === "none" ? null : values.defaultPrinterAgentId,
+    };
+    
     if (editingCashier) {
-      const updateData: Partial<CashierFormValues> = { ...values };
+      const updateData: Partial<CashierFormValues> = { ...processedValues };
       if (!updateData.password) {
         delete updateData.password;
       }
       updateCashierMutation.mutate({ id: editingCashier.id, data: updateData });
     } else {
-      createCashierMutation.mutate(values);
+      createCashierMutation.mutate(processedValues);
     }
   };
 
@@ -320,7 +321,7 @@ export default function CashierManagementPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Nome</TableHead>
-                  <TableHead>Email</TableHead>
+                  <TableHead>Username</TableHead>
                   <TableHead>Stampante</TableHead>
                   <TableHead>Stato</TableHead>
                   <TableHead className="text-right">Azioni</TableHead>
@@ -330,12 +331,11 @@ export default function CashierManagementPage() {
                 {cashiers.map((cashier) => (
                   <TableRow key={cashier.id} data-testid={`row-cashier-${cashier.id}`}>
                     <TableCell className="font-medium">
-                      {cashier.firstName} {cashier.lastName}
+                      {cashier.name}
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2 text-muted-foreground">
-                        <Mail className="w-4 h-4" />
-                        {cashier.email}
+                        {cashier.username}
                       </div>
                     </TableCell>
                     <TableCell>
@@ -404,56 +404,36 @@ export default function CashierManagementPage() {
 
           <Form {...form}>
             <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="firstName"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Nome</FormLabel>
-                      <FormControl>
-                        <Input 
-                          placeholder="Mario" 
-                          {...field} 
-                          data-testid="input-first-name"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="lastName"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Cognome</FormLabel>
-                      <FormControl>
-                        <Input 
-                          placeholder="Rossi" 
-                          {...field} 
-                          data-testid="input-last-name"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
+              <FormField
+                control={form.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Nome</FormLabel>
+                    <FormControl>
+                      <Input 
+                        placeholder="Mario Rossi" 
+                        {...field} 
+                        data-testid="input-name"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
               <FormField
                 control={form.control}
-                name="email"
+                name="username"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Email</FormLabel>
+                    <FormLabel>Username</FormLabel>
                     <FormControl>
                       <Input 
-                        type="email" 
-                        placeholder="mario.rossi@email.com" 
+                        placeholder="cassiere1" 
                         {...field} 
-                        data-testid="input-email"
+                        disabled={!!editingCashier}
+                        data-testid="input-username"
                       />
                     </FormControl>
                     <FormMessage />
@@ -498,7 +478,7 @@ export default function CashierManagementPage() {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="">Nessuna stampante</SelectItem>
+                        <SelectItem value="none">Nessuna stampante</SelectItem>
                         {printerAgents?.map((agent) => (
                           <SelectItem key={agent.id} value={agent.id}>
                             <div className="flex items-center gap-2">
@@ -573,7 +553,7 @@ export default function CashierManagementPage() {
             <AlertDialogTitle>Disattivare questo cassiere?</AlertDialogTitle>
             <AlertDialogDescription>
               Stai per disattivare il cassiere{" "}
-              <strong>{cashierToDelete?.firstName} {cashierToDelete?.lastName}</strong>.
+              <strong>{cashierToDelete?.name}</strong>.
               Il cassiere non potrà più accedere al sistema.
             </AlertDialogDescription>
           </AlertDialogHeader>

@@ -94,6 +94,7 @@ import {
   MessageSquare,
   Megaphone,
   ShieldAlert,
+  Shield,
   Lock,
   Unlock,
   Volume2,
@@ -1667,6 +1668,7 @@ export default function EventHub() {
               { id: 'guests', label: 'Liste', icon: Users },
               { id: 'tables', label: 'Tavoli', icon: Armchair },
               { id: 'staff', label: 'Staff', icon: Users },
+              { id: 'access', label: 'Controllo Accessi', icon: Shield },
               { id: 'inventory', label: 'Inventario', icon: Package },
               { id: 'finance', label: 'Incassi', icon: Euro },
               { id: 'report', label: 'Report', icon: BarChart3 },
@@ -2742,7 +2744,7 @@ export default function EventHub() {
           <TabsContent value="staff">
             <div className="space-y-6">
               {/* Stats Grid */}
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 gap-4">
                 <div className="p-4 rounded-lg bg-teal-500/10 border border-teal-500/30" data-testid="stat-staff-count">
                   <div className="text-2xl font-bold text-teal-400">{e4uStaff.length}</div>
                   <div className="text-sm text-muted-foreground">Staff Attivi</div>
@@ -2750,10 +2752,6 @@ export default function EventHub() {
                 <div className="p-4 rounded-lg bg-orange-500/10 border border-orange-500/30" data-testid="stat-pr-count">
                   <div className="text-2xl font-bold text-orange-400">{e4uPr.length}</div>
                   <div className="text-sm text-muted-foreground">PR Attivi</div>
-                </div>
-                <div className="p-4 rounded-lg bg-emerald-500/10 border border-emerald-500/30" data-testid="stat-scanner-count">
-                  <div className="text-2xl font-bold text-emerald-400">{e4uScanners.length}</div>
-                  <div className="text-sm text-muted-foreground">Scanner Attivi</div>
                 </div>
               </div>
 
@@ -2892,9 +2890,17 @@ export default function EventHub() {
                 <CardContent>
                   {e4uPr.length > 0 ? (
                     <div className="space-y-3">
-                      {e4uPr.map((pr: any) => {
-                        const prUser = users.find(u => u.id === pr.userId);
+                      {e4uPr.map((prData: any) => {
+                        const pr = prData.assignment || prData;
+                        const prUser = prData.user || users.find(u => u.id === pr.userId);
                         const supervisorUser = pr.staffUserId ? users.find(u => u.id === pr.staffUserId) : null;
+                        const displayName = prUser 
+                          ? (prUser.firstName && prUser.lastName 
+                              ? `${prUser.firstName} ${prUser.lastName}` 
+                              : prUser.email || 'Utente sconosciuto')
+                          : 'Utente sconosciuto';
+                        const initials = prUser?.firstName?.[0] || prUser?.email?.[0]?.toUpperCase() || '?';
+                        const initials2 = prUser?.lastName?.[0] || '';
                         
                         return (
                           <div 
@@ -2904,11 +2910,11 @@ export default function EventHub() {
                           >
                             <div className="flex items-center gap-3">
                               <div className="w-10 h-10 rounded-full bg-gradient-to-br from-orange-500 to-amber-600 flex items-center justify-center text-white font-medium">
-                                {prUser?.firstName?.[0]}{prUser?.lastName?.[0]}
+                                {initials}{initials2}
                               </div>
                               <div>
                                 <div className="font-medium">
-                                  {prUser ? `${prUser.firstName} ${prUser.lastName}` : 'Utente sconosciuto'}
+                                  {displayName}
                                 </div>
                                 {supervisorUser && (
                                   <div className="text-xs text-muted-foreground">
@@ -2953,6 +2959,18 @@ export default function EventHub() {
                   )}
                 </CardContent>
               </Card>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="access">
+            <div className="space-y-6">
+              {/* Stats Grid */}
+              <div className="grid grid-cols-1 gap-4">
+                <div className="p-4 rounded-lg bg-emerald-500/10 border border-emerald-500/30" data-testid="stat-access-scanner-count">
+                  <div className="text-2xl font-bold text-emerald-400">{e4uScanners.length}</div>
+                  <div className="text-sm text-muted-foreground">Scanner Attivi</div>
+                </div>
+              </div>
 
               {/* Scanner Section */}
               <Card className="glass-card">

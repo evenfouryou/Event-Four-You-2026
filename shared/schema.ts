@@ -4049,3 +4049,35 @@ export type UpdateSiaeCashierAllocation = z.infer<typeof updateSiaeCashierAlloca
 
 export type SiaeTicketAudit = typeof siaeTicketAudit.$inferSelect;
 export type InsertSiaeTicketAudit = z.infer<typeof insertSiaeTicketAuditSchema>;
+
+// ==================== SIAE CASHIERS (Internal) ====================
+
+export const siaeCashiers = pgTable("siae_cashiers", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").notNull().references(() => companies.id),
+  username: varchar("username", { length: 100 }).notNull(),
+  passwordHash: varchar("password_hash").notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  defaultPrinterAgentId: varchar("default_printer_agent_id"),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const siaeCashiersRelations = relations(siaeCashiers, ({ one }) => ({
+  company: one(companies, {
+    fields: [siaeCashiers.companyId],
+    references: [companies.id],
+  }),
+}));
+
+export const insertSiaeCashierSchema = createInsertSchema(siaeCashiers).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export const updateSiaeCashierSchema = insertSiaeCashierSchema.partial().omit({ companyId: true });
+
+export type SiaeCashier = typeof siaeCashiers.$inferSelect;
+export type InsertSiaeCashier = z.infer<typeof insertSiaeCashierSchema>;
+export type UpdateSiaeCashier = z.infer<typeof updateSiaeCashierSchema>;
