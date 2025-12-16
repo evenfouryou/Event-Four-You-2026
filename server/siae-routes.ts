@@ -2947,10 +2947,13 @@ router.get("/api/cashiers/events/:eventId/today-tickets", requireAuth, async (re
     
     // Per cassieri SIAE usa cashierId, per altri utenti usa user.id
     const userId = user.role === 'cassiere' ? (getSiaeCashierId(user) || user.id) : user.id;
+    console.log(`[TodayTickets] Fetching for userId=${userId}, eventId=${eventId}, role=${user.role}`);
     const tickets = await siaeStorage.getTodayTicketsByUser(userId, eventId);
+    console.log(`[TodayTickets] Found ${tickets.length} tickets`);
     
     res.json(tickets);
   } catch (error: any) {
+    console.error(`[TodayTickets] Error:`, error);
     res.status(500).json({ message: error.message });
   }
 });
