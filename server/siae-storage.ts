@@ -150,6 +150,7 @@ export interface ISiaeStorage {
   getSiaeCustomerByUniqueCode(uniqueCode: string): Promise<SiaeCustomer | undefined>;
   createSiaeCustomer(customer: InsertSiaeCustomer): Promise<SiaeCustomer>;
   updateSiaeCustomer(id: string, customer: Partial<SiaeCustomer>): Promise<SiaeCustomer | undefined>;
+  deleteSiaeCustomer(id: string): Promise<boolean>;
   
   // ==================== OTP Attempts ====================
   
@@ -593,6 +594,11 @@ export class SiaeStorage implements ISiaeStorage {
       .where(eq(siaeCustomers.id, id))
       .returning();
     return updated;
+  }
+  
+  async deleteSiaeCustomer(id: string): Promise<boolean> {
+    const result = await db.delete(siaeCustomers).where(eq(siaeCustomers.id, id));
+    return (result.rowCount ?? 0) > 0;
   }
   
   // ==================== OTP Attempts ====================

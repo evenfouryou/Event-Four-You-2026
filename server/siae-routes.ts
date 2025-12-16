@@ -496,6 +496,47 @@ router.patch("/api/siae/customers/:id", requireAuth, async (req: Request, res: R
   }
 });
 
+// Verifica manuale cliente (admin bypass OTP)
+router.post("/api/siae/customers/:id/verify-manual", requireAuth, requireGestore, async (req: Request, res: Response) => {
+  try {
+    const customer = await siaeStorage.getSiaeCustomer(req.params.id);
+    if (!customer) {
+      return res.status(404).json({ message: "Cliente non trovato" });
+    }
+    
+    const updated = await siaeStorage.updateSiaeCustomer(req.params.id, {
+      phoneVerified: true,
+      isActive: true,
+    });
+    
+    res.json({ 
+      message: "Cliente verificato manualmente con successo",
+      customer: updated 
+    });
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Elimina cliente
+router.delete("/api/siae/customers/:id", requireAuth, requireGestore, async (req: Request, res: Response) => {
+  try {
+    const customer = await siaeStorage.getSiaeCustomer(req.params.id);
+    if (!customer) {
+      return res.status(404).json({ message: "Cliente non trovato" });
+    }
+    
+    const deleted = await siaeStorage.deleteSiaeCustomer(req.params.id);
+    if (!deleted) {
+      return res.status(500).json({ message: "Errore durante l'eliminazione" });
+    }
+    
+    res.json({ message: "Cliente eliminato con successo" });
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
 // ==================== OTP Verification (Public) ====================
 
 // OTP request validation schema
