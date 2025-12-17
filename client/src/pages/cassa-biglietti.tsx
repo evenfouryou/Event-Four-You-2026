@@ -352,7 +352,7 @@ export default function CassaBigliettiPage() {
     }
 
     const sector = sectors?.find(s => s.id === selectedSectorId);
-    const price = customPrice ? parseFloat(customPrice) : (sector ? Number(sector.price) : 0);
+    const price = customPrice ? parseFloat(customPrice) : (sector ? Number(sector.priceIntero) : 0);
 
     emitTicketMutation.mutate({
       sectorId: selectedSectorId || undefined,
@@ -576,7 +576,7 @@ export default function CassaBigliettiPage() {
                       </span>
                       {sectors?.[0] && (
                         <Badge variant="outline" className="ml-auto">
-                          €{Number(sectors[0].price).toFixed(2)}
+                          €{Number(sectors[0].priceIntero).toFixed(2)}
                         </Badge>
                       )}
                     </div>
@@ -588,7 +588,7 @@ export default function CassaBigliettiPage() {
                       <SelectContent>
                         {sectors?.map((sector) => (
                           <SelectItem key={sector.id} value={sector.id}>
-                            {sector.name} - €{Number(sector.price).toFixed(2)} ({sector.availableSeats} disp.)
+                            {sector.name} - €{Number(sector.priceIntero).toFixed(2)} ({sector.availableSeats} disp.)
                           </SelectItem>
                         ))}
                       </SelectContent>

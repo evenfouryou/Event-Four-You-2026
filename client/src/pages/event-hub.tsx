@@ -3736,7 +3736,7 @@ export default function EventHub() {
                       <div key={sector.id} className="flex items-center justify-between p-3 rounded-lg bg-background/50 border">
                         <div>
                           <div className="font-medium">{sector.name}</div>
-                          <div className="text-xs text-muted-foreground">{sector.soldCount}/{sector.capacity} - EUR {sector.price.toFixed(2)}/biglietto</div>
+                          <div className="text-xs text-muted-foreground">{sector.soldCount}/{sector.capacity} - EUR {Number(sector.priceIntero || 0).toFixed(2)}/biglietto</div>
                         </div>
                         <div className="text-right font-bold text-emerald-400">EUR {sector.revenue.toFixed(2)}</div>
                       </div>
@@ -4437,9 +4437,9 @@ export default function EventHub() {
                       />
                       <div className="flex-1">
                         <div className="font-medium text-sm">{sector.name}</div>
-                        {sector.price && (
+                        {sector.priceIntero && (
                           <div className="text-xs text-muted-foreground">
-                            €{Number(sector.price).toFixed(2)}
+                            €{Number(sector.priceIntero).toFixed(2)}
                           </div>
                         )}
                       </div>

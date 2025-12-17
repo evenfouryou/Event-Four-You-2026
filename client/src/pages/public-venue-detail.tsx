@@ -338,7 +338,7 @@ function EventCard({ event }: { event: VenueEvent }) {
                     variant="outline" 
                     className="border-white/20 text-slate-300"
                   >
-                    {sector.name} - €{parseFloat(sector.price).toFixed(0)}
+                    {sector.name} - €{parseFloat(sector.priceIntero || '0').toFixed(0)}
                   </Badge>
                 ))}
               </div>
