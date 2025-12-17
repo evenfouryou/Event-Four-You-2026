@@ -101,6 +101,8 @@ import {
   Copy,
   Image,
   Building2,
+  FileText,
+  Send,
 } from "lucide-react";
 import { Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";

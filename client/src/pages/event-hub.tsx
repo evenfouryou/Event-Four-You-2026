@@ -1123,12 +1123,12 @@ export default function EventHub() {
     });
   };
 
-  const handleReportC1 = () => {
+  const handleReportC1 = (type: 'giornaliero' | 'mensile' = 'giornaliero') => {
     if (!ticketedEvent?.id) {
       toast({ title: "Errore", description: "Nessun evento SIAE associato.", variant: "destructive" });
       return;
     }
-    window.open(`/siae/reports/c1/${ticketedEvent.id}`, '_blank');
+    window.open(`/siae/reports/c1/${ticketedEvent.id}?type=${type}`, '_blank');
   };
 
   const handleReportC2 = () => {
@@ -2003,17 +2003,30 @@ export default function EventHub() {
                   </CardHeader>
                   <CardContent>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                      <Button 
-                        variant="outline" 
-                        className="h-auto py-4 flex flex-col gap-2" 
-                        data-testid="btn-report-c1"
-                        onClick={handleReportC1}
-                        disabled={!ticketedEvent?.id || reportLoading}
-                      >
-                        {reportLoading ? <Loader2 className="h-6 w-6 animate-spin text-blue-400" /> : <FileText className="h-6 w-6 text-blue-400" />}
-                        <span className="text-sm font-medium">Report C1</span>
-                        <span className="text-xs text-muted-foreground">Registro Giornaliero</span>
-                      </Button>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button 
+                            variant="outline" 
+                            className="h-auto py-4 flex flex-col gap-2" 
+                            data-testid="btn-report-c1"
+                            disabled={!ticketedEvent?.id || reportLoading}
+                          >
+                            {reportLoading ? <Loader2 className="h-6 w-6 animate-spin text-blue-400" /> : <FileText className="h-6 w-6 text-blue-400" />}
+                            <span className="text-sm font-medium">Report C1</span>
+                            <span className="text-xs text-muted-foreground">Registro Vendite</span>
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="center">
+                          <DropdownMenuItem onClick={() => handleReportC1('giornaliero')} data-testid="btn-report-c1-giornaliero">
+                            <Calendar className="h-4 w-4 mr-2" />
+                            Giornaliero
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleReportC1('mensile')} data-testid="btn-report-c1-mensile">
+                            <FileText className="h-4 w-4 mr-2" />
+                            Mensile
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                       <Button 
                         variant="outline" 
                         className="h-auto py-4 flex flex-col gap-2" 
