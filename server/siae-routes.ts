@@ -3058,6 +3058,16 @@ router.post("/api/cashiers/events/:eventId/tickets", requireAuth, async (req: Re
         });
       }
       
+      // Update ticket with fiscal seal if available
+      if (fiscalSealData?.sealCode && result.ticket) {
+        await siaeStorage.updateSiaeTicket(result.ticket.id, {
+          fiscalSealCode: fiscalSealData.sealCode,
+          fiscalSeal: JSON.stringify(fiscalSealData)
+        });
+        // Update result.ticket for response
+        result.ticket.fiscalSealCode = fiscalSealData.sealCode;
+      }
+      
       // Update counters for next iteration
       currentTicketsSold++;
       currentTotalRevenue += ticketPrice;
@@ -4644,7 +4654,7 @@ router.post("/api/siae/tickets/:id/print", requireAuth, async (req: Request, res
       ticket_number: ticket.ticketCode || '',
       progressive_number: String(ticket.progressiveNumber || ''),
       ticket_type: ticketTypeLabels[ticket.ticketType || ''] || ticket.ticketType || '',
-      sector: sector?.sectorName || '',
+      sector: sector?.name || '',
       row: ticket.row || '',
       seat: ticket.seatNumber || '',
       buyer_name: ticket.participantFirstName && ticket.participantLastName 
