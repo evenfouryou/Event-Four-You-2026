@@ -283,7 +283,7 @@ export default function CassaBigliettiPage() {
 
   // Range cancellation mutation
   const rangeCancelMutation = useMutation({
-    mutationFn: async (data: { eventId: string; fromNumber: number; toNumber: number; reasonCode: string; note?: string }) => {
+    mutationFn: async (data: { ticketedEventId: string; fromNumber: number; toNumber: number; reasonCode: string; note?: string }) => {
       const response = await apiRequest("POST", `/api/siae/tickets/cancel-range`, data);
       return response.json();
     },
@@ -1476,7 +1476,7 @@ export default function CassaBigliettiPage() {
                 const toNum = parseInt(rangeToNumber);
                 if (selectedEventId && fromNum && toNum && cancelReasonCode) {
                   rangeCancelMutation.mutate({
-                    eventId: selectedEventId,
+                    ticketedEventId: selectedEventId,
                     fromNumber: fromNum,
                     toNumber: toNum,
                     reasonCode: cancelReasonCode,
