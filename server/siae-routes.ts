@@ -2891,42 +2891,49 @@ router.post("/api/cashiers/events/:eventId/tickets", requireAuth, async (req: Re
       currentAvailableSeats--;
       
       // Create ticket audit entry (outside transaction, not critical)
-      await siaeStorage.createTicketAudit({
-        companyId: user.companyId,
-        ticketId: result.ticket!.id,
-        operationType: 'emission',
-        performedBy: user.id,
-        reason: null,
-        metadata: { 
-          paymentMethod, 
-          ticketType, 
-          price: ticketPrice,
-          batchIndex: ticketQuantity > 1 ? i + 1 : undefined,
-          batchTotal: ticketQuantity > 1 ? ticketQuantity : undefined,
-          fiscalSeal: fiscalSealData ? {
-            sealNumber: fiscalSealData.sealNumber,
-            sealCode: fiscalSealData.sealCode,
-            serialNumber: fiscalSealData.serialNumber,
-            counter: fiscalSealData.counter,
-            mac: fiscalSealData.mac,
-            dateTime: fiscalSealData.dateTime
-          } : null
-        }
-      });
+      // Skip for cassiere role - their ID is in siaeCashiers table, not users (FK constraint)
+      if (user.role !== 'cassiere') {
+        await siaeStorage.createTicketAudit({
+          companyId: user.companyId,
+          ticketId: result.ticket!.id,
+          operationType: 'emission',
+          performedBy: user.id,
+          reason: null,
+          metadata: { 
+            paymentMethod, 
+            ticketType, 
+            price: ticketPrice,
+            batchIndex: ticketQuantity > 1 ? i + 1 : undefined,
+            batchTotal: ticketQuantity > 1 ? ticketQuantity : undefined,
+            fiscalSeal: fiscalSealData ? {
+              sealNumber: fiscalSealData.sealNumber,
+              sealCode: fiscalSealData.sealCode,
+              serialNumber: fiscalSealData.serialNumber,
+              counter: fiscalSealData.counter,
+              mac: fiscalSealData.mac,
+              dateTime: fiscalSealData.dateTime
+            } : null
+          }
+        });
+      }
       
-      // General audit log
+      // General audit log (skip for cassiere role - they have separate table, not in users FK)
       const sealInfo = fiscalSealData ? ` (Sigillo: ${fiscalSealData.counter})` : '';
       const batchInfo = ticketQuantity > 1 ? ` [${i + 1}/${ticketQuantity}]` : '';
-      await siaeStorage.createAuditLog({
-        companyId: user.companyId,
-        userId: user.id,
-        action: 'ticket_emitted',
-        entityType: 'ticket',
-        entityId: result.ticket!.id,
-        description: `Emesso biglietto ${ticketCode} - €${ticketPrice}${sealInfo}${batchInfo}`,
-        ipAddress: (req.ip || '').substring(0, 45),
-        userAgent: (req.get('user-agent') || '').substring(0, 500)
-      });
+      if (user.role !== 'cassiere') {
+        await siaeStorage.createAuditLog({
+          companyId: user.companyId,
+          userId: user.id,
+          action: 'ticket_emitted',
+          entityType: 'ticket',
+          entityId: result.ticket!.id,
+          description: `Emesso biglietto ${ticketCode} - €${ticketPrice}${sealInfo}${batchInfo}`,
+          ipAddress: (req.ip || '').substring(0, 45),
+          userAgent: (req.get('user-agent') || '').substring(0, 500)
+        });
+      } else {
+        console.log(`[CashierTicket] Skipping audit log for cassiere (separate table): ${ticketCode}${sealInfo}${batchInfo}`);
+      }
       
       emittedTickets.push({
         ...result.ticket,
