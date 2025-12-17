@@ -367,16 +367,28 @@ function broadcastToClients(companyId: string, message: any): void {
 }
 
 export function sendPrintJobToAgent(agentId: string, job: any): boolean {
+  console.log(`[PrintRelay] sendPrintJobToAgent called for agent: ${agentId}`);
+  console.log(`[PrintRelay] Active agents count: ${activeAgents.size}`);
+  console.log(`[PrintRelay] Active agent IDs: ${Array.from(activeAgents.keys()).join(', ')}`);
+  
   const agent = activeAgents.get(agentId);
-  if (!agent || agent.ws.readyState !== WebSocket.OPEN) {
+  if (!agent) {
+    console.log(`[PrintRelay] Agent ${agentId} NOT FOUND in activeAgents map`);
+    return false;
+  }
+  
+  if (agent.ws.readyState !== WebSocket.OPEN) {
+    console.log(`[PrintRelay] Agent ${agentId} WebSocket not OPEN, state: ${agent.ws.readyState}`);
     return false;
   }
 
   try {
+    console.log(`[PrintRelay] Sending print_job to agent ${agentId}`);
     agent.ws.send(JSON.stringify({
       type: 'print_job',
       payload: job
     }));
+    console.log(`[PrintRelay] Successfully sent print_job to agent ${agentId}`);
     return true;
   } catch (error) {
     console.error('[PrintRelay] Send job error:', error);
@@ -392,3 +404,4 @@ export function getConnectedAgents(companyId: string): Array<{ agentId: string; 
       deviceName: a.deviceName
     }));
 }
+
