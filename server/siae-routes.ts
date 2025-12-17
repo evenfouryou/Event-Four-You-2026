@@ -3117,15 +3117,29 @@ router.get("/api/cashiers/events/:eventId/today-tickets", requireAuth, async (re
 // PATCH /api/siae/tickets/:id/cancel - Cancel a ticket
 // Uses atomic transaction to prevent race conditions on quota restoration
 // Registers fiscal cancellation via bridge if available
+// Request body: { reasonCode: string (SIAE code 01-12, 99), note?: string }
 router.patch("/api/siae/tickets/:id/cancel", requireAuth, async (req: Request, res: Response) => {
   try {
     const user = req.user as any;
     const { id } = req.params;
-    const { reason } = req.body;
+    const { reasonCode, note } = req.body;
     
-    if (!reason) {
-      return res.status(400).json({ message: "Il motivo dell'annullamento è richiesto" });
+    // Validate reasonCode (SIAE TAB.5 codes: 01-12, 99)
+    if (!reasonCode) {
+      return res.status(400).json({ message: "Il codice causale di annullamento è richiesto (reasonCode)" });
     }
+    
+    // Validate reasonCode format
+    const validReasonCodes = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12', '99'];
+    if (!validReasonCodes.includes(reasonCode)) {
+      return res.status(400).json({ 
+        message: `Codice causale non valido. Valori ammessi: ${validReasonCodes.join(', ')}`,
+        errorCode: "INVALID_REASON_CODE"
+      });
+    }
+    
+    // Combine reasonCode and note for the cancellation reason text
+    const reason = note ? `${reasonCode}: ${note}` : reasonCode;
     
     const ticket = await siaeStorage.getSiaeTicket(id);
     if (!ticket) {
@@ -3286,6 +3300,126 @@ router.patch("/api/siae/tickets/:id/cancel", requireAuth, async (req: Request, r
     res.json({
       ...result.ticket,
       fiscalCancellationRegistered
+    });
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// POST /api/siae/tickets/cancel-range - Bulk cancel tickets by progressive number range
+// Request body: { ticketedEventId: string, fromNumber: number, toNumber: number, reasonCode: string, note?: string }
+router.post("/api/siae/tickets/cancel-range", requireAuth, requireOrganizer, async (req: Request, res: Response) => {
+  try {
+    const user = req.user as any;
+    const { ticketedEventId, fromNumber, toNumber, reasonCode, note } = req.body;
+    
+    // Validate required fields
+    if (!ticketedEventId) {
+      return res.status(400).json({ message: "ticketedEventId è richiesto" });
+    }
+    if (fromNumber === undefined || toNumber === undefined) {
+      return res.status(400).json({ message: "fromNumber e toNumber sono richiesti" });
+    }
+    if (typeof fromNumber !== 'number' || typeof toNumber !== 'number') {
+      return res.status(400).json({ message: "fromNumber e toNumber devono essere numeri" });
+    }
+    if (fromNumber > toNumber) {
+      return res.status(400).json({ message: "fromNumber deve essere minore o uguale a toNumber" });
+    }
+    if (!reasonCode) {
+      return res.status(400).json({ message: "reasonCode è richiesto" });
+    }
+    
+    // Validate reasonCode format
+    const validReasonCodes = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12', '99'];
+    if (!validReasonCodes.includes(reasonCode)) {
+      return res.status(400).json({ 
+        message: `Codice causale non valido. Valori ammessi: ${validReasonCodes.join(', ')}`,
+        errorCode: "INVALID_REASON_CODE"
+      });
+    }
+    
+    // Verify event exists
+    const event = await siaeStorage.getSiaeTicketedEvent(ticketedEventId);
+    if (!event) {
+      return res.status(404).json({ message: "Evento non trovato" });
+    }
+    
+    // Check company access (super_admin can access all)
+    if (user.role !== 'super_admin' && event.companyId !== user.companyId) {
+      return res.status(403).json({ message: "Non autorizzato ad accedere a questo evento" });
+    }
+    
+    // Get all tickets for the event in the range
+    const allTickets = await siaeStorage.getSiaeTicketsByEvent(ticketedEventId);
+    const ticketsInRange = allTickets.filter(t => 
+      t.progressiveNumber >= fromNumber && 
+      t.progressiveNumber <= toNumber &&
+      t.status !== 'cancelled'
+    );
+    
+    if (ticketsInRange.length === 0) {
+      return res.json({
+        cancelledCount: 0,
+        errors: [],
+        message: "Nessun biglietto valido trovato nell'intervallo specificato"
+      });
+    }
+    
+    const cancellationReason = note ? `${reasonCode}: ${note}` : reasonCode;
+    const cancelledTickets: string[] = [];
+    const errors: { ticketId: string; ticketCode: string; error: string }[] = [];
+    
+    // Cancel each ticket in the range
+    for (const ticket of ticketsInRange) {
+      try {
+        const result = await siaeStorage.cancelTicketWithAtomicQuotaRestore({
+          ticketId: ticket.id,
+          cancelledByUserId: user.id,
+          cancellationReason: cancellationReason,
+          issuedByUserId: ticket.issuedByUserId,
+          ticketedEventId: ticket.ticketedEventId,
+          sectorId: ticket.sectorId,
+          ticketPrice: Number(ticket.ticketPrice || 0)
+        });
+        
+        if (result.success) {
+          cancelledTickets.push(ticket.id);
+        } else {
+          errors.push({
+            ticketId: ticket.id,
+            ticketCode: ticket.ticketCode || '',
+            error: result.error || 'Errore sconosciuto'
+          });
+        }
+      } catch (err: any) {
+        errors.push({
+          ticketId: ticket.id,
+          ticketCode: ticket.ticketCode || '',
+          error: err.message
+        });
+      }
+    }
+    
+    // Create audit log for bulk cancellation
+    await siaeStorage.createAuditLog({
+      companyId: user.companyId,
+      userId: user.id,
+      action: 'bulk_tickets_cancelled',
+      entityType: 'ticketed_event',
+      entityId: ticketedEventId,
+      description: `Annullamento massivo biglietti ${fromNumber}-${toNumber}: ${cancelledTickets.length} annullati, ${errors.length} errori`,
+      ipAddress: (req.ip || '').substring(0, 45),
+      userAgent: (req.get('user-agent') || '').substring(0, 500)
+    });
+    
+    res.json({
+      cancelledCount: cancelledTickets.length,
+      totalInRange: ticketsInRange.length,
+      errors,
+      message: errors.length === 0 
+        ? `Annullati ${cancelledTickets.length} biglietti con successo`
+        : `Annullati ${cancelledTickets.length} biglietti, ${errors.length} errori`
     });
   } catch (error: any) {
     res.status(500).json({ message: error.message });
@@ -4154,7 +4288,8 @@ router.get("/api/cashier/events/:eventId/c1-report", requireAuth, requireCashier
 });
 
 // GET /api/siae/events/:eventId/report-c1 - Generate C1 fiscal report
-router.get("/api/siae/events/:eventId/report-c1", requireAuth, requireGestore, async (req: Request, res: Response) => {
+// Accessible by gestore, organizer, admin, super_admin, and cassiere (only for allocated events)
+router.get("/api/siae/events/:eventId/report-c1", requireAuth, async (req: Request, res: Response) => {
   try {
     const user = req.user as any;
     const { eventId } = req.params;
@@ -4162,6 +4297,43 @@ router.get("/api/siae/events/:eventId/report-c1", requireAuth, requireGestore, a
     const event = await siaeStorage.getSiaeTicketedEvent(eventId);
     if (!event) {
       return res.status(404).json({ message: "Evento non trovato" });
+    }
+    
+    // Check authorization based on role
+    const isGestoreOrHigher = ['gestore', 'organizer', 'admin', 'super_admin'].includes(user.role);
+    const isCashier = user.role === 'cassiere';
+    
+    if (!isGestoreOrHigher && !isCashier) {
+      return res.status(403).json({ message: "Non autorizzato ad accedere a questo report" });
+    }
+    
+    // For cashiers, verify they are allocated to this event
+    if (isCashier) {
+      const cashierId = getSiaeCashierId(user);
+      if (!cashierId) {
+        return res.status(403).json({ message: "Impossibile identificare il cassiere" });
+      }
+      
+      // Check if cashier is allocated to this event
+      const allocations = await db.select()
+        .from(siaeCashierAllocations)
+        .where(and(
+          eq(siaeCashierAllocations.eventId, eventId),
+          eq(siaeCashierAllocations.cashierId, cashierId),
+          eq(siaeCashierAllocations.isActive, true)
+        ));
+      
+      if (allocations.length === 0) {
+        return res.status(403).json({ 
+          message: "Non sei allocato a questo evento. Puoi accedere solo ai report degli eventi a cui sei stato assegnato.",
+          errorCode: "NOT_ALLOCATED_TO_EVENT"
+        });
+      }
+    }
+    
+    // For gestore/organizer/admin, verify company access (super_admin can access all)
+    if (isGestoreOrHigher && user.role !== 'super_admin' && event.companyId !== user.companyId) {
+      return res.status(403).json({ message: "Non autorizzato ad accedere a questo evento" });
     }
     
     // Get all tickets for event

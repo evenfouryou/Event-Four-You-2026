@@ -5,7 +5,8 @@ import { it } from "date-fns/locale";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
-import { type SiaeTicketedEvent, type SiaeEventSector, type SiaeTicket, type SiaeCashierAllocation, type SiaeSubscription, type SiaeCustomer } from "@shared/schema";
+import { type SiaeTicketedEvent, type SiaeEventSector, type SiaeTicket, type SiaeCashierAllocation, type SiaeSubscription, type SiaeCustomer, type SiaeCancellationReason } from "@shared/schema";
+import { Progress } from "@/components/ui/progress";
 import { useSmartCardStatus } from "@/lib/smart-card-service";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -82,6 +83,7 @@ import {
   Wifi,
   WifiOff,
   Radio,
+  Printer,
 } from "lucide-react";
 
 export default function CassaBigliettiPage() {
@@ -104,6 +106,17 @@ export default function CassaBigliettiPage() {
   const [isNominative, setIsNominative] = useState<boolean>(false);
   const [ticketQuantity, setTicketQuantity] = useState<number>(1);
   const [activeTab, setActiveTab] = useState<string>("biglietti");
+  
+  // Print status tracking
+  const [printStatuses, setPrintStatuses] = useState<Record<string, 'idle' | 'printing' | 'success' | 'error'>>({});
+  const [printProgress, setPrintProgress] = useState<{current: number, total: number} | null>(null);
+  
+  // Enhanced cancellation state
+  const [cancelReasonCode, setCancelReasonCode] = useState<string>("");
+  const [cancelNote, setCancelNote] = useState<string>("");
+  const [isRangeCancelDialogOpen, setIsRangeCancelDialogOpen] = useState(false);
+  const [rangeFromNumber, setRangeFromNumber] = useState<string>("");
+  const [rangeToNumber, setRangeToNumber] = useState<string>("");
   
   // Subscription form state
   const [subCustomerId, setSubCustomerId] = useState<string>("");
@@ -186,7 +199,7 @@ export default function CassaBigliettiPage() {
 
   const { data: c1Report, isLoading: c1Loading } = useQuery<any>({
     queryKey: ["/api/siae/events", selectedEventId, "report-c1"],
-    enabled: !!selectedEventId && isGestore && isC1DialogOpen,
+    enabled: !!selectedEventId && (isGestore || isCassiere) && isC1DialogOpen,
   });
 
   // Subscriptions for this event
@@ -199,6 +212,12 @@ export default function CassaBigliettiPage() {
   const { data: customers } = useQuery<SiaeCustomer[]>({
     queryKey: ["/api/siae/companies", companyId, "customers"],
     enabled: !!companyId && activeTab === "abbonamenti",
+  });
+
+  // Cancellation reasons for SIAE
+  const { data: cancellationReasons } = useQuery<SiaeCancellationReason[]>({
+    queryKey: ["/api/siae/cancellation-reasons"],
+    enabled: isCancelDialogOpen || isRangeCancelDialogOpen,
   });
 
   // Create subscription mutation
@@ -230,20 +249,66 @@ export default function CassaBigliettiPage() {
     },
   });
 
-  // Print ticket mutation
+  // Print ticket mutation with status tracking
   const printTicketMutation = useMutation({
     mutationFn: async (ticketId: string) => {
+      setPrintStatuses(prev => ({ ...prev, [ticketId]: 'printing' }));
       const response = await apiRequest("POST", `/api/siae/tickets/${ticketId}/print`, {
         skipBackground: true // Use pre-printed paper
       });
+      return { ticketId, result: await response.json() };
+    },
+    onSuccess: ({ ticketId }) => {
+      setPrintStatuses(prev => ({ ...prev, [ticketId]: 'success' }));
+      // Update progress if multi-ticket printing
+      if (printProgress) {
+        const newCurrent = printProgress.current + 1;
+        if (newCurrent >= printProgress.total) {
+          setPrintProgress(null);
+        } else {
+          setPrintProgress({ current: newCurrent, total: printProgress.total });
+        }
+      }
+    },
+    onError: (error: any, ticketId: string) => {
+      console.warn('[Print] Error:', error.message);
+      setPrintStatuses(prev => ({ ...prev, [ticketId]: 'error' }));
+      // Update progress even on error
+      if (printProgress) {
+        const newCurrent = printProgress.current + 1;
+        if (newCurrent >= printProgress.total) {
+          setPrintProgress(null);
+        } else {
+          setPrintProgress({ current: newCurrent, total: printProgress.total });
+        }
+      }
+    },
+  });
+
+  // Range cancellation mutation
+  const rangeCancelMutation = useMutation({
+    mutationFn: async (data: { eventId: string; fromNumber: number; toNumber: number; reasonCode: string; note?: string }) => {
+      const response = await apiRequest("POST", `/api/siae/tickets/cancel-range`, data);
       return response.json();
     },
-    onSuccess: () => {
-      // Silent success - printing started
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/cashiers/events", selectedEventId] });
+      setIsRangeCancelDialogOpen(false);
+      setRangeFromNumber("");
+      setRangeToNumber("");
+      setCancelReasonCode("");
+      setCancelNote("");
+      toast({
+        title: "Annullamento Completato",
+        description: `${result.cancelledCount || 0} biglietti annullati con successo.`,
+      });
     },
     onError: (error: any) => {
-      console.warn('[Print] Error:', error.message);
-      // Non-blocking error - ticket was already emitted
+      toast({
+        title: "Errore Annullamento Range",
+        description: error.message || "Errore durante l'annullamento dei biglietti",
+        variant: "destructive",
+      });
     },
   });
 
@@ -263,8 +328,16 @@ export default function CassaBigliettiPage() {
       
       const emittedCount = Array.isArray(result) ? result.length : 1;
       
-      // Auto-print the emitted ticket(s)
-      if (Array.isArray(result)) {
+      // Auto-print the emitted ticket(s) with progress tracking
+      if (Array.isArray(result) && result.length > 1) {
+        setPrintProgress({ current: 0, total: result.length });
+        result.forEach((ticket: any) => {
+          if (ticket.id) {
+            setPrintStatuses(prev => ({ ...prev, [ticket.id]: 'idle' }));
+            printTicketMutation.mutate(ticket.id);
+          }
+        });
+      } else if (Array.isArray(result)) {
         result.forEach((ticket: any) => {
           if (ticket.id) {
             printTicketMutation.mutate(ticket.id);
@@ -523,10 +596,17 @@ export default function CassaBigliettiPage() {
             </Select>
           )}
 
-          {isGestore && selectedEventId && (
+          {(isGestore || isCassiere) && selectedEventId && (
             <Button variant="outline" onClick={() => setIsC1DialogOpen(true)} data-testid="button-c1-report">
               <FileText className="w-4 h-4 mr-2" />
               Report C1
+            </Button>
+          )}
+
+          {isGestore && selectedEventId && (
+            <Button variant="outline" onClick={() => setIsRangeCancelDialogOpen(true)} data-testid="button-range-cancel">
+              <XCircle className="w-4 h-4 mr-2" />
+              Annulla Range
             </Button>
           )}
         </div>
@@ -811,6 +891,20 @@ export default function CassaBigliettiPage() {
                   )}
                 </div>
 
+                {/* Print Progress Bar */}
+                {printProgress && (
+                  <div className="space-y-2 p-3 rounded-md bg-muted/30 border border-[#FFD700]/30" data-testid="print-progress-container">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="flex items-center gap-2">
+                        <Printer className="w-4 h-4 text-[#FFD700]" />
+                        <span>Stampa {printProgress.current}/{printProgress.total} biglietti...</span>
+                      </span>
+                      <span className="text-muted-foreground">{Math.round((printProgress.current / printProgress.total) * 100)}%</span>
+                    </div>
+                    <Progress value={(printProgress.current / printProgress.total) * 100} className="h-2" data-testid="progress-print" />
+                  </div>
+                )}
+
                 <Button
                   type="submit"
                   className="w-full"
@@ -907,11 +1001,26 @@ export default function CassaBigliettiPage() {
                               €{Number(ticket.ticketPrice || 0).toFixed(2)}
                             </TableCell>
                             <TableCell>
-                              {ticket.status === "cancelled" ? (
-                                <Badge variant="destructive">Annullato</Badge>
-                              ) : (
-                                <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30">Valido</Badge>
-                              )}
+                              <div className="flex items-center gap-2">
+                                {ticket.status === "cancelled" ? (
+                                  <Badge variant="destructive">Annullato</Badge>
+                                ) : (
+                                  <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30">Valido</Badge>
+                                )}
+                                {/* Print status icon */}
+                                {printStatuses[ticket.id] === 'printing' && (
+                                  <Loader2 className="w-4 h-4 animate-spin text-[#FFD700]" data-testid={`icon-printing-${ticket.id}`} />
+                                )}
+                                {printStatuses[ticket.id] === 'success' && (
+                                  <CheckCircle2 className="w-4 h-4 text-emerald-400" data-testid={`icon-print-success-${ticket.id}`} />
+                                )}
+                                {printStatuses[ticket.id] === 'error' && (
+                                  <XCircle className="w-4 h-4 text-red-400" data-testid={`icon-print-error-${ticket.id}`} />
+                                )}
+                                {printStatuses[ticket.id] === 'idle' && (
+                                  <Printer className="w-4 h-4 text-muted-foreground" data-testid={`icon-print-idle-${ticket.id}`} />
+                                )}
+                              </div>
                             </TableCell>
                             <TableCell className="text-right">
                               {ticket.status !== "cancelled" && (
@@ -1173,7 +1282,13 @@ export default function CassaBigliettiPage() {
         </>
       )}
 
-      <AlertDialog open={isCancelDialogOpen} onOpenChange={setIsCancelDialogOpen}>
+      <AlertDialog open={isCancelDialogOpen} onOpenChange={(open) => {
+        setIsCancelDialogOpen(open);
+        if (!open) {
+          setCancelReasonCode("");
+          setCancelNote("");
+        }
+      }}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Annulla Biglietto</AlertDialogTitle>
@@ -1182,27 +1297,62 @@ export default function CassaBigliettiPage() {
               Questa azione non può essere annullata.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <div className="py-4">
-            <Label htmlFor="cancel-reason">Motivo dell'annullamento *</Label>
-            <Textarea
-              id="cancel-reason"
-              placeholder="Inserisci il motivo dell'annullamento..."
-              value={cancelReason}
-              onChange={(e) => setCancelReason(e.target.value)}
-              className="mt-2"
-              data-testid="input-cancel-reason"
-            />
+          <div className="py-4 space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="cancel-reason-code">Motivo SIAE *</Label>
+              <Select value={cancelReasonCode} onValueChange={setCancelReasonCode}>
+                <SelectTrigger data-testid="select-cancel-reason">
+                  <SelectValue placeholder="Seleziona motivo annullamento..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {cancellationReasons?.map((reason) => (
+                    <SelectItem key={reason.id} value={reason.code}>
+                      {reason.code} - {reason.description}
+                    </SelectItem>
+                  )) || (
+                    <>
+                      <SelectItem value="01">01 - Errore emissione</SelectItem>
+                      <SelectItem value="02">02 - Richiesta cliente</SelectItem>
+                      <SelectItem value="03">03 - Evento annullato</SelectItem>
+                      <SelectItem value="04">04 - Duplicato</SelectItem>
+                      <SelectItem value="05">05 - Cambio data/ora</SelectItem>
+                      <SelectItem value="06">06 - Cambio settore/posto</SelectItem>
+                      <SelectItem value="07">07 - Rimborso parziale</SelectItem>
+                      <SelectItem value="08">08 - Rimborso totale</SelectItem>
+                      <SelectItem value="09">09 - Biglietto non ritirato</SelectItem>
+                      <SelectItem value="10">10 - Errore prezzo</SelectItem>
+                      <SelectItem value="11">11 - Errore dati nominativo</SelectItem>
+                      <SelectItem value="12">12 - Problemi tecnici</SelectItem>
+                      <SelectItem value="99">99 - Altro motivo</SelectItem>
+                    </>
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="cancel-note">Note aggiuntive (opzionale)</Label>
+              <Textarea
+                id="cancel-note"
+                placeholder="Inserisci eventuali note aggiuntive..."
+                value={cancelNote}
+                onChange={(e) => setCancelNote(e.target.value)}
+                data-testid="input-cancel-note"
+              />
+            </div>
           </div>
           <AlertDialogFooter>
             <AlertDialogCancel data-testid="button-cancel-dialog-cancel">Annulla</AlertDialogCancel>
             <AlertDialogAction
               className="bg-red-500 hover:bg-red-600"
-              disabled={!cancelReason.trim() || cancelTicketMutation.isPending}
+              disabled={!cancelReasonCode || cancelTicketMutation.isPending}
               onClick={() => {
-                if (ticketToCancel && cancelReason.trim()) {
+                if (ticketToCancel && cancelReasonCode) {
+                  const reason = cancelNote 
+                    ? `${cancelReasonCode}: ${cancelNote.trim()}`
+                    : cancelReasonCode;
                   cancelTicketMutation.mutate({
                     ticketId: ticketToCancel.id,
-                    reason: cancelReason.trim(),
+                    reason,
                   });
                 }
               }}
@@ -1220,6 +1370,135 @@ export default function CassaBigliettiPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Range Cancel Dialog */}
+      <Dialog open={isRangeCancelDialogOpen} onOpenChange={(open) => {
+        setIsRangeCancelDialogOpen(open);
+        if (!open) {
+          setRangeFromNumber("");
+          setRangeToNumber("");
+          setCancelReasonCode("");
+          setCancelNote("");
+        }
+      }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <XCircle className="w-5 h-5 text-red-500" />
+              Annulla Range Biglietti
+            </DialogTitle>
+            <DialogDescription>
+              Annulla tutti i biglietti compresi nell'intervallo specificato.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="range-from">Da Numero Progressivo</Label>
+                <Input
+                  id="range-from"
+                  type="number"
+                  placeholder="Es: 1"
+                  value={rangeFromNumber}
+                  onChange={(e) => setRangeFromNumber(e.target.value)}
+                  data-testid="input-range-from"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="range-to">A Numero Progressivo</Label>
+                <Input
+                  id="range-to"
+                  type="number"
+                  placeholder="Es: 100"
+                  value={rangeToNumber}
+                  onChange={(e) => setRangeToNumber(e.target.value)}
+                  data-testid="input-range-to"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="range-cancel-reason">Motivo SIAE *</Label>
+              <Select value={cancelReasonCode} onValueChange={setCancelReasonCode}>
+                <SelectTrigger data-testid="select-range-cancel-reason">
+                  <SelectValue placeholder="Seleziona motivo annullamento..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {cancellationReasons?.map((reason) => (
+                    <SelectItem key={reason.id} value={reason.code}>
+                      {reason.code} - {reason.description}
+                    </SelectItem>
+                  )) || (
+                    <>
+                      <SelectItem value="01">01 - Errore emissione</SelectItem>
+                      <SelectItem value="02">02 - Richiesta cliente</SelectItem>
+                      <SelectItem value="03">03 - Evento annullato</SelectItem>
+                      <SelectItem value="04">04 - Duplicato</SelectItem>
+                      <SelectItem value="05">05 - Cambio data/ora</SelectItem>
+                      <SelectItem value="06">06 - Cambio settore/posto</SelectItem>
+                      <SelectItem value="07">07 - Rimborso parziale</SelectItem>
+                      <SelectItem value="08">08 - Rimborso totale</SelectItem>
+                      <SelectItem value="09">09 - Biglietto non ritirato</SelectItem>
+                      <SelectItem value="10">10 - Errore prezzo</SelectItem>
+                      <SelectItem value="11">11 - Errore dati nominativo</SelectItem>
+                      <SelectItem value="12">12 - Problemi tecnici</SelectItem>
+                      <SelectItem value="99">99 - Altro motivo</SelectItem>
+                    </>
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="range-cancel-note">Note aggiuntive (opzionale)</Label>
+              <Textarea
+                id="range-cancel-note"
+                placeholder="Inserisci eventuali note aggiuntive..."
+                value={cancelNote}
+                onChange={(e) => setCancelNote(e.target.value)}
+                data-testid="input-range-cancel-note"
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsRangeCancelDialogOpen(false)} data-testid="button-range-cancel-close">
+              Annulla
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={!rangeFromNumber || !rangeToNumber || !cancelReasonCode || rangeCancelMutation.isPending}
+              onClick={() => {
+                const fromNum = parseInt(rangeFromNumber);
+                const toNum = parseInt(rangeToNumber);
+                if (selectedEventId && fromNum && toNum && cancelReasonCode) {
+                  rangeCancelMutation.mutate({
+                    eventId: selectedEventId,
+                    fromNumber: fromNum,
+                    toNumber: toNum,
+                    reasonCode: cancelReasonCode,
+                    note: cancelNote || undefined,
+                  });
+                }
+              }}
+              data-testid="button-range-cancel-confirm"
+            >
+              {rangeCancelMutation.isPending ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Annullamento...
+                </>
+              ) : (
+                <>
+                  <XCircle className="w-4 h-4 mr-2" />
+                  Annulla Range
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={isC1DialogOpen} onOpenChange={setIsC1DialogOpen}>
         <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
