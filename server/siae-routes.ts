@@ -2809,20 +2809,22 @@ router.post("/api/cashiers/events/:eventId/tickets", requireAuth, async (req: Re
             });
           }
           
-          // Audit log per tentativo fallito (prima di restituire errore)
-          try {
-            await siaeStorage.createAuditLog({
-              companyId: user.companyId,
-              userId: user.id,
-              action: 'ticket_emission_failed',
-              entityType: 'ticket',
-              entityId: eventId,
-              description: `Tentativo emissione biglietto fallito - Sigillo fiscale non ottenuto: ${sealError.message}`,
-              ipAddress: (req.ip || '').substring(0, 45),
-              userAgent: (req.get('user-agent') || '').substring(0, 500)
-            });
-          } catch (auditError: any) {
-            console.warn(`[CashierTicket] Failed to create audit log for failed emission:`, auditError.message);
+          // Audit log per tentativo fallito (solo per utenti, non cassieri - hanno tabella separata)
+          if (user.role !== 'cassiere') {
+            try {
+              await siaeStorage.createAuditLog({
+                companyId: user.companyId,
+                userId: user.id,
+                action: 'ticket_emission_failed',
+                entityType: 'ticket',
+                entityId: eventId,
+                description: `Tentativo emissione biglietto fallito - Sigillo fiscale non ottenuto: ${sealError.message}`,
+                ipAddress: (req.ip || '').substring(0, 45),
+                userAgent: (req.get('user-agent') || '').substring(0, 500)
+              });
+            } catch (auditError: any) {
+              console.warn(`[CashierTicket] Failed to create audit log for failed emission:`, auditError.message);
+            }
           }
           
           return res.status(503).json({ 
