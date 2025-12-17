@@ -110,6 +110,15 @@ function requireOrganizer(req: Request, res: Response, next: NextFunction) {
   next();
 }
 
+// Middleware to check if user is organizer OR cashier (for operations like cancel-range)
+function requireOrganizerOrCashier(req: Request, res: Response, next: NextFunction) {
+  const user = req.user as any;
+  if (!user || !['super_admin', 'gestore', 'organizer', 'cassiere'].includes(user.role)) {
+    return res.status(403).json({ message: "Accesso riservato agli Organizzatori o Cassieri" });
+  }
+  next();
+}
+
 // ==================== TAB.1-5 Reference Tables (Super Admin) ====================
 
 // Event Genres (TAB.1)
@@ -3329,10 +3338,15 @@ router.patch("/api/siae/tickets/:id/cancel", requireAuth, async (req: Request, r
 
 // POST /api/siae/tickets/cancel-range - Bulk cancel tickets by progressive number range
 // Request body: { ticketedEventId: string, fromNumber: number, toNumber: number, reasonCode: string, note?: string }
-router.post("/api/siae/tickets/cancel-range", requireAuth, requireOrganizer, async (req: Request, res: Response) => {
+router.post("/api/siae/tickets/cancel-range", requireAuth, requireOrganizerOrCashier, async (req: Request, res: Response) => {
   try {
     const user = req.user as any;
     const { ticketedEventId, fromNumber, toNumber, reasonCode, note } = req.body;
+    
+    // Determine user ID for cancellation (supports both regular users and cashiers)
+    const userIdForCancellation = user.role === 'cassiere' 
+      ? (user.siaeCashierId || user.id) 
+      : user.id;
     
     // Validate required fields
     if (!ticketedEventId) {
@@ -3396,7 +3410,7 @@ router.post("/api/siae/tickets/cancel-range", requireAuth, requireOrganizer, asy
       try {
         const result = await siaeStorage.cancelTicketWithAtomicQuotaRestore({
           ticketId: ticket.id,
-          cancelledByUserId: user.id,
+          cancelledByUserId: userIdForCancellation,
           cancellationReason: cancellationReason,
           issuedByUserId: ticket.issuedByUserId,
           ticketedEventId: ticket.ticketedEventId,
@@ -3425,7 +3439,7 @@ router.post("/api/siae/tickets/cancel-range", requireAuth, requireOrganizer, asy
     // Create audit log for bulk cancellation
     await siaeStorage.createAuditLog({
       companyId: user.companyId,
-      userId: user.id,
+      userId: userIdForCancellation,
       action: 'bulk_tickets_cancelled',
       entityType: 'ticketed_event',
       entityId: ticketedEventId,
