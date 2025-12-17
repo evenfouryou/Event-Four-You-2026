@@ -157,6 +157,7 @@ export interface ISiaeStorage {
   
   createSiaeOtpAttempt(attempt: InsertSiaeOtpAttempt): Promise<SiaeOtpAttempt>;
   getSiaeOtpAttempt(phone: string, otpCode: string): Promise<SiaeOtpAttempt | undefined>;
+  getSiaeOtpAttemptByPhone(phone: string): Promise<SiaeOtpAttempt | undefined>;
   markSiaeOtpVerified(id: string): Promise<void>;
   markSiaeOtpVerifiedByPhone(phone: string): Promise<void>;
   cleanupExpiredOtps(): Promise<void>;
@@ -627,6 +628,18 @@ export class SiaeStorage implements ISiaeStorage {
       .where(and(
         eq(siaeOtpAttempts.phone, phone),
         eq(siaeOtpAttempts.otpCode, otpCode)
+      ))
+      .orderBy(desc(siaeOtpAttempts.createdAt))
+      .limit(1);
+    return attempt;
+  }
+  
+  async getSiaeOtpAttemptByPhone(phone: string): Promise<SiaeOtpAttempt | undefined> {
+    // Get latest pending OTP attempt by phone (for MSG91 verification)
+    const [attempt] = await db.select().from(siaeOtpAttempts)
+      .where(and(
+        eq(siaeOtpAttempts.phone, phone),
+        eq(siaeOtpAttempts.status, 'pending')
       ))
       .orderBy(desc(siaeOtpAttempts.createdAt))
       .limit(1);

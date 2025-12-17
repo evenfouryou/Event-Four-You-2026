@@ -49,9 +49,10 @@ A digital badge creation system for schools and organizations, accessible via "B
 ### Third-Party Services
 - **Neon Database**: Serverless PostgreSQL hosting.
 - **Google Fonts CDN**: Typography.
-- **SMTP Email**: Email verification.
+- **SMTP Email**: Email verification and password reset.
 - **Replit OAuth**: Optional authentication.
 - **OpenAI API**: AI analytics (`gpt-4o-mini`).
+- **MSG91 OTP**: SMS OTP verification for customer phone validation (requires `MSG91_AUTHKEY` and `MSG91_TEMPLATE_ID` secrets).
 
 ### Key NPM Packages
 - **UI Components**: `@radix-ui/*`, `shadcn/ui`.
