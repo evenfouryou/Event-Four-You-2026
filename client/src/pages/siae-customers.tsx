@@ -249,9 +249,12 @@ export default function SiaeCustomersPage() {
   const deleteMutation = useMutation({
     mutationFn: async ({ id, force = false }: { id: string; force?: boolean }) => {
       const url = force ? `/api/siae/customers/${id}?force=true` : `/api/siae/customers/${id}`;
-      const response = await apiRequest("DELETE", url, {});
+      const response = await fetch(url, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      const data = await response.json();
       if (!response.ok) {
-        const data = await response.json();
         if (data.canForceDelete) {
           setDeleteErrorMessage(data.message);
           setCanForceDelete(true);
@@ -259,7 +262,7 @@ export default function SiaeCustomersPage() {
         }
         throw new Error(data.message || "Errore durante l'eliminazione");
       }
-      return response.json();
+      return data;
     },
     onSuccess: () => {
       toast({
