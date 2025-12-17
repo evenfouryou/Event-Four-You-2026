@@ -1,6 +1,13 @@
 const MSG91_BASE_URL = "https://control.msg91.com/api/v5";
-const MSG91_AUTHKEY = process.env.MSG91_AUTHKEY;
-const MSG91_TEMPLATE_ID = process.env.MSG91_TEMPLATE_ID;
+
+// Read secrets at runtime, not at module load time
+function getMSG91Authkey(): string | undefined {
+  return process.env.MSG91_AUTHKEY;
+}
+
+function getMSG91TemplateId(): string | undefined {
+  return process.env.MSG91_TEMPLATE_ID;
+}
 
 interface MSG91Response {
   type: string;
@@ -35,11 +42,14 @@ function formatPhoneNumber(phone: string): string {
 }
 
 export async function sendOTP(phone: string, otpExpiry: number = 10): Promise<SendOTPResult> {
-  console.log(`[MSG91] sendOTP called with phone: ${phone}`);
-  console.log(`[MSG91] AUTHKEY configured: ${!!MSG91_AUTHKEY}, TEMPLATE_ID configured: ${!!MSG91_TEMPLATE_ID}`);
+  const authkey = getMSG91Authkey();
+  const templateId = getMSG91TemplateId();
   
-  if (!MSG91_AUTHKEY || !MSG91_TEMPLATE_ID) {
-    console.error("[MSG91] Missing AUTHKEY or TEMPLATE_ID - AUTHKEY:", !!MSG91_AUTHKEY, "TEMPLATE_ID:", !!MSG91_TEMPLATE_ID);
+  console.log(`[MSG91] sendOTP called with phone: ${phone}`);
+  console.log(`[MSG91] AUTHKEY configured: ${!!authkey}, TEMPLATE_ID configured: ${!!templateId}`);
+  
+  if (!authkey || !templateId) {
+    console.error("[MSG91] Missing AUTHKEY or TEMPLATE_ID - AUTHKEY:", !!authkey, "TEMPLATE_ID:", !!templateId);
     return { success: false, message: "Configurazione MSG91 mancante" };
   }
 
@@ -47,13 +57,13 @@ export async function sendOTP(phone: string, otpExpiry: number = 10): Promise<Se
   console.log(`[MSG91] Formatted phone: ${formattedPhone}`);
   
   const url = new URL(`${MSG91_BASE_URL}/otp`);
-  url.searchParams.append('authkey', MSG91_AUTHKEY);
-  url.searchParams.append('template_id', MSG91_TEMPLATE_ID);
+  url.searchParams.append('authkey', authkey);
+  url.searchParams.append('template_id', templateId);
   url.searchParams.append('mobile', formattedPhone);
   url.searchParams.append('otp_expiry', String(otpExpiry));
   url.searchParams.append('realTimeResponse', '1');
 
-  console.log(`[MSG91] Sending OTP to ${formattedPhone} with template ${MSG91_TEMPLATE_ID}`);
+  console.log(`[MSG91] Sending OTP to ${formattedPhone} with template ${templateId}`);
 
   try {
     const response = await fetch(url.toString(), {
@@ -85,7 +95,9 @@ export async function sendOTP(phone: string, otpExpiry: number = 10): Promise<Se
 }
 
 export async function verifyOTP(phone: string, otp: string): Promise<VerifyOTPResult> {
-  if (!MSG91_AUTHKEY) {
+  const authkey = getMSG91Authkey();
+  
+  if (!authkey) {
     console.error("[MSG91] Missing AUTHKEY");
     return { success: false, message: "Configurazione MSG91 mancante" };
   }
@@ -93,7 +105,7 @@ export async function verifyOTP(phone: string, otp: string): Promise<VerifyOTPRe
   const formattedPhone = formatPhoneNumber(phone);
   
   const url = new URL(`${MSG91_BASE_URL}/otp/verify`);
-  url.searchParams.append('authkey', MSG91_AUTHKEY);
+  url.searchParams.append('authkey', authkey);
   url.searchParams.append('mobile', formattedPhone);
   url.searchParams.append('otp', otp);
 
@@ -130,7 +142,9 @@ export async function verifyOTP(phone: string, otp: string): Promise<VerifyOTPRe
 }
 
 export async function resendOTP(phone: string, retryType: 'text' | 'voice' = 'text'): Promise<SendOTPResult> {
-  if (!MSG91_AUTHKEY) {
+  const authkey = getMSG91Authkey();
+  
+  if (!authkey) {
     console.error("[MSG91] Missing AUTHKEY");
     return { success: false, message: "Configurazione MSG91 mancante" };
   }
@@ -138,7 +152,7 @@ export async function resendOTP(phone: string, retryType: 'text' | 'voice' = 'te
   const formattedPhone = formatPhoneNumber(phone);
   
   const url = new URL(`${MSG91_BASE_URL}/otp/retry`);
-  url.searchParams.append('authkey', MSG91_AUTHKEY);
+  url.searchParams.append('authkey', authkey);
   url.searchParams.append('mobile', formattedPhone);
   url.searchParams.append('retrytype', retryType);
 
@@ -174,5 +188,7 @@ export async function resendOTP(phone: string, retryType: 'text' | 'voice' = 'te
 }
 
 export function isMSG91Configured(): boolean {
-  return !!(MSG91_AUTHKEY && MSG91_TEMPLATE_ID);
+  const authkey = getMSG91Authkey();
+  const templateId = getMSG91TemplateId();
+  return !!(authkey && templateId);
 }
