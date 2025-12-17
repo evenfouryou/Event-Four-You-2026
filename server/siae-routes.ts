@@ -4059,7 +4059,7 @@ router.post("/api/cashier/events/:eventId/emit-ticket", requireAuth, requireCash
         const priceInCents = Math.round(Number(ticketPrice) * 100);
         const sealData = await requestFiscalSeal(priceInCents);
         fiscalSeal = sealData;
-        fiscalSealCode = sealData?.sealNumber;
+        fiscalSealCode = sealData?.sealCode;
       }
     } catch (sealError: any) {
       console.log(`[Cashier] Fiscal seal not available: ${sealError.message}`);
