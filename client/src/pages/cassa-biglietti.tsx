@@ -197,10 +197,6 @@ export default function CassaBigliettiPage() {
     enabled: !!selectedEventId && !!user?.id,
   });
 
-  const { data: c1Report, isLoading: c1Loading } = useQuery<any>({
-    queryKey: ["/api/siae/events", selectedEventId, "report-c1"],
-    enabled: !!selectedEventId && (isGestore || isCassiere) && isC1DialogOpen,
-  });
 
   // Subscriptions for this event
   const { data: eventSubscriptions, isLoading: subscriptionsLoading } = useQuery<SiaeSubscription[]>({
@@ -1505,124 +1501,54 @@ export default function CassaBigliettiPage() {
       </Dialog>
 
       <Dialog open={isC1DialogOpen} onOpenChange={setIsC1DialogOpen}>
-        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <FileText className="w-5 h-5 text-[#FFD700]" />
-              Report C1 - Riepilogo Fiscale
+              Report C1 SIAE
             </DialogTitle>
             <DialogDescription>
-              Report aggregato per trasmissione SIAE
+              Seleziona il tipo di report da generare
             </DialogDescription>
           </DialogHeader>
 
-          {c1Loading ? (
-            <div className="space-y-4 py-8">
-              {[1, 2, 3].map((i) => (
-                <Skeleton key={i} className="h-16 w-full" />
-              ))}
-            </div>
-          ) : c1Report ? (
-            <div className="space-y-6">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <Card className="glass-card">
-                  <CardContent className="p-4">
-                    <div className="text-xs text-muted-foreground mb-1">Biglietti Venduti</div>
-                    <div className="text-2xl font-bold">{c1Report.summary.totalTicketsSold}</div>
-                  </CardContent>
-                </Card>
-                <Card className="glass-card">
-                  <CardContent className="p-4">
-                    <div className="text-xs text-muted-foreground mb-1">Biglietti Annullati</div>
-                    <div className="text-2xl font-bold text-red-400">{c1Report.summary.totalTicketsCancelled}</div>
-                  </CardContent>
-                </Card>
-                <Card className="glass-card">
-                  <CardContent className="p-4">
-                    <div className="text-xs text-muted-foreground mb-1">Incasso Totale</div>
-                    <div className="text-2xl font-bold text-[#FFD700]">€{c1Report.summary.totalRevenue.toFixed(2)}</div>
-                  </CardContent>
-                </Card>
-                <Card className="glass-card">
-                  <CardContent className="p-4">
-                    <div className="text-xs text-muted-foreground mb-1">IVA ({c1Report.summary.vatRate}%)</div>
-                    <div className="text-2xl font-bold">€{c1Report.summary.vatAmount.toFixed(2)}</div>
-                  </CardContent>
-                </Card>
-              </div>
-
+          <div className="py-6 space-y-4">
+            <Button
+              variant="outline"
+              className="w-full h-20 flex flex-col items-center justify-center gap-2 hover-elevate"
+              onClick={() => {
+                setIsC1DialogOpen(false);
+                window.location.href = `/siae/reports/c1/${selectedEventId}?type=giornaliero`;
+              }}
+              data-testid="button-c1-giornaliero"
+            >
+              <Clock className="w-6 h-6 text-[#FFD700]" />
               <div>
-                <h4 className="font-semibold mb-3">Riepilogo per Settore</h4>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Settore</TableHead>
-                      <TableHead>Interi</TableHead>
-                      <TableHead>Ridotti</TableHead>
-                      <TableHead>Omaggi</TableHead>
-                      <TableHead>Annullati</TableHead>
-                      <TableHead className="text-right">Totale €</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {c1Report.sectors.map((sector: any, idx: number) => (
-                      <TableRow key={idx}>
-                        <TableCell className="font-medium">{sector.sectorName}</TableCell>
-                        <TableCell>{sector.interoCount}</TableCell>
-                        <TableCell>{sector.ridottoCount}</TableCell>
-                        <TableCell>{sector.omaggioCount}</TableCell>
-                        <TableCell className="text-red-400">{sector.cancelledCount}</TableCell>
-                        <TableCell className="text-right font-semibold">
-                          €{(sector.interoAmount + sector.ridottoAmount).toFixed(2)}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                <div className="font-semibold">C1 Giornaliero</div>
+                <div className="text-xs text-muted-foreground">Riepilogo vendite del giorno</div>
               </div>
+            </Button>
 
+            <Button
+              variant="outline"
+              className="w-full h-20 flex flex-col items-center justify-center gap-2 hover-elevate"
+              onClick={() => {
+                setIsC1DialogOpen(false);
+                window.location.href = `/siae/reports/c1/${selectedEventId}?type=mensile`;
+              }}
+              data-testid="button-c1-mensile"
+            >
+              <FileText className="w-6 h-6 text-[#FFD700]" />
               <div>
-                <h4 className="font-semibold mb-3">Riepilogo per Tipo</h4>
-                <div className="grid grid-cols-3 gap-4">
-                  <Card className="glass-card">
-                    <CardContent className="p-4">
-                      <div className="text-xs text-muted-foreground mb-1">Interi</div>
-                      <div className="font-bold">{c1Report.ticketTypes.intero.count} biglietti</div>
-                      <div className="text-sm text-[#FFD700]">€{c1Report.ticketTypes.intero.amount.toFixed(2)}</div>
-                    </CardContent>
-                  </Card>
-                  <Card className="glass-card">
-                    <CardContent className="p-4">
-                      <div className="text-xs text-muted-foreground mb-1">Ridotti</div>
-                      <div className="font-bold">{c1Report.ticketTypes.ridotto.count} biglietti</div>
-                      <div className="text-sm text-[#FFD700]">€{c1Report.ticketTypes.ridotto.amount.toFixed(2)}</div>
-                    </CardContent>
-                  </Card>
-                  <Card className="glass-card">
-                    <CardContent className="p-4">
-                      <div className="text-xs text-muted-foreground mb-1">Omaggi</div>
-                      <div className="font-bold">{c1Report.ticketTypes.omaggio.count} biglietti</div>
-                      <div className="text-sm text-muted-foreground">€0.00</div>
-                    </CardContent>
-                  </Card>
-                </div>
+                <div className="font-semibold">C1 Mensile</div>
+                <div className="text-xs text-muted-foreground">Riepilogo vendite del mese</div>
               </div>
-
-              <div className="text-xs text-muted-foreground text-center pt-4 border-t">
-                Report generato il {format(new Date(c1Report.generatedAt), "dd/MM/yyyy HH:mm", { locale: it })}
-                {" - "}da {c1Report.generatedBy}
-              </div>
-            </div>
-          ) : (
-            <div className="text-center py-8 text-muted-foreground">
-              <AlertCircle className="w-12 h-12 mx-auto mb-3 opacity-50" />
-              <p>Impossibile caricare il report C1</p>
-            </div>
-          )}
+            </Button>
+          </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsC1DialogOpen(false)} data-testid="button-close-c1-dialog">
-              Chiudi
+            <Button variant="ghost" onClick={() => setIsC1DialogOpen(false)} data-testid="button-close-c1-dialog">
+              Annulla
             </Button>
           </DialogFooter>
         </DialogContent>

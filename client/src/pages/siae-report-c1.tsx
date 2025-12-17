@@ -47,9 +47,14 @@ export default function SiaeReportC1() {
   const { id } = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
   const printRef = useRef<HTMLDivElement>(null);
+  
+  // Get report type from query string
+  const urlParams = new URLSearchParams(window.location.search);
+  const reportType = urlParams.get('type') || 'giornaliero';
+  const isMonthly = reportType === 'mensile';
 
   const { data: report, isLoading, error } = useQuery<C1ReportData>({
-    queryKey: ['/api/siae/ticketed-events', id, 'reports/c1'],
+    queryKey: ['/api/siae/ticketed-events', id, 'reports/c1', reportType],
     enabled: !!id,
   });
 
@@ -79,6 +84,7 @@ export default function SiaeReportC1() {
   const eventDate = report.eventDate ? new Date(report.eventDate) : new Date();
   const formattedDate = eventDate.toLocaleDateString('it-IT');
   const transmissionDate = new Date().toLocaleDateString('it-IT');
+  const monthName = eventDate.toLocaleDateString('it-IT', { month: 'long', year: 'numeric' });
 
   const totalCapacity = report.sectors.reduce((sum, s) => sum + s.capacity, 0);
   const totalEmessi = report.totalTicketsSold;
@@ -127,12 +133,12 @@ export default function SiaeReportC1() {
 
         <div className="flex gap-8 mb-4 text-xs">
           <label className="flex items-center gap-1">
-            <input type="checkbox" checked readOnly className="w-3 h-3" />
+            <input type="checkbox" checked={!isMonthly} readOnly className="w-3 h-3" />
             Riep. giornaliero del <span className="border-b border-black px-2 min-w-[80px]">{formattedDate}</span>
           </label>
           <label className="flex items-center gap-1">
-            <input type="checkbox" readOnly className="w-3 h-3" />
-            Riep. mensile del ............
+            <input type="checkbox" checked={isMonthly} readOnly className="w-3 h-3" />
+            Riep. mensile del <span className="border-b border-black px-2 min-w-[80px]">{isMonthly ? monthName : "............"}</span>
           </label>
         </div>
 
