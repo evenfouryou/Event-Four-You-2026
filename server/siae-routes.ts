@@ -4661,7 +4661,20 @@ router.post("/api/siae/tickets/:id/print", requireAuth, async (req: Request, res
         ? `${ticket.participantFirstName} ${ticket.participantLastName}` 
         : '',
       organizer_company: event.organizerName || event.companyName || '',
-      ticketing_manager: systemConfig?.businessName || event.companyName || '',
+      ticketing_manager: (() => {
+        if (!systemConfig) return event.companyName || '';
+        const parts: string[] = [];
+        if (systemConfig.businessName) parts.push(systemConfig.businessName);
+        if (systemConfig.vatNumber) parts.push(`P.IVA ${systemConfig.vatNumber}`);
+        if (systemConfig.businessAddress) {
+          let address = systemConfig.businessAddress;
+          if (systemConfig.businessPostalCode) address += ` - ${systemConfig.businessPostalCode}`;
+          if (systemConfig.businessCity) address += ` ${systemConfig.businessCity}`;
+          if (systemConfig.businessProvince) address += ` (${systemConfig.businessProvince})`;
+          parts.push(address);
+        }
+        return parts.length > 0 ? parts.join(' - ') : event.companyName || '';
+      })(),
       emission_datetime: ticket.emissionDate ? new Date(ticket.emissionDate).toLocaleString('it-IT') : '',
       fiscal_seal: ticket.fiscalSealCode || '',
       qr_code: `https://manage.eventfouryou.com/verify/${ticket.ticketCode}`,
