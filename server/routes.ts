@@ -1391,6 +1391,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch('/api/events/:id', isAuthenticated, async (req: any, res) => {
     try {
+      console.log("[Event PATCH] Request body:", JSON.stringify(req.body).substring(0, 500));
+      
       const companyId = await getUserCompanyId(req);
       if (!companyId) {
         return res.status(403).json({ message: "No company associated" });
@@ -1401,6 +1403,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!event || event.companyId !== companyId) {
         return res.status(404).json({ message: "Event not found" });
       }
+      
+      console.log("[Event PATCH] Current event status:", event.status, "Requested status:", req.body.status);
 
       // Status transition validation
       if (req.body.status && req.body.status !== event.status) {
