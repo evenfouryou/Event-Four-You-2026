@@ -599,7 +599,7 @@ export default function CassaBigliettiPage() {
             </Button>
           )}
 
-          {isGestore && selectedEventId && (
+          {(isGestore || isCassiere) && selectedEventId && (
             <Button variant="outline" onClick={() => setIsRangeCancelDialogOpen(true)} data-testid="button-range-cancel">
               <XCircle className="w-4 h-4 mr-2" />
               Annulla Range
