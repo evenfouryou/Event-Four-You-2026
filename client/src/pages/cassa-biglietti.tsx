@@ -383,8 +383,8 @@ export default function CassaBigliettiPage() {
   });
 
   const cancelTicketMutation = useMutation({
-    mutationFn: async ({ ticketId, reason }: { ticketId: string; reason: string }) => {
-      const response = await apiRequest("PATCH", `/api/siae/tickets/${ticketId}/cancel`, { reason });
+    mutationFn: async ({ ticketId, reasonCode, note }: { ticketId: string; reasonCode: string; note?: string }) => {
+      const response = await apiRequest("PATCH", `/api/siae/tickets/${ticketId}/cancel`, { reasonCode, note });
       return response.json();
     },
     onSuccess: () => {
@@ -971,6 +971,7 @@ export default function CassaBigliettiPage() {
                     <Table>
                       <TableHeader>
                         <TableRow className="bg-muted/50">
+                          <TableHead className="w-12">N°</TableHead>
                           <TableHead>Codice</TableHead>
                           <TableHead>Ora</TableHead>
                           <TableHead>Tipo</TableHead>
@@ -982,6 +983,9 @@ export default function CassaBigliettiPage() {
                       <TableBody>
                         {todayTickets?.map((ticket) => (
                           <TableRow key={ticket.id} data-testid={`row-ticket-${ticket.id}`}>
+                            <TableCell className="font-mono text-sm font-bold text-[#FFD700]" data-testid={`cell-progressive-${ticket.id}`}>
+                              {ticket.progressiveNumber || '-'}
+                            </TableCell>
                             <TableCell className="font-mono text-xs" data-testid={`cell-code-${ticket.id}`}>
                               {ticket.ticketCode}
                             </TableCell>
@@ -1345,12 +1349,10 @@ export default function CassaBigliettiPage() {
               disabled={!cancelReasonCode || cancelTicketMutation.isPending}
               onClick={() => {
                 if (ticketToCancel && cancelReasonCode) {
-                  const reason = cancelNote 
-                    ? `${cancelReasonCode}: ${cancelNote.trim()}`
-                    : cancelReasonCode;
                   cancelTicketMutation.mutate({
                     ticketId: ticketToCancel.id,
-                    reason,
+                    reasonCode: cancelReasonCode,
+                    note: cancelNote?.trim() || undefined,
                   });
                 }
               }}
