@@ -4137,17 +4137,23 @@ router.post("/api/siae/tickets/:id/print", requireAuth, async (req: Request, res
     const { id: ticketId } = req.params;
     const { agentId, skipBackground = true } = req.body;
     
+    console.log('[TicketPrint] Looking up ticket:', ticketId);
+    
     // Get the ticket
     const ticket = await siaeStorage.getSiaeTicket(ticketId);
     if (!ticket) {
+      console.log('[TicketPrint] Ticket NOT FOUND:', ticketId);
       return res.status(404).json({ message: "Biglietto non trovato" });
     }
+    console.log('[TicketPrint] Ticket found, eventId:', ticket.eventId);
     
     // Get event details
     const event = await siaeStorage.getSiaeTicketedEvent(ticket.eventId);
     if (!event) {
+      console.log('[TicketPrint] Event NOT FOUND:', ticket.eventId);
       return res.status(404).json({ message: "Evento non trovato" });
     }
+    console.log('[TicketPrint] Event found:', event.eventName);
     
     // Verify company access
     if (user.role !== 'super_admin' && event.companyId !== user.companyId) {
@@ -4195,11 +4201,13 @@ router.post("/api/siae/tickets/:id/print", requireAuth, async (req: Request, res
       .limit(1);
     
     if (!template) {
+      console.log('[TicketPrint] Template NOT FOUND for companyId:', event.companyId);
       return res.status(404).json({ 
         message: "Nessun template di stampa configurato per questa azienda",
         errorCode: "NO_TEMPLATE"
       });
     }
+    console.log('[TicketPrint] Template found:', template.name);
     
     // Get template elements
     const elements = await db.select().from(ticketTemplateElements)
