@@ -35,6 +35,7 @@ interface C1ReportData {
     priceIntero: number;
     priceRidotto: number;
     revenue: number;
+    cancelledCount: number;
   }>;
   ticketTypes: {
     intero: { count: number; amount: number };
@@ -257,7 +258,7 @@ export default function SiaeReportC1() {
                     <td className="border border-black p-1 text-right">{sector.revenue.toFixed(2)}</td>
                     <td className="border border-black p-1 text-right">0,00</td>
                     <td className="border border-black p-1 text-right">{sectorNet.toFixed(2)}</td>
-                    <td className="border border-black p-1 text-center">0</td>
+                    <td className="border border-black p-1 text-center">{sector.cancelledCount || 0}</td>
                     <td className="border border-black p-1 text-right">{sectorVat.toFixed(2)}</td>
                   </tr>
                 );

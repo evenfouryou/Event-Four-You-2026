@@ -2275,6 +2275,7 @@ router.get('/api/siae/ticketed-events/:id/reports/c1', requireAuth, async (req: 
         priceIntero: Number(s.priceIntero) || 0,
         priceRidotto: Number(s.priceRidotto) || 0,
         revenue: activeTickets.filter(t => t.sectorId === s.id).reduce((sum, t) => sum + (Number(t.ticketPrice) || 0), 0),
+        cancelledCount: tickets.filter(t => t.sectorId === s.id && t.status === 'cancelled').length,
       })),
       ticketTypes: {
         intero: {

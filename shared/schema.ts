@@ -1634,7 +1634,7 @@ export const siaeSubscriptionsRelations = relations(siaeSubscriptions, ({ one, m
 export const siaeAuditLogs = pgTable("siae_audit_logs", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   companyId: varchar("company_id").notNull().references(() => companies.id),
-  userId: varchar("user_id").references(() => users.id),
+  userId: varchar("user_id"), // Can be users.id OR siaeCashiers.id
   // Operazione
   action: varchar("action", { length: 50 }).notNull(), // create, update, delete, cancel, emit, validate, transmit
   entityType: varchar("entity_type", { length: 50 }).notNull(), // ticket, transaction, customer, event, sector, etc.
@@ -1658,10 +1658,7 @@ export const siaeAuditLogsRelations = relations(siaeAuditLogs, ({ one }) => ({
     fields: [siaeAuditLogs.companyId],
     references: [companies.id],
   }),
-  user: one(users, {
-    fields: [siaeAuditLogs.userId],
-    references: [users.id],
-  }),
+  // userId can be either users.id OR siaeCashiers.id, so no direct relation
 }));
 
 // ==================== SIAE Numbered Seats ====================
