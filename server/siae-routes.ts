@@ -3,7 +3,7 @@ import { Router, Request, Response, NextFunction } from "express";
 import { siaeStorage } from "./siae-storage";
 import { storage } from "./storage";
 import { db } from "./db";
-import { events, siaeCashiers, siaeTickets, siaeTransactions, siaeSubscriptions, siaeCashierAllocations, siaeOtpAttempts, siaeNameChanges, siaeResales, publicCartItems, publicCheckoutSessions, publicCustomerSessions, tableReservations, guestListEntries } from "@shared/schema";
+import { events, siaeCashiers, siaeTickets, siaeTransactions, siaeSubscriptions, siaeCashierAllocations, siaeOtpAttempts, siaeNameChanges, siaeResales, publicCartItems, publicCheckoutSessions, publicCustomerSessions, tableBookings, guestListEntries } from "@shared/schema";
 import { eq, and, sql } from "drizzle-orm";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
@@ -623,10 +623,10 @@ router.delete("/api/siae/customers/:id", requireAuth, requireGestore, async (req
       await db.delete(publicCustomerSessions)
         .where(eq(publicCustomerSessions.customerId, req.params.id));
       
-      // Anonimizza table reservations
-      await db.update(tableReservations)
+      // Anonimizza table bookings
+      await db.update(tableBookings)
         .set({ customerId: null })
-        .where(eq(tableReservations.customerId, req.params.id));
+        .where(eq(tableBookings.customerId, req.params.id));
       
       // Anonimizza guest list entries
       await db.update(guestListEntries)
