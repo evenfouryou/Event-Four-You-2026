@@ -591,12 +591,11 @@ router.delete("/api/siae/customers/:id", requireAuth, requireGestore, async (req
         .set({ customerId: null })
         .where(eq(siaeTickets.customerId, req.params.id));
       
-      // Anonimizza le transazioni
-      await db.update(siaeTransactions)
-        .set({ customerId: null })
+      // Elimina le transazioni (customerId è notNull)
+      await db.delete(siaeTransactions)
         .where(eq(siaeTransactions.customerId, req.params.id));
       
-      // Elimina abbonamenti
+      // Elimina abbonamenti (customerId è notNull)
       await db.delete(siaeSubscriptions)
         .where(eq(siaeSubscriptions.customerId, req.params.id));
       
@@ -604,15 +603,10 @@ router.delete("/api/siae/customers/:id", requireAuth, requireGestore, async (req
       await db.delete(siaeOtpAttempts)
         .where(eq(siaeOtpAttempts.customerId, req.params.id));
       
-      // Anonimizza name changes (originalCustomerId)
-      await db.update(siaeNameChanges)
-        .set({ originalCustomerId: null })
-        .where(eq(siaeNameChanges.originalCustomerId, req.params.id));
-      
-      // Anonimizza resales (sellerId, buyerId)
-      await db.update(siaeResales)
-        .set({ sellerId: null })
+      // Elimina resales dove è seller (sellerId è notNull)
+      await db.delete(siaeResales)
         .where(eq(siaeResales.sellerId, req.params.id));
+      // Anonimizza resales dove è buyer (buyerId è nullable)
       await db.update(siaeResales)
         .set({ buyerId: null })
         .where(eq(siaeResales.buyerId, req.params.id));

@@ -617,13 +617,16 @@ router.post("/api/public/customers/login", async (req, res) => {
 
 // Richiedi reset password cliente
 router.post("/api/public/customers/forgot-password", async (req, res) => {
+  console.log("[PUBLIC] Forgot password request received:", req.body);
   try {
     const { email } = req.body;
 
     if (!email) {
+      console.log("[PUBLIC] Email missing in request");
       return res.status(400).json({ message: "Email richiesta" });
     }
 
+    console.log("[PUBLIC] Looking up customer by email:", email.toLowerCase().trim());
     const [customer] = await db
       .select()
       .from(siaeCustomers)
@@ -632,12 +635,15 @@ router.post("/api/public/customers/forgot-password", async (req, res) => {
     const successMessage = "Se l'email è registrata, riceverai un link per reimpostare la password.";
 
     if (!customer) {
+      console.log("[PUBLIC] Customer not found for email:", email);
       return res.json({ message: successMessage });
     }
 
+    console.log("[PUBLIC] Customer found:", customer.id, customer.email);
     const resetToken = crypto.randomBytes(32).toString("hex");
     const resetExpires = new Date(Date.now() + 3600000);
 
+    console.log("[PUBLIC] Updating customer with reset token");
     await db
       .update(siaeCustomers)
       .set({
@@ -655,14 +661,16 @@ router.post("/api/public/customers/forgot-password", async (req, res) => {
           ? `https://${process.env.REPLIT_DEV_DOMAIN}`
           : "http://localhost:5000";
     const resetLink = `${baseUrl}/public/reset-password?token=${resetToken}`;
+    console.log("[PUBLIC] Reset link generated:", resetLink);
 
+    console.log("[PUBLIC] Sending password reset email to:", customer.email);
     await sendPasswordResetEmail({
       to: customer.email,
       firstName: customer.firstName,
       resetLink,
     });
 
-    console.log("[PUBLIC] Password reset email sent to:", customer.email);
+    console.log("[PUBLIC] Password reset email sent successfully to:", customer.email);
     res.json({ message: successMessage });
   } catch (error: any) {
     console.error("[PUBLIC] Forgot password error:", error);
