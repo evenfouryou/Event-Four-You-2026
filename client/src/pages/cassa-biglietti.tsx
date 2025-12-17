@@ -111,6 +111,11 @@ export default function CassaBigliettiPage() {
   const [printStatuses, setPrintStatuses] = useState<Record<string, 'idle' | 'printing' | 'success' | 'error'>>({});
   const [printProgress, setPrintProgress] = useState<{current: number, total: number} | null>(null);
   
+  // Printer selection state
+  const [isPrinterSelectOpen, setIsPrinterSelectOpen] = useState(false);
+  const [selectedPrintAgentId, setSelectedPrintAgentId] = useState<string>("");
+  const [pendingPrintTicketIds, setPendingPrintTicketIds] = useState<string[]>([]);
+  
   // Enhanced cancellation state
   const [cancelReasonCode, setCancelReasonCode] = useState<string>("");
   const [cancelNote, setCancelNote] = useState<string>("");
@@ -216,6 +221,12 @@ export default function CassaBigliettiPage() {
     enabled: isCancelDialogOpen || isRangeCancelDialogOpen,
   });
 
+  // Connected print agents (real-time)
+  const { data: connectedAgents = [], refetch: refetchAgents } = useQuery<{ agentId: string; deviceName: string }[]>({
+    queryKey: ["/api/printers/agents/connected"],
+    refetchInterval: 10000, // Refresh every 10 seconds
+  });
+
   // Create subscription mutation
   const createSubscriptionMutation = useMutation({
     mutationFn: async (data: any) => {
@@ -247,10 +258,11 @@ export default function CassaBigliettiPage() {
 
   // Print ticket mutation with status tracking
   const printTicketMutation = useMutation({
-    mutationFn: async (ticketId: string) => {
+    mutationFn: async ({ ticketId, agentId }: { ticketId: string; agentId?: string }) => {
       setPrintStatuses(prev => ({ ...prev, [ticketId]: 'printing' }));
       const response = await apiRequest("POST", `/api/siae/tickets/${ticketId}/print`, {
-        skipBackground: true // Use pre-printed paper
+        skipBackground: true, // Use pre-printed paper
+        agentId: agentId || undefined
       });
       return { ticketId, result: await response.json() };
     },
@@ -266,9 +278,9 @@ export default function CassaBigliettiPage() {
         }
       }
     },
-    onError: (error: any, ticketId: string) => {
+    onError: (error: any, variables: { ticketId: string; agentId?: string }) => {
       console.warn('[Print] Error:', error.message);
-      setPrintStatuses(prev => ({ ...prev, [ticketId]: 'error' }));
+      setPrintStatuses(prev => ({ ...prev, [variables.ticketId]: 'error' }));
       // Update progress even on error
       if (printProgress) {
         const newCurrent = printProgress.current + 1;
@@ -280,6 +292,55 @@ export default function CassaBigliettiPage() {
       }
     },
   });
+
+  // Function to print tickets with agent selection popup if multiple agents connected
+  const printTicketsWithAgentSelection = async (ticketIds: string[]) => {
+    // Refresh connected agents before printing
+    await refetchAgents();
+    
+    if (connectedAgents.length === 0) {
+      toast({
+        title: "Nessuna Stampante",
+        description: "Nessun Print Agent connesso. Avviare l'applicazione desktop.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    if (connectedAgents.length === 1) {
+      // Only one agent - use it automatically
+      const agentId = connectedAgents[0].agentId;
+      if (ticketIds.length > 1) {
+        setPrintProgress({ current: 0, total: ticketIds.length });
+      }
+      ticketIds.forEach(ticketId => {
+        setPrintStatuses(prev => ({ ...prev, [ticketId]: 'idle' }));
+        printTicketMutation.mutate({ ticketId, agentId });
+      });
+    } else {
+      // Multiple agents - show selection popup
+      setPendingPrintTicketIds(ticketIds);
+      setSelectedPrintAgentId("");
+      setIsPrinterSelectOpen(true);
+    }
+  };
+
+  // Handle printer selection confirmation
+  const handlePrinterSelected = () => {
+    if (!selectedPrintAgentId || pendingPrintTicketIds.length === 0) return;
+    
+    if (pendingPrintTicketIds.length > 1) {
+      setPrintProgress({ current: 0, total: pendingPrintTicketIds.length });
+    }
+    pendingPrintTicketIds.forEach(ticketId => {
+      setPrintStatuses(prev => ({ ...prev, [ticketId]: 'idle' }));
+      printTicketMutation.mutate({ ticketId, agentId: selectedPrintAgentId });
+    });
+    
+    setIsPrinterSelectOpen(false);
+    setPendingPrintTicketIds([]);
+    setSelectedPrintAgentId("");
+  };
 
   // Range cancellation mutation
   const rangeCancelMutation = useMutation({
@@ -324,23 +385,18 @@ export default function CassaBigliettiPage() {
       
       const emittedCount = Array.isArray(result) ? result.length : 1;
       
-      // Auto-print the emitted ticket(s) with progress tracking
-      if (Array.isArray(result) && result.length > 1) {
-        setPrintProgress({ current: 0, total: result.length });
+      // Auto-print the emitted ticket(s) with printer selection if needed
+      const ticketIds: string[] = [];
+      if (Array.isArray(result)) {
         result.forEach((ticket: any) => {
-          if (ticket.id) {
-            setPrintStatuses(prev => ({ ...prev, [ticket.id]: 'idle' }));
-            printTicketMutation.mutate(ticket.id);
-          }
-        });
-      } else if (Array.isArray(result)) {
-        result.forEach((ticket: any) => {
-          if (ticket.id) {
-            printTicketMutation.mutate(ticket.id);
-          }
+          if (ticket.id) ticketIds.push(ticket.id);
         });
       } else if (result.id) {
-        printTicketMutation.mutate(result.id);
+        ticketIds.push(result.id);
+      }
+      
+      if (ticketIds.length > 0) {
+        printTicketsWithAgentSelection(ticketIds);
       }
       
       toast({
@@ -1370,6 +1426,74 @@ export default function CassaBigliettiPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Printer Selection Dialog */}
+      <Dialog open={isPrinterSelectOpen} onOpenChange={(open) => {
+        if (!open) {
+          setIsPrinterSelectOpen(false);
+          setPendingPrintTicketIds([]);
+          setSelectedPrintAgentId("");
+        }
+      }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Printer className="w-5 h-5 text-[#FFD700]" />
+              Seleziona Stampante
+            </DialogTitle>
+            <DialogDescription>
+              Sono presenti {connectedAgents.length} stampanti connesse. Seleziona quale utilizzare per stampare {pendingPrintTicketIds.length} bigliett{pendingPrintTicketIds.length === 1 ? 'o' : 'i'}.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-3 py-4">
+            {connectedAgents.map((agent) => (
+              <div
+                key={agent.agentId}
+                className={`p-3 rounded-lg border cursor-pointer transition-all ${
+                  selectedPrintAgentId === agent.agentId
+                    ? 'border-[#FFD700] bg-[#FFD700]/10'
+                    : 'border-border hover-elevate'
+                }`}
+                onClick={() => setSelectedPrintAgentId(agent.agentId)}
+                data-testid={`printer-option-${agent.agentId}`}
+              >
+                <div className="flex items-center gap-3">
+                  <div className={`w-3 h-3 rounded-full ${selectedPrintAgentId === agent.agentId ? 'bg-[#FFD700]' : 'bg-green-500'}`} />
+                  <div className="flex-1">
+                    <p className="font-medium">{agent.deviceName || 'Stampante'}</p>
+                    <p className="text-xs text-muted-foreground font-mono">{agent.agentId.slice(0, 8)}...</p>
+                  </div>
+                  {selectedPrintAgentId === agent.agentId && (
+                    <CheckCircle2 className="w-5 h-5 text-[#FFD700]" />
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+          
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsPrinterSelectOpen(false);
+                setPendingPrintTicketIds([]);
+              }}
+              data-testid="button-cancel-printer-select"
+            >
+              Annulla
+            </Button>
+            <Button
+              className="bg-[#FFD700] hover:bg-[#FFD700]/90 text-black"
+              disabled={!selectedPrintAgentId}
+              onClick={handlePrinterSelected}
+              data-testid="button-confirm-printer-select"
+            >
+              Stampa
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Range Cancel Dialog */}
       <Dialog open={isRangeCancelDialogOpen} onOpenChange={(open) => {

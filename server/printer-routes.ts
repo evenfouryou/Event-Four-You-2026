@@ -8,6 +8,7 @@ import {
 } from '@shared/schema';
 import { eq, and, desc } from 'drizzle-orm';
 import crypto from 'crypto';
+import { getConnectedAgents } from './print-relay';
 
 // Type for authenticated user
 interface AuthenticatedUser {
@@ -221,6 +222,24 @@ router.delete('/profiles/:id', requireSuperAdmin, async (req: Request, res: Resp
 });
 
 // ==================== PRINTER AGENTS ====================
+
+// GET connected/online agents (real-time via WebSocket)
+router.get('/agents/connected', requireCashierOrAbove, async (req: Request, res: Response) => {
+  try {
+    const user = getUser(req);
+    const companyId = user?.companyId;
+    
+    if (!companyId) {
+      return res.status(400).json({ error: 'Company ID richiesto' });
+    }
+    
+    const connectedAgents = getConnectedAgents(companyId);
+    res.json(connectedAgents);
+  } catch (error) {
+    console.error('Error fetching connected agents:', error);
+    res.status(500).json({ error: 'Errore nel recupero agenti connessi' });
+  }
+});
 
 // GET agents for company (cassiere+ access per widget dashboard)
 // Super admin sees all agents, other users see only their own agents
