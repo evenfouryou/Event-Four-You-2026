@@ -2837,7 +2837,7 @@ router.post("/api/cashiers/events/:eventId/tickets", requireAuth, async (req: Re
   try {
     const user = req.user as any;
     const { eventId } = req.params;
-    const { sectorId, ticketType, price, participantFirstName, participantLastName, participantPhone, participantEmail, paymentMethod, skipFiscalSeal, quantity = 1 } = req.body;
+    const { sectorId, ticketType, price, participantFirstName, participantLastName, participantPhone, participantEmail, paymentMethod, skipFiscalSeal, quantity = 1, customText } = req.body;
     
     // Validate quantity (max 50 at once for safety)
     const ticketQuantity = Math.min(Math.max(1, parseInt(quantity) || 1), 50);
@@ -3035,6 +3035,7 @@ router.post("/api/cashiers/events/:eventId/tickets", requireAuth, async (req: Re
         participantLastName: ticketQuantity === 1 ? (participantLastName || null) : null,
         isComplimentary: finalTicketType === 'omaggio',
         paymentMethod: paymentMethod || 'cash',
+        customText: customText || null,
         currentTicketsSold,
         currentTotalRevenue,
         currentAvailableSeats
@@ -4509,6 +4510,9 @@ router.post("/api/siae/tickets/:id/print", requireAuth, async (req: Request, res
     // Get sector
     const sector = ticket.sectorId ? await siaeStorage.getSiaeEventSector(ticket.sectorId) : null;
     
+    // Get SIAE system config for ticketing_manager (businessName)
+    const systemConfig = await siaeStorage.getSiaeSystemConfig(event.companyId);
+    
     // Get list of currently connected agents for this company
     const connectedAgents = getConnectedAgents(event.companyId);
     const connectedAgentIds = new Set(connectedAgents.map(a => a.agentId));
@@ -4644,10 +4648,11 @@ router.post("/api/siae/tickets/:id/print", requireAuth, async (req: Request, res
         ? `${ticket.participantFirstName} ${ticket.participantLastName}` 
         : '',
       organizer_company: event.organizerName || event.companyName || '',
-      ticketing_manager: event.companyName || '',
+      ticketing_manager: systemConfig?.businessName || event.companyName || '',
       emission_datetime: ticket.emissionDate ? new Date(ticket.emissionDate).toLocaleString('it-IT') : '',
       fiscal_seal: ticket.fiscalSealCode || '',
       qr_code: `https://manage.eventfouryou.com/verify/${ticket.ticketCode}`,
+      custom_text: ticket.customText || '',
     };
     
     // Generate HTML

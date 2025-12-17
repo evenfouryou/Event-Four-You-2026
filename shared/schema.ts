@@ -1314,6 +1314,8 @@ export const siaeTickets = pgTable("siae_tickets", {
   // QR Code
   qrCode: text("qr_code"),
   pdfUrl: varchar("pdf_url", { length: 500 }),
+  // Testo libero personalizzabile (inserito dalla cassa)
+  customText: varchar("custom_text", { length: 255 }),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

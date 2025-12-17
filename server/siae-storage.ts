@@ -1823,6 +1823,7 @@ export class SiaeStorage implements ISiaeStorage {
     participantLastName: string | null;
     isComplimentary: boolean;
     paymentMethod: string;
+    customText?: string | null;
     currentTicketsSold: number;
     currentTotalRevenue: number;
     currentAvailableSeats: number;
@@ -1875,7 +1876,8 @@ export class SiaeStorage implements ISiaeStorage {
             participantFirstName: params.participantFirstName,
             participantLastName: params.participantLastName,
             isComplimentary: params.isComplimentary,
-            paymentMethod: params.paymentMethod
+            paymentMethod: params.paymentMethod,
+            customText: params.customText || null
           })
           .returning();
 

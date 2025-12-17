@@ -47,6 +47,7 @@ const ELEMENT_TYPES = [
   { type: 'dynamic', label: 'Fila', icon: Type, fieldKey: 'row', category: 'ticket' },
   { type: 'dynamic', label: 'Posto', icon: Type, fieldKey: 'seat', category: 'ticket' },
   { type: 'dynamic', label: 'Acquirente', icon: Type, fieldKey: 'buyer_name', category: 'ticket' },
+  { type: 'dynamic', label: 'Testo Libero', icon: Type, fieldKey: 'custom_text', category: 'ticket' },
   
   // CAMPI OBBLIGATORI SIAE
   { type: 'dynamic', label: 'Ditta Organizzatrice', icon: Type, fieldKey: 'organizer_company', category: 'siae', required: true },
@@ -72,6 +73,7 @@ const SAMPLE_DATA: Record<string, string> = {
   row: '12',
   seat: '45',
   buyer_name: 'Mario Rossi',
+  custom_text: 'Testo personalizzato',
   // SIAE required fields
   organizer_company: 'Eventi SpA',
   ticketing_manager: 'Biglietteria Centrale Srl',

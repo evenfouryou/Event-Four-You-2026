@@ -99,6 +99,7 @@ export default function CassaBigliettiPage() {
   const [participantLastName, setParticipantLastName] = useState<string>("");
   const [participantPhone, setParticipantPhone] = useState<string>("");
   const [participantEmail, setParticipantEmail] = useState<string>("");
+  const [customText, setCustomText] = useState<string>("");
   const [isCancelDialogOpen, setIsCancelDialogOpen] = useState(false);
   const [ticketToCancel, setTicketToCancel] = useState<SiaeTicket | null>(null);
   const [cancelReason, setCancelReason] = useState<string>("");
@@ -381,6 +382,7 @@ export default function CassaBigliettiPage() {
       setParticipantPhone("");
       setParticipantEmail("");
       setCustomPrice("");
+      setCustomText("");
       setTicketQuantity(1);
       
       const emittedCount = Array.isArray(result) ? result.length : 1;
@@ -542,6 +544,7 @@ export default function CassaBigliettiPage() {
       participantEmail: isNominative ? participantEmail : undefined,
       paymentMethod,
       quantity: qty,
+      customText: customText || undefined,
     });
   };
 
@@ -842,6 +845,21 @@ export default function CassaBigliettiPage() {
                     />
                   </div>
                 )}
+
+                <div className="space-y-2">
+                  <Label>Testo Libero</Label>
+                  <Input
+                    type="text"
+                    maxLength={255}
+                    placeholder="Testo personalizzato da stampare sul biglietto"
+                    value={customText}
+                    onChange={(e) => setCustomText(e.target.value)}
+                    data-testid="input-custom-text"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Opzionale - verrà stampato sul biglietto se presente nel template
+                  </p>
+                </div>
 
                 <div className="border-t pt-4 mt-4 space-y-4">
                   <div className="flex items-center justify-between">
