@@ -4145,12 +4145,12 @@ router.post("/api/siae/tickets/:id/print", requireAuth, async (req: Request, res
       console.log('[TicketPrint] Ticket NOT FOUND:', ticketId);
       return res.status(404).json({ message: "Biglietto non trovato" });
     }
-    console.log('[TicketPrint] Ticket found, eventId:', ticket.eventId);
+    console.log('[TicketPrint] Ticket found, ticketedEventId:', ticket.ticketedEventId);
     
     // Get event details
-    const event = await siaeStorage.getSiaeTicketedEvent(ticket.eventId);
+    const event = await siaeStorage.getSiaeTicketedEvent(ticket.ticketedEventId);
     if (!event) {
-      console.log('[TicketPrint] Event NOT FOUND:', ticket.eventId);
+      console.log('[TicketPrint] Event NOT FOUND:', ticket.ticketedEventId);
       return res.status(404).json({ message: "Evento non trovato" });
     }
     console.log('[TicketPrint] Event found:', event.eventName);
