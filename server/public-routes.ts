@@ -31,6 +31,10 @@ import {
 } from "@shared/schema";
 import { eq, and, gt, lt, desc, sql, gte, lte, or, isNull } from "drizzle-orm";
 import { getUncachableStripeClient, getStripePublishableKey } from "./stripeClient";
+import { generateTicketHtml } from "./template-routes";
+import { generateTicketPdf } from "./pdf-service";
+import { sendTicketEmail } from "./email-service";
+import { ticketTemplates, ticketTemplateElements } from "@shared/schema";
 
 const router = Router();
 
@@ -1190,6 +1194,152 @@ router.post("/api/public/checkout/confirm", async (req, res) => {
         completedAt: new Date(),
       })
       .where(eq(publicCheckoutSessions.id, checkoutSessionId));
+
+    // Get event details for email
+    const [eventDetails] = await db
+      .select({
+        eventName: events.name,
+        eventStart: events.startDatetime,
+        locationName: locations.name,
+      })
+      .from(siaeTicketedEvents)
+      .innerJoin(events, eq(siaeTicketedEvents.eventId, events.id))
+      .innerJoin(locations, eq(events.locationId, locations.id))
+      .where(eq(siaeTicketedEvents.id, ticketedEvent.id));
+
+    // Async email sending - don't block the response
+    (async () => {
+      try {
+        console.log('[PUBLIC] Starting async PDF/email generation for transaction:', transaction.transactionCode);
+        
+        // Get default ticket template for the company
+        const [defaultTemplate] = await db
+          .select()
+          .from(ticketTemplates)
+          .where(
+            and(
+              eq(ticketTemplates.companyId, ticketedEvent.companyId),
+              eq(ticketTemplates.isDefault, true),
+              eq(ticketTemplates.isActive, true)
+            )
+          )
+          .limit(1);
+
+        if (!defaultTemplate) {
+          console.log('[PUBLIC] No default ticket template found for company:', ticketedEvent.companyId);
+          return;
+        }
+
+        // Get template elements
+        const elements = await db
+          .select()
+          .from(ticketTemplateElements)
+          .where(eq(ticketTemplateElements.templateId, defaultTemplate.id))
+          .orderBy(ticketTemplateElements.zIndex);
+
+        // Parse elements for HTML generation
+        const parsedElements = elements.map((el) => {
+          let content = el.staticValue;
+          if (el.fieldKey && !el.staticValue) {
+            content = `{{${el.fieldKey}}}`;
+          } else if (el.fieldKey && el.staticValue) {
+            content = el.staticValue;
+          }
+          return {
+            type: el.type,
+            x: parseFloat(el.x as any),
+            y: parseFloat(el.y as any),
+            width: parseFloat(el.width as any),
+            height: parseFloat(el.height as any),
+            content,
+            fontSize: el.fontSize,
+            fontFamily: el.fontFamily,
+            fontWeight: el.fontWeight,
+            fontColor: el.color,
+            textAlign: el.textAlign,
+            rotation: el.rotation,
+          };
+        });
+
+        const ticketHtmls: Array<{ id: string; html: string }> = [];
+        const pdfBuffers: Buffer[] = [];
+
+        for (const ticket of tickets) {
+          // Get sector info for this ticket
+          const [ticketSector] = await db
+            .select()
+            .from(siaeEventSectors)
+            .where(eq(siaeEventSectors.id, ticket.sectorId));
+
+          // Build ticket data for template
+          const ticketData: Record<string, string> = {
+            event_name: eventDetails?.eventName || '',
+            event_date: eventDetails?.eventStart 
+              ? new Date(eventDetails.eventStart).toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric' }) 
+              : '',
+            event_time: eventDetails?.eventStart 
+              ? new Date(eventDetails.eventStart).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }) 
+              : '',
+            venue_name: eventDetails?.locationName || '',
+            price: `€ ${parseFloat(ticket.grossAmount).toFixed(2)}`,
+            ticket_number: ticket.id.slice(-12).toUpperCase(),
+            sector: ticketSector?.name || ticket.sectorCode || '',
+            row: ticket.seatId ? 'N/A' : '-',
+            seat: ticket.seatId ? 'N/A' : '-',
+            buyer_name: `${ticket.participantFirstName || ''} ${ticket.participantLastName || ''}`.trim(),
+            organizer_company: '',
+            ticketing_manager: 'Event4U',
+            emission_datetime: new Date().toLocaleString('it-IT'),
+            fiscal_seal: ticket.fiscalSealCode || '',
+            qr_code: ticket.qrCode || '',
+          };
+
+          // Generate HTML for this ticket
+          const ticketHtml = generateTicketHtml(
+            {
+              paperWidthMm: defaultTemplate.paperWidthMm,
+              paperHeightMm: defaultTemplate.paperHeightMm,
+              backgroundImageUrl: defaultTemplate.backgroundImageUrl,
+              dpi: defaultTemplate.dpi || 96,
+              printOrientation: defaultTemplate.printOrientation || 'auto',
+            },
+            parsedElements,
+            ticketData,
+            false // Don't skip background for PDF
+          );
+
+          ticketHtmls.push({ id: ticket.id, html: ticketHtml });
+
+          // Generate PDF
+          try {
+            const pdfBuffer = await generateTicketPdf(
+              ticketHtml,
+              defaultTemplate.paperWidthMm,
+              defaultTemplate.paperHeightMm
+            );
+            pdfBuffers.push(pdfBuffer);
+          } catch (pdfError) {
+            console.error('[PUBLIC] PDF generation failed for ticket:', ticket.id, pdfError);
+          }
+        }
+
+        // Send email if we have PDFs
+        if (pdfBuffers.length > 0 && customer.email) {
+          await sendTicketEmail({
+            to: customer.email,
+            subject: `I tuoi biglietti per ${eventDetails?.eventName || 'l\'evento'}`,
+            eventName: eventDetails?.eventName || 'Evento',
+            tickets: ticketHtmls,
+            pdfBuffers,
+          });
+          console.log('[PUBLIC] Ticket email sent successfully to:', customer.email);
+        } else {
+          console.log('[PUBLIC] No PDFs generated or no customer email, skipping email');
+        }
+      } catch (emailError) {
+        console.error('[PUBLIC] Async email/PDF generation failed:', emailError);
+      }
+    })();
 
     // Svuota carrello
     const sessionId = getOrCreateSessionId(req, res);
