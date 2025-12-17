@@ -3,7 +3,7 @@ import { Router, Request, Response, NextFunction } from "express";
 import { siaeStorage } from "./siae-storage";
 import { storage } from "./storage";
 import { db } from "./db";
-import { events, siaeCashiers, siaeTickets, siaeTransactions, siaeSubscriptions } from "@shared/schema";
+import { events, siaeCashiers, siaeTickets, siaeTransactions, siaeSubscriptions, siaeCashierAllocations } from "@shared/schema";
 import { eq, and, sql } from "drizzle-orm";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
@@ -4434,7 +4434,8 @@ router.get("/api/siae/events/:eventId/report-c1", requireAuth, async (req: Reque
     
     res.json(report);
   } catch (error: any) {
-    res.status(500).json({ message: error.message });
+    console.error('[ReportC1] Error generating report:', error);
+    res.status(500).json({ message: error.message || 'Errore nella generazione del report' });
   }
 });
 

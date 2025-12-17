@@ -1305,25 +1305,27 @@ export default function CassaBigliettiPage() {
                   <SelectValue placeholder="Seleziona motivo annullamento..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {cancellationReasons?.map((reason) => (
-                    <SelectItem key={reason.id} value={reason.code}>
-                      {reason.code} - {reason.description}
-                    </SelectItem>
-                  )) || (
+                  {cancellationReasons && cancellationReasons.length > 0 ? (
+                    cancellationReasons.map((reason) => (
+                      <SelectItem key={reason.id} value={reason.code}>
+                        {reason.code} - {reason.name}
+                      </SelectItem>
+                    ))
+                  ) : (
                     <>
-                      <SelectItem value="01">01 - Errore emissione</SelectItem>
-                      <SelectItem value="02">02 - Richiesta cliente</SelectItem>
-                      <SelectItem value="03">03 - Evento annullato</SelectItem>
-                      <SelectItem value="04">04 - Duplicato</SelectItem>
-                      <SelectItem value="05">05 - Cambio data/ora</SelectItem>
-                      <SelectItem value="06">06 - Cambio settore/posto</SelectItem>
-                      <SelectItem value="07">07 - Rimborso parziale</SelectItem>
-                      <SelectItem value="08">08 - Rimborso totale</SelectItem>
-                      <SelectItem value="09">09 - Biglietto non ritirato</SelectItem>
-                      <SelectItem value="10">10 - Errore prezzo</SelectItem>
-                      <SelectItem value="11">11 - Errore dati nominativo</SelectItem>
-                      <SelectItem value="12">12 - Problemi tecnici</SelectItem>
-                      <SelectItem value="99">99 - Altro motivo</SelectItem>
+                      <SelectItem value="01">01 - Annullamento evento</SelectItem>
+                      <SelectItem value="02">02 - Rinvio evento</SelectItem>
+                      <SelectItem value="03">03 - Modifica evento</SelectItem>
+                      <SelectItem value="04">04 - Richiesta cliente - rimborso</SelectItem>
+                      <SelectItem value="05">05 - Richiesta cliente - cambio data</SelectItem>
+                      <SelectItem value="06">06 - Errore emissione</SelectItem>
+                      <SelectItem value="07">07 - Duplicato</SelectItem>
+                      <SelectItem value="08">08 - Frode accertata</SelectItem>
+                      <SelectItem value="09">09 - Mancato pagamento</SelectItem>
+                      <SelectItem value="10">10 - Cambio nominativo</SelectItem>
+                      <SelectItem value="11">11 - Rimessa in vendita</SelectItem>
+                      <SelectItem value="12">12 - Revoca per forza maggiore</SelectItem>
+                      <SelectItem value="99">99 - Altra causale</SelectItem>
                     </>
                   )}
                 </SelectContent>
@@ -1425,25 +1427,27 @@ export default function CassaBigliettiPage() {
                   <SelectValue placeholder="Seleziona motivo annullamento..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {cancellationReasons?.map((reason) => (
-                    <SelectItem key={reason.id} value={reason.code}>
-                      {reason.code} - {reason.description}
-                    </SelectItem>
-                  )) || (
+                  {cancellationReasons && cancellationReasons.length > 0 ? (
+                    cancellationReasons.map((reason) => (
+                      <SelectItem key={reason.id} value={reason.code}>
+                        {reason.code} - {reason.name}
+                      </SelectItem>
+                    ))
+                  ) : (
                     <>
-                      <SelectItem value="01">01 - Errore emissione</SelectItem>
-                      <SelectItem value="02">02 - Richiesta cliente</SelectItem>
-                      <SelectItem value="03">03 - Evento annullato</SelectItem>
-                      <SelectItem value="04">04 - Duplicato</SelectItem>
-                      <SelectItem value="05">05 - Cambio data/ora</SelectItem>
-                      <SelectItem value="06">06 - Cambio settore/posto</SelectItem>
-                      <SelectItem value="07">07 - Rimborso parziale</SelectItem>
-                      <SelectItem value="08">08 - Rimborso totale</SelectItem>
-                      <SelectItem value="09">09 - Biglietto non ritirato</SelectItem>
-                      <SelectItem value="10">10 - Errore prezzo</SelectItem>
-                      <SelectItem value="11">11 - Errore dati nominativo</SelectItem>
-                      <SelectItem value="12">12 - Problemi tecnici</SelectItem>
-                      <SelectItem value="99">99 - Altro motivo</SelectItem>
+                      <SelectItem value="01">01 - Annullamento evento</SelectItem>
+                      <SelectItem value="02">02 - Rinvio evento</SelectItem>
+                      <SelectItem value="03">03 - Modifica evento</SelectItem>
+                      <SelectItem value="04">04 - Richiesta cliente - rimborso</SelectItem>
+                      <SelectItem value="05">05 - Richiesta cliente - cambio data</SelectItem>
+                      <SelectItem value="06">06 - Errore emissione</SelectItem>
+                      <SelectItem value="07">07 - Duplicato</SelectItem>
+                      <SelectItem value="08">08 - Frode accertata</SelectItem>
+                      <SelectItem value="09">09 - Mancato pagamento</SelectItem>
+                      <SelectItem value="10">10 - Cambio nominativo</SelectItem>
+                      <SelectItem value="11">11 - Rimessa in vendita</SelectItem>
+                      <SelectItem value="12">12 - Revoca per forza maggiore</SelectItem>
+                      <SelectItem value="99">99 - Altra causale</SelectItem>
                     </>
                   )}
                 </SelectContent>
