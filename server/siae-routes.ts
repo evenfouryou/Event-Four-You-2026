@@ -4509,33 +4509,68 @@ router.post("/api/siae/tickets/:id/print", requireAuth, async (req: Request, res
     // Get sector
     const sector = ticket.sectorId ? await siaeStorage.getSiaeEventSector(ticket.sectorId) : null;
     
-    // Determine print agent ID
-    let printerAgentId = agentId;
+    // Get list of currently connected agents for this company
+    const connectedAgents = getConnectedAgents(event.companyId);
+    const connectedAgentIds = new Set(connectedAgents.map(a => a.agentId));
     
-    // If no agent specified, try to get from cashier's default printer
-    if (!printerAgentId && user.role === 'cassiere') {
-      const cashierId = getSiaeCashierId(user);
-      if (cashierId) {
-        const [cashier] = await db.select().from(siaeCashiers).where(eq(siaeCashiers.id, cashierId));
-        if (cashier?.defaultPrinterAgentId) {
-          printerAgentId = cashier.defaultPrinterAgentId;
-        }
-      }
-    }
+    console.log('[TicketPrint] Connected agents:', connectedAgents.map(a => `${a.agentId} (${a.deviceName})`).join(', ') || 'NONE');
     
-    // Get first connected agent for the company if still no agent
-    if (!printerAgentId) {
-      const agents = getConnectedAgents(event.companyId);
-      if (agents.length > 0) {
-        printerAgentId = agents[0].agentId;
-      }
-    }
-    
-    if (!printerAgentId) {
+    // No agents connected at all
+    if (connectedAgents.length === 0) {
       return res.status(503).json({ 
         message: "Nessun agente di stampa connesso. Avviare l'applicazione desktop Event4U.",
         errorCode: "NO_PRINT_AGENT"
       });
+    }
+    
+    // Determine print agent ID with smart fallback
+    let printerAgentId = agentId;
+    let cashierId: string | null = null;
+    
+    // Get cashier info if applicable
+    if (user.role === 'cassiere') {
+      cashierId = getSiaeCashierId(user);
+    }
+    
+    // Verify the specified agent is actually connected
+    if (printerAgentId && !connectedAgentIds.has(printerAgentId)) {
+      console.log(`[TicketPrint] Specified agent ${printerAgentId} is not connected, will try fallback`);
+      printerAgentId = null;
+    }
+    
+    // If no valid agent specified, try cashier's default printer (if connected)
+    if (!printerAgentId && cashierId) {
+      const [cashier] = await db.select().from(siaeCashiers).where(eq(siaeCashiers.id, cashierId));
+      if (cashier?.defaultPrinterAgentId && connectedAgentIds.has(cashier.defaultPrinterAgentId)) {
+        printerAgentId = cashier.defaultPrinterAgentId;
+        console.log(`[TicketPrint] Using cashier's default agent: ${printerAgentId}`);
+      } else if (cashier?.defaultPrinterAgentId) {
+        console.log(`[TicketPrint] Cashier's default agent ${cashier.defaultPrinterAgentId} is not connected`);
+      }
+    }
+    
+    // Smart fallback: if exactly one agent is connected, use it automatically
+    if (!printerAgentId) {
+      if (connectedAgents.length === 1) {
+        printerAgentId = connectedAgents[0].agentId;
+        console.log(`[TicketPrint] Only one agent connected, using: ${printerAgentId} (${connectedAgents[0].deviceName})`);
+        
+        // Auto-update cashier's default for future prints
+        if (cashierId) {
+          await db.update(siaeCashiers)
+            .set({ defaultPrinterAgentId: printerAgentId })
+            .where(eq(siaeCashiers.id, cashierId));
+          console.log(`[TicketPrint] Auto-updated cashier's default printer to: ${printerAgentId}`);
+        }
+      } else {
+        // Multiple agents connected but none specified - require explicit selection
+        console.log(`[TicketPrint] Multiple agents connected but none specified. Agents:`, connectedAgents);
+        return res.status(400).json({ 
+          message: "Più agenti di stampa connessi. Selezionare un agente nelle impostazioni stampante.",
+          errorCode: "MULTIPLE_AGENTS",
+          connectedAgents: connectedAgents.map(a => ({ agentId: a.agentId, deviceName: a.deviceName }))
+        });
+      }
     }
     
     // Get event's ticket template
