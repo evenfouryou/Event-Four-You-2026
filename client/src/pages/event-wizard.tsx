@@ -123,6 +123,7 @@ export default function EventWizard() {
   const [siaeTaxType, setSiaeTaxType] = useState<string>('S');
   const [siaeRequiresNominative, setSiaeRequiresNominative] = useState(true);
   const [siaeMaxTicketsPerUser, setSiaeMaxTicketsPerUser] = useState(10);
+  const [siaeSubscriptionsEnabled, setSiaeSubscriptionsEnabled] = useState(false);
   const [siaeSectors, setSiaeSectors] = useState<SectorConfig[]>([]);
   
   // Dynamic steps based on SIAE enabled
@@ -1326,6 +1327,26 @@ export default function EventWizard() {
                       data-testid="input-max-tickets"
                     />
                   </div>
+
+                  <div className="flex items-center justify-between rounded-lg border p-3">
+                    <div>
+                      <Label className="font-medium">Abilita Vendita Abbonamenti</Label>
+                      <p className="text-xs text-muted-foreground">
+                        Consenti la vendita di abbonamenti dalla cassa
+                      </p>
+                    </div>
+                    <Switch
+                      checked={siaeSubscriptionsEnabled}
+                      onCheckedChange={setSiaeSubscriptionsEnabled}
+                      data-testid="switch-subscriptions-enabled"
+                    />
+                  </div>
+
+                  {siaeSubscriptionsEnabled && (
+                    <div className="rounded-lg bg-muted/50 p-3 text-sm text-muted-foreground">
+                      <p>Gli abbonamenti per questo evento saranno vendibili dalla cassa. Gli operatori potranno creare nuovi abbonamenti o utilizzare quelli esistenti per l'ingresso.</p>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>

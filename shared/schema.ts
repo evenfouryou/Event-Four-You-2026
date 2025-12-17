@@ -1607,6 +1607,9 @@ export const siaeSubscriptions = pgTable("siae_subscriptions", {
   holderLastName: varchar("holder_last_name", { length: 100 }).notNull(),
   // Stato
   status: varchar("status", { length: 20 }).notNull().default('active'), // active, expired, cancelled
+  // Collegamento opzionale a evento/settore per vendita da cassa
+  ticketedEventId: varchar("ticketed_event_id").references(() => siaeTicketedEvents.id),
+  sectorId: varchar("sector_id").references(() => siaeEventSectors.id),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -1619,6 +1622,14 @@ export const siaeSubscriptionsRelations = relations(siaeSubscriptions, ({ one, m
   customer: one(siaeCustomers, {
     fields: [siaeSubscriptions.customerId],
     references: [siaeCustomers.id],
+  }),
+  ticketedEvent: one(siaeTicketedEvents, {
+    fields: [siaeSubscriptions.ticketedEventId],
+    references: [siaeTicketedEvents.id],
+  }),
+  sector: one(siaeEventSectors, {
+    fields: [siaeSubscriptions.sectorId],
+    references: [siaeEventSectors.id],
   }),
 }));
 
