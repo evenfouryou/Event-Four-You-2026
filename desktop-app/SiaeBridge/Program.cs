@@ -88,7 +88,7 @@ namespace SiaeBridge
             try { _log = new StreamWriter(logPath, true) { AutoFlush = true }; } catch { }
 
             Log("═══════════════════════════════════════════════════════");
-            Log("SiaeBridge v3.4 - Enhanced card data logging + error reporting");
+            Log("SiaeBridge v3.5 - PIN verification before every seal (SIAE official sequence)");
             Log($"Time: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
             Log($"Dir: {AppDomain.CurrentDomain.BaseDirectory}");
             Log($"32-bit Process: {!Environment.Is64BitProcess}");
@@ -559,6 +559,7 @@ namespace SiaeBridge
             {
                 dynamic req = JsonConvert.DeserializeObject(json);
                 decimal price = req.price;
+                string pin = req.pin;  // Get PIN from request
 
                 int state = isCardIn(_slot);
                 if (!IsCardPresent(state)) { _slot = -1; return ERR("Carta rimossa"); }
@@ -566,6 +567,53 @@ namespace SiaeBridge
                 Initialize(_slot);
                 BeginTransactionML(_slot);
                 tx = true;
+
+                // ========================================
+                // PIN VERIFICATION BEFORE SEAL (required by SIAE cards)
+                // Sequence from official test.c: SelectML(0x0000) -> SelectML(0x1112) -> SelectML(0x1000) -> VerifyPINML(1, pin)
+                // Error 0x6982 = "Security status not satisfied" = C_NOT_AUTHORIZED
+                // ========================================
+                if (!string.IsNullOrEmpty(pin))
+                {
+                    Log($"  PIN provided, verifying before seal (SIAE sequence)...");
+                    
+                    // Clean PIN
+                    pin = new string(pin.Where(char.IsDigit).ToArray());
+                    
+                    // SIAE official sequence from test.c (lines 220-234):
+                    // 1. Select root DF (0x0000)
+                    int sel0000 = LibSiae.SelectML(0x0000, _slot);
+                    Log($"  SelectML(0x0000 root) = {sel0000} (0x{sel0000:X4})");
+                    
+                    // 2. Select DF Sigilli Fiscali (0x1112)
+                    int sel1112 = LibSiae.SelectML(0x1112, _slot);
+                    Log($"  SelectML(0x1112 DF Sigilli) = {sel1112} (0x{sel1112:X4})");
+                    
+                    // 3. Select EF (0x1000) - from performance test in official docs
+                    int sel1000 = LibSiae.SelectML(0x1000, _slot);
+                    Log($"  SelectML(0x1000 EF) = {sel1000} (0x{sel1000:X4})");
+                    
+                    // 4. Verify PIN with nPIN=1 (from official docs)
+                    int pinResult = VerifyPINML(1, pin, _slot);
+                    Log($"  VerifyPINML(nPIN=1) = {pinResult} (0x{pinResult:X4})");
+                    
+                    if (pinResult != 0)
+                    {
+                        if (pinResult == 0x6983)
+                            return ERR("PIN bloccato - troppi tentativi errati");
+                        else if (pinResult == 0x6982)
+                            return ERR("PIN errato - autenticazione fallita");
+                        else if (pinResult >= 0x63C0 && pinResult <= 0x63CF)
+                            return ERR($"PIN errato - tentativi rimasti: {pinResult & 0x0F}");
+                        else
+                            return ERR($"Verifica PIN fallita: 0x{pinResult:X4}");
+                    }
+                    Log($"  ✓ PIN verified successfully before seal");
+                }
+                else
+                {
+                    Log($"  WARNING: No PIN provided, seal may fail with 0x6982");
+                }
 
                 DateTime dt = DateTime.Now;
                 byte[] bcd = new byte[5];
