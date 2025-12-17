@@ -3998,7 +3998,7 @@ router.post("/api/cashier/events/:eventId/emit-ticket", requireAuth, requireCash
   try {
     const user = req.user as any;
     const { eventId } = req.params;
-    const { sectorId, ticketType, ticketPrice, participantFirstName, participantLastName, paymentMethod, isComplimentary } = req.body;
+    const { sectorId, ticketType, ticketPrice, participantFirstName, participantLastName, paymentMethod, isComplimentary, customText } = req.body;
     
     if (!sectorId || !ticketType || ticketPrice === undefined) {
       return res.status(400).json({ message: "sectorId, ticketType e ticketPrice sono obbligatori" });
@@ -4072,8 +4072,10 @@ router.post("/api/cashier/events/:eventId/emit-ticket", requireAuth, requireCash
       allocationId: allocation.id,
       eventId,
       sectorId,
+      sectorCode: sector.sectorCode || '',
       ticketCode,
       ticketType,
+      ticketTypeCode: ticketType.substring(0, 2).toUpperCase(),
       ticketPrice: Number(ticketPrice),
       customerId: null,
       issuedByUserId: cashierId,
@@ -4081,6 +4083,7 @@ router.post("/api/cashier/events/:eventId/emit-ticket", requireAuth, requireCash
       participantLastName: participantLastName || null,
       isComplimentary: isComplimentary || false,
       paymentMethod: paymentMethod || 'cash',
+      customText: customText || null,
       currentTicketsSold: event.ticketsSold || 0,
       currentTotalRevenue: Number(event.totalRevenue || 0),
       currentAvailableSeats: sector.availableSeats || 0

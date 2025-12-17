@@ -305,8 +305,10 @@ export interface ISiaeStorage {
     allocationId: string;
     eventId: string;
     sectorId: string;
+    sectorCode: string;
     ticketCode: string;
     ticketType: string;
+    ticketTypeCode: string;
     ticketPrice: number;
     customerId: string | null;
     issuedByUserId: string;
@@ -314,6 +316,7 @@ export interface ISiaeStorage {
     participantLastName: string | null;
     isComplimentary: boolean;
     paymentMethod: string;
+    customText?: string | null;
     currentTicketsSold: number;
     currentTotalRevenue: number;
     currentAvailableSeats: number;
