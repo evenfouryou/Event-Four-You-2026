@@ -4129,6 +4129,7 @@ router.get("/api/siae/events/:eventId/report-c1", requireAuth, requireGestore, a
 // POST /api/siae/tickets/:id/print - Print a ticket to thermal printer
 // Requires: printer agent connected, ticket template configured for event
 router.post("/api/siae/tickets/:id/print", requireAuth, async (req: Request, res: Response) => {
+  console.log('[TicketPrint] Endpoint hit! ticketId:', req.params.id, 'user:', (req.user as any)?.role);
   try {
     const user = req.user as any;
     const { id: ticketId } = req.params;
