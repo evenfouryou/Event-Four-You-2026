@@ -4620,6 +4620,13 @@ router.post("/api/siae/tickets/:id/print", requireAuth, async (req: Request, res
       };
     });
     
+    // Map ticket type to Italian label
+    const ticketTypeLabels: Record<string, string> = {
+      'intero': 'Intero',
+      'ridotto': 'Ridotto',
+      'omaggio': 'Omaggio',
+    };
+    
     // Build ticket data for template
     const ticketData: Record<string, string> = {
       event_name: event.eventName || '',
@@ -4629,14 +4636,15 @@ router.post("/api/siae/tickets/:id/print", requireAuth, async (req: Request, res
       price: `€ ${Number(ticket.ticketPrice || 0).toFixed(2).replace('.', ',')}`,
       ticket_number: ticket.ticketCode || '',
       progressive_number: String(ticket.progressiveNumber || ''),
+      ticket_type: ticketTypeLabels[ticket.ticketType || ''] || ticket.ticketType || '',
       sector: sector?.sectorName || '',
       row: '',
       seat: '',
       buyer_name: ticket.participantFirstName && ticket.participantLastName 
         ? `${ticket.participantFirstName} ${ticket.participantLastName}` 
         : '',
-      organizer_company: event.organizerName || '',
-      ticketing_manager: '',
+      organizer_company: event.organizerName || event.companyName || '',
+      ticketing_manager: event.companyName || '',
       emission_datetime: ticket.emittedAt ? new Date(ticket.emittedAt).toLocaleString('it-IT') : '',
       fiscal_seal: (ticket as any).fiscalSealNumber || '',
       qr_code: `https://manage.eventfouryou.com/verify/${ticket.ticketCode}`,

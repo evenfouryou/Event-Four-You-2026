@@ -41,6 +41,8 @@ const ELEMENT_TYPES = [
   
   // Campi biglietto
   { type: 'dynamic', label: 'Numero Biglietto', icon: Hash, fieldKey: 'ticket_number', category: 'ticket' },
+  { type: 'dynamic', label: 'Numero Progressivo', icon: Hash, fieldKey: 'progressive_number', category: 'ticket' },
+  { type: 'dynamic', label: 'Tipo Biglietto', icon: Type, fieldKey: 'ticket_type', category: 'ticket' },
   { type: 'dynamic', label: 'Settore', icon: Type, fieldKey: 'sector', category: 'ticket' },
   { type: 'dynamic', label: 'Fila', icon: Type, fieldKey: 'row', category: 'ticket' },
   { type: 'dynamic', label: 'Posto', icon: Type, fieldKey: 'seat', category: 'ticket' },
@@ -64,6 +66,8 @@ const SAMPLE_DATA: Record<string, string> = {
   venue_name: 'Stadio San Siro',
   price: '€ 45,00',
   ticket_number: 'TKT-2024-001234',
+  progressive_number: '1',
+  ticket_type: 'Intero',
   sector: 'Tribuna A',
   row: '12',
   seat: '45',

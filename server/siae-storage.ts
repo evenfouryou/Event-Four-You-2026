@@ -757,10 +757,12 @@ export class SiaeStorage implements ISiaeStorage {
       status: events.status,
       eventLocation: events.locationId,
       venueName: locations.name,
+      companyName: companies.name,
     })
     .from(siaeTicketedEvents)
     .leftJoin(events, eq(siaeTicketedEvents.eventId, events.id))
     .leftJoin(locations, eq(events.locationId, locations.id))
+    .leftJoin(companies, eq(siaeTicketedEvents.companyId, companies.id))
     .where(eq(siaeTicketedEvents.id, id));
     return result;
   }
