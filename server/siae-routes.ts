@@ -4638,15 +4638,15 @@ router.post("/api/siae/tickets/:id/print", requireAuth, async (req: Request, res
       progressive_number: String(ticket.progressiveNumber || ''),
       ticket_type: ticketTypeLabels[ticket.ticketType || ''] || ticket.ticketType || '',
       sector: sector?.sectorName || '',
-      row: '',
-      seat: '',
+      row: ticket.row || '',
+      seat: ticket.seatNumber || '',
       buyer_name: ticket.participantFirstName && ticket.participantLastName 
         ? `${ticket.participantFirstName} ${ticket.participantLastName}` 
         : '',
       organizer_company: event.organizerName || event.companyName || '',
       ticketing_manager: event.companyName || '',
-      emission_datetime: ticket.emittedAt ? new Date(ticket.emittedAt).toLocaleString('it-IT') : '',
-      fiscal_seal: (ticket as any).fiscalSealNumber || '',
+      emission_datetime: ticket.emissionDate ? new Date(ticket.emissionDate).toLocaleString('it-IT') : '',
+      fiscal_seal: ticket.fiscalSealCode || '',
       qr_code: `https://manage.eventfouryou.com/verify/${ticket.ticketCode}`,
     };
     
