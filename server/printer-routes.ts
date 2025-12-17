@@ -263,6 +263,9 @@ router.post('/agents/register', requireCashierOrAbove, async (req: Request, res:
     const user = getUser(req);
     const { deviceName, printerModelId, printerName, capabilities } = req.body;
     
+    console.log('[AgentRegister] Request body:', JSON.stringify(req.body));
+    console.log('[AgentRegister] User:', user ? `id=${user.id}, role=${user.role}, companyId=${user.companyId}` : 'null');
+    
     // Use user's company or allow super_admin to specify company
     let companyId = user?.companyId;
     if (user?.role === 'super_admin' && req.body.companyId) {
@@ -271,7 +274,10 @@ router.post('/agents/register', requireCashierOrAbove, async (req: Request, res:
     
     const userId = user?.id;
     
+    console.log('[AgentRegister] Final values - companyId:', companyId, 'userId:', userId, 'deviceName:', deviceName);
+    
     if (!companyId || !deviceName || !userId) {
+      console.log('[AgentRegister] Missing required field - companyId:', !!companyId, 'userId:', !!userId, 'deviceName:', !!deviceName);
       return res.status(400).json({ error: 'companyId, userId e deviceName richiesti' });
     }
     
