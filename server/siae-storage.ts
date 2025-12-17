@@ -1955,7 +1955,7 @@ export class SiaeStorage implements ISiaeStorage {
           .update(siaeTicketedEvents)
           .set({
             ticketsCancelled: sql`COALESCE(${siaeTicketedEvents.ticketsCancelled}, 0) + 1`,
-            totalRevenue: sql`GREATEST(0, COALESCE(${siaeTicketedEvents.totalRevenue}::numeric, 0) - ${params.ticketPrice})::text`,
+            totalRevenue: sql`GREATEST(0, COALESCE(${siaeTicketedEvents.totalRevenue}, 0) - ${params.ticketPrice})`,
             updatedAt: new Date()
           })
           .where(eq(siaeTicketedEvents.id, params.ticketedEventId));
