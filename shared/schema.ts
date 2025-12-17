@@ -4028,7 +4028,7 @@ export const siaeTicketAudit = pgTable("siae_ticket_audit", {
   companyId: varchar("company_id").notNull().references(() => companies.id),
   ticketId: varchar("ticket_id").notNull().references(() => siaeTickets.id),
   operationType: varchar("operation_type", { length: 20 }).notNull(), // emission, cancellation, reprint
-  performedBy: varchar("performed_by").notNull().references(() => users.id),
+  performedBy: varchar("performed_by").notNull(), // Can be users.id OR siaeCashiers.id
   reason: text("reason"),
   metadata: jsonb("metadata"),
   createdAt: timestamp("created_at").defaultNow(),
@@ -4043,10 +4043,7 @@ export const siaeTicketAuditRelations = relations(siaeTicketAudit, ({ one }) => 
     fields: [siaeTicketAudit.ticketId],
     references: [siaeTickets.id],
   }),
-  performer: one(users, {
-    fields: [siaeTicketAudit.performedBy],
-    references: [users.id],
-  }),
+  // performedBy can be either users.id OR siaeCashiers.id, so no direct relation
 }));
 
 // Schemas per validazione
