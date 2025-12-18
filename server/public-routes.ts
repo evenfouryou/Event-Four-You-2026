@@ -462,9 +462,9 @@ router.post("/api/public/customers/register", async (req, res) => {
     // Genera e invia OTP
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minuti
 
-    // Use MSG91 if configured, otherwise fallback to local OTP
+    // Use MSG91 SMS Flow API if configured, otherwise fallback to local OTP
     if (isMSG91Configured()) {
-      console.log(`[PUBLIC OTP] Using MSG91 for ${customer.phone}`);
+      console.log(`[PUBLIC OTP] Using MSG91 SMS Flow for ${customer.phone}`);
       const result = await sendMSG91OTP(customer.phone, 10);
       
       if (!result.success) {
@@ -472,11 +472,11 @@ router.post("/api/public/customers/register", async (req, res) => {
         return res.status(500).json({ message: "Errore nell'invio OTP. Riprova." });
       }
       
-      // Store reference in DB (MSG91 manages the actual OTP)
+      // Store the OTP code in DB (generated locally, sent via MSG91 SMS)
       await db.insert(siaeOtpAttempts).values({
         customerId: customer.id,
         phone: customer.phone,
-        otpCode: "MSG91", // Placeholder - MSG91 manages the actual code
+        otpCode: result.otpCode!, // Store the actual OTP code for local verification
         purpose: "registration",
         expiresAt,
         ipAddress: req.ip,
@@ -554,32 +554,18 @@ router.post("/api/public/customers/verify-otp", async (req, res) => {
       return res.status(400).json({ message: "Nessun OTP pendente. Richiedi un nuovo codice." });
     }
 
-    // Use MSG91 verification if configured
-    if (isMSG91Configured() && otpAttempt.otpCode === "MSG91") {
-      console.log(`[PUBLIC OTP] Verifying via MSG91 for ${customer.phone}`);
-      const result = await verifyMSG91OTP(customer.phone, otpCode);
-      
-      if (!result.success) {
-        console.log(`[PUBLIC OTP] MSG91 verification failed: ${result.message}`);
-        return res.status(400).json({ message: "Codice OTP non valido" });
-      }
-      
-      // MSG91 verification succeeded
-      await db
-        .update(siaeOtpAttempts)
-        .set({ status: "verified", verifiedAt: new Date() })
-        .where(eq(siaeOtpAttempts.id, otpAttempt.id));
-    } else {
-      // Local OTP verification
-      if (otpAttempt.otpCode !== otpCode) {
-        return res.status(400).json({ message: "Codice OTP non valido o scaduto" });
-      }
-      
-      await db
-        .update(siaeOtpAttempts)
-        .set({ status: "verified", verifiedAt: new Date() })
-        .where(eq(siaeOtpAttempts.id, otpAttempt.id));
+    // Local OTP verification (code is stored in DB, sent via MSG91 SMS)
+    console.log(`[PUBLIC OTP] Verifying OTP for ${customer.phone} - provided: ${otpCode}, stored: ${otpAttempt.otpCode}`);
+    
+    if (otpAttempt.otpCode !== otpCode) {
+      return res.status(400).json({ message: "Codice OTP non valido o scaduto" });
     }
+    
+    // OTP verification succeeded
+    await db
+      .update(siaeOtpAttempts)
+      .set({ status: "verified", verifiedAt: new Date() })
+      .where(eq(siaeOtpAttempts.id, otpAttempt.id));
 
     // Aggiorna cliente come verificato
     await db
@@ -649,7 +635,7 @@ router.post("/api/public/customers/resend-otp", async (req, res) => {
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
 
     if (isMSG91Configured()) {
-      console.log(`[PUBLIC OTP] Resending via MSG91 to ${customer.phone}`);
+      console.log(`[PUBLIC OTP] Resending via MSG91 SMS Flow to ${customer.phone}`);
       const result = await resendMSG91OTP(customer.phone, retryType as 'text' | 'voice');
       
       if (!result.success) {
@@ -657,11 +643,11 @@ router.post("/api/public/customers/resend-otp", async (req, res) => {
         return res.status(500).json({ message: "Errore nel reinvio OTP. Riprova." });
       }
 
-      // Update existing attempt or create new one
+      // Store the OTP code in DB (generated locally, sent via MSG91 SMS)
       await db.insert(siaeOtpAttempts).values({
         customerId: customer.id,
         phone: customer.phone,
-        otpCode: "MSG91",
+        otpCode: result.otpCode!,
         purpose: "registration",
         expiresAt,
         ipAddress: req.ip,

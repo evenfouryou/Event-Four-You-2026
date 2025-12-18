@@ -710,9 +710,9 @@ router.post("/api/siae/otp/send", async (req: Request, res: Response) => {
       return res.status(429).json({ message: "Troppi tentativi. Riprova tra un minuto." });
     }
     
-    // Use MSG91 if configured, otherwise fallback to local OTP generation
+    // Use MSG91 SMS Flow if configured, otherwise fallback to local OTP generation
     if (isMSG91Configured()) {
-      console.log(`[SIAE OTP] Using MSG91 for ${data.phone}`);
+      console.log(`[SIAE OTP] Using MSG91 SMS Flow for ${data.phone}`);
       const result = await sendMSG91OTP(data.phone, 10); // 10 minutes expiry
       
       if (!result.success) {
@@ -720,10 +720,10 @@ router.post("/api/siae/otp/send", async (req: Request, res: Response) => {
         return res.status(500).json({ message: result.message });
       }
       
-      // Store reference in DB (MSG91 manages the actual OTP)
+      // Store OTP code in DB (generated locally, sent via MSG91 SMS)
       await siaeStorage.createSiaeOtpAttempt({
         phone: data.phone,
-        otpCode: "MSG91", // Placeholder - MSG91 manages the actual code
+        otpCode: result.otpCode!, // Store the actual OTP code for local verification
         purpose: data.purpose,
         expiresAt: new Date(Date.now() + 10 * 60 * 1000),
       });
@@ -756,32 +756,8 @@ router.post("/api/siae/otp/verify", async (req: Request, res: Response) => {
   try {
     const data = otpVerifySchema.parse(req.body);
     
-    // Use MSG91 verification if configured
-    if (isMSG91Configured()) {
-      console.log(`[SIAE OTP] Verifying via MSG91 for ${data.phone}`);
-      const result = await verifyMSG91OTP(data.phone, data.otpCode);
-      
-      if (!result.success) {
-        console.log(`[SIAE OTP] MSG91 verification failed: ${result.message}`);
-        return res.status(400).json({ message: result.message || "OTP non valido" });
-      }
-      
-      // MSG91 verification succeeded - update local record if exists
-      const attempt = await siaeStorage.getSiaeOtpAttemptByPhone(data.phone);
-      if (attempt) {
-        await siaeStorage.markSiaeOtpVerified(attempt.id);
-      }
-      
-      // Check if customer exists with this phone
-      let customer = await siaeStorage.getSiaeCustomerByPhone(data.phone);
-      
-      return res.json({ 
-        verified: true, 
-        customerId: customer?.id,
-        isNewCustomer: !customer,
-        provider: "msg91"
-      });
-    }
+    // Local OTP verification (code is stored in DB, sent via MSG91 SMS Flow)
+    console.log(`[SIAE OTP] Verifying OTP for ${data.phone}`);
     
     // Fallback: Local OTP verification
     const attempt = await siaeStorage.getSiaeOtpAttempt(data.phone, data.otpCode);
@@ -821,7 +797,7 @@ router.post("/api/siae/otp/verify", async (req: Request, res: Response) => {
   }
 });
 
-// Resend OTP endpoint (MSG91 only)
+// Resend OTP endpoint
 router.post("/api/siae/otp/resend", async (req: Request, res: Response) => {
   try {
     const { phone, retryType = 'text' } = req.body;
@@ -836,13 +812,21 @@ router.post("/api/siae/otp/resend", async (req: Request, res: Response) => {
     }
     
     if (isMSG91Configured()) {
-      console.log(`[SIAE OTP] Resending via MSG91 to ${phone}`);
+      console.log(`[SIAE OTP] Resending via MSG91 SMS Flow to ${phone}`);
       const result = await resendMSG91OTP(phone, retryType as 'text' | 'voice');
       
       if (!result.success) {
         console.error(`[SIAE OTP] MSG91 resend failed: ${result.message}`);
         return res.status(500).json({ message: result.message });
       }
+      
+      // Store the new OTP code in DB
+      await siaeStorage.createSiaeOtpAttempt({
+        phone: phone,
+        otpCode: result.otpCode!,
+        purpose: "registration",
+        expiresAt: new Date(Date.now() + 10 * 60 * 1000),
+      });
       
       res.json({ message: "OTP reinviato con successo", provider: "msg91" });
     } else {
