@@ -685,24 +685,31 @@ router.post("/api/public/customers/resend-otp", async (req, res) => {
 router.post("/api/public/customers/login", async (req, res) => {
   try {
     const { email, password } = req.body;
+    console.log("[PUBLIC LOGIN] Attempt for email:", email);
 
     if (!email || !password) {
+      console.log("[PUBLIC LOGIN] Missing email or password");
       return res.status(400).json({ message: "Email e password richieste" });
     }
 
     // Normalizza email (minuscole e trim) per il confronto
     const normalizedEmail = email.toLowerCase().trim();
+    console.log("[PUBLIC LOGIN] Normalized email:", normalizedEmail);
     
     const [customer] = await db
       .select()
       .from(siaeCustomers)
       .where(eq(siaeCustomers.email, normalizedEmail));
 
+    console.log("[PUBLIC LOGIN] Customer found:", customer ? "YES" : "NO", customer?.id);
+
     if (!customer || !customer.passwordHash) {
+      console.log("[PUBLIC LOGIN] No customer or no password hash");
       return res.status(401).json({ message: "Credenziali non valide" });
     }
 
     const validPassword = await bcrypt.compare(password, customer.passwordHash);
+    console.log("[PUBLIC LOGIN] Password valid:", validPassword);
     if (!validPassword) {
       return res.status(401).json({ message: "Credenziali non valide" });
     }
