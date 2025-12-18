@@ -18,36 +18,48 @@ export class CommissionService {
     channel: 'online' | 'printed' | 'pr',
     ticketPriceGross: number,
     profile: {
-      channelOnlineType: string;
-      channelOnlineValue: string;
-      channelPrintedType: string;
-      channelPrintedValue: string;
-      channelPrType: string;
-      channelPrValue: string;
+      channelOnlineType: string | null;
+      channelOnlineValue: string | null;
+      channelPrintedType: string | null;
+      channelPrintedValue: string | null;
+      channelPrType: string | null;
+      channelPrValue: string | null;
     }
   ): number {
-    let type: string;
-    let value: number;
+    let type: string | null;
+    let valueStr: string | null;
 
     switch (channel) {
       case 'online':
         type = profile.channelOnlineType;
-        value = parseFloat(profile.channelOnlineValue);
+        valueStr = profile.channelOnlineValue;
         break;
       case 'printed':
         type = profile.channelPrintedType;
-        value = parseFloat(profile.channelPrintedValue);
+        valueStr = profile.channelPrintedValue;
         break;
       case 'pr':
         type = profile.channelPrType;
-        value = parseFloat(profile.channelPrValue);
+        valueStr = profile.channelPrValue;
         break;
     }
 
+    if (!type || !valueStr) {
+      return 0;
+    }
+
+    const value = parseFloat(valueStr);
+    if (isNaN(value) || value < 0) {
+      return 0;
+    }
+
     if (type === 'percent') {
-      return ticketPriceGross * (value / 100);
+      if (value > 100) {
+        return ticketPriceGross;
+      }
+      return Math.round(ticketPriceGross * (value / 100) * 100) / 100;
     } else {
-      return value;
+      return Math.round(value * 100) / 100;
     }
   }
 

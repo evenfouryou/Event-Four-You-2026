@@ -105,6 +105,7 @@ import AdminBillingPlans from "@/pages/admin-billing-plans";
 import AdminBillingOrganizers from "@/pages/admin-billing-organizers";
 import AdminBillingOrganizerDetail from "@/pages/admin-billing-organizer-detail";
 import AdminBillingInvoices from "@/pages/admin-billing-invoices";
+import AdminBillingReports from "@/pages/admin-billing-reports";
 import OrganizerBilling from "@/pages/organizer-billing";
 import { CookieConsent } from "@/components/cookie-consent";
 
@@ -243,6 +244,7 @@ function Router() {
               <Route path="/admin/billing/organizers/:companyId" component={AdminBillingOrganizerDetail} />
               <Route path="/admin/billing/organizers" component={AdminBillingOrganizers} />
               <Route path="/admin/billing/invoices" component={AdminBillingInvoices} />
+              <Route path="/admin/billing/reports" component={AdminBillingReports} />
               <Route path="/billing" component={OrganizerBilling} />
               <Route path="/scanner/:eventId?" component={E4uScanner} />
               <Route path="/wallet" component={ClientWallet} />

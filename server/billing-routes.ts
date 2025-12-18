@@ -520,59 +520,246 @@ router.get("/api/organizer/billing/invoices", requireAuth, requireGestore, async
 });
 
 // ============================================================================
+// REPORTS - Helper Functions
+// ============================================================================
+
+interface SalesReportData {
+  period: { from: string; to: string };
+  summary: {
+    ticketsSoldTotal: number;
+    ticketsSoldOnline: number;
+    ticketsSoldPrinted: number;
+    ticketsSoldPr: number;
+    grossRevenueTotal: number;
+    commissionOnline: number;
+    commissionPrinted: number;
+    commissionPr: number;
+    commissionTotal: number;
+    netToOrganizer: number;
+    walletDebt: number;
+    invoicesIssued: number;
+    invoicesPaid: number;
+  };
+  byEvent: Array<{
+    eventId: string;
+    eventName: string;
+    eventDate: string;
+    ticketsSold: number;
+    grossRevenue: number;
+    commissions: number;
+    netRevenue: number;
+  }>;
+  byChannel: Array<{
+    channel: 'online' | 'printed' | 'pr';
+    ticketsSold: number;
+    grossRevenue: number;
+    commissions: number;
+  }>;
+}
+
+function generateCSV(data: SalesReportData): string {
+  const lines: string[] = [];
+  
+  lines.push("REPORT VENDITE");
+  lines.push(`Periodo: ${data.period.from} - ${data.period.to}`);
+  lines.push("");
+  
+  lines.push("RIEPILOGO");
+  lines.push(`Biglietti Venduti Totale,${data.summary.ticketsSoldTotal}`);
+  lines.push(`Biglietti Online,${data.summary.ticketsSoldOnline}`);
+  lines.push(`Biglietti Biglietteria,${data.summary.ticketsSoldPrinted}`);
+  lines.push(`Biglietti PR,${data.summary.ticketsSoldPr}`);
+  lines.push(`Ricavo Lordo Totale,${data.summary.grossRevenueTotal.toFixed(2)}`);
+  lines.push(`Commissioni Online,${data.summary.commissionOnline.toFixed(2)}`);
+  lines.push(`Commissioni Biglietteria,${data.summary.commissionPrinted.toFixed(2)}`);
+  lines.push(`Commissioni PR,${data.summary.commissionPr.toFixed(2)}`);
+  lines.push(`Commissioni Totali,${data.summary.commissionTotal.toFixed(2)}`);
+  lines.push(`Netto Organizzatore,${data.summary.netToOrganizer.toFixed(2)}`);
+  lines.push(`Debito Wallet,${data.summary.walletDebt.toFixed(2)}`);
+  lines.push(`Fatture Emesse,${data.summary.invoicesIssued}`);
+  lines.push(`Fatture Pagate,${data.summary.invoicesPaid}`);
+  lines.push("");
+  
+  if (data.byEvent.length > 0) {
+    lines.push("PER EVENTO");
+    lines.push("ID Evento,Nome Evento,Data Evento,Biglietti Venduti,Ricavo Lordo,Commissioni,Ricavo Netto");
+    for (const event of data.byEvent) {
+      lines.push(`${event.eventId},${event.eventName.replace(/,/g, ";")},${event.eventDate},${event.ticketsSold},${event.grossRevenue.toFixed(2)},${event.commissions.toFixed(2)},${event.netRevenue.toFixed(2)}`);
+    }
+    lines.push("");
+  }
+  
+  if (data.byChannel.length > 0) {
+    lines.push("PER CANALE");
+    lines.push("Canale,Biglietti Venduti,Ricavo Lordo,Commissioni");
+    for (const channel of data.byChannel) {
+      const channelLabel = channel.channel === 'online' ? 'Online' : channel.channel === 'printed' ? 'Biglietteria' : 'PR';
+      lines.push(`${channelLabel},${channel.ticketsSold},${channel.grossRevenue.toFixed(2)},${channel.commissions.toFixed(2)}`);
+    }
+  }
+  
+  return lines.join("\n");
+}
+
+async function generateSalesReport(
+  companyIdFilter: string | null,
+  eventIdFilter: string | null,
+  fromDate: string | null,
+  toDate: string | null
+): Promise<SalesReportData> {
+  const conditions = [];
+  
+  if (companyIdFilter) {
+    conditions.push(eq(organizerWalletLedger.companyId, companyIdFilter));
+  }
+  if (fromDate) {
+    conditions.push(gte(organizerWalletLedger.createdAt!, new Date(fromDate)));
+  }
+  if (toDate) {
+    conditions.push(lte(organizerWalletLedger.createdAt!, new Date(toDate)));
+  }
+  if (eventIdFilter) {
+    conditions.push(
+      and(
+        eq(organizerWalletLedger.referenceType, "event"),
+        eq(organizerWalletLedger.referenceId, eventIdFilter)
+      )!
+    );
+  }
+  
+  conditions.push(eq(organizerWalletLedger.type, "commission"));
+  
+  const entries = await db
+    .select()
+    .from(organizerWalletLedger)
+    .where(and(...conditions))
+    .orderBy(desc(organizerWalletLedger.createdAt));
+  
+  const channelData: Record<string, { ticketsSold: number; grossRevenue: number; commissions: number }> = {
+    online: { ticketsSold: 0, grossRevenue: 0, commissions: 0 },
+    printed: { ticketsSold: 0, grossRevenue: 0, commissions: 0 },
+    pr: { ticketsSold: 0, grossRevenue: 0, commissions: 0 },
+  };
+  
+  const eventData: Record<string, { eventName: string; eventDate: string; ticketsSold: number; grossRevenue: number; commissions: number }> = {};
+  
+  for (const entry of entries) {
+    const amount = Math.abs(parseFloat(entry.amount));
+    const channel = entry.channel || "online";
+    const ticketCount = entry.ticketQuantity || 1;
+    const grossAmount = entry.ticketGrossAmount ? parseFloat(entry.ticketGrossAmount) : 0;
+    
+    if (channelData[channel]) {
+      channelData[channel].ticketsSold += ticketCount;
+      channelData[channel].grossRevenue += grossAmount;
+      channelData[channel].commissions += amount;
+    }
+    
+    if (entry.referenceType === "event" && entry.referenceId) {
+      if (!eventData[entry.referenceId]) {
+        eventData[entry.referenceId] = {
+          eventName: entry.eventName || "Evento",
+          eventDate: entry.createdAt ? new Date(entry.createdAt).toISOString().split("T")[0] : "",
+          ticketsSold: 0,
+          grossRevenue: 0,
+          commissions: 0,
+        };
+      }
+      eventData[entry.referenceId].ticketsSold += ticketCount;
+      eventData[entry.referenceId].grossRevenue += grossAmount;
+      eventData[entry.referenceId].commissions += amount;
+    }
+  }
+  
+  const invoiceConditions = [];
+  if (companyIdFilter) {
+    invoiceConditions.push(eq(organizerInvoices.companyId, companyIdFilter));
+  }
+  if (fromDate) {
+    invoiceConditions.push(gte(organizerInvoices.createdAt!, new Date(fromDate)));
+  }
+  if (toDate) {
+    invoiceConditions.push(lte(organizerInvoices.createdAt!, new Date(toDate)));
+  }
+  
+  const allInvoices = invoiceConditions.length > 0
+    ? await db.select().from(organizerInvoices).where(and(...invoiceConditions))
+    : await db.select().from(organizerInvoices);
+  
+  const invoicesIssued = allInvoices.filter(i => i.status === "issued" || i.status === "paid").length;
+  const invoicesPaid = allInvoices.filter(i => i.status === "paid").length;
+  
+  let walletDebt = 0;
+  if (companyIdFilter) {
+    const wallet = await WalletService.getOrCreateWallet(companyIdFilter);
+    walletDebt = Math.abs(Math.min(0, parseFloat(wallet.balance)));
+  }
+  
+  const ticketsSoldTotal = channelData.online.ticketsSold + channelData.printed.ticketsSold + channelData.pr.ticketsSold;
+  const grossRevenueTotal = channelData.online.grossRevenue + channelData.printed.grossRevenue + channelData.pr.grossRevenue;
+  const commissionTotal = channelData.online.commissions + channelData.printed.commissions + channelData.pr.commissions;
+  
+  return {
+    period: {
+      from: fromDate || new Date(new Date().setMonth(new Date().getMonth() - 1)).toISOString().split("T")[0],
+      to: toDate || new Date().toISOString().split("T")[0],
+    },
+    summary: {
+      ticketsSoldTotal,
+      ticketsSoldOnline: channelData.online.ticketsSold,
+      ticketsSoldPrinted: channelData.printed.ticketsSold,
+      ticketsSoldPr: channelData.pr.ticketsSold,
+      grossRevenueTotal,
+      commissionOnline: channelData.online.commissions,
+      commissionPrinted: channelData.printed.commissions,
+      commissionPr: channelData.pr.commissions,
+      commissionTotal,
+      netToOrganizer: grossRevenueTotal - commissionTotal,
+      walletDebt,
+      invoicesIssued,
+      invoicesPaid,
+    },
+    byEvent: Object.entries(eventData).map(([eventId, data]) => ({
+      eventId,
+      eventName: data.eventName,
+      eventDate: data.eventDate,
+      ticketsSold: data.ticketsSold,
+      grossRevenue: data.grossRevenue,
+      commissions: data.commissions,
+      netRevenue: data.grossRevenue - data.commissions,
+    })),
+    byChannel: [
+      { channel: 'online' as const, ...channelData.online },
+      { channel: 'printed' as const, ...channelData.printed },
+      { channel: 'pr' as const, ...channelData.pr },
+    ].filter(c => c.ticketsSold > 0 || c.commissions > 0),
+  };
+}
+
+// ============================================================================
 // REPORTS - Admin
 // ============================================================================
 
 router.get("/api/admin/billing/reports/sales", requireAuth, requireSuperAdmin, async (req: Request, res: Response) => {
   try {
-    const { from, to, companyId, channel } = req.query;
-
-    const conditions = [];
-
-    if (companyId && typeof companyId === "string") {
-      conditions.push(eq(organizerWalletLedger.companyId, companyId));
+    const { from, to, companyId, eventId, format } = req.query;
+    
+    const reportData = await generateSalesReport(
+      companyId as string | null,
+      eventId as string | null,
+      from as string | null,
+      to as string | null
+    );
+    
+    if (format === "csv") {
+      const csv = generateCSV(reportData);
+      const dateStr = new Date().toISOString().split("T")[0];
+      res.setHeader("Content-Type", "text/csv; charset=utf-8");
+      res.setHeader("Content-Disposition", `attachment; filename="report-sales-${dateStr}.csv"`);
+      return res.send(csv);
     }
-    if (from && typeof from === "string") {
-      conditions.push(gte(organizerWalletLedger.createdAt!, new Date(from)));
-    }
-    if (to && typeof to === "string") {
-      conditions.push(lte(organizerWalletLedger.createdAt!, new Date(to)));
-    }
-    if (channel && typeof channel === "string") {
-      conditions.push(eq(organizerWalletLedger.channel, channel));
-    }
-
-    conditions.push(eq(organizerWalletLedger.type, "commission"));
-
-    const entries = await db
-      .select()
-      .from(organizerWalletLedger)
-      .where(and(...conditions))
-      .orderBy(desc(organizerWalletLedger.createdAt));
-
-    const summary = {
-      totalCommissions: 0,
-      byChannel: {
-        online: { count: 0, total: 0 },
-        printed: { count: 0, total: 0 },
-        pr: { count: 0, total: 0 },
-      } as Record<string, { count: number; total: number }>,
-      entriesCount: entries.length,
-    };
-
-    for (const entry of entries) {
-      const amount = Math.abs(parseFloat(entry.amount));
-      summary.totalCommissions += amount;
-      if (entry.channel && summary.byChannel[entry.channel]) {
-        summary.byChannel[entry.channel].count++;
-        summary.byChannel[entry.channel].total += amount;
-      }
-    }
-
-    res.json({
-      summary,
-      entries,
-    });
+    
+    res.json(reportData);
   } catch (error) {
     console.error("[Billing] Error generating sales report:", error);
     res.status(500).json({ message: "Errore nella generazione del report" });
@@ -592,52 +779,24 @@ router.get("/api/organizer/billing/reports/sales", requireAuth, requireGestore, 
       return res.status(400).json({ message: "Utente non associato a un'azienda" });
     }
 
-    const { from, to, channel } = req.query;
-
-    const conditions = [
-      eq(organizerWalletLedger.companyId, companyId),
-      eq(organizerWalletLedger.type, "commission"),
-    ];
-
-    if (from && typeof from === "string") {
-      conditions.push(gte(organizerWalletLedger.createdAt!, new Date(from)));
+    const { from, to, eventId, format } = req.query;
+    
+    const reportData = await generateSalesReport(
+      companyId,
+      eventId as string | null,
+      from as string | null,
+      to as string | null
+    );
+    
+    if (format === "csv") {
+      const csv = generateCSV(reportData);
+      const dateStr = new Date().toISOString().split("T")[0];
+      res.setHeader("Content-Type", "text/csv; charset=utf-8");
+      res.setHeader("Content-Disposition", `attachment; filename="report-sales-${dateStr}.csv"`);
+      return res.send(csv);
     }
-    if (to && typeof to === "string") {
-      conditions.push(lte(organizerWalletLedger.createdAt!, new Date(to)));
-    }
-    if (channel && typeof channel === "string") {
-      conditions.push(eq(organizerWalletLedger.channel, channel));
-    }
-
-    const entries = await db
-      .select()
-      .from(organizerWalletLedger)
-      .where(and(...conditions))
-      .orderBy(desc(organizerWalletLedger.createdAt));
-
-    const summary = {
-      totalCommissions: 0,
-      byChannel: {
-        online: { count: 0, total: 0 },
-        printed: { count: 0, total: 0 },
-        pr: { count: 0, total: 0 },
-      } as Record<string, { count: number; total: number }>,
-      entriesCount: entries.length,
-    };
-
-    for (const entry of entries) {
-      const amount = Math.abs(parseFloat(entry.amount));
-      summary.totalCommissions += amount;
-      if (entry.channel && summary.byChannel[entry.channel]) {
-        summary.byChannel[entry.channel].count++;
-        summary.byChannel[entry.channel].total += amount;
-      }
-    }
-
-    res.json({
-      summary,
-      entries,
-    });
+    
+    res.json(reportData);
   } catch (error) {
     console.error("[Billing] Error generating sales report:", error);
     res.status(500).json({ message: "Errore nella generazione del report" });
