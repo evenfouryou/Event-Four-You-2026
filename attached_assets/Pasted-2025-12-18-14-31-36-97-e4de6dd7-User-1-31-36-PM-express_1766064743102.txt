@@ -1,0 +1,73 @@
+2025-12-18 14:31:36.97
+e4de6dd7
+User
+1:31:36 PM [express] GET /api/public/events 304 in 153ms :: [{"id":"fe9793b6-c270-4d3f-97d3-fef3957f…
+
+2025-12-18 14:31:39.09
+e4de6dd7
+User
+1:31:39 PM [express] GET /api/public/events/ecc3d8e1-00e5-4dbd-9369-6e35ac377fd8 304 in 96ms :: {"id…
+2025-12-18 14:31:42.20
+e4de6dd7
+User
+1:31:42 PM [express] POST /api/public/cart/add 200 in 106ms :: {"id":"8e25d40c-45b8-4ee5-aa1c-025e73…
+2025-12-18 14:31:44.13
+e4de6dd7
+User
+1:31:44 PM [express] GET /api/public/cart 200 in 316ms :: {"items":[{"id":"da10cfd0-f476-4965-abc5-7…
+2025-12-18 14:31:46.36
+e4de6dd7
+User
+1:31:46 PM [express] DELETE /api/public/cart/da10cfd0-f476-4965-abc5-7daf6c12bf34 200 in 91ms :: {"m…
+2025-12-18 14:31:46.39
+e4de6dd7
+User
+[Bridge] Message received: type=ping
+2025-12-18 14:31:46.62
+e4de6dd7
+User
+1:31:46 PM [express] GET /api/public/cart 200 in 70ms :: {"items":[{"id":"8e25d40c-45b8-4ee5-aa1c-02…
+2025-12-18 14:31:48.10
+e4de6dd7
+User
+[Stripe] Using environment variables for credentials
+2025-12-18 14:31:48.20
+e4de6dd7
+User
+[Stripe] Using environment variables for credentials
+2025-12-18 14:31:48.23
+e4de6dd7
+User
+1:31:48 PM [express] GET /api/public/stripe-key 200 in 199ms :: {"publishableKey":"mk_1PkTcy083fDHdL…
+2025-12-18 14:31:48.48
+e4de6dd7
+User
+1:31:48 PM [express] POST /api/public/checkout/create-payment-intent 200 in 453ms :: {"clientSecret"…
+2025-12-18 14:31:48.48
+e4de6dd7
+User
+1:31:48 PM [express] POST /api/public/checkout/create-payment-intent 200 in 453ms :: {"clientSecret"…
+2025-12-18 14:31:59.60
+e4de6dd7
+User
+[Bridge] Message received: type=pong
+2025-12-18 14:32:00.56
+7fadb115
+User
+[Bridge] Message received: type=ping
+2025-12-18 14:32:00.56
+7fadb115
+User
+[Bridge] Global bridge not connected
+2025-12-18 14:32:01.44
+e4de6dd7
+User
+1:32:01 PM [express] GET /api/printers/agents 304 in 296ms :: [{"id":"0e68fd9a-3791-4383-a6e0-540131…
+2025-12-18 14:32:02.51
+7fadb115
+User
+[Bridge] Pong received from userId=1b809fda-2601-452a-9c70-5de6f23ecf97, lastPing updated
+2025-12-18 14:32:02.51
+7fadb115
+User
+[Bridge] Message received: type=pong
