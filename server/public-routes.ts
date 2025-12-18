@@ -177,15 +177,25 @@ router.get("/api/public/events", async (req, res) => {
       .from(siaeTicketedEvents)
       .innerJoin(events, eq(siaeTicketedEvents.eventId, events.id));
     
-    console.log("[PUBLIC EVENTS DEBUG] Now:", now.toISOString());
-    console.log("[PUBLIC EVENTS DEBUG] All ticketed events:", JSON.stringify(allTicketedEvents.map(e => ({
-      name: e.eventName,
-      ticketingStatus: e.ticketingStatus,
-      eventStatus: e.eventStatus,
-      isPublic: e.isPublic,
-      endDatetime: e.endDatetime,
-      isEndInFuture: e.endDatetime ? new Date(e.endDatetime) > now : null,
-    })), null, 2));
+    // Log each event separately for clarity
+    console.log("=== PUBLIC EVENTS DEBUG START ===");
+    console.log("Server time NOW:", now.toISOString());
+    allTicketedEvents.forEach((e, i) => {
+      const endDt = e.endDatetime ? new Date(e.endDatetime) : null;
+      const isEndFuture = endDt ? endDt > now : false;
+      const passesFilter = 
+        e.ticketingStatus === 'active' && 
+        e.isPublic === true && 
+        (e.eventStatus === 'scheduled' || e.eventStatus === 'ongoing') && 
+        isEndFuture;
+      console.log(`EVENT ${i+1}: ${e.eventName}`);
+      console.log(`  ticketingStatus: ${e.ticketingStatus} (needs: active) ${e.ticketingStatus === 'active' ? '✓' : '✗'}`);
+      console.log(`  isPublic: ${e.isPublic} (needs: true) ${e.isPublic === true ? '✓' : '✗'}`);
+      console.log(`  eventStatus: ${e.eventStatus} (needs: scheduled/ongoing) ${e.eventStatus === 'scheduled' || e.eventStatus === 'ongoing' ? '✓' : '✗'}`);
+      console.log(`  endDatetime: ${e.endDatetime} > ${now.toISOString()} = ${isEndFuture} ${isEndFuture ? '✓' : '✗'}`);
+      console.log(`  PASSES ALL FILTERS: ${passesFilter ? 'YES' : 'NO'}`);
+    });
+    console.log("=== PUBLIC EVENTS DEBUG END ===");
 
     const result = await db
       .select({
