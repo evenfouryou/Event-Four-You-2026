@@ -333,7 +333,14 @@ function CheckoutContent() {
             </CardTitle>
           </CardHeader>
           <CardContent className="p-6">
-            {createPaymentIntent.isPending ? (
+            {(() => {
+            console.log("[Checkout Debug] isPending:", createPaymentIntent.isPending);
+            console.log("[Checkout Debug] data:", createPaymentIntent.data);
+            console.log("[Checkout Debug] elementsOptions:", !!elementsOptions);
+            console.log("[Checkout Debug] stripePromise:", !!stripePromise);
+            return null;
+          })()}
+          {createPaymentIntent.isPending ? (
               <div className="flex items-center justify-center py-12">
                 <Loader2 className="w-8 h-8 animate-spin text-primary" />
               </div>
