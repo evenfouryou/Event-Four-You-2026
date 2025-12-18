@@ -1,0 +1,15 @@
+index-BrQJZHPr.js:1321 SW registered: https://manage.eventfouryou.com/
+index-BrQJZHPr.js:1271 [Checkout] cartLoading: false customerLoading: false cart: Object customer: Object
+index-BrQJZHPr.js:1271 [Checkout] Creating payment intent...
+index-BrQJZHPr.js:1271 [Checkout] cartLoading: false customerLoading: false cart: Object customer: Object
+index-BrQJZHPr.js:1271 [Checkout] cartLoading: false customerLoading: false cart: Object customer: Object
+index-BrQJZHPr.js:1271 [Checkout] Response status: 200
+index-BrQJZHPr.js:1271 [Checkout] Response data: Object
+index-BrQJZHPr.js:1271 [Checkout] Payment intent created successfully: Object
+index-BrQJZHPr.js:1271 [Checkout] cartLoading: false customerLoading: false cart: Object customer: Object
+api.stripe.com/v1/elements/sessions?client_secret=pi_3Sfkv3083fDHdLKV1o23DeoS_secret_WwJADtTAgnr9Y807IHp4cBKNs&key=pk_live_51PkTcs083fDHdLKV9H9dFkEnI1LMk93z1kVfR41xwVR0nqKiPjUnhIexzh4H57C5GvB08rDVRABCwrukjm00Hwh900G0QTzGR0&_stripe_version=2025-09-30.clover&elements_init_source=stripe.elements&referrer_host=manage.eventfouryou.com&stripe_js_id=998b10ea-73a0-4f00-a587-db8f00149759&locale=it-IT&expand[0]=payment_method_preference.payment_intent.payment_method&type=payment_intent:1  Failed to load resource: the server responded with a status of 401 ()
+api.stripe.com/v1/elements/sessions?client_secret=pi_3Sfkv3083fDHdLKV1o23DeoS_secret_WwJADtTAgnr9Y807IHp4cBKNs&key=pk_live_51PkTcs083fDHdLKV9H9dFkEnI1LMk93z1kVfR41xwVR0nqKiPjUnhIexzh4H57C5GvB08rDVRABCwrukjm00Hwh900G0QTzGR0&_stripe_version=2025-09-30.clover&elements_init_source=stripe.elements&referrer_host=manage.eventfouryou.com&stripe_js_id=998b10ea-73a0-4f00-a587-db8f00149759&locale=it-IT&expand[0]=payment_method_preference.payment_intent.payment_method&type=payment_intent:1  Failed to load resource: the server responded with a status of 401 ()
+api.stripe.com/v1/elements/sessions?client_secret=pi_3Sfkv3083fDHdLKV1o23DeoS_secret_WwJADtTAgnr9Y807IHp4cBKNs&key=pk_live_51PkTcs083fDHdLKV9H9dFkEnI1LMk93z1kVfR41xwVR0nqKiPjUnhIexzh4H57C5GvB08rDVRABCwrukjm00Hwh900G0QTzGR0&_stripe_version=2025-09-30.clover&elements_init_source=stripe.elements&referrer_host=manage.eventfouryou.com&stripe_js_id=998b10ea-73a0-4f00-a587-db8f00149759&locale=it-IT&expand[0]=payment_method_preference.payment_intent.payment_method&type=payment_intent:1  Failed to load resource: the server responded with a status of 401 ()
+checkout:1 Unable to download payment manifest "https://pay.google.com/about/redirect/".
+checkout:1 Unable to download payment manifest "https://pay.google.com/about/redirect/".
+index-BrQJZHPr.js:1271 [Checkout] cartLoading: false customerLoading: false cart: Object customer: Object
