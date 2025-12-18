@@ -1,0 +1,146 @@
+Ciao Jonathan 👋
+ok, andiamo dritti al punto. Su **Replit + Stripe** i problemi più comuni sono quasi sempre questi. Segui il check rapido qui sotto 👇
+
+---
+
+## 1️⃣ Variabili d’ambiente NON settate correttamente
+
+Su Replit **Stripe NON funziona** se le chiavi sono hardcodate.
+
+👉 Vai su **Replit → Secrets (🔒)** e assicurati di avere:
+
+```
+STRIPE_SECRET_KEY=sk_test_...
+STRIPE_PUBLIC_KEY=pk_test_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+```
+
+⚠️ Attenzione:
+
+* **Niente spazi**
+* **Niente virgolette**
+* Riavvia il Repl dopo averle inserite
+
+Nel codice devi usare **process.env** (Node) o **env()** (Laravel).
+
+---
+
+## 2️⃣ Replit usa HTTPS → Stripe webhook obbligatoriamente HTTPS
+
+Stripe **rifiuta webhook HTTP**.
+
+Controlla che l’endpoint webhook sia tipo:
+
+```
+https://tuo-repl.replit.app/api/stripe/webhook
+```
+
+❌ NON:
+
+```
+http://localhost
+```
+
+---
+
+## 3️⃣ Webhook Stripe NON configurato (errore più comune)
+
+Nel dashboard Stripe:
+
+👉 **Developers → Webhooks → Add endpoint**
+
+Endpoint:
+
+```
+https://tuo-repl.replit.app/webhook
+```
+
+Eventi minimi da selezionare:
+
+* `checkout.session.completed`
+* `payment_intent.succeeded`
+* `invoice.payment_succeeded` (se usi abbonamenti)
+
+Poi copia **Signing secret (`whsec_...`)** → mettilo nei Secrets di Replit.
+
+---
+
+## 4️⃣ Errore CORS (frontend non “si attacca”)
+
+Se dal frontend sembra che Stripe “non parta”:
+
+* NON chiamare Stripe direttamente dal browser
+* Devi chiamare **una tua API su Replit**
+* Stripe Secret Key **solo backend**
+
+Esempio corretto:
+
+```
+Frontend → /create-checkout-session → Stripe
+```
+
+❌ Sbagliato:
+
+```
+Frontend → Stripe API diretta
+```
+
+---
+
+## 5️⃣ Test mode vs Live mode (classico)
+
+Controlla:
+
+* Chiavi **test** con prodotti **test**
+* Chiavi **live** con prodotti **live**
+
+Se mescoli:
+👉 Stripe “non si attacca” ma non dà errori chiari
+
+---
+
+## 6️⃣ Replit va in sleep (webhook fallisce)
+
+Replit free **va in sleep** → Stripe webhook fallisce.
+
+Soluzioni:
+
+* Usa **Replit Always On** (se disponibile)
+* Oppure **UptimeRobot**
+* Oppure deploy su **Railway / Render / VPS**
+
+---
+
+## 7️⃣ Errori silenziosi → LOG
+
+Su Replit guarda sempre:
+
+* **Console**
+* **Logs del server**
+
+E nel dashboard Stripe:
+👉 **Developers → Logs**
+
+Lì trovi **l’errore vero**.
+
+---
+
+## Dimmi questo e lo risolviamo subito ⚡
+
+Rispondimi con:
+
+1. **Stack** (Node / Next / Laravel / altro)
+2. **Cosa non funziona**:
+
+   * checkout non si apre?
+   * pagamento fallisce?
+   * webhook non arriva?
+3. **Errore preciso** (console o Stripe logs)
+
+Se vuoi, ti preparo anche:
+
+* configurazione Stripe **plug & play per Replit**
+* webhook già pronti
+* schema corretto frontend → backend → Stripe
+
+Andiamo 💪
