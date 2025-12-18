@@ -237,6 +237,8 @@ function CheckoutContent() {
     }
   }, [cart, customer]);
 
+  console.log("[Checkout] cartLoading:", cartLoading, "customerLoading:", customerLoading, "cart:", cart, "customer:", customer);
+
   if (cartLoading || customerLoading) {
     return (
       <div className="space-y-6">
