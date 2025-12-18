@@ -99,7 +99,7 @@ function ResaleCard({
   };
 
   return (
-    <Card className="bg-[#151922] border-white/10" data-testid={`resale-${resale.id}`}>
+    <Card className="bg-card border-border" data-testid={`resale-${resale.id}`}>
       <CardContent className="p-4">
         <div className="flex items-start justify-between gap-4">
           <div className="flex-1 min-w-0">
@@ -108,10 +108,10 @@ function ResaleCard({
                 {statusLabel()}
               </Badge>
             </div>
-            <h3 className="font-semibold text-white truncate" data-testid="text-event-name">
+            <h3 className="font-semibold text-foreground truncate" data-testid="text-event-name">
               {resale.eventName}
             </h3>
-            <div className="flex flex-col gap-1 mt-2 text-sm text-slate-400">
+            <div className="flex flex-col gap-1 mt-2 text-sm text-muted-foreground">
               <div className="flex items-center gap-2">
                 <Calendar className="w-4 h-4" />
                 <span>{format(eventDate, "d MMM yyyy, HH:mm", { locale: it })}</span>
@@ -122,13 +122,13 @@ function ResaleCard({
               </div>
               <div className="flex items-center gap-2">
                 <Tag className="w-4 h-4" />
-                <span className="text-slate-500">
+                <span className="text-muted-foreground">
                   Originale: €{originalPrice.toFixed(2)}
                 </span>
               </div>
               <div className="flex items-center gap-2">
-                <Tag className="w-4 h-4 text-yellow-400" />
-                <span className="text-yellow-400 font-medium">
+                <Tag className="w-4 h-4 text-primary" />
+                <span className="text-primary font-medium">
                   In vendita a: €{resalePrice.toFixed(2)}
                 </span>
               </div>
@@ -202,7 +202,7 @@ function NameChangeCard({ request }: { request: NameChangeRequest }) {
   const newName = `${request.newFirstName} ${request.newLastName}`;
 
   return (
-    <Card className="bg-[#151922] border-white/10" data-testid={`name-change-${request.id}`}>
+    <Card className="bg-card border-border" data-testid={`name-change-${request.id}`}>
       <CardContent className="p-4">
         <div className="flex items-start justify-between gap-4">
           <div className="flex-1 min-w-0">
@@ -212,10 +212,10 @@ function NameChangeCard({ request }: { request: NameChangeRequest }) {
                 {statusLabel()}
               </Badge>
             </div>
-            <h3 className="font-semibold text-white truncate" data-testid="text-event-name">
+            <h3 className="font-semibold text-foreground truncate" data-testid="text-event-name">
               {request.eventName}
             </h3>
-            <div className="flex flex-col gap-1 mt-2 text-sm text-slate-400">
+            <div className="flex flex-col gap-1 mt-2 text-sm text-muted-foreground">
               <div className="flex items-center gap-2">
                 <Calendar className="w-4 h-4" />
                 <span>{format(eventDate, "d MMM yyyy, HH:mm", { locale: it })}</span>
@@ -225,12 +225,12 @@ function NameChangeCard({ request }: { request: NameChangeRequest }) {
                 <span>
                   {previousName ? (
                     <>
-                      <span className="line-through text-slate-500">{previousName}</span>
+                      <span className="line-through text-muted-foreground">{previousName}</span>
                       <span className="mx-2">→</span>
-                      <span className="text-white">{newName}</span>
+                      <span className="text-foreground">{newName}</span>
                     </>
                   ) : (
-                    <span className="text-white">{newName}</span>
+                    <span className="text-foreground">{newName}</span>
                   )}
                 </span>
               </div>
@@ -240,7 +240,7 @@ function NameChangeCard({ request }: { request: NameChangeRequest }) {
                   <span>Commissione: €{parseFloat(request.fee).toFixed(2)}</span>
                 </div>
               )}
-              <div className="flex items-center gap-2 text-xs text-slate-500">
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <Clock className="w-3 h-3" />
                 <span>Richiesto: {format(createdDate, "d MMM yyyy, HH:mm", { locale: it })}</span>
               </div>
@@ -291,7 +291,7 @@ export default function AccountResales() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[50vh]">
-        <Loader2 className="w-8 h-8 animate-spin text-yellow-400" />
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
       </div>
     );
   }
@@ -299,15 +299,15 @@ export default function AccountResales() {
   return (
     <div className="max-w-3xl mx-auto">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-white" data-testid="text-page-title">Gestione Biglietti</h1>
-        <p className="text-slate-400 mt-2">Rivendite e cambi nominativo</p>
+        <h1 className="text-3xl font-bold text-foreground" data-testid="text-page-title">Gestione Biglietti</h1>
+        <p className="text-muted-foreground mt-2">Rivendite e cambi nominativo</p>
       </div>
 
       <Tabs defaultValue="resales" className="space-y-6">
-        <TabsList className="bg-[#151922] border border-white/10">
+        <TabsList className="bg-card border border-border">
           <TabsTrigger
             value="resales"
-            className="data-[state=active]:bg-yellow-500 data-[state=active]:text-black"
+            className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
             data-testid="tab-resales"
           >
             <RefreshCw className="w-4 h-4 mr-2" />
@@ -315,7 +315,7 @@ export default function AccountResales() {
           </TabsTrigger>
           <TabsTrigger
             value="name-changes"
-            className="data-[state=active]:bg-yellow-500 data-[state=active]:text-black"
+            className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
             data-testid="tab-name-changes"
           >
             <User className="w-4 h-4 mr-2" />
@@ -325,11 +325,11 @@ export default function AccountResales() {
 
         <TabsContent value="resales" className="space-y-4">
           {resales.length === 0 ? (
-            <Card className="bg-[#151922] border-white/10">
+            <Card className="bg-card border-border">
               <CardContent className="py-12 text-center">
-                <RefreshCw className="w-12 h-12 text-slate-600 mx-auto mb-4" />
-                <p className="text-slate-400 mb-2">Non hai biglietti in vendita</p>
-                <p className="text-sm text-slate-500">
+                <RefreshCw className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                <p className="text-muted-foreground mb-2">Non hai biglietti in vendita</p>
+                <p className="text-sm text-muted-foreground">
                   Puoi mettere in vendita un biglietto dalla sua pagina di dettaglio
                 </p>
               </CardContent>
@@ -348,11 +348,11 @@ export default function AccountResales() {
 
         <TabsContent value="name-changes" className="space-y-4">
           {nameChanges.length === 0 ? (
-            <Card className="bg-[#151922] border-white/10">
+            <Card className="bg-card border-border">
               <CardContent className="py-12 text-center">
-                <User className="w-12 h-12 text-slate-600 mx-auto mb-4" />
-                <p className="text-slate-400 mb-2">Nessuna richiesta di cambio nominativo</p>
-                <p className="text-sm text-slate-500">
+                <User className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                <p className="text-muted-foreground mb-2">Nessuna richiesta di cambio nominativo</p>
+                <p className="text-sm text-muted-foreground">
                   Puoi richiedere un cambio nominativo dalla pagina di dettaglio del biglietto
                 </p>
               </CardContent>

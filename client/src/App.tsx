@@ -176,7 +176,7 @@ function Router() {
         <Route path="/locali" component={PublicVenues} />
         <Route path="/">
           {() => {
-            window.location.href = '/account/profile';
+            window.location.href = '/account/home';
             return null;
           }}
         </Route>

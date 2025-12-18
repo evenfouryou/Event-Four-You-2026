@@ -87,18 +87,18 @@ export default function PublicResetPassword() {
 
   if (isVerifying) {
     return (
-      <div className="min-h-screen bg-[#0a0e17] flex items-center justify-center">
+      <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
-          <Loader2 className="h-12 w-12 animate-spin text-[#FFD700] mx-auto mb-4" />
-          <p className="text-gray-400">Verifica del link in corso...</p>
+          <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto mb-4" />
+          <p className="text-muted-foreground">Verifica del link in corso...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#0a0e17] flex flex-col">
-      <header className="border-b border-white/10">
+    <div className="min-h-screen bg-background flex flex-col">
+      <header className="border-b border-border">
         <div className="container mx-auto px-6 py-4 flex items-center justify-between">
           <Link href="/">
             <img 
@@ -117,14 +117,14 @@ export default function PublicResetPassword() {
           transition={{ duration: 0.5 }}
           className="w-full max-w-md"
         >
-          <Card className="bg-[#151922]/80 backdrop-blur-md border-white/10">
+          <Card className="bg-card/80 backdrop-blur-md border-border">
             <CardHeader className="text-center">
-              <div className="mx-auto w-16 h-16 bg-[#FFD700]/10 rounded-full flex items-center justify-center mb-4">
-                <Lock className="h-8 w-8 text-[#FFD700]" />
+              <div className="mx-auto w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mb-4">
+                <Lock className="h-8 w-8 text-primary" />
               </div>
-              <CardTitle className="text-white text-2xl">Reimposta Password</CardTitle>
+              <CardTitle className="text-foreground text-2xl">Reimposta Password</CardTitle>
               {isValid && email && (
-                <CardDescription className="text-gray-400">
+                <CardDescription className="text-muted-foreground">
                   Imposta una nuova password per {email}
                 </CardDescription>
               )}
@@ -136,7 +136,7 @@ export default function PublicResetPassword() {
                     <AlertCircle className="h-4 w-4" />
                     <AlertDescription>{error}</AlertDescription>
                   </Alert>
-                  <Button asChild className="w-full bg-[#FFD700] hover:bg-[#FFD700]/90 text-black font-semibold">
+                  <Button asChild className="w-full">
                     <Link href="/public/forgot-password">
                       Richiedi Nuovo Link
                     </Link>
@@ -161,7 +161,7 @@ export default function PublicResetPassword() {
                   )}
 
                   <div className="space-y-2">
-                    <Label htmlFor="password" className="text-gray-300">Nuova Password</Label>
+                    <Label htmlFor="password" className="text-muted-foreground">Nuova Password</Label>
                     <Input
                       id="password"
                       type="password"
@@ -171,12 +171,12 @@ export default function PublicResetPassword() {
                       required
                       disabled={isLoading || !!success}
                       data-testid="input-password"
-                      className="bg-white/5 border-white/10 text-white placeholder:text-gray-500"
+                      className="bg-muted/50 border-border text-foreground placeholder:text-muted-foreground"
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="confirmPassword" className="text-gray-300">Conferma Password</Label>
+                    <Label htmlFor="confirmPassword" className="text-muted-foreground">Conferma Password</Label>
                     <Input
                       id="confirmPassword"
                       type="password"
@@ -186,21 +186,21 @@ export default function PublicResetPassword() {
                       required
                       disabled={isLoading || !!success}
                       data-testid="input-confirm-password"
-                      className="bg-white/5 border-white/10 text-white placeholder:text-gray-500"
+                      className="bg-muted/50 border-border text-foreground placeholder:text-muted-foreground"
                     />
                   </div>
 
                   <Button 
                     type="submit" 
-                    className="w-full bg-[#FFD700] hover:bg-[#FFD700]/90 text-black font-semibold" 
+                    className="w-full" 
                     disabled={isLoading || !!success}
                     data-testid="button-submit"
                   >
                     {isLoading ? "Salvataggio..." : "Salva Nuova Password"}
                   </Button>
 
-                  <div className="text-center text-sm text-gray-400">
-                    <Link href="/accedi" className="text-[#FFD700] hover:underline" data-testid="link-login">
+                  <div className="text-center text-sm text-muted-foreground">
+                    <Link href="/accedi" className="text-primary hover:underline" data-testid="link-login">
                       Torna al Login
                     </Link>
                   </div>

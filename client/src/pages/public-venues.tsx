@@ -61,29 +61,29 @@ export default function PublicVenues() {
   });
 
   return (
-    <div className="min-h-screen bg-[#0a0e17]">
-      <header className="sticky top-0 z-50 bg-[#0a0e17]/95 backdrop-blur-md border-b border-white/10">
+    <div className="min-h-screen bg-background">
+      <header className="sticky top-0 z-50 bg-background/95 backdrop-blur-md border-b border-border">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between gap-4">
           <Link href="/">
             <div className="flex items-center gap-3 cursor-pointer">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-yellow-400 to-amber-500 flex items-center justify-center">
-                <Sparkles className="h-5 w-5 text-black" />
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center">
+                <Sparkles className="h-5 w-5 text-primary-foreground" />
               </div>
-              <span className="text-xl font-bold text-white hidden sm:block">
-                Event<span className="text-yellow-400">4</span>U
+              <span className="text-xl font-bold text-foreground hidden sm:block">
+                Event<span className="text-primary">4</span>U
               </span>
             </div>
           </Link>
           
           <div className="flex items-center gap-3">
             <Link href="/acquista">
-              <Button variant="outline" size="sm" className="border-yellow-500/50 text-yellow-400 hover:bg-yellow-500/10" data-testid="button-events">
+              <Button variant="outline" size="sm" className="border-primary/50 text-primary hover:bg-primary/10" data-testid="button-events">
                 <Ticket className="w-4 h-4 mr-1" />
                 Eventi
               </Button>
             </Link>
             <Link href="/login">
-              <Button variant="ghost" size="sm" className="text-slate-400 hover:text-white" data-testid="button-login">
+              <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground" data-testid="button-login">
                 Accedi
               </Button>
             </Link>
@@ -94,27 +94,27 @@ export default function PublicVenues() {
 
       <main className="container mx-auto px-4 py-8">
         <div className="mb-12 text-center">
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10 text-sm font-medium mb-6">
-            <Building2 className="w-4 h-4 text-yellow-400" />
-            <span className="text-slate-300">I Migliori Locali</span>
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-muted/50 border border-border text-sm font-medium mb-6">
+            <Building2 className="w-4 h-4 text-primary" />
+            <span className="text-muted-foreground">I Migliori Locali</span>
           </div>
           
-          <h1 className="text-4xl md:text-5xl font-bold text-white mb-4" data-testid="text-page-title">
-            Scopri i <span className="text-yellow-400">Club</span>
+          <h1 className="text-4xl md:text-5xl font-bold text-foreground mb-4" data-testid="text-page-title">
+            Scopri i <span className="text-primary">Club</span>
           </h1>
-          <p className="text-slate-400 max-w-2xl mx-auto text-lg">
+          <p className="text-muted-foreground max-w-2xl mx-auto text-lg">
             Esplora i migliori locali della tua città e scopri gli eventi in programma
           </p>
         </div>
 
         <div className="max-w-xl mx-auto mb-12">
           <div className="relative">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
             <Input
               placeholder="Cerca per città..."
               value={searchCity}
               onChange={(e) => setSearchCity(e.target.value)}
-              className="pl-12 h-14 bg-white/5 border-white/10 text-white placeholder:text-slate-500 rounded-xl text-lg"
+              className="pl-12 h-14 bg-muted/50 border-border text-foreground placeholder:text-muted-foreground rounded-xl text-lg"
               data-testid="input-search-city"
             />
           </div>
@@ -123,7 +123,7 @@ export default function PublicVenues() {
         {isLoading ? (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {[1, 2, 3, 4, 5, 6].map((i) => (
-              <Card key={i} className="bg-[#151922] border-white/10 overflow-hidden">
+              <Card key={i} className="bg-card border-border overflow-hidden">
                 <Skeleton className="h-48 w-full" />
                 <CardContent className="p-6 space-y-4">
                   <Skeleton className="h-6 w-3/4" />
@@ -138,10 +138,10 @@ export default function PublicVenues() {
             <p className="text-red-400">Errore nel caricamento dei locali</p>
           </Card>
         ) : venues?.length === 0 ? (
-          <Card className="p-12 text-center bg-white/5 border-white/10">
-            <Building2 className="w-16 h-16 mx-auto mb-4 text-slate-600" />
-            <h3 className="text-xl font-semibold text-white mb-2">Nessun locale trovato</h3>
-            <p className="text-slate-400">
+          <Card className="p-12 text-center bg-muted/50 border-border">
+            <Building2 className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
+            <h3 className="text-xl font-semibold text-foreground mb-2">Nessun locale trovato</h3>
+            <p className="text-muted-foreground">
               {searchCity 
                 ? `Non ci sono locali disponibili a "${searchCity}"`
                 : "Non ci sono locali disponibili al momento"}
@@ -156,8 +156,8 @@ export default function PublicVenues() {
         )}
       </main>
 
-      <footer className="border-t border-white/10 py-8 mt-16">
-        <div className="container mx-auto px-4 text-center text-slate-500 text-sm">
+      <footer className="border-t border-border py-8 mt-16">
+        <div className="container mx-auto px-4 text-center text-muted-foreground text-sm">
           <p>&copy; {new Date().getFullYear()} Event4U - Tutti i diritti riservati</p>
         </div>
       </footer>
@@ -168,7 +168,7 @@ export default function PublicVenues() {
 function VenueCard({ venue }: { venue: Venue }) {
   return (
     <Card 
-      className="bg-[#151922] border-white/10 overflow-hidden group hover:border-yellow-500/30 transition-all duration-300"
+      className="bg-card border-border overflow-hidden group hover:border-primary/30 transition-all duration-300"
       data-testid={`card-venue-${venue.id}`}
     >
       <div className="relative h-48 overflow-hidden">
@@ -179,11 +179,11 @@ function VenueCard({ venue }: { venue: Venue }) {
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
           />
         ) : (
-          <div className="w-full h-full bg-gradient-to-br from-yellow-500/20 via-amber-500/10 to-orange-500/20 flex items-center justify-center">
-            <Building2 className="w-16 h-16 text-yellow-500/50" />
+          <div className="w-full h-full bg-gradient-to-br from-primary/20 via-primary/10 to-primary/20 flex items-center justify-center">
+            <Building2 className="w-16 h-16 text-primary/50" />
           </div>
         )}
-        <div className="absolute inset-0 bg-gradient-to-t from-[#151922] via-transparent to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-card via-transparent to-transparent" />
         
         {venue.city && (
           <Badge 
@@ -197,7 +197,7 @@ function VenueCard({ venue }: { venue: Venue }) {
         
         {venue.eventCount > 0 && (
           <Badge 
-            className="absolute top-4 right-4 bg-yellow-500 text-black border-0"
+            className="absolute top-4 right-4 bg-primary text-primary-foreground border-0"
             data-testid={`badge-events-${venue.id}`}
           >
             {venue.eventCount} {venue.eventCount === 1 ? "evento" : "eventi"}
@@ -206,50 +206,50 @@ function VenueCard({ venue }: { venue: Venue }) {
       </div>
 
       <CardContent className="p-6">
-        <h3 className="text-xl font-bold text-white mb-2" data-testid={`text-venue-name-${venue.id}`}>
+        <h3 className="text-xl font-bold text-foreground mb-2" data-testid={`text-venue-name-${venue.id}`}>
           {venue.name}
         </h3>
         
         {venue.address && (
-          <p className="text-slate-400 text-sm mb-3 flex items-start gap-2">
-            <MapPin className="w-4 h-4 mt-0.5 flex-shrink-0 text-slate-500" />
+          <p className="text-muted-foreground text-sm mb-3 flex items-start gap-2">
+            <MapPin className="w-4 h-4 mt-0.5 flex-shrink-0 text-muted-foreground" />
             <span>{venue.address}</span>
           </p>
         )}
         
         {venue.shortDescription && (
-          <p className="text-slate-300 text-sm mb-4 line-clamp-2">
+          <p className="text-muted-foreground text-sm mb-4 line-clamp-2">
             {venue.shortDescription}
           </p>
         )}
 
         {venue.openingHours && (
-          <div className="flex items-center gap-1.5 text-sm text-slate-400 mb-4">
+          <div className="flex items-center gap-1.5 text-sm text-muted-foreground mb-4">
             <Clock className="w-4 h-4" />
             <span>{venue.openingHours}</span>
           </div>
         )}
 
         {venue.upcomingEvents.length > 0 && (
-          <div className="border-t border-white/10 pt-4 mt-4">
-            <p className="text-xs text-slate-500 uppercase tracking-wide mb-3">Prossimi Eventi</p>
+          <div className="border-t border-border pt-4 mt-4">
+            <p className="text-xs text-muted-foreground uppercase tracking-wide mb-3">Prossimi Eventi</p>
             <div className="space-y-2">
               {venue.upcomingEvents.slice(0, 2).map((event) => (
                 <Link key={event.id} href={`/acquista/${event.id}`}>
                   <div 
-                    className="flex items-center justify-between p-3 rounded-lg bg-white/5 hover:bg-yellow-500/10 transition-colors cursor-pointer"
+                    className="flex items-center justify-between p-3 rounded-lg bg-muted/50 hover:bg-primary/10 transition-colors cursor-pointer"
                     data-testid={`link-event-${event.id}`}
                   >
                     <div className="flex-1 min-w-0">
-                      <p className="text-white font-medium text-sm truncate">{event.eventName}</p>
-                      <p className="text-slate-500 text-xs flex items-center gap-1">
+                      <p className="text-foreground font-medium text-sm truncate">{event.eventName}</p>
+                      <p className="text-muted-foreground text-xs flex items-center gap-1">
                         <Calendar className="w-3 h-3" />
                         {format(new Date(event.eventStart), "d MMM yyyy", { locale: it })}
                       </p>
                     </div>
                     {event.minPrice !== null && (
                       <div className="text-right ml-3">
-                        <p className="text-yellow-400 font-semibold text-sm">
+                        <p className="text-primary font-semibold text-sm">
                           da €{event.minPrice.toFixed(0)}
                         </p>
                       </div>
@@ -263,7 +263,7 @@ function VenueCard({ venue }: { venue: Venue }) {
 
         <Link href={`/locali/${venue.id}`}>
           <Button 
-            className="w-full mt-4 bg-yellow-500 hover:bg-yellow-400 text-black font-semibold"
+            className="w-full mt-4"
             data-testid={`button-view-venue-${venue.id}`}
           >
             Scopri di più

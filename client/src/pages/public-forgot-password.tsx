@@ -33,8 +33,8 @@ export default function PublicForgotPassword() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0a0e17] flex flex-col">
-      <header className="border-b border-white/10">
+    <div className="min-h-screen bg-background flex flex-col">
+      <header className="border-b border-border">
         <div className="container mx-auto px-6 py-4 flex items-center justify-between">
           <Link href="/">
             <img 
@@ -59,13 +59,13 @@ export default function PublicForgotPassword() {
           transition={{ duration: 0.5 }}
           className="w-full max-w-md"
         >
-          <Card className="bg-[#151922]/80 backdrop-blur-md border-white/10">
+          <Card className="bg-card/80 backdrop-blur-md border-border">
             <CardHeader className="text-center">
-              <div className="mx-auto w-16 h-16 bg-[#FFD700]/10 rounded-full flex items-center justify-center mb-4">
-                <Mail className="h-8 w-8 text-[#FFD700]" />
+              <div className="mx-auto w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mb-4">
+                <Mail className="h-8 w-8 text-primary" />
               </div>
-              <CardTitle className="text-white text-2xl">Password Dimenticata</CardTitle>
-              <CardDescription className="text-gray-400">
+              <CardTitle className="text-foreground text-2xl">Password Dimenticata</CardTitle>
+              <CardDescription className="text-muted-foreground">
                 Inserisci la tua email per ricevere un link di reset password
               </CardDescription>
             </CardHeader>
@@ -88,7 +88,7 @@ export default function PublicForgotPassword() {
                 )}
 
                 <div className="space-y-2">
-                  <Label htmlFor="email" className="text-gray-300">Email</Label>
+                  <Label htmlFor="email" className="text-muted-foreground">Email</Label>
                   <Input
                     id="email"
                     type="email"
@@ -98,22 +98,22 @@ export default function PublicForgotPassword() {
                     required
                     disabled={isLoading}
                     data-testid="input-email"
-                    className="bg-white/5 border-white/10 text-white placeholder:text-gray-500"
+                    className="bg-muted/50 border-border text-foreground placeholder:text-muted-foreground"
                   />
                 </div>
 
                 <Button 
                   type="submit" 
-                  className="w-full bg-[#FFD700] hover:bg-[#FFD700]/90 text-black font-semibold" 
+                  className="w-full" 
                   disabled={isLoading}
                   data-testid="button-submit"
                 >
                   {isLoading ? "Invio in corso..." : "Invia Link di Reset"}
                 </Button>
 
-                <div className="text-center text-sm text-gray-400">
+                <div className="text-center text-sm text-muted-foreground">
                   Ricordi la password?{" "}
-                  <Link href="/accedi" className="text-[#FFD700] hover:underline" data-testid="link-login">
+                  <Link href="/accedi" className="text-primary hover:underline" data-testid="link-login">
                     Accedi
                   </Link>
                 </div>

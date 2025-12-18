@@ -226,19 +226,19 @@ export default function Register() {
 
   if (clienteOtpStep) {
     return (
-      <div className="min-h-screen bg-[#0a0e17] flex items-center justify-center p-4">
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           className="w-full max-w-md"
         >
-          <Card className="bg-[#151922] border-white/10">
+          <Card className="bg-card border-border">
             <CardHeader className="text-center">
-              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-yellow-500/20 flex items-center justify-center">
-                <Shield className="w-8 h-8 text-yellow-400" />
+              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-primary/20 flex items-center justify-center">
+                <Shield className="w-8 h-8 text-primary" />
               </div>
-              <CardTitle className="text-2xl text-white">Verifica OTP</CardTitle>
-              <CardDescription className="text-slate-400">
+              <CardTitle className="text-2xl text-foreground">Verifica OTP</CardTitle>
+              <CardDescription className="text-muted-foreground">
                 Inserisci il codice a 6 cifre inviato al tuo telefono
               </CardDescription>
             </CardHeader>
@@ -255,7 +255,7 @@ export default function Register() {
                       <InputOTPSlot
                         key={i}
                         index={i}
-                        className="border-white/20 text-white"
+                        className="border-border text-foreground"
                       />
                     ))}
                   </InputOTPGroup>
@@ -264,7 +264,7 @@ export default function Register() {
               <Button
                 onClick={handleVerifyOTP}
                 disabled={otpValue.length !== 6 || isLoading}
-                className="w-full bg-yellow-500 hover:bg-yellow-400 text-black font-semibold h-12"
+                className="w-full h-12"
                 data-testid="button-verify"
               >
                 {isLoading ? (
@@ -282,7 +282,7 @@ export default function Register() {
                   setClienteOtpStep(false);
                   setOtpValue("");
                 }}
-                className="w-full text-slate-400"
+                className="w-full text-muted-foreground"
                 data-testid="button-back-to-form"
               >
                 <ArrowLeft className="w-4 h-4 mr-2" />
@@ -465,13 +465,13 @@ export default function Register() {
 
   if (accountType === "cliente") {
     return (
-      <div className="min-h-screen bg-[#0a0e17] flex flex-col">
-        <header className="border-b border-white/5">
+      <div className="min-h-screen bg-background flex flex-col">
+        <header className="border-b border-border">
           <div className="max-w-4xl mx-auto px-4 py-4">
             <div className="flex items-center justify-between">
               <Button 
                 variant="ghost" 
-                className="text-white hover:bg-white/10" 
+                className="text-foreground" 
                 onClick={() => setAccountType(null)}
                 data-testid="button-back-select"
               >
@@ -479,10 +479,10 @@ export default function Register() {
               </Button>
               <Link href="/">
                 <div className="flex items-center gap-2 cursor-pointer">
-                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-yellow-400 to-yellow-600 flex items-center justify-center">
-                    <Sparkles className="w-4 h-4 text-black" />
+                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center">
+                    <Sparkles className="w-4 h-4 text-primary-foreground" />
                   </div>
-                  <span className="text-lg font-bold text-white">Event4U</span>
+                  <span className="text-lg font-bold text-foreground">Event4U</span>
                 </div>
               </Link>
               <div className="w-24" />
@@ -496,15 +496,15 @@ export default function Register() {
             animate={{ opacity: 1, y: 0 }}
             className="w-full max-w-md"
           >
-            <Card className="bg-[#151922] border-white/10">
+            <Card className="bg-card border-border">
               <CardHeader>
                 <div className="flex items-center gap-3 mb-2">
-                  <div className="w-10 h-10 rounded-full bg-yellow-500/20 flex items-center justify-center">
-                    <Ticket className="w-5 h-5 text-yellow-400" />
+                  <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
+                    <Ticket className="w-5 h-5 text-primary" />
                   </div>
                   <div>
-                    <CardTitle className="text-xl text-white">Registrazione Cliente</CardTitle>
-                    <CardDescription className="text-slate-400">
+                    <CardTitle className="text-xl text-foreground">Registrazione Cliente</CardTitle>
+                    <CardDescription className="text-muted-foreground">
                       Crea il tuo account per acquistare biglietti
                     </CardDescription>
                   </div>
@@ -519,14 +519,14 @@ export default function Register() {
                         name="firstName"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel className="text-slate-400">Nome</FormLabel>
+                            <FormLabel className="text-muted-foreground">Nome</FormLabel>
                             <FormControl>
                               <div className="relative">
-                                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                                 <Input
                                   {...field}
                                   placeholder="Mario"
-                                  className="pl-10 bg-white/5 border-white/10 text-white"
+                                  className="pl-10 bg-muted/50 border-border text-foreground"
                                   data-testid="input-cliente-firstname"
                                 />
                               </div>
@@ -540,12 +540,12 @@ export default function Register() {
                         name="lastName"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel className="text-slate-400">Cognome</FormLabel>
+                            <FormLabel className="text-muted-foreground">Cognome</FormLabel>
                             <FormControl>
                               <Input
                                 {...field}
                                 placeholder="Rossi"
-                                className="bg-white/5 border-white/10 text-white"
+                                className="bg-muted/50 border-border text-foreground"
                                 data-testid="input-cliente-lastname"
                               />
                             </FormControl>
@@ -559,15 +559,15 @@ export default function Register() {
                       name="email"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-slate-400">Email</FormLabel>
+                          <FormLabel className="text-muted-foreground">Email</FormLabel>
                           <FormControl>
                             <div className="relative">
-                              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                               <Input
                                 {...field}
                                 type="email"
                                 placeholder="mario@esempio.it"
-                                className="pl-10 bg-white/5 border-white/10 text-white"
+                                className="pl-10 bg-muted/50 border-border text-foreground"
                                 data-testid="input-cliente-email"
                               />
                             </div>
@@ -581,15 +581,15 @@ export default function Register() {
                       name="phone"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-slate-400">Telefono</FormLabel>
+                          <FormLabel className="text-muted-foreground">Telefono</FormLabel>
                           <FormControl>
                             <div className="relative">
-                              <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                              <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                               <Input
                                 {...field}
                                 type="tel"
                                 placeholder="+39 333 1234567"
-                                className="pl-10 bg-white/5 border-white/10 text-white"
+                                className="pl-10 bg-muted/50 border-border text-foreground"
                                 data-testid="input-cliente-phone"
                               />
                             </div>
@@ -603,15 +603,15 @@ export default function Register() {
                       name="password"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-slate-400">Password</FormLabel>
+                          <FormLabel className="text-muted-foreground">Password</FormLabel>
                           <FormControl>
                             <div className="relative">
-                              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                               <Input
                                 {...field}
                                 type="password"
                                 placeholder="Minimo 8 caratteri"
-                                className="pl-10 bg-white/5 border-white/10 text-white"
+                                className="pl-10 bg-muted/50 border-border text-foreground"
                                 data-testid="input-cliente-password"
                               />
                             </div>
@@ -625,15 +625,15 @@ export default function Register() {
                       name="confirmPassword"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-slate-400">Conferma Password</FormLabel>
+                          <FormLabel className="text-muted-foreground">Conferma Password</FormLabel>
                           <FormControl>
                             <div className="relative">
-                              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                               <Input
                                 {...field}
                                 type="password"
                                 placeholder="Ripeti la password"
-                                className="pl-10 bg-white/5 border-white/10 text-white"
+                                className="pl-10 bg-muted/50 border-border text-foreground"
                                 data-testid="input-cliente-confirm-password"
                               />
                             </div>
@@ -645,7 +645,7 @@ export default function Register() {
                     <Button
                       type="submit"
                       disabled={isLoading}
-                      className="w-full bg-yellow-500 hover:bg-yellow-400 text-black font-semibold h-12"
+                      className="w-full h-12"
                       data-testid="button-cliente-register"
                     >
                       {isLoading ? (
@@ -746,7 +746,7 @@ export default function Register() {
                           <Input 
                             {...field} 
                             placeholder="Mario" 
-                            className="h-12 bg-background/50 border-white/10 focus:border-primary"
+                            className="h-12 bg-background/50 border-border focus:border-primary"
                             data-testid="input-gestore-first-name" 
                           />
                         </FormControl>
@@ -765,7 +765,7 @@ export default function Register() {
                           <Input 
                             {...field} 
                             placeholder="Rossi" 
-                            className="h-12 bg-background/50 border-white/10 focus:border-primary"
+                            className="h-12 bg-background/50 border-border focus:border-primary"
                             data-testid="input-gestore-last-name" 
                           />
                         </FormControl>
@@ -789,7 +789,7 @@ export default function Register() {
                           {...field} 
                           type="email" 
                           placeholder="mario.rossi@example.com" 
-                          className="h-12 bg-background/50 border-white/10 focus:border-primary"
+                          className="h-12 bg-background/50 border-border focus:border-primary"
                           data-testid="input-gestore-email" 
                         />
                       </FormControl>
@@ -812,7 +812,7 @@ export default function Register() {
                           {...field} 
                           type="password" 
                           placeholder="Minimo 8 caratteri" 
-                          className="h-12 bg-background/50 border-white/10 focus:border-primary"
+                          className="h-12 bg-background/50 border-border focus:border-primary"
                           data-testid="input-gestore-password" 
                         />
                       </FormControl>
@@ -832,7 +832,7 @@ export default function Register() {
                           {...field} 
                           type="password" 
                           placeholder="Ripeti la password" 
-                          className="h-12 bg-background/50 border-white/10 focus:border-primary"
+                          className="h-12 bg-background/50 border-border focus:border-primary"
                           data-testid="input-gestore-confirm-password" 
                         />
                       </FormControl>

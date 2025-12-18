@@ -3,7 +3,7 @@ import { Link } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { format, isPast } from "date-fns";
+import { format } from "date-fns";
 import { it } from "date-fns/locale";
 import {
   Wallet,
@@ -115,8 +115,8 @@ export default function AccountHome() {
         <Link href="/account/tickets">
           <Card className="hover-elevate cursor-pointer h-full">
             <CardContent className="p-4 flex flex-col items-center justify-center text-center gap-2">
-              <div className="w-12 h-12 rounded-full bg-green-500/10 flex items-center justify-center">
-                <QrCode className="w-6 h-6 text-green-500" />
+              <div className="w-12 h-12 rounded-full bg-emerald-500/10 dark:bg-emerald-500/20 flex items-center justify-center">
+                <QrCode className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
               </div>
               <span className="font-medium text-sm text-foreground">I Miei QR</span>
             </CardContent>
@@ -125,8 +125,8 @@ export default function AccountHome() {
         <Link href="/account/wallet">
           <Card className="hover-elevate cursor-pointer h-full">
             <CardContent className="p-4 flex flex-col items-center justify-center text-center gap-2">
-              <div className="w-12 h-12 rounded-full bg-blue-500/10 flex items-center justify-center">
-                <CreditCard className="w-6 h-6 text-blue-500" />
+              <div className="w-12 h-12 rounded-full bg-blue-500/10 dark:bg-blue-500/20 flex items-center justify-center">
+                <CreditCard className="w-6 h-6 text-blue-600 dark:text-blue-400" />
               </div>
               <span className="font-medium text-sm text-foreground">Ricarica Wallet</span>
             </CardContent>
@@ -135,8 +135,8 @@ export default function AccountHome() {
         <Link href="/account/resales">
           <Card className="hover-elevate cursor-pointer h-full">
             <CardContent className="p-4 flex flex-col items-center justify-center text-center gap-2">
-              <div className="w-12 h-12 rounded-full bg-purple-500/10 flex items-center justify-center">
-                <Ticket className="w-6 h-6 text-purple-500" />
+              <div className="w-12 h-12 rounded-full bg-purple-500/10 dark:bg-purple-500/20 flex items-center justify-center">
+                <Ticket className="w-6 h-6 text-purple-600 dark:text-purple-400" />
               </div>
               <span className="font-medium text-sm text-foreground">Rivendi Biglietti</span>
             </CardContent>

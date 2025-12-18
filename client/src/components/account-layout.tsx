@@ -77,7 +77,7 @@ function SidebarContent({ customer, onLogout }: { customer: Customer | null; onL
               <div
                 className={`flex items-center gap-3 px-4 py-3 rounded-lg cursor-pointer transition-colors ${
                   isActive
-                    ? "bg-primary/20 text-primary border-l-4 border-primary"
+                    ? "bg-primary/20 text-primary"
                     : "text-muted-foreground hover:bg-muted hover:text-foreground"
                 }`}
                 data-testid={`nav-${item.href.split("/").pop()}`}

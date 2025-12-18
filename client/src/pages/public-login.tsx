@@ -14,8 +14,8 @@ export default function PublicLoginPage() {
   }, [navigate, redirectTo]);
 
   return (
-    <div className="min-h-screen bg-[#0a0e17] flex items-center justify-center">
-      <div className="text-white">Reindirizzamento...</div>
+    <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="text-foreground">Reindirizzamento...</div>
     </div>
   );
 }
