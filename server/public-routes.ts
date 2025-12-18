@@ -420,12 +420,15 @@ const customerRegisterSchema = z.object({
 router.post("/api/public/customers/register", async (req, res) => {
   try {
     const data = customerRegisterSchema.parse(req.body);
+    
+    // Normalizza email (minuscole e trim)
+    const normalizedEmail = data.email.toLowerCase().trim();
 
     // Controlla se email o telefono già esistono
     const [existing] = await db
       .select()
       .from(siaeCustomers)
-      .where(eq(siaeCustomers.email, data.email));
+      .where(eq(siaeCustomers.email, normalizedEmail));
 
     if (existing) {
       return res.status(400).json({ message: "Email già registrata" });
@@ -448,7 +451,7 @@ router.post("/api/public/customers/register", async (req, res) => {
       .insert(siaeCustomers)
       .values({
         uniqueCode: generateCustomerCode(),
-        email: data.email,
+        email: normalizedEmail,
         phone: data.phone.startsWith("+") ? data.phone : `+39${data.phone}`,
         firstName: data.firstName,
         lastName: data.lastName,
@@ -687,10 +690,13 @@ router.post("/api/public/customers/login", async (req, res) => {
       return res.status(400).json({ message: "Email e password richieste" });
     }
 
+    // Normalizza email (minuscole e trim) per il confronto
+    const normalizedEmail = email.toLowerCase().trim();
+    
     const [customer] = await db
       .select()
       .from(siaeCustomers)
-      .where(eq(siaeCustomers.email, email));
+      .where(eq(siaeCustomers.email, normalizedEmail));
 
     if (!customer || !customer.passwordHash) {
       return res.status(401).json({ message: "Credenziali non valide" });
