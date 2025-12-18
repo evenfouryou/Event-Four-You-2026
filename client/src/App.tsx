@@ -110,7 +110,7 @@ import OrganizerBilling from "@/pages/organizer-billing";
 import { CookieConsent } from "@/components/cookie-consent";
 
 function Router() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
   const isMobile = useIsMobile();
 
   if (isLoading) {
@@ -129,6 +129,7 @@ function Router() {
     "--sidebar-width-icon": "3rem",
   } as React.CSSProperties;
 
+  // Public routes (non-authenticated)
   if (!isAuthenticated) {
     return (
       <Switch>
@@ -154,8 +155,31 @@ function Router() {
         <Route path="/badge/verify" component={SchoolBadgeVerify} />
         <Route path="/badge/view/:code" component={SchoolBadgeView} />
         <Route path="/badge/:slug" component={SchoolBadgeLanding} />
+        <Route component={NotFound} />
+      </Switch>
+    );
+  }
+
+  // Customer portal routes (role: cliente)
+  if ((user as any)?.role === 'cliente') {
+    return (
+      <Switch>
         <Route path="/account/:rest*" component={AccountPage} />
         <Route path="/account" component={AccountPage} />
+        <Route path="/acquista/:id" component={PublicEventDetail} />
+        <Route path="/acquista" component={PublicEvents} />
+        <Route path="/carrello" component={PublicCart} />
+        <Route path="/checkout/success" component={PublicCheckoutSuccess} />
+        <Route path="/checkout" component={PublicCheckout} />
+        <Route path="/e/:shortId" component={EventShortLink} />
+        <Route path="/locali/:id" component={PublicVenueDetail} />
+        <Route path="/locali" component={PublicVenues} />
+        <Route path="/">
+          {() => {
+            window.location.href = '/account/profile';
+            return null;
+          }}
+        </Route>
         <Route component={NotFound} />
       </Switch>
     );
