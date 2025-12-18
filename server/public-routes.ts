@@ -28,6 +28,10 @@ import {
   events,
   locations,
   insertPublicCartItemSchema,
+  guestListEntries,
+  guestLists,
+  tableBookings,
+  eventTables,
 } from "@shared/schema";
 import { eq, and, gt, lt, desc, sql, gte, lte, or, isNull } from "drizzle-orm";
 import { getUncachableStripeClient, getStripePublishableKey } from "./stripeClient";
@@ -1895,6 +1899,110 @@ router.get("/api/public/account/tickets", async (req, res) => {
   } catch (error: any) {
     console.error("[PUBLIC] Get tickets error:", error);
     res.status(500).json({ message: "Errore nel caricamento biglietti" });
+  }
+});
+
+// Ottieni liste ospiti per il cliente autenticato
+router.get("/api/public/account/guest-entries", async (req, res) => {
+  try {
+    const customer = await getAuthenticatedCustomer(req);
+    if (!customer || !customer.id) {
+      return res.status(401).json({ message: "Non autenticato" });
+    }
+
+    const entries = await db
+      .select({
+        id: guestListEntries.id,
+        firstName: guestListEntries.firstName,
+        lastName: guestListEntries.lastName,
+        plusOnes: guestListEntries.plusOnes,
+        qrCode: guestListEntries.qrCode,
+        qrScannedAt: guestListEntries.qrScannedAt,
+        status: guestListEntries.status,
+        arrivedAt: guestListEntries.arrivedAt,
+        createdAt: guestListEntries.createdAt,
+        listName: guestLists.name,
+        listType: guestLists.listType,
+        eventId: events.id,
+        eventName: events.name,
+        eventStart: events.startDatetime,
+        eventEnd: events.endDatetime,
+        locationName: locations.name,
+        locationAddress: locations.address,
+      })
+      .from(guestListEntries)
+      .innerJoin(guestLists, eq(guestListEntries.guestListId, guestLists.id))
+      .innerJoin(events, eq(guestListEntries.eventId, events.id))
+      .innerJoin(locations, eq(events.locationId, locations.id))
+      .where(eq(guestListEntries.customerId, customer.id))
+      .orderBy(desc(events.startDatetime));
+
+    const now = new Date();
+    const upcoming = entries.filter(e => new Date(e.eventStart) >= now && e.status !== 'cancelled');
+    const past = entries.filter(e => new Date(e.eventStart) < now || e.status === 'cancelled');
+
+    res.json({
+      upcoming,
+      past,
+      total: entries.length,
+    });
+  } catch (error: any) {
+    console.error("[PUBLIC] Get guest entries error:", error);
+    res.status(500).json({ message: "Errore nel caricamento liste ospiti" });
+  }
+});
+
+// Ottieni prenotazioni tavoli per il cliente autenticato
+router.get("/api/public/account/table-reservations", async (req, res) => {
+  try {
+    const customer = await getAuthenticatedCustomer(req);
+    if (!customer || !customer.id) {
+      return res.status(401).json({ message: "Non autenticato" });
+    }
+
+    const reservations = await db
+      .select({
+        id: tableBookings.id,
+        customerName: tableBookings.customerName,
+        guestsCount: tableBookings.guestsCount,
+        qrCode: tableBookings.qrCode,
+        qrScannedAt: tableBookings.qrScannedAt,
+        status: tableBookings.status,
+        arrivedAt: tableBookings.arrivedAt,
+        confirmedAt: tableBookings.confirmedAt,
+        depositAmount: tableBookings.depositAmount,
+        depositPaid: tableBookings.depositPaid,
+        createdAt: tableBookings.createdAt,
+        tableName: eventTables.name,
+        tableType: eventTables.tableType,
+        tableCapacity: eventTables.capacity,
+        minSpend: eventTables.minSpend,
+        eventId: events.id,
+        eventName: events.name,
+        eventStart: events.startDatetime,
+        eventEnd: events.endDatetime,
+        locationName: locations.name,
+        locationAddress: locations.address,
+      })
+      .from(tableBookings)
+      .innerJoin(eventTables, eq(tableBookings.tableId, eventTables.id))
+      .innerJoin(events, eq(tableBookings.eventId, events.id))
+      .innerJoin(locations, eq(events.locationId, locations.id))
+      .where(eq(tableBookings.customerId, customer.id))
+      .orderBy(desc(events.startDatetime));
+
+    const now = new Date();
+    const upcoming = reservations.filter(r => new Date(r.eventStart) >= now && r.status !== 'cancelled');
+    const past = reservations.filter(r => new Date(r.eventStart) < now || r.status === 'cancelled');
+
+    res.json({
+      upcoming,
+      past,
+      total: reservations.length,
+    });
+  } catch (error: any) {
+    console.error("[PUBLIC] Get table reservations error:", error);
+    res.status(500).json({ message: "Errore nel caricamento prenotazioni tavoli" });
   }
 });
 
