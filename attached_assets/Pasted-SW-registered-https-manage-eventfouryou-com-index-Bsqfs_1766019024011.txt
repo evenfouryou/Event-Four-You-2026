@@ -1,0 +1,68 @@
+SW registered: https://manage.eventfouryou.com/
+index-BsqfsnDb.js:879 [DEBUG SC] Fetching initial status via HTTP...
+index-BsqfsnDb.js:879 [DEBUG SC] ====== SMART CARD CONNECTION START ======
+index-BsqfsnDb.js:879 [DEBUG SC] URL: wss://manage.eventfouryou.com/ws/bridge
+index-BsqfsnDb.js:879 [DEBUG SC] Cookies present: YES
+index-BsqfsnDb.js:879 [DEBUG SC] Cookie value: __stripe_mid=39f24ecb-1777-4afa-a25d-8bc0b00768382...
+index-BsqfsnDb.js:879 [DEBUG SC] WebSocket created, state: 0
+index-BsqfsnDb.js:879 [DEBUG SC] HTTP status received: {
+  "bridgeConnected": true,
+  "readerConnected": true,
+  "cardInserted": true,
+  "readerName": null,
+  "cardSerial": "4130313238343837",
+  "cardCounter": 224,
+  "cardBalance": 420811,
+  "cardKeyId": 129,
+  "cardAtr": null,
+  "demoMode": false,
+  "canEmitTickets": true,
+  "relayConnected": true,
+  "pinLocked": false,
+  "pinRequired": false
+}
+index-BsqfsnDb.js:879 [DEBUG SC] HTTP - cardSerial: 4130313238343837
+index-BsqfsnDb.js:879 [DEBUG SC] HTTP - cardCounter: 224
+index-BsqfsnDb.js:879 [DEBUG SC] HTTP - cardBalance: 420811
+index-BsqfsnDb.js:879 [DEBUG SC] HTTP - cardKeyId: 129
+index-BsqfsnDb.js:879 [DEBUG SC] HTTP - cardInserted: true
+index-BsqfsnDb.js:879 [DEBUG SC] WebSocket OPEN! State: 1
+index-BsqfsnDb.js:879 [DEBUG SC] Sending get_status request...
+index-BsqfsnDb.js:879 [DEBUG SC] MESSAGE RECEIVED: {"type":"connection_status","bridgeConnected":true,"connected":true,"message":"Bridge desktop app is connected"}
+index-BsqfsnDb.js:879 [DEBUG SC] Parsed message type: connection_status
+index-BsqfsnDb.js:879 [DEBUG SC] Handling bridge/connection status: connection_status {type: 'connection_status', bridgeConnected: true, connected: true, message: 'Bridge desktop app is connected'}
+index-BsqfsnDb.js:879 [DEBUG SC] ====== BRIDGE STATUS UPDATE ======
+index-BsqfsnDb.js:879 [DEBUG SC] Message type: connection_status
+index-BsqfsnDb.js:879 [DEBUG SC] msg.connected: true
+index-BsqfsnDb.js:879 [DEBUG SC] msg.bridgeConnected: true
+index-BsqfsnDb.js:879 [DEBUG SC] isConnected (final): true
+index-BsqfsnDb.js:879 [DEBUG SC] Full message: {"type":"connection_status","bridgeConnected":true,"connected":true,"message":"Bridge desktop app is connected"}
+index-BsqfsnDb.js:879 [DEBUG SC] Bridge IS connected - updating status to CONNECTED
+index-BsqfsnDb.js:879 [DEBUG SC] Status after update: {"connected":true,"relayConnected":true,"readerDetected":true,"cardInserted":true,"readerName":null,"cardAtr":null,"cardSerial":"4130313238343837","cardCounter":224,"cardBalance":420811,"cardKeyId":129,"cardType":"Smart Card SIAE","lastCheck":"2025-12-18T00:49:31.279Z","error":null,"bridgeConnected":true,"canEmitRealSeals":true,"demoMode":false}
+index-BsqfsnDb.js:879 [DEBUG SC] MESSAGE RECEIVED: {"type":"status","data":{"bridgeConnected":true,"readerConnected":true,"cardInserted":true,"readerName":null,"cardSerial":"4130313238343837","cardCounter":224,"cardBalance":420811,"cardKeyId":129,"car
+index-BsqfsnDb.js:879 [DEBUG SC] Parsed message type: status
+index-BsqfsnDb.js:879 [DEBUG SC] Handling status message
+index-BsqfsnDb.js:879 [DEBUG SC] ====== CARD STATUS DATA RECEIVED ======
+index-BsqfsnDb.js:879 [DEBUG SC] Full data object: {
+  "bridgeConnected": true,
+  "readerConnected": true,
+  "cardInserted": true,
+  "readerName": null,
+  "cardSerial": "4130313238343837",
+  "cardCounter": 224,
+  "cardBalance": 420811,
+  "cardKeyId": 129,
+  "cardAtr": null,
+  "demoMode": false,
+  "canEmitTickets": true,
+  "relayConnected": true,
+  "pinLocked": false,
+  "pinRequired": false
+}
+index-BsqfsnDb.js:879 [DEBUG SC] data.cardSerial: 4130313238343837
+index-BsqfsnDb.js:879 [DEBUG SC] data.cardCounter: 224
+index-BsqfsnDb.js:879 [DEBUG SC] data.cardBalance: 420811
+index-BsqfsnDb.js:879 [DEBUG SC] data.cardKeyId: 129
+index-BsqfsnDb.js:879 [DEBUG SC] data.cardInserted: true
+index-BsqfsnDb.js:879 [DEBUG SC] data.readerDetected: undefined
+index-BsqfsnDb.js:879 
