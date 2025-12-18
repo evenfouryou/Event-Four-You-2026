@@ -208,6 +208,7 @@ export const events = pgTable("events", {
   recurrenceCount: integer("recurrence_count"), // total occurrences (null = infinite with end date)
   recurrenceEndDate: timestamp("recurrence_end_date"), // when recurrence ends
   parentEventId: varchar("parent_event_id").references((): any => events.id), // null for parent, points to parent for exceptions
+  isPublic: boolean("is_public").notNull().default(false), // Mostra nella vetrina pubblica e abilita link biglietti
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
