@@ -19,7 +19,7 @@ export default function AccountPage() {
 
   useEffect(() => {
     if (!isLoading && (isError || !customer)) {
-      navigate("/accedi?redirect=" + encodeURIComponent(location));
+      navigate("/login?redirect=" + encodeURIComponent(location));
     }
   }, [isLoading, isError, customer, navigate, location]);
 

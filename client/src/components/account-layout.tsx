@@ -116,10 +116,15 @@ export function AccountLayout({ children }: AccountLayoutProps) {
     retry: false,
   });
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      await fetch("/api/logout", { method: "POST", credentials: "include" });
+    } catch (e) {
+      console.error("Logout error:", e);
+    }
     localStorage.removeItem("customerToken");
     localStorage.removeItem("customerData");
-    navigate("/acquista");
+    window.location.href = "/acquista";
   };
 
   if (isMobile) {

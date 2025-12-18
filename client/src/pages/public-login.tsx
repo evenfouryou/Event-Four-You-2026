@@ -55,18 +55,26 @@ export default function PublicLoginPage() {
     setIsLoading(true);
 
     try {
-      const res = await apiRequest("POST", "/api/public/customers/login", loginData);
+      // Use unified login endpoint with session-based auth
+      const res = await apiRequest("POST", "/api/auth/login", {
+        email: loginData.email,
+        password: loginData.password,
+      });
       const data = await res.json();
-
-      localStorage.setItem("customerToken", data.token);
-      localStorage.setItem("customerData", JSON.stringify(data.customer));
 
       toast({
         title: "Benvenuto!",
-        description: `Ciao ${data.customer.firstName}!`,
+        description: `Ciao ${data.user.firstName}!`,
       });
 
-      navigate(redirectTo);
+      // Redirect based on role
+      if (data.user.role === 'cliente') {
+        // For customers, redirect to the specified destination or account
+        window.location.href = redirectTo === '/carrello' ? '/carrello' : '/account';
+      } else {
+        // For admin/gestore, go to dashboard
+        window.location.href = '/';
+      }
     } catch (error: any) {
       toast({
         title: "Errore di accesso",
@@ -130,17 +138,17 @@ export default function PublicLoginPage() {
         customerId,
         otpCode: otpValue,
       });
-      const data = await res.json();
-
-      localStorage.setItem("customerToken", data.token);
-      localStorage.setItem("customerData", JSON.stringify(data.customer));
+      await res.json();
 
       toast({
         title: "Verifica completata!",
-        description: "Il tuo account è stato attivato.",
+        description: "Il tuo account è stato attivato. Effettua il login.",
       });
 
-      navigate(redirectTo);
+      // Redirect to login page so user can log in with session-based auth
+      setShowOTP(false);
+      setActiveTab("login");
+      setLoginData({ email: registerData.email, password: registerData.password });
     } catch (error: any) {
       toast({
         title: "Errore verifica",
