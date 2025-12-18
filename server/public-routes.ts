@@ -1258,25 +1258,6 @@ router.post("/api/public/checkout/confirm", async (req, res) => {
       return res.status(401).json({ message: "Non autenticato" });
     }
 
-    // CRITICAL: Verifica che la smart card SIAE sia disponibile PRIMA di tutto
-    // Senza sigillo fiscale, non possiamo emettere biglietti
-    if (!isBridgeConnected()) {
-      console.log("[PUBLIC] Checkout failed: Desktop bridge not connected");
-      return res.status(503).json({ 
-        message: "Sistema sigilli fiscali non disponibile. L'app desktop Event4U deve essere connessa con la smart card SIAE inserita. Riprova tra qualche minuto.",
-        code: "SEAL_BRIDGE_OFFLINE"
-      });
-    }
-
-    const cardReadiness = isCardReadyForSeals();
-    if (!cardReadiness.ready) {
-      console.log(`[PUBLIC] Checkout failed: Card not ready - ${cardReadiness.error}`);
-      return res.status(503).json({ 
-        message: `Smart card SIAE non pronta: ${cardReadiness.error}. Riprova tra qualche minuto.`,
-        code: "SEAL_CARD_NOT_READY"
-      });
-    }
-
     // Verifica checkout session
     const [checkoutSession] = await db
       .select()
@@ -1291,12 +1272,79 @@ router.post("/api/public/checkout/confirm", async (req, res) => {
       return res.status(400).json({ message: "Pagamento già completato" });
     }
 
+    if (checkoutSession.status === "refunded") {
+      return res.status(400).json({ message: "Pagamento già stornato", code: "ALREADY_REFUNDED" });
+    }
+
     // Verifica payment intent con Stripe
     const stripe = await getUncachableStripeClient();
     const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
 
     if (paymentIntent.status !== "succeeded") {
       return res.status(400).json({ message: "Pagamento non completato" });
+    }
+
+    // CRITICAL: Verifica che la smart card SIAE sia disponibile
+    // Se il pagamento è già andato a buon fine ma la smart card non è pronta, STORNIAMO
+    const bridgeConnected = isBridgeConnected();
+    const cardReadiness = isCardReadyForSeals();
+
+    if (!bridgeConnected || !cardReadiness.ready) {
+      const errorReason = !bridgeConnected 
+        ? "Desktop bridge non connesso" 
+        : `Smart card non pronta: ${cardReadiness.error}`;
+      
+      console.log(`[PUBLIC] Checkout confirm failed after payment: ${errorReason}`);
+      console.log(`[PUBLIC] Payment already succeeded, initiating refund for ${paymentIntentId}`);
+      
+      try {
+        // STORNO AUTOMATICO - il pagamento è già completato ma non possiamo emettere sigilli
+        const refund = await stripe.refunds.create({
+          payment_intent: paymentIntentId,
+          reason: 'requested_by_customer',
+          metadata: {
+            reason: 'fiscal_seal_unavailable_at_confirm',
+            error: errorReason,
+          }
+        });
+        
+        console.log(`[PUBLIC] Refund created successfully: ${refund.id}, status: ${refund.status}`);
+        
+        // Aggiorna checkout session come stornata
+        await db
+          .update(publicCheckoutSessions)
+          .set({
+            status: "refunded",
+            refundId: refund.id,
+            refundReason: `Sigillo fiscale non disponibile al momento della conferma: ${errorReason}`,
+          })
+          .where(eq(publicCheckoutSessions.id, checkoutSessionId));
+        
+        return res.status(503).json({ 
+          message: `Sistema sigilli fiscali non disponibile. Il pagamento è stato stornato automaticamente. ${!bridgeConnected ? "L'app desktop Event4U deve essere connessa." : ""}`,
+          code: !bridgeConnected ? "SEAL_BRIDGE_OFFLINE_REFUNDED" : "SEAL_CARD_NOT_READY_REFUNDED",
+          refunded: true,
+          refundId: refund.id,
+        });
+        
+      } catch (refundError: any) {
+        console.error(`[PUBLIC] Failed to refund payment on confirm:`, refundError.message);
+        
+        // Se lo storno fallisce, segna come pending per gestione manuale
+        await db
+          .update(publicCheckoutSessions)
+          .set({
+            status: "refund_pending",
+            refundReason: `Sigillo non disponibile: ${errorReason}. Storno fallito: ${refundError.message}`,
+          })
+          .where(eq(publicCheckoutSessions.id, checkoutSessionId));
+        
+        return res.status(503).json({ 
+          message: `Errore critico: sigillo fiscale non disponibile e storno fallito. Contatta l'assistenza per il rimborso.`,
+          code: "SEAL_ERROR_REFUND_FAILED",
+          refunded: false,
+        });
+      }
     }
 
     // Genera transazione SIAE

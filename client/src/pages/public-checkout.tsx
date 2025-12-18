@@ -123,21 +123,59 @@ function CheckoutForm({
       }
 
       if (paymentIntent && paymentIntent.status === "succeeded") {
-        const response = await apiRequest("POST", "/api/public/checkout/confirm", {
-          paymentIntentId: paymentIntent.id,
-          checkoutSessionId,
-        });
+        try {
+          const response = await apiRequest("POST", "/api/public/checkout/confirm", {
+            paymentIntentId: paymentIntent.id,
+            checkoutSessionId,
+          });
 
-        const result = await response.json();
+          const result = await response.json();
 
-        toast({
-          title: "Pagamento completato!",
-          description: "I tuoi biglietti sono stati generati.",
-        });
+          toast({
+            title: "Pagamento completato!",
+            description: "I tuoi biglietti sono stati generati.",
+          });
 
-        navigate(`/checkout/success?transaction=${result.transactionCode}`);
+          navigate(`/checkout/success?transaction=${result.transactionCode}`);
+        } catch (confirmError: any) {
+          // Gestione specifica degli errori di conferma/sigillo fiscale
+          const errorData = confirmError.data || {};
+          const errorCode = errorData.code || confirmError.code || "";
+          
+          if (errorData.refunded || errorCode.includes("REFUNDED")) {
+            // Pagamento stornato automaticamente
+            setPaymentError(
+              `${confirmError.message || "Errore sistema sigilli fiscali."} Il rimborso è stato elaborato automaticamente sul tuo metodo di pagamento.`
+            );
+            toast({
+              title: "Pagamento stornato",
+              description: "Il rimborso è stato elaborato automaticamente.",
+              variant: "destructive",
+            });
+          } else if (errorCode === "SEAL_ERROR_REFUND_FAILED") {
+            // Errore critico - storno fallito
+            setPaymentError(
+              "Errore critico: il pagamento è andato a buon fine ma non è stato possibile generare i biglietti né elaborare il rimborso automatico. Contatta immediatamente l'assistenza per ricevere il rimborso."
+            );
+            toast({
+              title: "Errore critico",
+              description: "Contatta l'assistenza per il rimborso.",
+              variant: "destructive",
+            });
+          } else if (errorCode.includes("SEAL_BRIDGE") || errorCode.includes("SEAL_CARD")) {
+            // Sistema sigilli non disponibile (senza storno - non dovrebbe accadere)
+            setPaymentError(
+              confirmError.message || "Sistema di emissione biglietti temporaneamente non disponibile. Riprova tra qualche minuto."
+            );
+          } else {
+            setPaymentError(confirmError.message || "Errore durante la conferma del pagamento.");
+          }
+          setIsProcessing(false);
+          return;
+        }
       }
     } catch (error: any) {
+      // Errore nel pagamento Stripe stesso
       setPaymentError(error.message || "Errore durante il pagamento.");
       setIsProcessing(false);
     }
@@ -222,8 +260,17 @@ function CheckoutContent() {
     },
     onError: (error: any) => {
       console.log("[Checkout] Payment intent error:", error);
+      const errorCode = error.data?.code || error.code || "";
+      
       if (error.message?.includes("autenticato")) {
         navigate("/login?redirect=/checkout");
+      } else if (errorCode === "SEAL_BRIDGE_OFFLINE" || errorCode === "SEAL_CARD_NOT_READY") {
+        // Sistema sigilli non disponibile - errore specifico
+        toast({
+          title: "Sistema non disponibile",
+          description: error.message || "Il sistema di emissione biglietti è temporaneamente non disponibile. Riprova tra qualche minuto.",
+          variant: "destructive",
+        });
       } else {
         toast({
           title: "Errore",
