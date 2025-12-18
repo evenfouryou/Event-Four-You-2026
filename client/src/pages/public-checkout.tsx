@@ -145,14 +145,14 @@ function CheckoutForm({
           if (errorData.refunded || errorCode.includes("REFUNDED")) {
             // Pagamento stornato automaticamente
             setPaymentError(
-              `${confirmError.message || "Errore sistema sigilli fiscali."} Il rimborso è stato elaborato automaticamente sul tuo metodo di pagamento.`
+              `${confirmError.message || "Si è verificato un errore."} Il rimborso è stato elaborato automaticamente sul tuo metodo di pagamento.`
             );
             toast({
               title: "Pagamento stornato",
               description: "Il rimborso è stato elaborato automaticamente.",
               variant: "destructive",
             });
-          } else if (errorCode === "SEAL_ERROR_REFUND_FAILED") {
+          } else if (errorCode === "SEAL_ERROR_REFUND_FAILED" || errorCode === "CRITICAL_ERROR_REFUND_FAILED") {
             // Errore critico - storno fallito
             setPaymentError(
               "Errore critico: il pagamento è andato a buon fine ma non è stato possibile generare i biglietti né elaborare il rimborso automatico. Contatta immediatamente l'assistenza per ricevere il rimborso."
@@ -168,6 +168,7 @@ function CheckoutForm({
               confirmError.message || "Sistema di emissione biglietti temporaneamente non disponibile. Riprova tra qualche minuto."
             );
           } else {
+            // Errore generico - verifica se c'è info sullo storno
             setPaymentError(confirmError.message || "Errore durante la conferma del pagamento.");
           }
           setIsProcessing(false);

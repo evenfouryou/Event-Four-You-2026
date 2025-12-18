@@ -1349,13 +1349,24 @@ router.post("/api/public/checkout/confirm", async (req, res) => {
 
     // Genera transazione SIAE
     const cartItems = checkoutSession.cartSnapshot as any[];
+    if (!cartItems || cartItems.length === 0) {
+      console.error("[PUBLIC] Cart items empty in checkout session");
+      throw new Error("Carrello vuoto nella sessione checkout");
+    }
     const firstItem = cartItems[0];
+    console.log(`[PUBLIC] Processing checkout with ${cartItems.length} cart items, first item ticketedEventId: ${firstItem.ticketedEventId}`);
 
     // Ottieni evento per la transazione
     const [ticketedEvent] = await db
       .select()
       .from(siaeTicketedEvents)
       .where(eq(siaeTicketedEvents.id, firstItem.ticketedEventId));
+
+    if (!ticketedEvent) {
+      console.error(`[PUBLIC] Ticketed event not found: ${firstItem.ticketedEventId}`);
+      throw new Error(`Evento non trovato: ${firstItem.ticketedEventId}`);
+    }
+    console.log(`[PUBLIC] Found ticketed event: ${ticketedEvent.id}, companyId: ${ticketedEvent.companyId}`);
 
     // Ottieni canale emissione (online)
     const [emissionChannel] = await db
@@ -1390,10 +1401,17 @@ router.post("/api/public/checkout/confirm", async (req, res) => {
     const tickets: any[] = [];
 
     for (const item of cartItems) {
+      console.log(`[PUBLIC] Processing cart item: sectorId=${item.sectorId}, quantity=${item.quantity}`);
+      
       const [sector] = await db
         .select()
         .from(siaeEventSectors)
         .where(eq(siaeEventSectors.id, item.sectorId));
+
+      if (!sector) {
+        console.error(`[PUBLIC] Sector not found: ${item.sectorId}`);
+        throw new Error(`Settore non trovato: ${item.sectorId}`);
+      }
 
       // Ottieni carta attivazione per sigillo
       const [card] = await db
@@ -1406,6 +1424,10 @@ router.post("/api/public/checkout/confirm", async (req, res) => {
           )
         )
         .limit(1);
+      
+      if (!card) {
+        console.log(`[PUBLIC] No active activation card found for company ${ticketedEvent.companyId}, will use bridge card`);
+      }
 
       for (let i = 0; i < item.quantity; i++) {
         // RICHIEDI SIGILLO FISCALE REALE DALLA SMART CARD SIAE
@@ -1756,6 +1778,73 @@ router.post("/api/public/checkout/confirm", async (req, res) => {
     });
   } catch (error: any) {
     console.error("[PUBLIC] Checkout confirm error:", error);
+    
+    // CRITICAL: Se arriviamo qui, il pagamento potrebbe essere già andato a buon fine
+    // Dobbiamo tentare lo storno automatico per evitare di lasciare il cliente senza biglietti ma con addebito
+    const { paymentIntentId, checkoutSessionId } = req.body;
+    
+    if (paymentIntentId && checkoutSessionId) {
+      try {
+        console.log(`[PUBLIC] Attempting auto-refund for unexpected error: ${error.message}`);
+        const stripe = await getUncachableStripeClient();
+        
+        // Verifica se il pagamento è già completato
+        const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+        
+        if (paymentIntent.status === "succeeded") {
+          // Il pagamento è andato a buon fine, dobbiamo stornare
+          const refund = await stripe.refunds.create({
+            payment_intent: paymentIntentId,
+            reason: 'requested_by_customer',
+            metadata: {
+              reason: 'ticket_generation_failed',
+              error: error.message?.substring(0, 500) || 'Unknown error',
+            }
+          });
+          
+          console.log(`[PUBLIC] Auto-refund created: ${refund.id}`);
+          
+          // Aggiorna checkout session
+          await db
+            .update(publicCheckoutSessions)
+            .set({
+              status: "refunded",
+              refundId: refund.id,
+              refundReason: `Errore nella generazione biglietti: ${error.message?.substring(0, 200)}`,
+            })
+            .where(eq(publicCheckoutSessions.id, checkoutSessionId));
+          
+          return res.status(500).json({ 
+            message: "Errore nella generazione dei biglietti. Il pagamento è stato stornato automaticamente.",
+            code: "TICKET_ERROR_REFUNDED",
+            refunded: true,
+            refundId: refund.id,
+          });
+        }
+      } catch (refundError: any) {
+        console.error(`[PUBLIC] Auto-refund failed:`, refundError.message);
+        
+        // Tenta di segnare come refund_pending
+        try {
+          await db
+            .update(publicCheckoutSessions)
+            .set({
+              status: "refund_pending",
+              refundReason: `Errore: ${error.message}. Storno fallito: ${refundError.message}`,
+            })
+            .where(eq(publicCheckoutSessions.id, checkoutSessionId));
+        } catch (dbError) {
+          console.error(`[PUBLIC] Failed to mark session as refund_pending:`, dbError);
+        }
+        
+        return res.status(500).json({ 
+          message: "Errore critico: impossibile completare l'acquisto e stornare il pagamento. Contatta l'assistenza.",
+          code: "CRITICAL_ERROR_REFUND_FAILED",
+          refunded: false,
+        });
+      }
+    }
+    
     res.status(500).json({ message: "Errore nella conferma del pagamento" });
   }
 });
