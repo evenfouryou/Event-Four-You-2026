@@ -278,6 +278,7 @@ function Router() {
               <Route path="/cassa-biglietti" component={CassaBiglietti} />
               <Route path="/cashier/management" component={CashierManagement} />
               <Route path="/cashier/dashboard" component={CashierDashboard} />
+              <Route path="/e/:shortId" component={EventShortLink} />
               <Route path="/accedi">
                 <Redirect to="/" />
               </Route>
