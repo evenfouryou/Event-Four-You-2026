@@ -167,35 +167,35 @@ export default function PublicEventsPage() {
   return (
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-50 backdrop-blur-xl bg-background/80 border-b border-border">
-        <div className="max-w-7xl mx-auto px-4 py-4">
-          <div className="flex items-center justify-between gap-4">
+        <div className="max-w-7xl mx-auto px-3 sm:px-4 py-3">
+          <div className="flex items-center gap-2 sm:gap-4">
             <Link href="/">
-              <div className="flex items-center gap-2 cursor-pointer group">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-yellow-400 to-yellow-600 flex items-center justify-center">
-                  <Sparkles className="w-6 h-6 text-black" />
+              <div className="flex items-center gap-2 cursor-pointer group shrink-0">
+                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-yellow-400 to-yellow-600 flex items-center justify-center">
+                  <Sparkles className="w-5 h-5 sm:w-6 sm:h-6 text-black" />
                 </div>
-                <span className="text-xl font-bold text-foreground group-hover:text-primary transition-colors">
+                <span className="hidden sm:block text-xl font-bold text-foreground group-hover:text-primary transition-colors">
                   Event4U
                 </span>
               </div>
             </Link>
-            <div className="flex-1 max-w-md">
+            <div className="flex-1 min-w-0">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-muted-foreground" />
                 <Input
-                  placeholder="Cerca eventi..."
+                  placeholder="Cerca..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10 bg-muted/50 border-border text-foreground placeholder:text-muted-foreground focus:border-primary focus:ring-primary/20"
+                  className="pl-9 sm:pl-10 h-9 sm:h-10 bg-muted/50 border-border text-foreground placeholder:text-muted-foreground focus:border-primary focus:ring-primary/20 text-sm sm:text-base"
                   data-testid="input-search"
                 />
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
               <Link href="/carrello">
-                <Button variant="outline" size="sm" className="border-border text-foreground" data-testid="button-cart">
-                  <Ticket className="w-4 h-4 mr-1" />
-                  Carrello
+                <Button variant="outline" size="icon" className="h-9 w-9 sm:h-10 sm:w-auto sm:px-3 border-border text-foreground" data-testid="button-cart">
+                  <Ticket className="w-4 h-4 sm:mr-1" />
+                  <span className="hidden sm:inline">Carrello</span>
                 </Button>
               </Link>
               {isAuthenticated ? (
@@ -208,7 +208,7 @@ export default function PublicEventsPage() {
                 </Link>
               ) : (
                 <Link href="/accedi">
-                  <Button size="sm" data-testid="button-login">
+                  <Button size="sm" className="h-9 px-3 sm:px-4" data-testid="button-login">
                     Accedi
                   </Button>
                 </Link>
@@ -218,17 +218,17 @@ export default function PublicEventsPage() {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 py-8">
+      <main className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-8">
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="text-center mb-12"
+          className="text-center mb-6 sm:mb-12"
         >
-          <h1 className="text-4xl md:text-5xl font-bold text-foreground mb-4" data-testid="text-page-title">
+          <h1 className="text-2xl sm:text-4xl md:text-5xl font-bold text-foreground mb-2 sm:mb-4" data-testid="text-page-title">
             Scopri gli Eventi
           </h1>
-          <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
-            Acquista i tuoi biglietti per le migliori serate. Pagamenti sicuri, biglietti digitali e accesso garantito.
+          <p className="text-muted-foreground text-sm sm:text-lg max-w-2xl mx-auto px-2">
+            Acquista i tuoi biglietti per le migliori serate.
           </p>
         </motion.div>
 
