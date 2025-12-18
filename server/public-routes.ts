@@ -186,6 +186,7 @@ router.get("/api/public/events", async (req, res) => {
       .where(
         and(
           eq(siaeTicketedEvents.ticketingStatus, "active"),
+          eq(events.isPublic, true), // Only show events marked as public
           gt(events.startDatetime, now),
           or(isNull(siaeTicketedEvents.saleStartDate), lte(siaeTicketedEvents.saleStartDate, now)),
           or(isNull(siaeTicketedEvents.saleEndDate), gte(siaeTicketedEvents.saleEndDate, now))
@@ -265,8 +266,8 @@ router.get("/api/public/all-events", async (req, res) => {
       .where(
         and(
           eq(events.status, "scheduled"),
-          gt(events.startDatetime, now),
-          eq(locations.isPublic, true) // Only public locations
+          eq(events.isPublic, true), // Only show events marked as public
+          gt(events.startDatetime, now)
         )
       )
       .orderBy(events.startDatetime)
