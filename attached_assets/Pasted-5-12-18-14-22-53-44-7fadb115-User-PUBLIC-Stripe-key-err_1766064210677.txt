@@ -1,0 +1,85 @@
+5-12-18 14:22:53.44
+7fadb115
+User
+[PUBLIC] Stripe key error: Error: Stripe production connection not found
+
+2025-12-18 14:22:53.44
+7fadb115
+User
+at async file:///home/runner/workspace/dist/index.js:15014:28
+2025-12-18 14:22:53.44
+7fadb115
+User
+at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+2025-12-18 14:22:53.44
+7fadb115
+User
+at async getStripePublishableKey (file:///home/runner/workspace/dist/index.js:13961:30)
+2025-12-18 14:22:53.44
+7fadb115
+User
+at getCredentials (file:///home/runner/workspace/dist/index.js:13947:11)
+2025-12-18 14:22:53.45
+7fadb115
+User
+at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+2025-12-18 14:22:53.45
+7fadb115
+User
+[PUBLIC] Create payment intent error: Error: Stripe production connection not found
+2025-12-18 14:22:53.45
+7fadb115
+User
+at getCredentials (file:///home/runner/workspace/dist/index.js:13947:11)
+2025-12-18 14:22:53.45
+7fadb115
+User
+at async getUncachableStripeClient (file:///home/runner/workspace/dist/index.js:13955:25)
+2025-12-18 14:22:53.45
+7fadb115
+User
+at async file:///home/runner/workspace/dist/index.js:15055:20
+2025-12-18 14:22:53.46
+7fadb115
+User
+1:22:53 PM [express] GET /api/public/stripe-key 500 in 137ms :: {"message":"Errore nel caricamento c…
+2025-12-18 14:22:53.60
+7fadb115
+User
+1:22:53 PM [express] POST /api/public/checkout/create-payment-intent 500 in 304ms :: {"message":"Err…
+2025-12-18 14:22:55.93
+7fadb115
+User
+at async file:///home/runner/workspace/dist/index.js:15055:20
+2025-12-18 14:22:55.93
+7fadb115
+User
+[PUBLIC] Create payment intent error: Error: Stripe production connection not found
+2025-12-18 14:22:55.93
+7fadb115
+User
+at async getUncachableStripeClient (file:///home/runner/workspace/dist/index.js:13955:25)
+2025-12-18 14:22:55.93
+7fadb115
+User
+at getCredentials (file:///home/runner/workspace/dist/index.js:13947:11)
+2025-12-18 14:22:55.93
+7fadb115
+User
+at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+2025-12-18 14:22:55.96
+7fadb115
+User
+1:22:55 PM [express] POST /api/public/checkout/create-payment-intent 500 in 152ms :: {"message":"Err…
+2025-12-18 14:23:00.95
+87b990b2
+User
+[Bridge] Message received: type=pong
+2025-12-18 14:23:03.68
+87b990b2
+User
+[Bridge] Message received: type=ping
+2025-12-18 14:23:03.68
+87b990b2
+User
+[Bridge] Message received: type=ping
