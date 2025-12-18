@@ -1898,36 +1898,75 @@ router.get("/api/public/account/tickets", async (req, res) => {
       return res.status(401).json({ message: "Non autenticato" });
     }
 
-    const tickets = await db
-      .select({
-        id: siaeTickets.id,
-        ticketCode: siaeTickets.ticketCode,
-        ticketType: siaeTickets.ticketType,
-        ticketPrice: siaeTickets.ticketPrice,
-        participantFirstName: siaeTickets.participantFirstName,
-        participantLastName: siaeTickets.participantLastName,
-        status: siaeTickets.status,
-        emittedAt: siaeTickets.emittedAt,
-        qrCode: siaeTickets.qrCode,
-        sectorName: siaeEventSectors.name,
-        eventName: events.name,
-        eventStart: events.startDatetime,
-        eventEnd: events.endDatetime,
-        locationName: locations.name,
-        ticketedEventId: siaeTickets.ticketedEventId,
-      })
+    // Query semplificata per evitare errori Drizzle con left join multipli
+    const ticketRows = await db
+      .select()
       .from(siaeTickets)
-      .leftJoin(siaeEventSectors, eq(siaeTickets.sectorId, siaeEventSectors.id))
-      .leftJoin(siaeTicketedEvents, eq(siaeTickets.ticketedEventId, siaeTicketedEvents.id))
-      .leftJoin(events, eq(siaeTicketedEvents.eventId, events.id))
-      .leftJoin(locations, eq(events.locationId, locations.id))
-      .where(eq(siaeTickets.customerId, customer.id))
-      .orderBy(desc(events.startDatetime));
+      .where(eq(siaeTickets.customerId, customer.id));
+
+    // Se non ci sono biglietti, ritorna array vuoti
+    if (ticketRows.length === 0) {
+      return res.json({ upcoming: [], past: [], total: 0 });
+    }
+
+    // Fetch dati correlati separatamente per robustezza
+    const tickets = await Promise.all(ticketRows.map(async (ticket) => {
+      let sectorName = null;
+      let eventName = null;
+      let eventStart = null;
+      let eventEnd = null;
+      let locationName = null;
+
+      // Fetch sector
+      if (ticket.sectorId) {
+        const [sector] = await db.select().from(siaeEventSectors).where(eq(siaeEventSectors.id, ticket.sectorId));
+        sectorName = sector?.name || null;
+      }
+
+      // Fetch ticketed event -> event -> location
+      if (ticket.ticketedEventId) {
+        const [ticketedEvent] = await db.select().from(siaeTicketedEvents).where(eq(siaeTicketedEvents.id, ticket.ticketedEventId));
+        if (ticketedEvent?.eventId) {
+          const [event] = await db.select().from(events).where(eq(events.id, ticketedEvent.eventId));
+          if (event) {
+            eventName = event.name;
+            eventStart = event.startDatetime;
+            eventEnd = event.endDatetime;
+            if (event.locationId) {
+              const [location] = await db.select().from(locations).where(eq(locations.id, event.locationId));
+              locationName = location?.name || null;
+            }
+          }
+        }
+      }
+
+      return {
+        id: ticket.id,
+        ticketCode: ticket.ticketCode,
+        ticketType: ticket.ticketType,
+        ticketPrice: ticket.ticketPrice,
+        participantFirstName: ticket.participantFirstName,
+        participantLastName: ticket.participantLastName,
+        status: ticket.status,
+        emittedAt: ticket.emittedAt,
+        qrCode: ticket.qrCode,
+        sectorName,
+        eventName,
+        eventStart,
+        eventEnd,
+        locationName,
+        ticketedEventId: ticket.ticketedEventId,
+      };
+    }));
 
     // Separa biglietti futuri/passati
     const now = new Date();
     const upcoming = tickets.filter(t => t.eventStart && new Date(t.eventStart) >= now && t.status === 'emitted');
     const past = tickets.filter(t => !t.eventStart || new Date(t.eventStart) < now || t.status !== 'emitted');
+
+    // Ordina per data evento decrescente
+    upcoming.sort((a, b) => (b.eventStart ? new Date(b.eventStart).getTime() : 0) - (a.eventStart ? new Date(a.eventStart).getTime() : 0));
+    past.sort((a, b) => (b.eventStart ? new Date(b.eventStart).getTime() : 0) - (a.eventStart ? new Date(a.eventStart).getTime() : 0));
 
     res.json({
       upcoming,

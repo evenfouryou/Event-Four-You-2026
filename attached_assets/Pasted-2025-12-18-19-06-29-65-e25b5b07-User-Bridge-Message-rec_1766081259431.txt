@@ -1,0 +1,159 @@
+2025-12-18 19:06:29.65
+e25b5b07
+User
+[Bridge] Message received: type=pong
+2025-12-18 19:06:30.77
+e25b5b07
+User
+[Bridge] Message received: type=ping
+2025-12-18 19:06:44.27
+e25b5b07
+User
+at PgSelectBase.then (file:///home/runner/workspace/node_modules/drizzle-orm/query-promise.js:21:17)
+2025-12-18 19:06:44.27
+e25b5b07
+User
+at orderSelectedFields (file:///home/runner/workspace/node_modules/drizzle-orm/utils.js:53:17)
+2025-12-18 19:06:44.27
+e25b5b07
+User
+at Function.entries ()
+2025-12-18 19:06:44.27
+e25b5b07
+User
+at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+2025-12-18 19:06:44.27
+e25b5b07
+User
+at Array.reduce ()
+2025-12-18 19:06:44.27
+e25b5b07
+User
+at Object.startActiveSpan (file:///home/runner/workspace/node_modules/drizzle-orm/tracing.js:8:14)
+2025-12-18 19:06:44.27
+e25b5b07
+User
+at file:///home/runner/workspace/node_modules/drizzle-orm/utils.js:63:22
+2025-12-18 19:06:44.27
+e25b5b07
+User
+[PUBLIC] Get tickets error: TypeError: Cannot convert undefined or null to object
+2025-12-18 19:06:44.27
+e25b5b07
+User
+at file:///home/runner/workspace/node_modules/drizzle-orm/pg-core/query-builders/select.js:708:19
+2025-12-18 19:06:44.27
+e25b5b07
+User
+at orderSelectedFields (file:///home/runner/workspace/node_modules/drizzle-orm/utils.js:53:33)
+2025-12-18 19:06:44.27
+e25b5b07
+User
+at file:///home/runner/workspace/node_modules/drizzle-orm/pg-core/query-builders/select.js:684:26
+2025-12-18 19:06:44.27
+e25b5b07
+User
+at PgSelectBase._prepare (file:///home/runner/workspace/node_modules/drizzle-orm/pg-core/query-builders/select.js:683:19)
+2025-12-18 19:06:44.27
+e25b5b07
+User
+at PgSelectBase.execute (file:///home/runner/workspace/node_modules/drizzle-orm/pg-core/query-builders/select.js:707:19)
+2025-12-18 19:06:44.27
+e25b5b07
+User
+at Object.startActiveSpan (file:///home/runner/workspace/node_modules/drizzle-orm/tracing.js:8:14)
+2025-12-18 19:06:44.30
+e25b5b07
+User
+6:06:44 PM [express] GET /api/public/account/tickets 500 in 283ms :: {"message":"Errore nel caricame…
+2025-12-18 19:06:46.07
+e25b5b07
+User
+at PgSelectBase.execute (file:///home/runner/workspace/node_modules/drizzle-orm/pg-core/query-builders/select.js:707:19)
+2025-12-18 19:06:46.07
+e25b5b07
+User
+[PUBLIC] Get tickets error: TypeError: Cannot convert undefined or null to object
+2025-12-18 19:06:46.07
+e25b5b07
+User
+at file:///home/runner/workspace/node_modules/drizzle-orm/pg-core/query-builders/select.js:708:19
+2025-12-18 19:06:46.07
+e25b5b07
+User
+at Object.startActiveSpan (file:///home/runner/workspace/node_modules/drizzle-orm/tracing.js:8:14)
+2025-12-18 19:06:46.07
+e25b5b07
+User
+at file:///home/runner/workspace/node_modules/drizzle-orm/utils.js:63:22
+2025-12-18 19:06:46.07
+e25b5b07
+User
+at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+2025-12-18 19:06:46.07
+e25b5b07
+User
+at PgSelectBase._prepare (file:///home/runner/workspace/node_modules/drizzle-orm/pg-core/query-builders/select.js:683:19)
+2025-12-18 19:06:46.07
+e25b5b07
+User
+at Object.startActiveSpan (file:///home/runner/workspace/node_modules/drizzle-orm/tracing.js:8:14)
+2025-12-18 19:06:46.07
+e25b5b07
+User
+at orderSelectedFields (file:///home/runner/workspace/node_modules/drizzle-orm/utils.js:53:17)
+2025-12-18 19:06:46.07
+e25b5b07
+User
+at Array.reduce ()
+
+2025-12-18 19:06:46.07
+e25b5b07
+User
+at Function.entries ()
+2025-12-18 19:06:46.07
+e25b5b07
+User
+at file:///home/runner/workspace/node_modules/drizzle-orm/pg-core/query-builders/select.js:684:26
+2025-12-18 19:06:46.07
+e25b5b07
+User
+at PgSelectBase.then (file:///home/runner/workspace/node_modules/drizzle-orm/query-promise.js:21:17)
+2025-12-18 19:06:46.07
+e25b5b07
+User
+at orderSelectedFields (file:///home/runner/workspace/node_modules/drizzle-orm/utils.js:53:33)
+2025-12-18 19:06:46.16
+e25b5b07
+User
+6:06:46 PM [express] GET /api/public/account/guest-entries 200 in 108ms :: {"upcoming":[],"past":[],…
+2025-12-18 19:06:46.24
+e25b5b07
+User
+6:06:46 PM [express] GET /api/public/account/tickets 500 in 218ms :: {"message":"Errore nel caricame…
+2025-12-18 19:06:46.33
+e25b5b07
+User
+6:06:46 PM [express] GET /api/public/account/table-reservations 200 in 275ms :: {"upcoming":[],"past…
+2025-12-18 19:07:00.59
+e25b5b07
+User
+[Bridge] Message received: type=pong
+2025-12-18 19:07:00.78
+e25b5b07
+User
+[Bridge] Message received: type=ping
+2025-12-18 19:07:00.78
+e25b5b07
+User
+[Bridge] Message received: type=ping
+2025-12-18 19:07:00.78
+e25b5b07
+User
+[Bridge] Message received: type=ping
+
+Collapse
+
+Wrap
+
+Colors
