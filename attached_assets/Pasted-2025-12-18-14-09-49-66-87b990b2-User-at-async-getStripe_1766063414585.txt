@@ -1,0 +1,77 @@
+2025-12-18 14:09:49.66
+87b990b2
+User
+at async getStripePublishableKey (file:///home/runner/workspace/dist/index.js:13961:30)
+2025-12-18 14:09:49.66
+87b990b2
+User
+at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+2025-12-18 14:09:49.66
+87b990b2
+User
+at async file:///home/runner/workspace/dist/index.js:15009:28
+2025-12-18 14:09:49.66
+87b990b2
+User
+[PUBLIC] Stripe key error: Error: Stripe production connection not found
+2025-12-18 14:09:49.66
+87b990b2
+User
+at getCredentials (file:///home/runner/workspace/dist/index.js:13947:11)
+2025-12-18 14:09:49.68
+87b990b2
+User
+1:09:49 PM [express] GET /api/public/stripe-key 500 in 129ms :: {"message":"Errore nel caricamento c…
+2025-12-18 14:09:49.70
+87b990b2
+User
+1:09:49 PM [express] GET /api/public/cart 304 in 140ms :: {"items":[{"id":"da10cfd0-f476-4965-abc5-7…
+2025-12-18 14:09:50.04
+87b990b2
+User
+at async file:///home/runner/workspace/dist/index.js:15050:20
+2025-12-18 14:09:50.04
+87b990b2
+User
+[PUBLIC] Create payment intent error: Error: Stripe production connection not found
+2025-12-18 14:09:50.04
+87b990b2
+User
+at getCredentials (file:///home/runner/workspace/dist/index.js:13947:11)
+2025-12-18 14:09:50.04
+87b990b2
+User
+at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+2025-12-18 14:09:50.04
+87b990b2
+User
+at async getUncachableStripeClient (file:///home/runner/workspace/dist/index.js:13955:25)
+2025-12-18 14:09:50.06
+87b990b2
+User
+1:09:50 PM [express] POST /api/public/checkout/create-payment-intent 500 in 165ms :: {"message":"Err…
+2025-12-18 14:09:50.93
+87b990b2
+User
+[Bridge] Message received: type=ping
+2025-12-18 14:09:51.61
+87b990b2
+User
+at async file:///home/runner/workspace/dist/index.js:15050:20
+
+2025-12-18 14:09:51.61
+87b990b2
+User
+[PUBLIC] Create payment intent error: Error: Stripe production connection not found
+2025-12-18 14:09:51.61
+87b990b2
+User
+at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+2025-12-18 14:09:51.61
+87b990b2
+User
+at getCredentials (file:///home/runner/workspace/dist/index.js:13947:11)
+2025-12-18 14:09:51.61
+87b990b2
+User
+at async getUncachableStripeClient (file:///home/runner/workspace/dist/index.js:13955:25)
