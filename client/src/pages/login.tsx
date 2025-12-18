@@ -30,9 +30,15 @@ export default function Login() {
       const isEmail = email.includes('@');
       
       if (isEmail) {
-        // Normal user login with email
-        await apiRequest('POST', '/api/auth/login', { email, password });
-        window.location.href = '/';
+        // Unified login - works for both admin/gestore and customers
+        const response: any = await apiRequest('POST', '/api/auth/login', { email, password });
+        
+        // Redirect based on user role
+        if (response.user?.role === 'cliente') {
+          window.location.href = '/account';
+        } else {
+          window.location.href = '/';
+        }
       } else {
         // Cashier login with username - redirect to cashier dashboard
         await apiRequest('POST', '/api/cashiers/login', { username: email, password });

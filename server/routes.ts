@@ -75,6 +75,8 @@ import {
   siaeServiceCodes,
   siaeCancellationReasons,
   siaeCashiers,
+  siaeCustomers,
+  publicCustomerSessions,
   systemSettings,
   insertSiaeEventGenreSchema,
   updateSiaeEventGenreSchema,
@@ -251,8 +253,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const validated = registerSchema.parse(req.body);
       
+      // Normalize email for consistent storage and lookup
+      const normalizedEmail = validated.email.toLowerCase().trim();
+      
       // Check if user already exists
-      const existingUser = await storage.getUserByEmail(validated.email);
+      const existingUser = await storage.getUserByEmail(normalizedEmail);
       if (existingUser) {
         return res.status(400).json({ message: "Email already registered" });
       }
@@ -264,9 +269,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const crypto = await import('crypto');
       const verificationToken = crypto.randomBytes(32).toString('hex');
 
-      // Create user
+      // Create user with normalized email
       const user = await storage.createUser({
-        email: validated.email,
+        email: normalizedEmail,
         passwordHash,
         firstName: validated.firstName,
         lastName: validated.lastName,
@@ -422,7 +427,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Email richiesta" });
       }
 
-      const user = await storage.getUserByEmail(email);
+      const normalizedEmail = email.toLowerCase().trim();
+      const user = await storage.getUserByEmail(normalizedEmail);
       if (!user) {
         // Don't reveal if email exists for security
         return res.json({ message: "Se l'email è registrata, riceverai un link di verifica." });
@@ -499,7 +505,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Forgot password - Request password reset
+  // Unified Forgot password - Request password reset for both users and customers
   app.post('/api/forgot-password', async (req, res) => {
     try {
       const { email } = req.body;
@@ -508,92 +514,170 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Email richiesta" });
       }
 
-      const user = await storage.getUserByEmail(email);
-      
-      // Always return success message for security (don't reveal if email exists)
+      const normalizedEmail = email.toLowerCase().trim();
       const successMessage = "Se l'email è registrata, riceverai un link per reimpostare la password.";
       
-      if (!user) {
-        return res.json({ message: successMessage });
-      }
+      // First, try to find in users table
+      const user = await storage.getUserByEmail(normalizedEmail);
+      
+      if (user) {
+        // Generate reset token for user
+        const resetToken = crypto.randomBytes(32).toString('hex');
+        const resetExpires = new Date(Date.now() + 3600000); // 1 hour from now
 
-      // Generate reset token
-      const crypto = await import('crypto');
-      const resetToken = crypto.randomBytes(32).toString('hex');
-      const resetExpires = new Date(Date.now() + 3600000); // 1 hour from now
+        // Save token to user
+        await storage.updateUser(user.id, { 
+          resetPasswordToken: resetToken,
+          resetPasswordExpires: resetExpires 
+        });
 
-      // Save token to user
-      await storage.updateUser(user.id, { 
-        resetPasswordToken: resetToken,
-        resetPasswordExpires: resetExpires 
-      });
+        // Build reset link
+        const baseUrl = process.env.CUSTOM_DOMAIN 
+          ? `https://${process.env.CUSTOM_DOMAIN}`
+          : process.env.PUBLIC_URL 
+            ? process.env.PUBLIC_URL.replace(/\/$/, '')
+            : process.env.REPLIT_DEV_DOMAIN 
+              ? `https://${process.env.REPLIT_DEV_DOMAIN}`
+              : 'http://localhost:5000';
+        const resetLink = `${baseUrl}/reset-password?token=${resetToken}&type=user`;
+        const fromEmail = process.env.SMTP_FROM || 'Event4U <noreply@event4u.com>';
 
-      // Build reset link - Priority: CUSTOM_DOMAIN > PUBLIC_URL > REPLIT_DEV_DOMAIN > localhost
-      const baseUrl = process.env.CUSTOM_DOMAIN 
-        ? `https://${process.env.CUSTOM_DOMAIN}`
-        : process.env.PUBLIC_URL 
-          ? process.env.PUBLIC_URL.replace(/\/$/, '')
-          : process.env.REPLIT_DEV_DOMAIN 
-            ? `https://${process.env.REPLIT_DEV_DOMAIN}`
-            : 'http://localhost:5000';
-      const resetLink = `${baseUrl}/reset-password?token=${resetToken}`;
-      const fromEmail = process.env.SMTP_FROM || 'Event4U <noreply@event4u.com>';
-
-      try {
-        await emailTransporter.sendMail({
-          from: fromEmail,
-          to: user.email!,
-          subject: 'Reimposta la tua password - Event4U',
-          html: `
-            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-              <h2 style="color: #2563eb;">Reimposta la tua password</h2>
-              <p>Ciao ${user.firstName},</p>
-              <p>Hai richiesto di reimpostare la password del tuo account Event Four You.</p>
-              
-              <div style="background-color: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
-                <p style="margin-top: 0;"><strong>Clicca sul pulsante qui sotto per impostare una nuova password:</strong></p>
-                <a href="${resetLink}" 
-                   style="display: inline-block; background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin: 10px 0;">
-                  Reimposta Password
-                </a>
-                <p style="margin-bottom: 0; font-size: 12px; color: #6b7280;">
-                  Oppure copia e incolla questo link nel browser:<br/>
-                  <span style="word-break: break-all;">${resetLink}</span>
+        try {
+          await emailTransporter.sendMail({
+            from: fromEmail,
+            to: user.email!,
+            subject: 'Reimposta la tua password - Event4U',
+            html: `
+              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                <h2 style="color: #2563eb;">Reimposta la tua password</h2>
+                <p>Ciao ${user.firstName},</p>
+                <p>Hai richiesto di reimpostare la password del tuo account Event Four You.</p>
+                
+                <div style="background-color: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                  <p style="margin-top: 0;"><strong>Clicca sul pulsante qui sotto per impostare una nuova password:</strong></p>
+                  <a href="${resetLink}" 
+                     style="display: inline-block; background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin: 10px 0;">
+                    Reimposta Password
+                  </a>
+                  <p style="margin-bottom: 0; font-size: 12px; color: #6b7280;">
+                    Oppure copia e incolla questo link nel browser:<br/>
+                    <span style="word-break: break-all;">${resetLink}</span>
+                  </p>
+                </div>
+                
+                <p style="color: #dc2626; font-size: 14px;">
+                  <strong>Attenzione:</strong> Questo link scadrà tra 1 ora.
+                </p>
+                
+                <p style="color: #6b7280; font-size: 14px;">
+                  Se non hai richiesto il reset della password, puoi ignorare questa email. La tua password non verrà modificata.
+                </p>
+                
+                <p style="margin-top: 30px;">
+                  <strong>Il Team Event Four You</strong>
                 </p>
               </div>
-              
-              <p style="color: #dc2626; font-size: 14px;">
-                <strong>Attenzione:</strong> Questo link scadrà tra 1 ora.
-              </p>
-              
-              <p style="color: #6b7280; font-size: 14px;">
-                Se non hai richiesto il reset della password, puoi ignorare questa email. La tua password non verrà modificata.
-              </p>
-              
-              <p style="margin-top: 30px;">
-                <strong>Il Team Event Four You</strong>
-              </p>
-            </div>
-          `,
-        });
+            `,
+          });
 
-        res.json({ message: successMessage });
-      } catch (emailError) {
-        console.error("Failed to send password reset email:", emailError);
-        return res.status(500).json({ 
-          message: "Impossibile inviare l'email. Riprova più tardi." 
-        });
+          return res.json({ message: successMessage });
+        } catch (emailError) {
+          console.error("Failed to send password reset email:", emailError);
+          return res.status(500).json({ 
+            message: "Impossibile inviare l'email. Riprova più tardi." 
+          });
+        }
       }
+
+      // If not found in users, try siae_customers table
+      const [customer] = await db
+        .select()
+        .from(siaeCustomers)
+        .where(eq(siaeCustomers.email, normalizedEmail));
+      
+      if (customer) {
+        // Generate reset token for customer
+        const resetToken = crypto.randomBytes(32).toString('hex');
+        const resetExpires = new Date(Date.now() + 3600000);
+
+        await db
+          .update(siaeCustomers)
+          .set({
+            resetPasswordToken: resetToken,
+            resetPasswordExpires: resetExpires,
+          })
+          .where(eq(siaeCustomers.id, customer.id));
+
+        // Build reset link
+        const baseUrl = process.env.CUSTOM_DOMAIN 
+          ? `https://${process.env.CUSTOM_DOMAIN}`
+          : process.env.PUBLIC_URL 
+            ? process.env.PUBLIC_URL.replace(/\/$/, '')
+            : process.env.REPLIT_DEV_DOMAIN 
+              ? `https://${process.env.REPLIT_DEV_DOMAIN}`
+              : 'http://localhost:5000';
+        const resetLink = `${baseUrl}/reset-password?token=${resetToken}&type=customer`;
+        const fromEmail = process.env.SMTP_FROM || 'Event4U <noreply@event4u.com>';
+
+        try {
+          await emailTransporter.sendMail({
+            from: fromEmail,
+            to: customer.email,
+            subject: 'Reimposta la tua password - Event4U',
+            html: `
+              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                <h2 style="color: #2563eb;">Reimposta la tua password</h2>
+                <p>Ciao ${customer.firstName},</p>
+                <p>Hai richiesto di reimpostare la password del tuo account Event Four You.</p>
+                
+                <div style="background-color: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                  <p style="margin-top: 0;"><strong>Clicca sul pulsante qui sotto per impostare una nuova password:</strong></p>
+                  <a href="${resetLink}" 
+                     style="display: inline-block; background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin: 10px 0;">
+                    Reimposta Password
+                  </a>
+                  <p style="margin-bottom: 0; font-size: 12px; color: #6b7280;">
+                    Oppure copia e incolla questo link nel browser:<br/>
+                    <span style="word-break: break-all;">${resetLink}</span>
+                  </p>
+                </div>
+                
+                <p style="color: #dc2626; font-size: 14px;">
+                  <strong>Attenzione:</strong> Questo link scadrà tra 1 ora.
+                </p>
+                
+                <p style="color: #6b7280; font-size: 14px;">
+                  Se non hai richiesto il reset della password, puoi ignorare questa email. La tua password non verrà modificata.
+                </p>
+                
+                <p style="margin-top: 30px;">
+                  <strong>Il Team Event Four You</strong>
+                </p>
+              </div>
+            `,
+          });
+
+          return res.json({ message: successMessage });
+        } catch (emailError) {
+          console.error("Failed to send password reset email:", emailError);
+          return res.status(500).json({ 
+            message: "Impossibile inviare l'email. Riprova più tardi." 
+          });
+        }
+      }
+
+      // Neither found - still return success for security
+      res.json({ message: successMessage });
     } catch (error: any) {
       console.error("Forgot password error:", error);
       res.status(500).json({ message: "Errore durante l'invio. Riprova più tardi." });
     }
   });
 
-  // Reset password with token
+  // Unified Reset password with token - supports both users and customers
   app.post('/api/reset-password', async (req, res) => {
     try {
-      const { token, password } = req.body;
+      const { token, password, type } = req.body;
 
       if (!token || !password) {
         return res.status(400).json({ message: "Token e password richiesti" });
@@ -603,37 +687,64 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "La password deve essere di almeno 8 caratteri" });
       }
 
-      // Find user by reset token
+      // First try users table
       const user = await storage.getUserByResetToken(token);
       
-      if (!user) {
-        return res.status(400).json({ message: "Link non valido o scaduto" });
+      if (user) {
+        // Check if token is expired
+        if (user.resetPasswordExpires && new Date() > new Date(user.resetPasswordExpires)) {
+          return res.status(400).json({ message: "Link scaduto. Richiedi un nuovo reset password." });
+        }
+
+        // Hash new password
+        const passwordHash = await bcrypt.hash(password, 10);
+
+        // Update user with new password and clear reset token
+        await storage.updateUser(user.id, { 
+          passwordHash,
+          resetPasswordToken: null,
+          resetPasswordExpires: null,
+          emailVerified: true // Also verify email since they received the email
+        });
+
+        return res.json({ message: "Password reimpostata con successo! Ora puoi accedere." });
       }
 
-      // Check if token is expired
-      if (user.resetPasswordExpires && new Date() > new Date(user.resetPasswordExpires)) {
-        return res.status(400).json({ message: "Link scaduto. Richiedi un nuovo reset password." });
+      // Try customers table
+      const [customer] = await db
+        .select()
+        .from(siaeCustomers)
+        .where(eq(siaeCustomers.resetPasswordToken, token));
+      
+      if (customer) {
+        if (customer.resetPasswordExpires && new Date() > new Date(customer.resetPasswordExpires)) {
+          return res.status(400).json({ message: "Link scaduto. Richiedi un nuovo reset password." });
+        }
+
+        const passwordHash = await bcrypt.hash(password, 10);
+
+        await db
+          .update(siaeCustomers)
+          .set({
+            passwordHash,
+            resetPasswordToken: null,
+            resetPasswordExpires: null,
+            registrationCompleted: true
+          })
+          .where(eq(siaeCustomers.id, customer.id));
+
+        return res.json({ message: "Password reimpostata con successo! Ora puoi accedere." });
       }
 
-      // Hash new password
-      const passwordHash = await bcrypt.hash(password, 10);
-
-      // Update user with new password and clear reset token
-      await storage.updateUser(user.id, { 
-        passwordHash,
-        resetPasswordToken: null,
-        resetPasswordExpires: null,
-        emailVerified: true // Also verify email since they received the email
-      });
-
-      res.json({ message: "Password reimpostata con successo! Ora puoi accedere." });
+      // Token not found in either table
+      return res.status(400).json({ message: "Link non valido o scaduto" });
     } catch (error: any) {
       console.error("Reset password error:", error);
       res.status(500).json({ message: "Errore durante il reset. Riprova più tardi." });
     }
   });
 
-  // Verify reset token is valid (for frontend validation)
+  // Unified Verify reset token - for frontend validation (checks both users and customers)
   app.get('/api/verify-reset-token/:token', async (req, res) => {
     try {
       const { token } = req.params;
@@ -642,24 +753,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ valid: false, message: "Token mancante" });
       }
 
+      // First try users table
       const user = await storage.getUserByResetToken(token);
       
-      if (!user) {
-        return res.status(400).json({ valid: false, message: "Link non valido" });
+      if (user) {
+        if (user.resetPasswordExpires && new Date() > new Date(user.resetPasswordExpires)) {
+          return res.status(400).json({ valid: false, message: "Link scaduto" });
+        }
+        return res.json({ valid: true, email: user.email, type: 'user' });
       }
 
-      if (user.resetPasswordExpires && new Date() > new Date(user.resetPasswordExpires)) {
-        return res.status(400).json({ valid: false, message: "Link scaduto" });
+      // Try customers table
+      const [customer] = await db
+        .select()
+        .from(siaeCustomers)
+        .where(eq(siaeCustomers.resetPasswordToken, token));
+      
+      if (customer) {
+        if (customer.resetPasswordExpires && new Date() > new Date(customer.resetPasswordExpires)) {
+          return res.status(400).json({ valid: false, message: "Link scaduto" });
+        }
+        return res.json({ valid: true, email: customer.email, type: 'customer' });
       }
 
-      res.json({ valid: true, email: user.email });
+      return res.status(400).json({ valid: false, message: "Link non valido" });
     } catch (error: any) {
       console.error("Verify reset token error:", error);
       res.status(500).json({ valid: false, message: "Errore di verifica" });
     }
   });
 
-  // Classic email/password login
+  // Unified login - supports both users (admin/gestore) and customers (SIAE clients)
   app.post('/api/auth/login', async (req, res) => {
     try {
       const { email, password } = req.body;
@@ -668,44 +792,94 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Email e password richiesti" });
       }
 
-      const user = await storage.getUserByEmail(email);
-      console.log('[Login] Email:', email, 'Found:', !!user, 'Has passwordHash:', !!user?.passwordHash);
-      if (!user || !user.passwordHash) {
-        return res.status(401).json({ message: "Credenziali non valide" });
-      }
-
-      const isValidPassword = await bcrypt.compare(password, user.passwordHash);
-      if (!isValidPassword) {
-        return res.status(401).json({ message: "Credenziali non valide" });
-      }
-
-      // Super admin can login without email verification
-      if (!user.emailVerified && user.role !== 'super_admin') {
-        return res.status(403).json({ message: "Email non verificata" });
-      }
-
-      // Use passport login to properly set up session
-      (req as any).login({ 
-        claims: { sub: user.id, email: user.email },
-        role: user.role,
-        companyId: user.companyId
-      }, (err: any) => {
-        if (err) {
-          console.error("Session creation error:", err);
-          return res.status(500).json({ message: "Login failed" });
+      const normalizedEmail = email.toLowerCase().trim();
+      
+      // First, try to find in users table (admin/gestore/staff)
+      const user = await storage.getUserByEmail(normalizedEmail);
+      console.log('[Login] Email:', normalizedEmail, 'User Found:', !!user);
+      
+      if (user && user.passwordHash) {
+        const isValidPassword = await bcrypt.compare(password, user.passwordHash);
+        if (!isValidPassword) {
+          return res.status(401).json({ message: "Credenziali non valide" });
         }
-        
-        res.json({ 
-          message: "Login successful",
-          user: {
-            id: user.id,
-            email: user.email,
-            firstName: user.firstName,
-            lastName: user.lastName,
-            role: user.role,
+
+        // Super admin can login without email verification
+        if (!user.emailVerified && user.role !== 'super_admin') {
+          return res.status(403).json({ message: "Email non verificata" });
+        }
+
+        // Use passport login to properly set up session
+        return (req as any).login({ 
+          claims: { sub: user.id, email: user.email },
+          role: user.role,
+          companyId: user.companyId,
+          accountType: 'user'
+        }, (err: any) => {
+          if (err) {
+            console.error("Session creation error:", err);
+            return res.status(500).json({ message: "Login failed" });
           }
+          
+          res.json({ 
+            message: "Login successful",
+            user: {
+              id: user.id,
+              email: user.email,
+              firstName: user.firstName,
+              lastName: user.lastName,
+              role: user.role,
+            }
+          });
         });
-      });
+      }
+      
+      // If not found in users, try siae_customers table
+      const [customer] = await db
+        .select()
+        .from(siaeCustomers)
+        .where(eq(siaeCustomers.email, normalizedEmail));
+      
+      console.log('[Login] Customer Found:', !!customer);
+      
+      if (customer && customer.passwordHash) {
+        const isValidPassword = await bcrypt.compare(password, customer.passwordHash);
+        if (!isValidPassword) {
+          return res.status(401).json({ message: "Credenziali non valide" });
+        }
+
+        if (!customer.registrationCompleted) {
+          return res.status(403).json({ message: "Completa la registrazione con OTP" });
+        }
+
+        // Create session for customer
+        return (req as any).login({ 
+          claims: { sub: customer.id, email: customer.email },
+          role: 'cliente',
+          customerId: customer.id,
+          accountType: 'customer'
+        }, (err: any) => {
+          if (err) {
+            console.error("Session creation error:", err);
+            return res.status(500).json({ message: "Login failed" });
+          }
+          
+          res.json({ 
+            message: "Login successful",
+            user: {
+              id: customer.id,
+              email: customer.email,
+              firstName: customer.firstName,
+              lastName: customer.lastName,
+              role: 'cliente',
+            }
+          });
+        });
+      }
+      
+      // Neither user nor customer found
+      return res.status(401).json({ message: "Credenziali non valide" });
+      
     } catch (error: any) {
       console.error("Login error:", error);
       res.status(500).json({ message: "Login failed" });
@@ -757,6 +931,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
             companyId: cashier.companyId,
             isCashier: true,
             cashierType: 'siae'
+          });
+        }
+      }
+      
+      // Check if this is a customer session
+      if (req.user?.accountType === 'customer' && req.user?.customerId) {
+        const [customer] = await db.select().from(siaeCustomers)
+          .where(eq(siaeCustomers.id, req.user.customerId));
+        
+        if (customer) {
+          const { passwordHash, ...customerData } = customer;
+          return res.json({
+            id: customer.id,
+            email: customer.email,
+            firstName: customer.firstName,
+            lastName: customer.lastName,
+            phone: customer.phone,
+            role: 'cliente',
+            isCustomer: true,
+            accountType: 'customer'
           });
         }
       }
