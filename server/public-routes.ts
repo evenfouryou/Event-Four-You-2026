@@ -82,30 +82,46 @@ function getOrCreateSessionId(req: any, res: any): string {
 async function getAuthenticatedCustomer(req: any): Promise<any | null> {
   // Prima prova con la sessione Passport (login unificato)
   if (req.user && req.isAuthenticated && req.isAuthenticated()) {
-    // Utente loggato tramite sessione Passport
-    // Cerca il profilo cliente SIAE collegato all'utente
-    const [customer] = await db
-      .select()
-      .from(siaeCustomers)
-      .where(eq(siaeCustomers.userId, req.user.id));
-    
-    if (customer) {
-      return customer;
+    // Caso 1: Login diretto come cliente (accountType: 'customer')
+    if (req.user.accountType === 'customer' && req.user.customerId) {
+      const [customer] = await db
+        .select()
+        .from(siaeCustomers)
+        .where(eq(siaeCustomers.id, req.user.customerId));
+      
+      if (customer) {
+        return customer;
+      }
     }
     
-    // Se non esiste un profilo SIAE, restituisci i dati base dell'utente
-    // per permettere la creazione on-demand durante il checkout
-    return {
-      id: null,
-      userId: req.user.id,
-      email: req.user.email,
-      firstName: req.user.firstName || '',
-      lastName: req.user.lastName || '',
-      phone: req.user.phone || null,
-      phoneVerified: false,
-      isActive: true,
-      _isUserWithoutSiaeProfile: true,
-    };
+    // Caso 2: Utente admin/gestore loggato - cerca profilo cliente collegato
+    if (req.user.claims?.sub) {
+      const userId = req.user.claims.sub;
+      
+      // Cerca il profilo cliente SIAE collegato all'utente
+      const [customer] = await db
+        .select()
+        .from(siaeCustomers)
+        .where(eq(siaeCustomers.userId, userId));
+      
+      if (customer) {
+        return customer;
+      }
+      
+      // Se non esiste un profilo SIAE, restituisci i dati base dell'utente
+      // per permettere la creazione on-demand durante il checkout
+      return {
+        id: null,
+        userId: userId,
+        email: req.user.claims.email || '',
+        firstName: '',
+        lastName: '',
+        phone: null,
+        phoneVerified: false,
+        isActive: true,
+        _isUserWithoutSiaeProfile: true,
+      };
+    }
   }
   
   // Fallback: prova con Bearer token (legacy)
