@@ -187,7 +187,8 @@ router.get("/api/public/events", async (req, res) => {
         and(
           eq(siaeTicketedEvents.ticketingStatus, "active"),
           eq(events.isPublic, true), // Only show events marked as public
-          gt(events.startDatetime, now),
+          or(eq(events.status, "scheduled"), eq(events.status, "ongoing")), // Include both scheduled and ongoing events
+          gt(events.endDatetime, now), // Event hasn't ended yet
           or(isNull(siaeTicketedEvents.saleStartDate), lte(siaeTicketedEvents.saleStartDate, now)),
           or(isNull(siaeTicketedEvents.saleEndDate), gte(siaeTicketedEvents.saleEndDate, now))
         )
