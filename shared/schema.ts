@@ -2801,9 +2801,11 @@ export const publicCheckoutSessions = pgTable("public_checkout_sessions", {
   stripeClientSecret: varchar("stripe_client_secret", { length: 500 }),
   totalAmount: decimal("total_amount", { precision: 12, scale: 2 }).notNull(),
   currency: varchar("currency", { length: 3 }).notNull().default('EUR'),
-  status: varchar("status", { length: 30 }).notNull().default('pending'), // pending, processing, completed, failed, expired
+  status: varchar("status", { length: 30 }).notNull().default('pending'), // pending, processing, completed, failed, expired, refunded, refund_pending
   cartSnapshot: jsonb("cart_snapshot"), // Snapshot carrello al momento del checkout
   transactionId: varchar("transaction_id").references(() => siaeTransactions.id), // Dopo completamento
+  refundId: varchar("refund_id", { length: 255 }), // Stripe refund ID se stornato
+  refundReason: text("refund_reason"), // Motivo dello storno
   customerIp: varchar("customer_ip", { length: 45 }),
   customerUserAgent: text("customer_user_agent"),
   expiresAt: timestamp("expires_at").notNull(),

@@ -1145,6 +1145,27 @@ router.post("/api/public/checkout/create-payment-intent", async (req, res) => {
       return res.status(401).json({ message: "Devi essere autenticato per procedere al pagamento" });
     }
 
+    // CRITICAL: Verifica smart card SIAE PRIMA di creare il payment intent
+    // Non permettiamo pagamenti se non possiamo emettere sigilli fiscali
+    if (!isBridgeConnected()) {
+      console.log("[PUBLIC] Create payment intent blocked: Desktop bridge not connected");
+      return res.status(503).json({ 
+        message: "Sistema sigilli fiscali non disponibile. L'app desktop Event4U deve essere connessa con la smart card SIAE inserita.",
+        code: "SEAL_BRIDGE_OFFLINE"
+      });
+    }
+
+    const cardReadiness = isCardReadyForSeals();
+    if (!cardReadiness.ready) {
+      console.log(`[PUBLIC] Create payment intent blocked: Card not ready - ${cardReadiness.error}`);
+      return res.status(503).json({ 
+        message: `Smart card SIAE non pronta: ${cardReadiness.error}`,
+        code: "SEAL_CARD_NOT_READY"
+      });
+    }
+    
+    console.log("[PUBLIC] Smart card check passed, proceeding with payment intent creation");
+
     // Se l'utente non ha un profilo SIAE, crealo automaticamente
     if (customer._isUserWithoutSiaeProfile && customer.userId) {
       const uniqueCode = `CL${Date.now().toString(36).toUpperCase()}`;
@@ -1350,21 +1371,73 @@ router.post("/api/public/checkout/confirm", async (req, res) => {
           console.log(`[PUBLIC] Seal received: ${sealData.sealCode}, counter: ${sealData.counter}`);
         } catch (sealError: any) {
           console.error(`[PUBLIC] Failed to get fiscal seal:`, sealError.message);
-          // Se fallisce la generazione sigillo, NON possiamo creare il biglietto
-          // Aggiorna checkout session come in attesa
-          await db
-            .update(publicCheckoutSessions)
-            .set({
-              status: "waiting_for_seal",
-            })
-            .where(eq(publicCheckoutSessions.id, checkoutSessionId));
           
-          return res.status(503).json({
-            message: `Impossibile generare sigillo fiscale: ${sealError.message.replace(/^[A-Z_]+:\s*/, '')}`,
-            code: sealError.message.split(':')[0] || 'SEAL_ERROR',
-            ticketsCreated: tickets.length,
-            ticketsRemaining: cartItems.reduce((sum: number, it: any) => sum + it.quantity, 0) - tickets.length
-          });
+          // CRITICAL: Se il sigillo fallisce DOPO il pagamento, dobbiamo STORNARE il pagamento
+          // Senza sigillo fiscale non possiamo emettere biglietti validi SIAE
+          try {
+            console.log(`[PUBLIC] Initiating refund for payment intent ${paymentIntentId} due to seal failure`);
+            const stripe = await getUncachableStripeClient();
+            
+            // Storna l'intero importo
+            const refund = await stripe.refunds.create({
+              payment_intent: paymentIntentId,
+              reason: 'requested_by_customer',
+              metadata: {
+                reason: 'fiscal_seal_unavailable',
+                sealError: sealError.message,
+                ticketsCreated: tickets.length.toString(),
+              }
+            });
+            
+            console.log(`[PUBLIC] Refund created successfully: ${refund.id}, status: ${refund.status}`);
+            
+            // Aggiorna checkout session come stornata
+            await db
+              .update(publicCheckoutSessions)
+              .set({
+                status: "refunded",
+                refundId: refund.id,
+                refundReason: `Sigillo fiscale non disponibile: ${sealError.message}`,
+              })
+              .where(eq(publicCheckoutSessions.id, checkoutSessionId));
+            
+            // Se abbiamo già creato alcuni biglietti prima del fallimento, li annulliamo
+            if (tickets.length > 0) {
+              for (const createdTicket of tickets) {
+                await db
+                  .update(siaeTickets)
+                  .set({ status: "cancelled" })
+                  .where(eq(siaeTickets.id, createdTicket.id));
+              }
+              console.log(`[PUBLIC] Cancelled ${tickets.length} tickets due to seal failure`);
+            }
+            
+            return res.status(503).json({
+              message: `Impossibile generare sigillo fiscale. Il pagamento è stato stornato automaticamente.`,
+              code: 'SEAL_ERROR_REFUNDED',
+              refunded: true,
+              refundId: refund.id,
+            });
+            
+          } catch (refundError: any) {
+            console.error(`[PUBLIC] Failed to refund payment:`, refundError.message);
+            
+            // Se anche lo storno fallisce, segna come pending per gestione manuale
+            await db
+              .update(publicCheckoutSessions)
+              .set({
+                status: "refund_pending",
+                refundReason: `Sigillo non disponibile: ${sealError.message}. Storno fallito: ${refundError.message}`,
+              })
+              .where(eq(publicCheckoutSessions.id, checkoutSessionId));
+            
+            return res.status(503).json({
+              message: `Errore critico: sigillo fiscale non disponibile e storno fallito. Contatta l'assistenza per il rimborso.`,
+              code: 'SEAL_ERROR_REFUND_FAILED',
+              refunded: false,
+              ticketsCreated: tickets.length,
+            });
+          }
         }
 
         const now = new Date();
