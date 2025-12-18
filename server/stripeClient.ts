@@ -6,8 +6,9 @@ let connectionSettings: any;
 
 async function getCredentials() {
   // First, check for environment variables (works in both dev and production)
-  const envPublishableKey = process.env.STRIPE_PUBLISHABLE_KEY?.replace(/\s/g, '');
-  const envSecretKey = process.env.STRIPE_SECRET_KEY?.replace(/\s/g, '');
+  // Remove whitespace and non-ASCII characters that may have been accidentally copied
+  const envPublishableKey = process.env.STRIPE_PUBLISHABLE_KEY?.replace(/[^a-zA-Z0-9_]/g, '');
+  const envSecretKey = process.env.STRIPE_SECRET_KEY?.replace(/[^a-zA-Z0-9_]/g, '');
   
   if (envPublishableKey && envSecretKey) {
     console.log("[Stripe] Using environment variables for credentials");

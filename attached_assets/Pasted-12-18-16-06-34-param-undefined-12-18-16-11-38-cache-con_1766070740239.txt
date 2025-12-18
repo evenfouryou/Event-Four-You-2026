@@ -1,0 +1,86 @@
+12-18 16:06:34
+param: undefined,
+12-18 16:11:38
+'cache-control': 'no-cache, no-store',
+12-18 16:11:43
+3:11:43 PM [express] DELETE /api/public/cart/366fc814-ad3e-4f2f-9ea4-80fa3172a30c 200 in 104ms :: {"…
+12-18 16:11:43
+3:11:43 PM [express] GET /api/public/cart 200 in 75ms :: {"items":[],"total":0,"itemsCount":0}
+12-18 16:11:45
+eventStatus: ongoing (needs: scheduled/ongoing) ✓
+12-18 16:11:45
+EVENT 1: Prova Davis
+12-18 16:11:45
+Server time NOW: 2025-12-18T15:11:45.360Z
+12-18 16:11:45
+PASSES ALL FILTERS: YES
+12-18 16:11:45
+ticketingStatus: active (needs: active) ✓
+12-18 16:11:45
+EVENT 2: MELONS
+12-18 16:11:45
+ticketingStatus: active (needs: active) ✓
+12-18 16:11:45
+endDatetime: Fri Dec 19 2025 16:30:00 GMT+0000 (Coordinated Universal Time) > 2025-12-18T15:11:45.360Z = true ✓
+12-18 16:11:45
+isPublic: true (needs: true) ✓
+12-18 16:11:45
+isPublic: true (needs: true) ✓
+12-18 16:11:45
+=== PUBLIC EVENTS DEBUG END ===
+12-18 16:11:45
+endDatetime: Sun Dec 21 2025 19:55:00 GMT+0000 (Coordinated Universal Time) > 2025-12-18T15:11:45.360Z = true ✓
+12-18 16:11:45
+=== PUBLIC EVENTS DEBUG START ===
+12-18 16:11:45
+eventStatus: ongoing (needs: scheduled/ongoing) ✓
+12-18 16:11:45
+PASSES ALL FILTERS: YES
+12-18 16:11:45
+3:11:45 PM [express] GET /api/public/events 304 in 132ms :: [{"id":"fe9793b6-c270-4d3f-97d3-fef3957f…
+12-18 16:11:48
+3:11:48 PM [express] GET /api/public/events/ecc3d8e1-00e5-4dbd-9369-6e35ac377fd8 304 in 99ms :: {"id…
+12-18 16:11:49
+3:11:49 PM [express] POST /api/public/cart/add 200 in 107ms :: {"id":"126a4ffe-827b-4823-a50f-f50718…
+12-18 16:11:52
+3:11:52 PM [express] GET /api/public/cart 200 in 74ms :: {"items":[{"id":"126a4ffe-827b-4823-a50f-f5…
+12-18 16:11:53
+[Stripe] Using environment variables for credentials
+12-18 16:11:53
+type: 'StripeAuthenticationError',
+12-18 16:11:53
+},
+12-18 16:11:53
+'strict-transport-security': 'max-age=63072000; includeSubDomains; preload'
+12-18 16:11:53
+'access-control-allow-origin': '*',
+12-18 16:11:53
+'content-type': 'application/json',
+12-18 16:11:53
+'access-control-allow-credentials': 'true',
+12-18 16:11:53
+'content-security-policy': "base-uri 'none'; default-src 'none'; form-action 'none'; frame-ancestors 'none'; img-src 'self'; script-src 'self' 'report-sample'; style-src 'self'; worker-src 'none'; upgrade-insecure-requests; report-uri https://q.stripe.com/csp-violation?q=Qd8CFusGtG9iIyZ76LaKFmqzWUqShxn5SAGRz036dW0sH8i6s8iS-dk6OpFdyRfqFmTkcwAWj0sAI313",
+12-18 16:11:53
+'x-wc': 'ABHIJ',
+12-18 16:11:53
+'access-control-allow-methods': 'GET, HEAD, PUT, PATCH, POST, DELETE',
+12-18 16:11:53
+connection: 'keep-alive',
+12-18 16:11:53
+connection: 'keep-alive',
+12-18 16:11:53
+requestId: undefined,
+12-18 16:11:53
+at process.processTicksAndRejections (node:internal/process/task_queues:95:5) {
+12-18 16:11:53
+'cache-control': 'no-cache, no-store',
+12-18 16:11:53
+'access-control-max-age': '300',
+12-18 16:11:53
+'x-wc': 'ABHIJ',
+12-18 16:11:53
+statusCode: 401,
+12-18 16:11:53
+'www-authenticate': 'Bearer realm="Stripe"',
+12-18 16:11:53
+server: 'nginx',
