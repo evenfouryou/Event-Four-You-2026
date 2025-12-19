@@ -199,6 +199,32 @@ export function setupBridgeRelay(server: Server): void {
             console.log(`[Bridge] Broadcasting status update to all clients:`, JSON.stringify(message).substring(0, 500));
             console.log(`[Bridge] Status payload details:`, JSON.stringify(message.payload, null, 2));
             broadcastToAllClients(message);
+          } else if (message.type === 'STATUS_RESPONSE') {
+            // Handle fresh status response from desktop app (for payment verification)
+            console.log(`[Bridge] STATUS_RESPONSE received: requestId=${message.requestId}`);
+            console.log(`[Bridge] STATUS_RESPONSE payload:`, JSON.stringify(message.payload, null, 2));
+            
+            // Update cached status with fresh data
+            if (message.payload) {
+              cachedBridgeStatus = {
+                type: 'status',
+                data: message.payload,
+                payload: message.payload
+              };
+              cachedBridgeStatusTimestamp = new Date();
+            }
+            
+            // Resolve any pending status request
+            if (pendingStatusRequest) {
+              clearTimeout(pendingStatusRequest.timeout);
+              pendingStatusRequest.resolve({
+                type: 'status',
+                data: message.payload,
+                payload: message.payload
+              });
+              pendingStatusRequest = null;
+              console.log(`[Bridge] Resolved pending status request from STATUS_RESPONSE`);
+            }
           } else if (message.type === 'SEAL_RESPONSE') {
             // Handle seal response from desktop app (for server-side seal requests)
             console.log(`[Bridge] Seal response received: requestId=${message.requestId}`);
@@ -581,12 +607,14 @@ async function requestFreshStatus(): Promise<any> {
     pendingStatusRequest = { resolve, reject, timeout };
     
     // Send status request to bridge
+    const requestId = `status-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     try {
       globalBridge!.ws.send(JSON.stringify({
         type: 'STATUS_REQUEST',
+        requestId,
         timestamp: new Date().toISOString()
       }));
-      console.log(`[Bridge] Sent STATUS_REQUEST to desktop bridge`);
+      console.log(`[Bridge] Sent STATUS_REQUEST to desktop bridge, requestId=${requestId}`);
     } catch (error) {
       clearTimeout(timeout);
       pendingStatusRequest = null;

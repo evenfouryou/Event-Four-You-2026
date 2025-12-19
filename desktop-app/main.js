@@ -1086,6 +1086,66 @@ async function handleRelayCommand(msg) {
         }
       }
       break;
+    
+    case 'STATUS_REQUEST':
+      // Server requests fresh status - used before payment processing
+      // to ensure we have up-to-date reader/card state
+      try {
+        const statusRequestId = msg.requestId;
+        log.info(`[STATUS] Fresh status request received, requestId=${statusRequestId}`);
+        
+        // Perform fresh reader check
+        if (bridgeProcess) {
+          const result = await sendBridgeCommand('CHECK_READER');
+          const wasInserted = currentStatus.cardInserted;
+          
+          updateStatus({
+            readerConnected: result.readerConnected || false,
+            cardInserted: result.cardPresent || false,
+            readerName: result.readerName || null
+          });
+          
+          // If card was removed and is now detected as not present, lock PIN
+          if (wasInserted && !result.cardPresent) {
+            log.info('[STATUS] Card detected as removed during status check');
+            pinLocked = true;
+            pinVerified = false;
+          }
+        }
+        
+        // Send fresh status response back to server
+        if (relayWs && relayWs.readyState === WebSocket.OPEN) {
+          relayWs.send(JSON.stringify({
+            type: 'STATUS_RESPONSE',
+            requestId: statusRequestId,
+            payload: {
+              bridgeConnected: !!bridgeProcess,
+              readerConnected: currentStatus.readerConnected,
+              cardInserted: currentStatus.cardInserted,
+              pinVerified: pinVerified,
+              demoMode: currentStatus.demoMode,
+              timestamp: Date.now()
+            }
+          }));
+          log.info(`[STATUS] Fresh status sent: reader=${currentStatus.readerConnected}, card=${currentStatus.cardInserted}, pin=${pinVerified}`);
+        }
+      } catch (err) {
+        log.error(`[STATUS] Error processing status request: ${err.message}`);
+        if (relayWs && relayWs.readyState === WebSocket.OPEN) {
+          relayWs.send(JSON.stringify({
+            type: 'STATUS_RESPONSE',
+            requestId: msg.requestId,
+            payload: {
+              bridgeConnected: !!bridgeProcess,
+              readerConnected: false,
+              cardInserted: false,
+              pinVerified: false,
+              error: err.message
+            }
+          }));
+        }
+      }
+      break;
       
     default:
       log.warn('Unknown relay command:', msg.type);
