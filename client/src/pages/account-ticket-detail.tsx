@@ -7,13 +7,13 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
+import { DigitalTicketCard } from "@/components/DigitalTicketCard";
 import {
   ChevronLeft,
   Calendar,
   MapPin,
   Ticket,
   User,
-  QrCode,
   RefreshCw,
   Tag,
   XCircle,
@@ -223,20 +223,9 @@ export default function AccountTicketDetail() {
             </div>
           )}
 
-          {ticket.qrCode && ticket.status === "emitted" && !ticket.isListed && (
-            <div className="flex flex-col items-center py-4 sm:py-6 border-y border-border">
-              <div className="bg-white p-3 sm:p-4 rounded-xl mb-3 sm:mb-4">
-                <img
-                  src={ticket.qrCode}
-                  alt="QR Code biglietto"
-                  className="w-36 h-36 sm:w-48 sm:h-48"
-                  data-testid="img-qrcode"
-                />
-              </div>
-              <p className="text-sm text-muted-foreground flex items-center gap-2">
-                <QrCode className="w-4 h-4" />
-                Mostra questo QR code all'ingresso
-              </p>
+          {ticket.status === "emitted" && !ticket.isListed && (
+            <div className="py-4 sm:py-6 border-y border-border">
+              <DigitalTicketCard ticket={ticket} />
             </div>
           )}
 
