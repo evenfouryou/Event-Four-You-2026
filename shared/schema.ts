@@ -3673,6 +3673,80 @@ export type TicketTemplateElement = typeof ticketTemplateElements.$inferSelect;
 export type InsertTicketTemplateElement = z.infer<typeof insertTicketTemplateElementSchema>;
 export type UpdateTicketTemplateElement = z.infer<typeof updateTicketTemplateElementSchema>;
 
+// ==================== DIGITAL TICKET TEMPLATES ====================
+
+// Digital Ticket Templates - for customer-facing digital tickets (PDF/mobile view)
+export const digitalTicketTemplates = pgTable("digital_ticket_templates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").references(() => companies.id), // null = global/system template
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  isDefault: boolean("is_default").notNull().default(false),
+  isActive: boolean("is_active").notNull().default(true),
+  
+  // Visual Configuration
+  primaryColor: varchar("primary_color", { length: 7 }).default("#6366f1"), // Hex color
+  secondaryColor: varchar("secondary_color", { length: 7 }).default("#4f46e5"),
+  backgroundColor: varchar("background_color", { length: 7 }).default("#1e1b4b"),
+  textColor: varchar("text_color", { length: 7 }).default("#ffffff"),
+  accentColor: varchar("accent_color", { length: 7 }).default("#a855f7"),
+  
+  // Logo
+  logoUrl: text("logo_url"), // URL to company/event logo
+  logoPosition: varchar("logo_position", { length: 20 }).default("top-center"), // top-left, top-center, top-right
+  logoSize: varchar("logo_size", { length: 20 }).default("medium"), // small, medium, large
+  
+  // QR Code Configuration
+  qrSize: integer("qr_size").default(200), // Size in pixels
+  qrPosition: varchar("qr_position", { length: 20 }).default("center"), // center, bottom-center, bottom-left
+  qrStyle: varchar("qr_style", { length: 20 }).default("square"), // square, rounded, dots
+  qrForegroundColor: varchar("qr_foreground_color", { length: 7 }).default("#ffffff"),
+  qrBackgroundColor: varchar("qr_background_color", { length: 7 }).default("transparent"),
+  
+  // Background Style
+  backgroundStyle: varchar("background_style", { length: 20 }).default("gradient"), // solid, gradient, pattern
+  gradientDirection: varchar("gradient_direction", { length: 20 }).default("to-bottom"), // to-bottom, to-right, radial
+  backgroundPattern: varchar("background_pattern", { length: 50 }), // Optional pattern name
+  
+  // Layout Configuration
+  showEventName: boolean("show_event_name").notNull().default(true),
+  showEventDate: boolean("show_event_date").notNull().default(true),
+  showEventTime: boolean("show_event_time").notNull().default(true),
+  showVenue: boolean("show_venue").notNull().default(true),
+  showPrice: boolean("show_price").notNull().default(true),
+  showTicketType: boolean("show_ticket_type").notNull().default(true),
+  showSector: boolean("show_sector").notNull().default(true),
+  showSeat: boolean("show_seat").notNull().default(false),
+  showBuyerName: boolean("show_buyer_name").notNull().default(true),
+  showFiscalSeal: boolean("show_fiscal_seal").notNull().default(true),
+  showPerforatedEdge: boolean("show_perforated_edge").notNull().default(true),
+  
+  // Font Configuration
+  fontFamily: varchar("font_family", { length: 100 }).default("Inter, system-ui, sans-serif"),
+  titleFontSize: integer("title_font_size").default(24),
+  bodyFontSize: integer("body_font_size").default(14),
+  
+  // Metadata
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const digitalTicketTemplatesRelations = relations(digitalTicketTemplates, ({ one }) => ({
+  company: one(companies, {
+    fields: [digitalTicketTemplates.companyId],
+    references: [companies.id],
+  }),
+}));
+
+export const insertDigitalTicketTemplateSchema = createInsertSchema(digitalTicketTemplates).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertDigitalTicketTemplate = z.infer<typeof insertDigitalTicketTemplateSchema>;
+export type DigitalTicketTemplate = typeof digitalTicketTemplates.$inferSelect;
+
 // ==================== EVENT FOUR YOU - LISTE & TAVOLI ====================
 
 // Event Lists - Liste per evento
