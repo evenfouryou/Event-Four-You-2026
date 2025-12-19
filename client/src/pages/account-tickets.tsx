@@ -83,6 +83,7 @@ interface TableReservationItem {
 interface TicketsResponse {
   upcoming: TicketItem[];
   past: TicketItem[];
+  cancelled: TicketItem[];
   total: number;
 }
 
@@ -393,6 +394,7 @@ export default function AccountTickets() {
 
   const upcomingTickets = ticketsData?.upcoming || [];
   const pastTickets = ticketsData?.past || [];
+  const cancelledTickets = ticketsData?.cancelled || [];
   const upcomingGuestEntries = guestEntriesData?.upcoming || [];
   const pastGuestEntries = guestEntriesData?.past || [];
   const allGuestEntries = [...upcomingGuestEntries, ...pastGuestEntries];
@@ -418,31 +420,38 @@ export default function AccountTickets() {
       </div>
 
       <Tabs defaultValue="upcoming" className="space-y-4 sm:space-y-6">
-        <TabsList className="bg-card border border-border grid w-full grid-cols-2 sm:grid-cols-4 h-auto">
+        <TabsList className="bg-card border border-border grid w-full grid-cols-3 sm:grid-cols-5 h-auto">
           <TabsTrigger
             value="upcoming"
-            className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+            className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground text-xs sm:text-sm"
             data-testid="tab-upcoming"
           >
             Prossimi ({upcomingTickets.length})
           </TabsTrigger>
           <TabsTrigger
             value="past"
-            className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+            className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground text-xs sm:text-sm"
             data-testid="tab-past"
           >
             Passati ({pastTickets.length})
           </TabsTrigger>
           <TabsTrigger
+            value="cancelled"
+            className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground text-xs sm:text-sm"
+            data-testid="tab-cancelled"
+          >
+            Annullati ({cancelledTickets.length})
+          </TabsTrigger>
+          <TabsTrigger
             value="lists"
-            className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+            className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground text-xs sm:text-sm"
             data-testid="tab-lists"
           >
             Liste ({allGuestEntries.length})
           </TabsTrigger>
           <TabsTrigger
             value="tables"
-            className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+            className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground text-xs sm:text-sm"
             data-testid="tab-tables"
           >
             Tavoli ({allTableReservations.length})
@@ -479,6 +488,21 @@ export default function AccountTickets() {
             </Card>
           ) : (
             pastTickets.map((ticket) => (
+              <TicketCard key={ticket.id} ticket={ticket} />
+            ))
+          )}
+        </TabsContent>
+
+        <TabsContent value="cancelled" className="space-y-4">
+          {cancelledTickets.length === 0 ? (
+            <Card>
+              <CardContent className="py-12 text-center">
+                <TicketX className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                <p className="text-muted-foreground">Non hai biglietti annullati</p>
+              </CardContent>
+            </Card>
+          ) : (
+            cancelledTickets.map((ticket) => (
               <TicketCard key={ticket.id} ticket={ticket} />
             ))
           )}

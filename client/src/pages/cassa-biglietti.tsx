@@ -55,6 +55,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -103,6 +104,7 @@ export default function CassaBigliettiPage() {
   const [isCancelDialogOpen, setIsCancelDialogOpen] = useState(false);
   const [ticketToCancel, setTicketToCancel] = useState<SiaeTicket | null>(null);
   const [cancelReason, setCancelReason] = useState<string>("");
+  const [refundOnCancel, setRefundOnCancel] = useState(false);
   const [isC1DialogOpen, setIsC1DialogOpen] = useState(false);
   const [isNominative, setIsNominative] = useState<boolean>(false);
   const [ticketQuantity, setTicketQuantity] = useState<number>(1);
@@ -487,19 +489,33 @@ export default function CassaBigliettiPage() {
   });
 
   const cancelTicketMutation = useMutation({
-    mutationFn: async ({ ticketId, reasonCode, note }: { ticketId: string; reasonCode: string; note?: string }) => {
-      const response = await apiRequest("PATCH", `/api/siae/tickets/${ticketId}/cancel`, { reasonCode, note });
+    mutationFn: async ({ ticketId, reasonCode, note, refund }: { ticketId: string; reasonCode: string; note?: string; refund?: boolean }) => {
+      const response = await apiRequest("POST", `/api/siae/tickets/${ticketId}/cancel`, { 
+        reasonCode, 
+        note,
+        refund,
+        refundReason: refund ? `Annullamento biglietto - Causale: ${reasonCode}` : undefined
+      });
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/cashiers/events", selectedEventId] });
       setIsCancelDialogOpen(false);
       setTicketToCancel(null);
       setCancelReason("");
-      toast({
-        title: "Biglietto Annullato",
-        description: "Il biglietto è stato annullato con successo.",
-      });
+      setRefundOnCancel(false);
+      
+      if (data.refunded) {
+        toast({
+          title: "Biglietto Annullato e Rimborsato",
+          description: `Il biglietto è stato annullato e rimborsato €${data.refundedAmount}`,
+        });
+      } else {
+        toast({
+          title: "Biglietto Annullato",
+          description: "Il biglietto è stato annullato con successo.",
+        });
+      }
     },
     onError: (error: any) => {
       let title = "Errore Annullamento";
@@ -1470,6 +1486,7 @@ export default function CassaBigliettiPage() {
         if (!open) {
           setCancelReasonCode("");
           setCancelNote("");
+          setRefundOnCancel(false);
         }
       }}>
         <AlertDialogContent>
@@ -1524,6 +1541,25 @@ export default function CassaBigliettiPage() {
                 data-testid="input-cancel-note"
               />
             </div>
+            
+            {ticketToCancel?.transactionId && (
+              <div className="flex items-center space-x-2 p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg">
+                <Checkbox 
+                  id="refund-checkbox-cassa" 
+                  checked={refundOnCancel} 
+                  onCheckedChange={(checked) => setRefundOnCancel(checked === true)}
+                  data-testid="checkbox-refund"
+                />
+                <div className="flex flex-col">
+                  <Label htmlFor="refund-checkbox-cassa" className="text-sm font-medium cursor-pointer">
+                    Rimborsa via Stripe
+                  </Label>
+                  <span className="text-xs text-muted-foreground">
+                    Il cliente riceverà il rimborso automaticamente
+                  </span>
+                </div>
+              </div>
+            )}
           </div>
           <AlertDialogFooter>
             <AlertDialogCancel data-testid="button-cancel-dialog-cancel">Annulla</AlertDialogCancel>
@@ -1536,6 +1572,7 @@ export default function CassaBigliettiPage() {
                     ticketId: ticketToCancel.id,
                     reasonCode: cancelReasonCode,
                     note: cancelNote?.trim() || undefined,
+                    refund: refundOnCancel,
                   });
                 }
               }}

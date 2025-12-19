@@ -2263,6 +2263,10 @@ router.get("/api/public/account/tickets", async (req, res) => {
         }
       }
 
+      const emittedAt = ticket.emissionDate 
+        ? new Date(ticket.emissionDate).toISOString() 
+        : null;
+
       return {
         id: ticket.id,
         ticketCode: ticket.ticketCode,
@@ -2272,6 +2276,7 @@ router.get("/api/public/account/tickets", async (req, res) => {
         participantLastName: ticket.participantLastName,
         status: ticket.status,
         emissionDate: ticket.emissionDate,
+        emittedAt,
         qrCode: ticket.qrCode,
         sectorName,
         eventName,
@@ -2282,18 +2287,24 @@ router.get("/api/public/account/tickets", async (req, res) => {
       };
     }));
 
-    // Separa biglietti futuri/passati
+    // Separa biglietti futuri/passati/annullati
     const now = new Date();
-    const upcoming = tickets.filter(t => t.eventStart && new Date(t.eventStart) >= now && t.status === 'emitted');
-    const past = tickets.filter(t => !t.eventStart || new Date(t.eventStart) < now || t.status !== 'emitted');
+    const cancelled = tickets.filter(t => t.status === 'cancelled');
+    const active = tickets.filter(t => t.status !== 'cancelled');
+    const upcoming = active.filter(t => t.eventStart && new Date(t.eventStart) >= now && t.status === 'emitted');
+    const past = active.filter(t => !t.eventStart || new Date(t.eventStart) < now || t.status !== 'emitted');
 
     // Ordina per data evento decrescente
     upcoming.sort((a, b) => (b.eventStart ? new Date(b.eventStart).getTime() : 0) - (a.eventStart ? new Date(a.eventStart).getTime() : 0));
     past.sort((a, b) => (b.eventStart ? new Date(b.eventStart).getTime() : 0) - (a.eventStart ? new Date(a.eventStart).getTime() : 0));
 
+    // Ordina annullati per data decrescente
+    cancelled.sort((a, b) => (b.eventStart ? new Date(b.eventStart).getTime() : 0) - (a.eventStart ? new Date(a.eventStart).getTime() : 0));
+
     res.json({
       upcoming,
       past,
+      cancelled,
       total: tickets.length,
     });
   } catch (error: any) {
