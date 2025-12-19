@@ -20,6 +20,17 @@ let globalBridge: BridgeConnection | null = null;
 
 // Cached status from bridge - sent immediately to new clients
 let cachedBridgeStatus: any = null;
+let cachedBridgeStatusTimestamp: Date | null = null;
+
+// Pending status request promise for synchronous status fetching
+let pendingStatusRequest: {
+  resolve: (status: any) => void;
+  reject: (error: Error) => void;
+  timeout: NodeJS.Timeout;
+} | null = null;
+
+const STATUS_REQUEST_TIMEOUT = 3000; // 3 seconds timeout for status request
+const STATUS_MAX_AGE = 30000; // 30 seconds - consider status stale after this
 
 interface ClientConnection {
   ws: WebSocket;
@@ -172,8 +183,18 @@ export function setupBridgeRelay(server: Server): void {
         } else if (connectionType === 'bridge') {
           // Messages from the bridge
           if (message.type === 'status') {
-            // Cache the status for new clients
+            // Cache the status for new clients with timestamp
             cachedBridgeStatus = message;
+            cachedBridgeStatusTimestamp = new Date();
+            
+            // Resolve any pending status request
+            if (pendingStatusRequest) {
+              clearTimeout(pendingStatusRequest.timeout);
+              pendingStatusRequest.resolve(message);
+              pendingStatusRequest = null;
+              console.log(`[Bridge] Resolved pending status request`);
+            }
+            
             // Bridge status update - broadcast to ALL clients
             console.log(`[Bridge] Broadcasting status update to all clients:`, JSON.stringify(message).substring(0, 500));
             console.log(`[Bridge] Status payload details:`, JSON.stringify(message.payload, null, 2));
@@ -212,6 +233,15 @@ export function setupBridgeRelay(server: Server): void {
       if (connectionType === 'bridge') {
         globalBridge = null;
         cachedBridgeStatus = null; // Clear cached status when bridge disconnects
+        cachedBridgeStatusTimestamp = null;
+        
+        // Reject any pending status request
+        if (pendingStatusRequest) {
+          clearTimeout(pendingStatusRequest.timeout);
+          pendingStatusRequest.reject(new Error('Bridge disconnected'));
+          pendingStatusRequest = null;
+        }
+        
         // Notify ALL clients that bridge disconnected
         notifyAllClientsOfBridgeStatus(false);
         console.log(`[Bridge] Global bridge disconnected`);
@@ -531,7 +561,77 @@ function generateRequestId(): string {
   return `seal_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 }
 
-// Check if card is ready for seal emission
+// Request a fresh status from the desktop bridge
+async function requestFreshStatus(): Promise<any> {
+  console.log(`[Bridge] Requesting fresh status from desktop bridge`);
+  
+  if (!globalBridge || globalBridge.ws.readyState !== WebSocket.OPEN) {
+    throw new Error('Bridge not connected');
+  }
+  
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      if (pendingStatusRequest) {
+        pendingStatusRequest = null;
+        console.log(`[Bridge] Status request timeout`);
+        reject(new Error('Status request timeout'));
+      }
+    }, STATUS_REQUEST_TIMEOUT);
+    
+    pendingStatusRequest = { resolve, reject, timeout };
+    
+    // Send status request to bridge
+    try {
+      globalBridge!.ws.send(JSON.stringify({
+        type: 'STATUS_REQUEST',
+        timestamp: new Date().toISOString()
+      }));
+      console.log(`[Bridge] Sent STATUS_REQUEST to desktop bridge`);
+    } catch (error) {
+      clearTimeout(timeout);
+      pendingStatusRequest = null;
+      reject(error);
+    }
+  });
+}
+
+// Check if cached status is fresh enough
+function isStatusFresh(): boolean {
+  if (!cachedBridgeStatusTimestamp) return false;
+  const age = Date.now() - cachedBridgeStatusTimestamp.getTime();
+  return age < STATUS_MAX_AGE;
+}
+
+// Ensure we have fresh status before checking card readiness (async version)
+export async function ensureCardReadyForSeals(): Promise<{ ready: boolean; error: string | null }> {
+  console.log(`[Bridge] ensureCardReadyForSeals called`);
+  
+  // If no bridge connected, fail fast
+  if (!globalBridge || globalBridge.ws.readyState !== WebSocket.OPEN) {
+    console.log(`[Bridge] Bridge not connected`);
+    return { ready: false, error: 'App desktop Event4U non connessa' };
+  }
+  
+  // If status is stale or missing, request a fresh one
+  if (!cachedBridgeStatus || !isStatusFresh()) {
+    console.log(`[Bridge] Status is stale or missing, requesting fresh status`);
+    try {
+      await requestFreshStatus();
+      console.log(`[Bridge] Got fresh status`);
+    } catch (error) {
+      console.log(`[Bridge] Failed to get fresh status: ${error}`);
+      // Continue with stale status if we have one, otherwise fail
+      if (!cachedBridgeStatus) {
+        return { ready: false, error: 'Impossibile ottenere stato Smart Card' };
+      }
+    }
+  }
+  
+  // Now check the status
+  return isCardReadyForSeals();
+}
+
+// Check if card is ready for seal emission (sync version - uses cached status)
 export function isCardReadyForSeals(): { ready: boolean; error: string | null } {
   console.log(`[Bridge] isCardReadyForSeals called`);
   console.log(`[Bridge] globalBridge exists: ${!!globalBridge}`);

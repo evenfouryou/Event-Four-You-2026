@@ -7,7 +7,8 @@ import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import { 
   requestFiscalSeal, 
-  isCardReadyForSeals, 
+  isCardReadyForSeals,
+  ensureCardReadyForSeals,
   isBridgeConnected,
   type FiscalSealData 
 } from "./bridge-relay";
@@ -1147,20 +1148,20 @@ router.post("/api/public/checkout/create-payment-intent", async (req, res) => {
 
     // CRITICAL: Verifica smart card SIAE PRIMA di creare il payment intent
     // Non permettiamo pagamenti se non possiamo emettere sigilli fiscali
-    if (!isBridgeConnected()) {
-      console.log("[PUBLIC] Create payment intent blocked: Desktop bridge not connected");
-      return res.status(503).json({ 
-        message: "Sistema sigilli fiscali non disponibile. L'app desktop Event4U deve essere connessa con la smart card SIAE inserita.",
-        code: "SEAL_BRIDGE_OFFLINE"
-      });
-    }
-
-    const cardReadiness = isCardReadyForSeals();
+    // Uso versione async che richiede uno status fresco dal bridge se necessario
+    const cardReadiness = await ensureCardReadyForSeals();
     if (!cardReadiness.ready) {
       console.log(`[PUBLIC] Create payment intent blocked: Card not ready - ${cardReadiness.error}`);
+      
+      // Determina il codice errore appropriato
+      const errorCode = !isBridgeConnected() ? "SEAL_BRIDGE_OFFLINE" : "SEAL_CARD_NOT_READY";
+      const errorMessage = !isBridgeConnected() 
+        ? "Sistema sigilli fiscali non disponibile. L'app desktop Event4U deve essere connessa con la smart card SIAE inserita."
+        : `Smart card SIAE non pronta: ${cardReadiness.error}`;
+      
       return res.status(503).json({ 
-        message: `Smart card SIAE non pronta: ${cardReadiness.error}`,
-        code: "SEAL_CARD_NOT_READY"
+        message: errorMessage,
+        code: errorCode
       });
     }
     
