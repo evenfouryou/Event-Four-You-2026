@@ -2054,7 +2054,7 @@ export default function EventHub() {
                   <Button 
                     variant="outline" 
                     className="h-auto py-6 flex items-center justify-between gap-4 hover-elevate"
-                    onClick={() => navigate('/siae/transactions')}
+                    onClick={() => navigate(`/siae/transactions/${ticketedEvent?.id}`)}
                     data-testid="btn-view-all-transactions"
                   >
                     <div className="flex items-center gap-3">
@@ -2069,7 +2069,7 @@ export default function EventHub() {
                   <Button 
                     variant="outline" 
                     className="h-auto py-6 flex items-center justify-between gap-4 hover-elevate"
-                    onClick={() => navigate('/siae/tickets')}
+                    onClick={() => navigate(`/siae/tickets/${ticketedEvent?.id}`)}
                     data-testid="btn-view-all-tickets"
                   >
                     <div className="flex items-center gap-3">

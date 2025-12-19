@@ -1,11 +1,13 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useRoute, useLocation } from "wouter";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
 import { useAuth } from "@/hooks/useAuth";
 import {
   type SiaeTransaction,
   type SiaeTicketedEvent,
+  type Event,
 } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -51,28 +53,35 @@ import {
   XCircle,
   AlertCircle,
   RefreshCcw,
+  ArrowLeft,
 } from "lucide-react";
 import { motion } from "framer-motion";
 
 export default function SiaeTransactionsPage() {
   const { user } = useAuth();
-  const [selectedEventId, setSelectedEventId] = useState<string>("");
+  const [, navigate] = useLocation();
+  const [, params] = useRoute("/siae/transactions/:eventId");
+  const eventId = params?.eventId || "";
+  
   const [selectedTransaction, setSelectedTransaction] = useState<SiaeTransaction | null>(null);
   const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [dateRange, setDateRange] = useState<string>("all");
 
-  const companyId = user?.companyId;
+  const { data: ticketedEvent } = useQuery<SiaeTicketedEvent>({
+    queryKey: ['/api/siae/ticketed-events', eventId],
+    enabled: !!eventId,
+  });
 
-  const { data: ticketedEvents } = useQuery<SiaeTicketedEvent[]>({
-    queryKey: ['/api/siae/companies', companyId, 'ticketed-events'],
-    enabled: !!companyId,
+  const { data: baseEvent } = useQuery<Event>({
+    queryKey: ['/api/events', ticketedEvent?.eventId],
+    enabled: !!ticketedEvent?.eventId,
   });
 
   const { data: transactions, isLoading: transactionsLoading } = useQuery<SiaeTransaction[]>({
-    queryKey: ['/api/siae/ticketed-events', selectedEventId, 'transactions'],
-    enabled: !!selectedEventId,
+    queryKey: ['/api/siae/ticketed-events', eventId, 'transactions'],
+    enabled: !!eventId,
   });
 
   const getStatusBadge = (status: string) => {
@@ -164,14 +173,24 @@ export default function SiaeTransactionsPage() {
   return (
     <div className="p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6" data-testid="page-siae-transactions">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-foreground flex items-center gap-2 sm:gap-3" data-testid="page-title">
-            <Receipt className="w-6 h-6 sm:w-8 sm:h-8 text-[#FFD700] flex-shrink-0" />
-            Transazioni SIAE
-          </h1>
-          <p className="text-muted-foreground mt-1 text-sm sm:text-base">
-            Monitora le transazioni di acquisto biglietti
-          </p>
+        <div className="flex items-center gap-3">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => navigate(`/events/${ticketedEvent?.eventId}/hub`)}
+            data-testid="button-back"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <div>
+            <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-foreground flex items-center gap-2 sm:gap-3" data-testid="page-title">
+              <Receipt className="w-6 h-6 sm:w-8 sm:h-8 text-[#FFD700] flex-shrink-0" />
+              Transazioni
+            </h1>
+            <p className="text-muted-foreground mt-1 text-sm sm:text-base">
+              {baseEvent?.name || "Caricamento..."}
+            </p>
+          </div>
         </div>
         <Button variant="outline" className="w-full sm:w-auto" data-testid="button-export">
           <Download className="w-4 h-4 mr-2" />
@@ -183,71 +202,52 @@ export default function SiaeTransactionsPage() {
         <CardContent className="p-3 sm:p-4">
           <div className="flex flex-col md:flex-row gap-2 sm:gap-4">
             <div className="flex-1">
-              <label className="text-sm font-medium mb-2 block">Seleziona Evento</label>
-              <Select value={selectedEventId} onValueChange={setSelectedEventId}>
-                <SelectTrigger data-testid="select-event-filter">
-                  <SelectValue placeholder="Seleziona un evento" />
+              <label className="text-sm font-medium mb-2 block">Cerca</label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                <Input
+                  placeholder="Cerca per codice, cliente..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10"
+                  data-testid="input-search"
+                />
+              </div>
+            </div>
+            <div className="w-full md:w-40">
+              <label className="text-sm font-medium mb-2 block">Stato</label>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger data-testid="select-status-filter">
+                  <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {ticketedEvents?.map((event) => (
-                    <SelectItem key={event.id} value={event.id}>
-                      Evento #{event.id.slice(0, 8)} - {event.ticketingStatus}
-                    </SelectItem>
-                  ))}
+                  <SelectItem value="all">Tutti</SelectItem>
+                  <SelectItem value="completed">Completate</SelectItem>
+                  <SelectItem value="pending">In Attesa</SelectItem>
+                  <SelectItem value="failed">Fallite</SelectItem>
+                  <SelectItem value="refunded">Rimborsate</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-            {selectedEventId && (
-              <>
-                <div className="flex-1">
-                  <label className="text-sm font-medium mb-2 block">Cerca</label>
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-                    <Input
-                      placeholder="Cerca per codice, cliente..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="pl-10"
-                      data-testid="input-search"
-                    />
-                  </div>
-                </div>
-                <div className="w-full md:w-40">
-                  <label className="text-sm font-medium mb-2 block">Stato</label>
-                  <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger data-testid="select-status-filter">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Tutti</SelectItem>
-                      <SelectItem value="completed">Completate</SelectItem>
-                      <SelectItem value="pending">In Attesa</SelectItem>
-                      <SelectItem value="failed">Fallite</SelectItem>
-                      <SelectItem value="refunded">Rimborsate</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="w-full md:w-40">
-                  <label className="text-sm font-medium mb-2 block">Periodo</label>
-                  <Select value={dateRange} onValueChange={setDateRange}>
-                    <SelectTrigger data-testid="select-date-filter">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Tutto</SelectItem>
-                      <SelectItem value="today">Oggi</SelectItem>
-                      <SelectItem value="week">Ultima settimana</SelectItem>
-                      <SelectItem value="month">Ultimo mese</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </>
-            )}
+            <div className="w-full md:w-40">
+              <label className="text-sm font-medium mb-2 block">Periodo</label>
+              <Select value={dateRange} onValueChange={setDateRange}>
+                <SelectTrigger data-testid="select-date-filter">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tutto</SelectItem>
+                  <SelectItem value="today">Oggi</SelectItem>
+                  <SelectItem value="week">Ultima settimana</SelectItem>
+                  <SelectItem value="month">Ultimo mese</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </CardContent>
       </Card>
 
-      {selectedEventId && (
+      {eventId && (
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
           <Card className="glass-card">
             <CardContent className="p-4">
@@ -296,19 +296,7 @@ export default function SiaeTransactionsPage() {
         </div>
       )}
 
-      {!selectedEventId ? (
-        <Card className="glass-card" data-testid="card-empty-state">
-          <CardContent className="p-12 text-center">
-            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-[#FFD700]/10 flex items-center justify-center">
-              <Receipt className="w-8 h-8 text-[#FFD700]" />
-            </div>
-            <h3 className="text-lg font-semibold mb-2">Seleziona un Evento</h3>
-            <p className="text-muted-foreground">
-              Seleziona un evento per visualizzare le transazioni
-            </p>
-          </CardContent>
-        </Card>
-      ) : transactionsLoading ? (
+      {transactionsLoading ? (
         <Card className="glass-card">
           <CardContent className="p-6 space-y-4">
             {[1, 2, 3].map((i) => (

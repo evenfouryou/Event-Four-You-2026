@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useRoute, useLocation } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -16,6 +17,7 @@ import {
   type SiaeCustomer,
   type SiaeCancellationReason,
   type SiaeTicketType,
+  type Event,
 } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -104,6 +106,7 @@ import {
   Lock,
   Settings,
   Info,
+  ArrowLeft,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { smartCardService, useSmartCardStatus } from "@/lib/smart-card-service";
@@ -125,12 +128,15 @@ type EmissionFormData = z.infer<typeof emissionFormSchema>;
 export default function SiaeTicketsPage() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const [, navigate] = useLocation();
+  const [, params] = useRoute("/siae/tickets/:eventId");
+  const eventId = params?.eventId || "";
+  
   const smartCardStatus = useSmartCardStatus();
   const [isEmissionDialogOpen, setIsEmissionDialogOpen] = useState(false);
   const [isCancelDialogOpen, setIsCancelDialogOpen] = useState(false);
   const [isValidateDialogOpen, setIsValidateDialogOpen] = useState(false);
   const [selectedTicket, setSelectedTicket] = useState<SiaeTicket | null>(null);
-  const [selectedEventId, setSelectedEventId] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [cancelReasonCode, setCancelReasonCode] = useState("");
@@ -141,19 +147,29 @@ export default function SiaeTicketsPage() {
   
   const cardReadiness = smartCardService.isReadyForEmission();
 
+  const { data: ticketedEvent } = useQuery<SiaeTicketedEvent>({
+    queryKey: ['/api/siae/ticketed-events', eventId],
+    enabled: !!eventId,
+  });
+
+  const { data: baseEvent } = useQuery<Event>({
+    queryKey: ['/api/events', ticketedEvent?.eventId],
+    enabled: !!ticketedEvent?.eventId,
+  });
+
   const { data: ticketedEvents } = useQuery<SiaeTicketedEvent[]>({
     queryKey: ['/api/siae/companies', companyId, 'ticketed-events'],
     enabled: !!companyId,
   });
 
   const { data: tickets, isLoading: ticketsLoading } = useQuery<SiaeTicket[]>({
-    queryKey: ['/api/siae/ticketed-events', selectedEventId, 'tickets'],
-    enabled: !!selectedEventId,
+    queryKey: ['/api/siae/ticketed-events', eventId, 'tickets'],
+    enabled: !!eventId,
   });
 
   const { data: sectors, isLoading: sectorsLoading } = useQuery<SiaeEventSector[]>({
-    queryKey: ['/api/siae/ticketed-events', selectedEventId, 'sectors'],
-    enabled: !!selectedEventId,
+    queryKey: ['/api/siae/ticketed-events', eventId, 'sectors'],
+    enabled: !!eventId,
   });
 
   const { data: customers } = useQuery<SiaeCustomer[]>({
@@ -199,7 +215,7 @@ export default function SiaeTicketsPage() {
   const selectedEventDetails = ticketedEvents?.find(e => e.id === selectedEventForForm);
   const isNominativeRequired = selectedEventDetails?.requiresNominative || false;
   
-  const currentEventDetails = ticketedEvents?.find(e => e.id === selectedEventId);
+  const currentEventDetails = ticketedEvents?.find(e => e.id === eventId);
   
   useEffect(() => {
     if (hasSingleSector && formSectors && formSectors[0]) {
@@ -401,7 +417,7 @@ export default function SiaeTicketsPage() {
   };
 
   const filteredTickets = tickets?.filter((ticket) => {
-    if (ticket.ticketedEventId !== selectedEventId) return false;
+    if (ticket.ticketedEventId !== eventId) return false;
     
     const matchesSearch =
       searchQuery === "" ||
@@ -429,14 +445,24 @@ export default function SiaeTicketsPage() {
   return (
     <div className="p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6 pb-24 md:pb-6" data-testid="page-siae-tickets">
       <div className="flex flex-col gap-3">
-        <div>
-          <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-foreground flex items-center gap-2 sm:gap-3" data-testid="page-title">
-            <Ticket className="w-6 h-6 sm:w-8 sm:h-8 text-[#FFD700] flex-shrink-0" />
-            <span className="truncate">Gestione Biglietti SIAE</span>
-          </h1>
-          <p className="text-muted-foreground mt-1 text-sm sm:text-base">
-            Emetti, valida e gestisci i biglietti per i tuoi eventi
-          </p>
+        <div className="flex items-center gap-3">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => navigate(`/events/${ticketedEvent?.eventId}/hub`)}
+            data-testid="button-back"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <div>
+            <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-foreground flex items-center gap-2 sm:gap-3" data-testid="page-title">
+              <Ticket className="w-6 h-6 sm:w-8 sm:h-8 text-[#FFD700] flex-shrink-0" />
+              <span className="truncate">Biglietti Emessi</span>
+            </h1>
+            <p className="text-muted-foreground mt-1 text-sm sm:text-base">
+              {baseEvent?.name || "Caricamento..."}
+            </p>
+          </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium ${
@@ -474,67 +500,39 @@ export default function SiaeTicketsPage() {
 
       <Card className="glass-card" data-testid="card-event-selector">
         <CardContent className="p-3 sm:p-4">
-          <div className="flex flex-col gap-3">
-            <div className="w-full">
-              <label className="text-sm font-medium mb-2 block">Seleziona Evento</label>
-              <Select value={selectedEventId} onValueChange={setSelectedEventId}>
-                <SelectTrigger data-testid="select-event-filter">
-                  <SelectValue placeholder="Seleziona un evento" />
+          <div className="flex flex-col sm:flex-row gap-2 sm:gap-4">
+            <div className="flex-1">
+              <label className="text-sm font-medium mb-2 block">Cerca</label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                <Input
+                  placeholder="Cerca..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10"
+                  data-testid="input-search"
+                />
+              </div>
+            </div>
+            <div className="w-full sm:w-40">
+              <label className="text-sm font-medium mb-2 block">Stato</label>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger data-testid="select-status-filter">
+                  <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {ticketedEvents?.map((event) => (
-                    <SelectItem key={event.id} value={event.id}>
-                      <div className="flex items-center gap-2">
-                        <span className="truncate">
-                          {(event as any).eventName || `Evento #${event.id.slice(0, 8)}`}
-                        </span>
-                        {(event as any).eventDate && (
-                          <span className="text-muted-foreground text-xs">
-                            {format(new Date((event as any).eventDate), "dd/MM/yyyy", { locale: it })}
-                          </span>
-                        )}
-                      </div>
-                    </SelectItem>
-                  ))}
+                  <SelectItem value="all">Tutti</SelectItem>
+                  <SelectItem value="valid">Validi</SelectItem>
+                  <SelectItem value="used">Utilizzati</SelectItem>
+                  <SelectItem value="cancelled">Annullati</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-            {selectedEventId && (
-              <div className="flex flex-col sm:flex-row gap-2 sm:gap-4">
-                <div className="flex-1">
-                  <label className="text-sm font-medium mb-2 block">Cerca</label>
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-                    <Input
-                      placeholder="Cerca..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="pl-10"
-                      data-testid="input-search"
-                    />
-                  </div>
-                </div>
-                <div className="w-full sm:w-40">
-                  <label className="text-sm font-medium mb-2 block">Stato</label>
-                  <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger data-testid="select-status-filter">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Tutti</SelectItem>
-                      <SelectItem value="valid">Validi</SelectItem>
-                      <SelectItem value="used">Utilizzati</SelectItem>
-                      <SelectItem value="cancelled">Annullati</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            )}
           </div>
         </CardContent>
       </Card>
 
-      {selectedEventId && (
+      {eventId && (
         <>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4">
             <Card className="glass-card">
@@ -665,7 +663,7 @@ export default function SiaeTicketsPage() {
         </>
       )}
 
-      {!selectedEventId ? (
+      {!eventId ? (
         <Card className="glass-card" data-testid="card-empty-state">
           <CardContent className="p-8 sm:p-12 text-center">
             <div className="w-12 h-12 sm:w-16 sm:h-16 mx-auto mb-4 rounded-full bg-[#FFD700]/10 flex items-center justify-center">

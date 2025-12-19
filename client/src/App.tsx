@@ -237,8 +237,8 @@ function Router() {
               <Route path="/siae/system-config" component={SiaeSystemConfig} />
               <Route path="/siae/customers" component={SiaeCustomers} />
               <Route path="/siae/ticketed-events" component={SiaeTicketedEvents} />
-              <Route path="/siae/tickets" component={SiaeTickets} />
-              <Route path="/siae/transactions" component={SiaeTransactions} />
+              <Route path="/siae/tickets/:eventId" component={SiaeTickets} />
+              <Route path="/siae/transactions/:eventId" component={SiaeTransactions} />
               <Route path="/siae/name-changes" component={SiaeNameChanges} />
               <Route path="/siae/resales" component={SiaeResales} />
               <Route path="/siae/box-office" component={SiaeBoxOffice} />
