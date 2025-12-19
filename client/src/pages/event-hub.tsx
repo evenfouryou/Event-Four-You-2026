@@ -1917,15 +1917,10 @@ export default function EventHub() {
                 {/* Elenco Biglietti (Sectors) */}
                 <Card className="glass-card">
                   <CardHeader>
-                    <div className="flex items-center justify-between flex-wrap gap-2">
-                      <CardTitle className="flex items-center gap-2">
-                        <FileText className="h-5 w-5 text-cyan-400" />
-                        Tipologie Biglietti
-                      </CardTitle>
-                      <Button onClick={() => navigate('/siae/ticketed-events')} variant="outline" size="sm" data-testid="btn-manage-tickets">
-                        Gestisci <ChevronRight className="h-4 w-4 ml-1" />
-                      </Button>
-                    </div>
+                    <CardTitle className="flex items-center gap-2">
+                      <FileText className="h-5 w-5 text-cyan-400" />
+                      Tipologie Biglietti
+                    </CardTitle>
                   </CardHeader>
                   <CardContent>
                     {ticketedEvent.sectors && ticketedEvent.sectors.length > 0 ? (
@@ -1961,25 +1956,12 @@ export default function EventHub() {
                                     {sector.availableSeats} disponibili
                                   </div>
                                 </div>
-                                <div className="flex items-center gap-2">
-                                  <Switch
-                                    checked={sector.active}
-                                    onCheckedChange={(checked) => toggleSectorMutation.mutate({ sectorId: sector.id, active: checked })}
-                                    disabled={toggleSectorMutation.isPending}
-                                    data-testid={`toggle-sector-${sector.id}`}
-                                  />
-                                  <Button
-                                    size="icon"
-                                    variant="ghost"
-                                    onClick={() => {
-                                      setEditingSector(sector);
-                                      setEditingCapacity(sector.capacity.toString());
-                                    }}
-                                    data-testid={`btn-edit-sector-${sector.id}`}
-                                  >
-                                    <Edit className="h-4 w-4" />
-                                  </Button>
-                                </div>
+                                <Switch
+                                  checked={sector.active}
+                                  onCheckedChange={(checked) => toggleSectorMutation.mutate({ sectorId: sector.id, active: checked })}
+                                  disabled={toggleSectorMutation.isPending}
+                                  data-testid={`toggle-sector-${sector.id}`}
+                                />
                               </div>
                             </div>
                           );
