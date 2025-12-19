@@ -2269,7 +2269,7 @@ router.get("/api/public/account/tickets", async (req, res) => {
         participantFirstName: ticket.participantFirstName,
         participantLastName: ticket.participantLastName,
         status: ticket.status,
-        emittedAt: ticket.emittedAt,
+        emissionDate: ticket.emissionDate,
         qrCode: ticket.qrCode,
         sectorName,
         eventName,
@@ -2424,7 +2424,7 @@ router.get("/api/public/account/tickets/:id", async (req, res) => {
         participantFirstName: siaeTickets.participantFirstName,
         participantLastName: siaeTickets.participantLastName,
         status: siaeTickets.status,
-        emittedAt: siaeTickets.emittedAt,
+        emissionDate: siaeTickets.emissionDate,
         qrCode: siaeTickets.qrCode,
         customText: siaeTickets.customText,
         fiscalSealCode: siaeTickets.fiscalSealCode,
@@ -2437,11 +2437,8 @@ router.get("/api/public/account/tickets/:id", async (req, res) => {
         eventEnd: events.endDatetime,
         locationName: locations.name,
         locationAddress: locations.address,
-        allowNameChange: siaeTicketedEvents.allowNameChange,
-        allowResale: siaeTicketedEvents.allowResale,
-        nameChangeDeadlineHours: siaeTicketedEvents.nameChangeDeadlineHours,
-        resaleDeadlineHours: siaeTicketedEvents.resaleDeadlineHours,
-        resaleMaxMarkupPercent: siaeTicketedEvents.resaleMaxMarkupPercent,
+        allowsChangeName: siaeTicketedEvents.allowsChangeName,
+        allowsResale: siaeTicketedEvents.allowsResale,
       })
       .from(siaeTickets)
       .innerJoin(siaeEventSectors, eq(siaeTickets.sectorId, siaeEventSectors.id))
@@ -2462,13 +2459,13 @@ router.get("/api/public/account/tickets/:id", async (req, res) => {
     const eventStart = new Date(ticket.eventStart);
     const hoursToEvent = (eventStart.getTime() - now.getTime()) / (1000 * 60 * 60);
 
-    const canNameChange = ticket.allowNameChange && 
+    const canNameChange = ticket.allowsChangeName && 
                           ticket.status === 'emitted' && 
-                          hoursToEvent >= (ticket.nameChangeDeadlineHours || 24);
+                          hoursToEvent >= 24;
     
-    const canResale = ticket.allowResale && 
+    const canResale = ticket.allowsResale && 
                       ticket.status === 'emitted' && 
-                      hoursToEvent >= (ticket.resaleDeadlineHours || 48);
+                      hoursToEvent >= 48;
 
     // Verifica se già in rivendita
     const [existingResale] = await db
@@ -2557,9 +2554,7 @@ router.post("/api/public/account/name-change", async (req, res) => {
         ticketPrice: siaeTickets.ticketPrice,
         participantFirstName: siaeTickets.participantFirstName,
         participantLastName: siaeTickets.participantLastName,
-        allowNameChange: siaeTicketedEvents.allowNameChange,
-        nameChangeDeadlineHours: siaeTicketedEvents.nameChangeDeadlineHours,
-        nameChangeFee: siaeTicketedEvents.nameChangeFee,
+        allowsChangeName: siaeTicketedEvents.allowsChangeName,
         eventStart: events.startDatetime,
       })
       .from(siaeTickets)
@@ -2578,7 +2573,7 @@ router.post("/api/public/account/name-change", async (req, res) => {
       return res.status(400).json({ message: "Biglietto non valido per cambio nominativo" });
     }
 
-    if (!ticket.allowNameChange) {
+    if (!ticket.allowsChangeName) {
       return res.status(400).json({ message: "Cambio nominativo non consentito per questo evento" });
     }
 
@@ -2586,9 +2581,9 @@ router.post("/api/public/account/name-change", async (req, res) => {
     const eventStart = new Date(ticket.eventStart);
     const hoursToEvent = (eventStart.getTime() - now.getTime()) / (1000 * 60 * 60);
 
-    if (hoursToEvent < (ticket.nameChangeDeadlineHours || 24)) {
+    if (hoursToEvent < 24) {
       return res.status(400).json({ 
-        message: `Cambio nominativo non più disponibile. Scadenza: ${ticket.nameChangeDeadlineHours || 24}h prima dell'evento` 
+        message: `Cambio nominativo non più disponibile. Scadenza: 24h prima dell'evento` 
       });
     }
 
@@ -2597,14 +2592,11 @@ router.post("/api/public/account/name-change", async (req, res) => {
       .insert(siaeNameChanges)
       .values({
         originalTicketId: ticketId,
-        requestedByCustomerId: customer.id,
-        previousFirstName: ticket.participantFirstName,
-        previousLastName: ticket.participantLastName,
+        requestedById: customer.id,
+        requestedByType: 'customer',
         newFirstName,
         newLastName,
-        newEmail: newEmail || null,
-        newPhone: newPhone || null,
-        fee: ticket.nameChangeFee || '0',
+        fee: '0',
         status: 'pending',
       })
       .returning();
@@ -2613,7 +2605,7 @@ router.post("/api/public/account/name-change", async (req, res) => {
     res.json({ 
       message: "Richiesta cambio nominativo inviata",
       nameChangeId: nameChange.id,
-      fee: ticket.nameChangeFee || '0',
+      fee: '0',
     });
   } catch (error: any) {
     console.error("[PUBLIC] Name change error:", error);
@@ -2643,9 +2635,7 @@ router.post("/api/public/account/resale", async (req, res) => {
         ticketedEventId: siaeTickets.ticketedEventId,
         customerId: siaeTickets.customerId,
         ticketPrice: siaeTickets.ticketPrice,
-        allowResale: siaeTicketedEvents.allowResale,
-        resaleDeadlineHours: siaeTicketedEvents.resaleDeadlineHours,
-        resaleMaxMarkupPercent: siaeTicketedEvents.resaleMaxMarkupPercent,
+        allowsResale: siaeTicketedEvents.allowsResale,
         eventStart: events.startDatetime,
       })
       .from(siaeTickets)
@@ -2664,7 +2654,7 @@ router.post("/api/public/account/resale", async (req, res) => {
       return res.status(400).json({ message: "Biglietto non valido per rivendita" });
     }
 
-    if (!ticket.allowResale) {
+    if (!ticket.allowsResale) {
       return res.status(400).json({ message: "Rivendita non consentita per questo evento" });
     }
 
@@ -2672,20 +2662,19 @@ router.post("/api/public/account/resale", async (req, res) => {
     const eventStart = new Date(ticket.eventStart);
     const hoursToEvent = (eventStart.getTime() - now.getTime()) / (1000 * 60 * 60);
 
-    if (hoursToEvent < (ticket.resaleDeadlineHours || 48)) {
+    if (hoursToEvent < 48) {
       return res.status(400).json({ 
-        message: `Rivendita non più disponibile. Scadenza: ${ticket.resaleDeadlineHours || 48}h prima dell'evento` 
+        message: `Rivendita non più disponibile. Scadenza: 48h prima dell'evento` 
       });
     }
 
-    // Verifica prezzo massimo
-    const originalPrice = parseFloat(ticket.ticketPrice);
-    const maxMarkup = (ticket.resaleMaxMarkupPercent || 0) / 100;
-    const maxPrice = originalPrice * (1 + maxMarkup);
+    // Verifica prezzo massimo (no markup allowed by default)
+    const originalPrice = parseFloat(ticket.ticketPrice || '0');
+    const maxPrice = originalPrice;
 
     if (resalePrice > maxPrice) {
       return res.status(400).json({ 
-        message: `Prezzo massimo consentito: €${maxPrice.toFixed(2)} (originale + ${ticket.resaleMaxMarkupPercent || 0}%)` 
+        message: `Prezzo massimo consentito: €${maxPrice.toFixed(2)} (non può superare il prezzo originale)` 
       });
     }
 
@@ -2708,7 +2697,7 @@ router.post("/api/public/account/resale", async (req, res) => {
       .values({
         originalTicketId: ticketId,
         sellerId: customer.id,
-        originalPrice: ticket.ticketPrice,
+        originalPrice: ticket.ticketPrice || '0',
         resalePrice: resalePrice.toFixed(2),
         status: 'listed',
         listedAt: new Date(),
@@ -2816,8 +2805,6 @@ router.get("/api/public/account/name-changes", async (req, res) => {
       .select({
         id: siaeNameChanges.id,
         originalTicketId: siaeNameChanges.originalTicketId,
-        previousFirstName: siaeNameChanges.previousFirstName,
-        previousLastName: siaeNameChanges.previousLastName,
         newFirstName: siaeNameChanges.newFirstName,
         newLastName: siaeNameChanges.newLastName,
         fee: siaeNameChanges.fee,
@@ -2831,7 +2818,10 @@ router.get("/api/public/account/name-changes", async (req, res) => {
       .innerJoin(siaeTickets, eq(siaeNameChanges.originalTicketId, siaeTickets.id))
       .innerJoin(siaeTicketedEvents, eq(siaeTickets.ticketedEventId, siaeTicketedEvents.id))
       .innerJoin(events, eq(siaeTicketedEvents.eventId, events.id))
-      .where(eq(siaeNameChanges.requestedByCustomerId, customer.id))
+      .where(and(
+        eq(siaeNameChanges.requestedById, customer.id),
+        eq(siaeNameChanges.requestedByType, 'customer')
+      ))
       .orderBy(desc(siaeNameChanges.createdAt));
 
     res.json({ nameChanges });

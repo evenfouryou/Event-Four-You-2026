@@ -1637,8 +1637,8 @@ export default function EventHub() {
           />
         </div>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <div className="overflow-x-auto scrollbar-hide -mx-4 px-4 sm:mx-0 sm:px-0" data-testid="tabs-scroll-container">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 sm:space-y-6">
+          <div className="overflow-x-auto scrollbar-hide -mx-3 px-3 sm:-mx-4 sm:px-4 md:mx-0 md:px-0 pb-1" data-testid="tabs-scroll-container">
             <TabsList className="inline-flex justify-start bg-transparent gap-1 p-0 min-w-max">
               {[
                 { id: 'overview', label: 'Panoramica', shortLabel: 'Home', icon: LayoutDashboard },
@@ -1667,9 +1667,9 @@ export default function EventHub() {
             </TabsList>
           </div>
 
-          <TabsContent value="overview" className="space-y-6">
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-              <div className="md:col-span-1 lg:col-span-2 space-y-6">
+          <TabsContent value="overview" className="space-y-4 sm:space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+              <div className="md:col-span-1 lg:col-span-2 space-y-4 sm:space-y-6">
                 <Card className="glass-card">
                   <CardHeader className="pb-3">
                     <div className="flex items-center justify-between">
@@ -1792,7 +1792,7 @@ export default function EventHub() {
                 />
               </div>
 
-              <div className="space-y-6">
+              <div className="space-y-4 sm:space-y-6">
                 <TopConsumptionsWidget eventId={id || ''} />
                 <Card className="glass-card">
                   <CardHeader className="pb-3">
@@ -1868,14 +1868,15 @@ export default function EventHub() {
 
           <TabsContent value="ticketing">
             {ticketedEvent ? (
-              <div className="space-y-6">
+              <div className="space-y-4 sm:space-y-6">
                 {/* Statistiche Generali */}
                 <Card className="glass-card">
-                  <CardHeader>
+                  <CardHeader className="px-4 sm:px-6">
                     <div className="flex items-center justify-between flex-wrap gap-2">
-                      <CardTitle className="flex items-center gap-2">
+                      <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
                         <Ticket className="h-5 w-5 text-blue-400" />
-                        Riepilogo Biglietteria
+                        <span className="hidden sm:inline">Riepilogo Biglietteria</span>
+                        <span className="sm:hidden">Biglietteria</span>
                       </CardTitle>
                       <div className="flex items-center gap-2 flex-wrap">
                         <Badge variant={ticketedEvent.ticketingStatus === 'active' ? 'default' : 'secondary'}>
@@ -1887,21 +1888,21 @@ export default function EventHub() {
                     </div>
                   </CardHeader>
                   <CardContent>
-                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-                      <div className="p-4 rounded-lg bg-background/50 border" data-testid="stat-sold">
-                        <div className="text-2xl font-bold text-blue-400">{ticketedEvent.ticketsSold}</div>
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-4">
+                      <div className="p-3 sm:p-4 rounded-lg bg-background/50 border" data-testid="stat-sold">
+                        <div className="text-xl sm:text-2xl font-bold text-blue-400">{ticketedEvent.ticketsSold}</div>
                         <div className="text-xs text-muted-foreground">Venduti</div>
                       </div>
-                      <div className="p-4 rounded-lg bg-background/50 border" data-testid="stat-available">
-                        <div className="text-2xl font-bold text-emerald-400">{ticketedEvent.totalCapacity - ticketedEvent.ticketsSold}</div>
+                      <div className="p-3 sm:p-4 rounded-lg bg-background/50 border" data-testid="stat-available">
+                        <div className="text-xl sm:text-2xl font-bold text-emerald-400">{ticketedEvent.totalCapacity - ticketedEvent.ticketsSold}</div>
                         <div className="text-xs text-muted-foreground">Disponibili</div>
                       </div>
-                      <div className="p-4 rounded-lg bg-background/50 border" data-testid="stat-cancelled">
-                        <div className="text-2xl font-bold text-rose-400">{ticketedEvent.ticketsCancelled}</div>
+                      <div className="p-3 sm:p-4 rounded-lg bg-background/50 border" data-testid="stat-cancelled">
+                        <div className="text-xl sm:text-2xl font-bold text-rose-400">{ticketedEvent.ticketsCancelled}</div>
                         <div className="text-xs text-muted-foreground">Annullati</div>
                       </div>
-                      <div className="p-4 rounded-lg bg-background/50 border" data-testid="stat-revenue">
-                        <div className="text-2xl font-bold text-amber-400">€{Number(ticketedEvent.totalRevenue || 0).toFixed(2)}</div>
+                      <div className="p-3 sm:p-4 rounded-lg bg-background/50 border" data-testid="stat-revenue">
+                        <div className="text-xl sm:text-2xl font-bold text-amber-400">€{Number(ticketedEvent.totalRevenue || 0).toFixed(2)}</div>
                         <div className="text-xs text-muted-foreground">Incasso</div>
                       </div>
                     </div>
@@ -2268,18 +2269,18 @@ export default function EventHub() {
                       </p>
                     </div>
                   ) : (
-                    <div className="overflow-x-auto">
-                      <Table>
+                    <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
+                      <Table className="min-w-[700px]">
                         <TableHeader>
                           <TableRow>
-                            <TableHead>Codice Biglietto</TableHead>
-                            <TableHead>Settore</TableHead>
-                            <TableHead>Tipo</TableHead>
-                            <TableHead>Prezzo</TableHead>
-                            <TableHead>Data Emissione</TableHead>
-                            <TableHead>Stato</TableHead>
-                            <TableHead>Canale</TableHead>
-                            <TableHead className="text-right">Azioni</TableHead>
+                            <TableHead className="whitespace-nowrap">Codice</TableHead>
+                            <TableHead className="whitespace-nowrap">Settore</TableHead>
+                            <TableHead className="whitespace-nowrap">Tipo</TableHead>
+                            <TableHead className="whitespace-nowrap">Prezzo</TableHead>
+                            <TableHead className="whitespace-nowrap hidden sm:table-cell">Data</TableHead>
+                            <TableHead className="whitespace-nowrap">Stato</TableHead>
+                            <TableHead className="whitespace-nowrap hidden sm:table-cell">Canale</TableHead>
+                            <TableHead className="text-right whitespace-nowrap">Azioni</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -2299,13 +2300,13 @@ export default function EventHub() {
                               <TableCell className="font-medium">
                                 €{Number(ticket.grossAmount || 0).toFixed(2)}
                               </TableCell>
-                              <TableCell className="text-sm text-muted-foreground">
+                              <TableCell className="text-sm text-muted-foreground hidden sm:table-cell">
                                 {ticket.emissionDate ? format(new Date(ticket.emissionDate), 'dd/MM/yyyy HH:mm', { locale: it }) : 'N/A'}
                               </TableCell>
                               <TableCell data-testid={`ticket-status-${ticket.id}`}>
                                 {getTicketStatusBadge(ticket.status)}
                               </TableCell>
-                              <TableCell className="text-sm text-muted-foreground">
+                              <TableCell className="text-sm text-muted-foreground hidden sm:table-cell">
                                 {ticket.emissionChannelCode || ticket.cardCode || "N/A"}
                               </TableCell>
                               <TableCell className="text-right">
@@ -2408,23 +2409,23 @@ export default function EventHub() {
           </TabsContent>
 
           <TabsContent value="guests">
-            <div className="space-y-6">
+            <div className="space-y-4 sm:space-y-6">
               {e4uStats && (
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div className="p-4 rounded-lg bg-cyan-500/10 border border-cyan-500/30">
-                    <div className="text-2xl font-bold text-cyan-400">{e4uStats.lists?.total || guestLists.length}</div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+                  <div className="p-3 sm:p-4 rounded-lg bg-cyan-500/10 border border-cyan-500/30">
+                    <div className="text-xl sm:text-2xl font-bold text-cyan-400">{e4uStats.lists?.total || guestLists.length}</div>
                     <div className="text-sm text-muted-foreground">Liste Attive</div>
                   </div>
-                  <div className="p-4 rounded-lg bg-background/50 border">
-                    <div className="text-2xl font-bold">{(e4uStats.lists?.entries || 0) + (e4uStats.tables?.totalGuests || 0) || totalGuests}</div>
-                    <div className="text-sm text-muted-foreground">Iscritti Totali</div>
+                  <div className="p-3 sm:p-4 rounded-lg bg-background/50 border">
+                    <div className="text-xl sm:text-2xl font-bold">{(e4uStats.lists?.entries || 0) + (e4uStats.tables?.totalGuests || 0) || totalGuests}</div>
+                    <div className="text-xs sm:text-sm text-muted-foreground">Iscritti Totali</div>
                   </div>
-                  <div className="p-4 rounded-lg bg-background/50 border">
-                    <div className="text-2xl font-bold text-emerald-400">{e4uStats.totalCheckIns || checkedInGuests}</div>
-                    <div className="text-sm text-muted-foreground">Check-in</div>
+                  <div className="p-3 sm:p-4 rounded-lg bg-background/50 border">
+                    <div className="text-xl sm:text-2xl font-bold text-emerald-400">{e4uStats.totalCheckIns || checkedInGuests}</div>
+                    <div className="text-xs sm:text-sm text-muted-foreground">Check-in</div>
                   </div>
-                  <div className="p-4 rounded-lg bg-background/50 border">
-                    <div className="text-2xl font-bold">{(() => {
+                  <div className="p-3 sm:p-4 rounded-lg bg-background/50 border">
+                    <div className="text-xl sm:text-2xl font-bold">{(() => {
                       const total = (e4uStats.lists?.entries || 0) + (e4uStats.tables?.totalGuests || 0);
                       const checked = e4uStats.totalCheckIns || 0;
                       return total > 0 ? `${Math.round((checked / total) * 100)}%` : '--';
@@ -2536,7 +2537,7 @@ export default function EventHub() {
           </TabsContent>
 
           <TabsContent value="tables">
-            <div className="space-y-6">
+            <div className="space-y-4 sm:space-y-6">
               {(() => {
                 const pendingReservations = e4uReservations.filter((r: any) => r.status === 'pending');
                 const approvedReservations = e4uReservations.filter((r: any) => r.status === 'approved' || r.status === 'confirmed');
@@ -2544,24 +2545,24 @@ export default function EventHub() {
                 return (
                   <>
                     {(e4uTableTypes.length > 0 || pendingReservations.length > 0) && (
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        <div className="p-4 rounded-lg bg-purple-500/10 border border-purple-500/30">
-                          <div className="text-2xl font-bold text-purple-400">{e4uTableTypes.length || tables.length}</div>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+                        <div className="p-3 sm:p-4 rounded-lg bg-purple-500/10 border border-purple-500/30">
+                          <div className="text-xl sm:text-2xl font-bold text-purple-400">{e4uTableTypes.length || tables.length}</div>
                           <div className="text-sm text-muted-foreground">Tipologie Tavoli</div>
                         </div>
-                        <div className="p-4 rounded-lg bg-background/50 border">
-                          <div className="text-2xl font-bold">{bookedTables}/{tables.length}</div>
-                          <div className="text-sm text-muted-foreground">Prenotati</div>
+                        <div className="p-3 sm:p-4 rounded-lg bg-background/50 border">
+                          <div className="text-xl sm:text-2xl font-bold">{bookedTables}/{tables.length}</div>
+                          <div className="text-xs sm:text-sm text-muted-foreground">Prenotati</div>
                         </div>
                         {pendingReservations.length > 0 && (
-                          <div className="p-4 rounded-lg bg-amber-500/10 border border-amber-500/30">
-                            <div className="text-2xl font-bold text-amber-400">{pendingReservations.length}</div>
+                          <div className="p-3 sm:p-4 rounded-lg bg-amber-500/10 border border-amber-500/30">
+                            <div className="text-xl sm:text-2xl font-bold text-amber-400">{pendingReservations.length}</div>
                             <div className="text-sm text-muted-foreground">In Attesa</div>
                           </div>
                         )}
-                        <div className="p-4 rounded-lg bg-background/50 border">
-                          <div className="text-2xl font-bold text-emerald-400">{approvedReservations.length}</div>
-                          <div className="text-sm text-muted-foreground">Confermate</div>
+                        <div className="p-3 sm:p-4 rounded-lg bg-background/50 border">
+                          <div className="text-xl sm:text-2xl font-bold text-emerald-400">{approvedReservations.length}</div>
+                          <div className="text-xs sm:text-sm text-muted-foreground">Confermate</div>
                         </div>
                       </div>
                     )}
@@ -2737,12 +2738,12 @@ export default function EventHub() {
           </TabsContent>
 
           <TabsContent value="staff">
-            <div className="space-y-6">
+            <div className="space-y-4 sm:space-y-6">
               {/* Stats Grid */}
-              <div className="grid grid-cols-1 gap-4">
-                <div className="p-4 rounded-lg bg-teal-500/10 border border-teal-500/30" data-testid="stat-staff-count">
-                  <div className="text-2xl font-bold text-teal-400">{e4uStaff.length}</div>
-                  <div className="text-sm text-muted-foreground">Staff Attivi</div>
+              <div className="grid grid-cols-2 sm:grid-cols-1 gap-3 sm:gap-4">
+                <div className="p-3 sm:p-4 rounded-lg bg-teal-500/10 border border-teal-500/30" data-testid="stat-staff-count">
+                  <div className="text-xl sm:text-2xl font-bold text-teal-400">{e4uStaff.length}</div>
+                  <div className="text-xs sm:text-sm text-muted-foreground">Staff Attivi</div>
                 </div>
               </div>
 
@@ -2863,12 +2864,12 @@ export default function EventHub() {
           </TabsContent>
 
           <TabsContent value="pr">
-            <div className="space-y-6">
+            <div className="space-y-4 sm:space-y-6">
               {/* Stats Grid */}
-              <div className="grid grid-cols-1 gap-4">
-                <div className="p-4 rounded-lg bg-orange-500/10 border border-orange-500/30" data-testid="stat-pr-count">
-                  <div className="text-2xl font-bold text-orange-400">{e4uPr.length}</div>
-                  <div className="text-sm text-muted-foreground">PR Attivi</div>
+              <div className="grid grid-cols-2 sm:grid-cols-1 gap-3 sm:gap-4">
+                <div className="p-3 sm:p-4 rounded-lg bg-orange-500/10 border border-orange-500/30" data-testid="stat-pr-count">
+                  <div className="text-xl sm:text-2xl font-bold text-orange-400">{e4uPr.length}</div>
+                  <div className="text-xs sm:text-sm text-muted-foreground">PR Attivi</div>
                 </div>
               </div>
 
@@ -3069,12 +3070,12 @@ export default function EventHub() {
           </TabsContent>
 
           <TabsContent value="access">
-            <div className="space-y-6">
+            <div className="space-y-4 sm:space-y-6">
               {/* Stats Grid */}
-              <div className="grid grid-cols-1 gap-4">
-                <div className="p-4 rounded-lg bg-emerald-500/10 border border-emerald-500/30" data-testid="stat-access-scanner-count">
-                  <div className="text-2xl font-bold text-emerald-400">{e4uScanners.length}</div>
-                  <div className="text-sm text-muted-foreground">Scanner Attivi</div>
+              <div className="grid grid-cols-2 sm:grid-cols-1 gap-3 sm:gap-4">
+                <div className="p-3 sm:p-4 rounded-lg bg-emerald-500/10 border border-emerald-500/30" data-testid="stat-access-scanner-count">
+                  <div className="text-xl sm:text-2xl font-bold text-emerald-400">{e4uScanners.length}</div>
+                  <div className="text-xs sm:text-sm text-muted-foreground">Scanner Attivi</div>
                 </div>
               </div>
 
@@ -3201,26 +3202,26 @@ export default function EventHub() {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                  <div className="p-4 rounded-lg bg-background/50 border text-center">
-                    <div className="text-3xl font-bold text-indigo-400">{eventStocks.length}</div>
-                    <div className="text-sm text-muted-foreground">Prodotti</div>
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-4 sm:mb-6">
+                  <div className="p-3 sm:p-4 rounded-lg bg-background/50 border text-center">
+                    <div className="text-2xl sm:text-3xl font-bold text-indigo-400">{eventStocks.length}</div>
+                    <div className="text-xs sm:text-sm text-muted-foreground">Prodotti</div>
                   </div>
-                  <div className="p-4 rounded-lg bg-background/50 border text-center">
-                    <div className="text-3xl font-bold text-emerald-400">{eventStations.length}</div>
-                    <div className="text-sm text-muted-foreground">Postazioni</div>
+                  <div className="p-3 sm:p-4 rounded-lg bg-background/50 border text-center">
+                    <div className="text-2xl sm:text-3xl font-bold text-emerald-400">{eventStations.length}</div>
+                    <div className="text-xs sm:text-sm text-muted-foreground">Postazioni</div>
                   </div>
-                  <div className="p-4 rounded-lg bg-background/50 border text-center">
-                    <div className="text-3xl font-bold text-amber-400">
+                  <div className="p-3 sm:p-4 rounded-lg bg-background/50 border text-center">
+                    <div className="text-2xl sm:text-3xl font-bold text-amber-400">
                       {eventStocks.reduce((acc, s) => acc + Number(s.quantity || 0), 0).toFixed(0)}
                     </div>
-                    <div className="text-sm text-muted-foreground">Unità Totali</div>
+                    <div className="text-xs sm:text-sm text-muted-foreground">Unità Totali</div>
                   </div>
-                  <div className="p-4 rounded-lg bg-background/50 border text-center">
-                    <div className="text-3xl font-bold text-cyan-400">
+                  <div className="p-3 sm:p-4 rounded-lg bg-background/50 border text-center">
+                    <div className="text-2xl sm:text-3xl font-bold text-cyan-400">
                       {new Set(eventStations.flatMap(s => s.bartenderIds || [])).size}
                     </div>
-                    <div className="text-sm text-muted-foreground">Baristi</div>
+                    <div className="text-xs sm:text-sm text-muted-foreground">Baristi</div>
                   </div>
                 </div>
                 {eventStocks.length === 0 && (
@@ -3253,26 +3254,26 @@ export default function EventHub() {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                  <div className="p-4 rounded-lg bg-gradient-to-br from-amber-500/20 to-orange-500/20 border border-amber-500/30">
-                    <div className="text-3xl font-bold text-amber-400">€{totalRevenue.toFixed(0)}</div>
-                    <div className="text-sm text-muted-foreground">Incasso Totale</div>
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-4 sm:mb-6">
+                  <div className="p-3 sm:p-4 rounded-lg bg-gradient-to-br from-amber-500/20 to-orange-500/20 border border-amber-500/30">
+                    <div className="text-2xl sm:text-3xl font-bold text-amber-400">€{totalRevenue.toFixed(0)}</div>
+                    <div className="text-xs sm:text-sm text-muted-foreground">Incasso Totale</div>
                   </div>
-                  <div className="p-4 rounded-lg bg-background/50 border">
-                    <div className="text-2xl font-bold text-blue-400">
+                  <div className="p-3 sm:p-4 rounded-lg bg-background/50 border">
+                    <div className="text-xl sm:text-2xl font-bold text-blue-400">
                       €{Number(ticketedEvent?.totalRevenue || 0).toFixed(0)}
                     </div>
-                    <div className="text-sm text-muted-foreground">Biglietti</div>
+                    <div className="text-xs sm:text-sm text-muted-foreground">Biglietti</div>
                   </div>
-                  <div className="p-4 rounded-lg bg-background/50 border">
-                    <div className="text-2xl font-bold text-purple-400">
+                  <div className="p-3 sm:p-4 rounded-lg bg-background/50 border">
+                    <div className="text-xl sm:text-2xl font-bold text-purple-400">
                       €{bookings.filter(b => b.status !== 'cancelled').reduce((acc, b) => acc + Number(b.depositPaid || 0), 0).toFixed(0)}
                     </div>
-                    <div className="text-sm text-muted-foreground">Caparre Tavoli</div>
+                    <div className="text-xs sm:text-sm text-muted-foreground">Caparre Tavoli</div>
                   </div>
-                  <div className="p-4 rounded-lg bg-background/50 border">
-                    <div className="text-2xl font-bold text-emerald-400">--</div>
-                    <div className="text-sm text-muted-foreground">Consumazioni</div>
+                  <div className="p-3 sm:p-4 rounded-lg bg-background/50 border">
+                    <div className="text-xl sm:text-2xl font-bold text-emerald-400">--</div>
+                    <div className="text-xs sm:text-sm text-muted-foreground">Consumazioni</div>
                   </div>
                 </div>
                 <div className="text-center py-8 border-t">
@@ -3289,47 +3290,47 @@ export default function EventHub() {
             </Card>
           </TabsContent>
 
-          <TabsContent value="report" className="space-y-6">
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <TabsContent value="report" className="space-y-4 sm:space-y-6">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
               <div 
-                className="p-4 rounded-lg bg-gradient-to-br from-amber-500/20 to-orange-500/20 border border-amber-500/30"
+                className="p-3 sm:p-4 rounded-lg bg-gradient-to-br from-amber-500/20 to-orange-500/20 border border-amber-500/30"
                 data-testid="stats-total-checkins"
               >
-                <div className="text-3xl font-bold text-amber-400">
+                <div className="text-2xl sm:text-3xl font-bold text-amber-400">
                   {e4uReport?.overview?.totalCheckIns || 0}
                 </div>
-                <div className="text-sm text-muted-foreground">Totale Ingressi</div>
+                <div className="text-xs sm:text-sm text-muted-foreground">Totale Ingressi</div>
               </div>
               <div 
-                className="p-4 rounded-lg bg-gradient-to-br from-orange-500/20 to-red-500/20 border border-orange-500/30"
+                className="p-3 sm:p-4 rounded-lg bg-gradient-to-br from-orange-500/20 to-red-500/20 border border-orange-500/30"
                 data-testid="stats-checkin-rate"
               >
-                <div className="text-3xl font-bold text-orange-400">
+                <div className="text-2xl sm:text-3xl font-bold text-orange-400">
                   {e4uReport?.overview?.checkInRate || 0}%
                 </div>
-                <div className="text-sm text-muted-foreground">Tasso Check-in</div>
+                <div className="text-xs sm:text-sm text-muted-foreground">Tasso Check-in</div>
               </div>
               <div 
-                className="p-4 rounded-lg bg-background/50 border"
+                className="p-3 sm:p-4 rounded-lg bg-background/50 border"
                 data-testid="stats-list-revenue"
               >
-                <div className="text-2xl font-bold text-cyan-400">
+                <div className="text-xl sm:text-2xl font-bold text-cyan-400">
                   €{(e4uReport?.overview?.listRevenue || 0).toFixed(0)}
                 </div>
-                <div className="text-sm text-muted-foreground">Incasso Liste</div>
+                <div className="text-xs sm:text-sm text-muted-foreground">Incasso Liste</div>
               </div>
               <div 
-                className="p-4 rounded-lg bg-background/50 border"
+                className="p-3 sm:p-4 rounded-lg bg-background/50 border"
                 data-testid="stats-table-revenue"
               >
-                <div className="text-2xl font-bold text-purple-400">
+                <div className="text-xl sm:text-2xl font-bold text-purple-400">
                   €{(e4uReport?.overview?.tableRevenue || 0).toFixed(0)}
                 </div>
-                <div className="text-sm text-muted-foreground">Incasso Tavoli</div>
+                <div className="text-xs sm:text-sm text-muted-foreground">Incasso Tavoli</div>
               </div>
             </div>
 
-            <div className="grid lg:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
               <Card className="glass-card" data-testid="table-staff-performance">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
@@ -3340,16 +3341,16 @@ export default function EventHub() {
                 </CardHeader>
                 <CardContent>
                   {e4uReport?.staffPerformance && e4uReport.staffPerformance.length > 0 ? (
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-sm">
+                    <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
+                      <table className="w-full text-sm min-w-[500px]">
                         <thead>
                           <tr className="border-b border-border">
-                            <th className="text-left py-2 px-2 font-medium text-muted-foreground">Staff</th>
-                            <th className="text-center py-2 px-2 font-medium text-muted-foreground">Liste</th>
-                            <th className="text-center py-2 px-2 font-medium text-muted-foreground">Persone</th>
-                            <th className="text-center py-2 px-2 font-medium text-muted-foreground">Tavoli Prop.</th>
-                            <th className="text-center py-2 px-2 font-medium text-muted-foreground">Tavoli Appr.</th>
-                            <th className="text-center py-2 px-2 font-medium text-muted-foreground">Check-in PR</th>
+                            <th className="text-left py-2 px-2 font-medium text-muted-foreground whitespace-nowrap">Staff</th>
+                            <th className="text-center py-2 px-2 font-medium text-muted-foreground whitespace-nowrap">Liste</th>
+                            <th className="text-center py-2 px-2 font-medium text-muted-foreground whitespace-nowrap">Pers.</th>
+                            <th className="text-center py-2 px-2 font-medium text-muted-foreground whitespace-nowrap">T.Prop.</th>
+                            <th className="text-center py-2 px-2 font-medium text-muted-foreground whitespace-nowrap">T.Appr.</th>
+                            <th className="text-center py-2 px-2 font-medium text-muted-foreground whitespace-nowrap">Check-in</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -3433,16 +3434,16 @@ export default function EventHub() {
                 </CardHeader>
                 <CardContent>
                   {e4uReport?.prPerformance && e4uReport.prPerformance.length > 0 ? (
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-sm">
+                    <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
+                      <table className="w-full text-sm min-w-[500px]">
                         <thead>
                           <tr className="border-b border-border">
-                            <th className="text-left py-2 px-2 font-medium text-muted-foreground">PR</th>
-                            <th className="text-left py-2 px-2 font-medium text-muted-foreground">Staff</th>
-                            <th className="text-center py-2 px-2 font-medium text-muted-foreground">In Lista</th>
-                            <th className="text-center py-2 px-2 font-medium text-muted-foreground">Ingressi</th>
-                            <th className="text-center py-2 px-2 font-medium text-muted-foreground">Tavoli Prop.</th>
-                            <th className="text-center py-2 px-2 font-medium text-muted-foreground">Tavoli Appr.</th>
+                            <th className="text-left py-2 px-2 font-medium text-muted-foreground whitespace-nowrap">PR</th>
+                            <th className="text-left py-2 px-2 font-medium text-muted-foreground whitespace-nowrap">Staff</th>
+                            <th className="text-center py-2 px-2 font-medium text-muted-foreground whitespace-nowrap">Lista</th>
+                            <th className="text-center py-2 px-2 font-medium text-muted-foreground whitespace-nowrap">Ingr.</th>
+                            <th className="text-center py-2 px-2 font-medium text-muted-foreground whitespace-nowrap">T.Prop.</th>
+                            <th className="text-center py-2 px-2 font-medium text-muted-foreground whitespace-nowrap">T.Appr.</th>
                           </tr>
                         </thead>
                         <tbody>

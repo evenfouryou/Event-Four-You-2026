@@ -1,6 +1,8 @@
+import { useState, useEffect } from "react";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
-import { Calendar, MapPin, Ticket, User, QrCode } from "lucide-react";
+import { Calendar, MapPin, Ticket, User, QrCode, Loader2 } from "lucide-react";
+import QRCodeLib from "qrcode";
 
 interface TicketDetail {
   id: string;
@@ -68,6 +70,9 @@ interface DigitalTicketCardProps {
 }
 
 export function DigitalTicketCard({ ticket, template }: DigitalTicketCardProps) {
+  const [qrCodeImage, setQrCodeImage] = useState<string | null>(null);
+  const [qrLoading, setQrLoading] = useState(false);
+  
   const t = template || {};
   const eventDate = new Date(ticket.eventStart);
   const holderName = [ticket.participantFirstName, ticket.participantLastName]
@@ -75,6 +80,28 @@ export function DigitalTicketCard({ ticket, template }: DigitalTicketCardProps) 
     .join(" ") || "Non nominativo";
   const price = parseFloat(ticket.ticketPrice || "0");
   const showQrCode = ticket.status === "emitted" && !ticket.isListed && ticket.qrCode;
+
+  useEffect(() => {
+    if (showQrCode && ticket.qrCode) {
+      setQrLoading(true);
+      QRCodeLib.toDataURL(ticket.qrCode, {
+        width: 256,
+        margin: 2,
+        color: {
+          dark: '#000000',
+          light: '#FFFFFF',
+        },
+      })
+        .then((url: string) => {
+          setQrCodeImage(url);
+          setQrLoading(false);
+        })
+        .catch((err: Error) => {
+          console.error('Error generating QR code:', err);
+          setQrLoading(false);
+        });
+    }
+  }, [showQrCode, ticket.qrCode]);
 
   const containerStyle: React.CSSProperties = template ? {
     fontFamily: t.fontFamily || undefined,
@@ -250,13 +277,29 @@ export function DigitalTicketCard({ ticket, template }: DigitalTicketCardProps) 
                 style={template && t.backgroundColor ? { backgroundColor: t.backgroundColor } : undefined}
               >
                 <div className="bg-white p-4 rounded-xl shadow-lg mb-3">
-                  <img
-                    src={ticket.qrCode!}
-                    alt="QR Code biglietto"
-                    style={{ width: qrSize, height: qrSize }}
-                    className="w-40 h-40 sm:w-48 sm:h-48"
-                    data-testid="ticket-qrcode"
-                  />
+                  {qrLoading ? (
+                    <div 
+                      className="flex items-center justify-center w-40 h-40 sm:w-48 sm:h-48"
+                      style={{ width: qrSize, height: qrSize }}
+                    >
+                      <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
+                    </div>
+                  ) : qrCodeImage ? (
+                    <img
+                      src={qrCodeImage}
+                      alt="QR Code biglietto"
+                      style={{ width: qrSize, height: qrSize }}
+                      className="w-40 h-40 sm:w-48 sm:h-48"
+                      data-testid="ticket-qrcode"
+                    />
+                  ) : (
+                    <div 
+                      className="flex items-center justify-center w-40 h-40 sm:w-48 sm:h-48 bg-gray-100 text-gray-400"
+                      style={{ width: qrSize, height: qrSize }}
+                    >
+                      <QrCode className="w-12 h-12" />
+                    </div>
+                  )}
                 </div>
                 <div className="flex items-center gap-2 text-muted-foreground">
                   <QrCode className="w-4 h-4" />
