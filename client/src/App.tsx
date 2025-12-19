@@ -91,6 +91,7 @@ import SchoolBadgeError from "@/pages/school-badge-error";
 import SchoolBadgeScanner from "@/pages/school-badge-scanner";
 import PrinterSettings from "@/pages/printer-settings";
 import TemplateBuilder from "@/pages/template-builder";
+import DigitalTemplateBuilder from "@/pages/digital-template-builder";
 import StripeAdmin from "@/pages/stripe-admin";
 import E4uScanner from "@/pages/e4u-scanner";
 import ClientWallet from "@/pages/client-wallet";
@@ -262,6 +263,8 @@ function Router() {
               <Route path="/printer-settings" component={PrinterSettings} />
               <Route path="/template-builder" component={TemplateBuilder} />
               <Route path="/template-builder/:id" component={TemplateBuilder} />
+              <Route path="/digital-template-builder" component={DigitalTemplateBuilder} />
+              <Route path="/digital-template-builder/:id" component={DigitalTemplateBuilder} />
               <Route path="/stripe-admin" component={StripeAdmin} />
               <Route path="/admin/site-settings" component={AdminSiteSettings} />
               <Route path="/admin/billing/plans" component={AdminBillingPlans} />
