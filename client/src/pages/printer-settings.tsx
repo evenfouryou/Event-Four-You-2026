@@ -73,9 +73,10 @@ import {
   Check,
   Layout,
   Eye,
+  Smartphone,
 } from "lucide-react";
 import { Link } from "wouter";
-import type { TicketTemplate } from "@shared/schema";
+import type { TicketTemplate, DigitalTicketTemplate } from "@shared/schema";
 import type { 
   PrinterModel, 
   PrinterAgent, 
@@ -146,6 +147,10 @@ export default function PrinterSettings() {
     queryKey: ["/api/ticket/templates"],
   });
 
+  const { data: digitalTemplates = [], isLoading: digitalTemplatesLoading } = useQuery<DigitalTicketTemplate[]>({
+    queryKey: ["/api/digital-templates"],
+  });
+
   const deleteTemplateMutation = useMutation({
     mutationFn: async (id: string) => {
       await apiRequest("DELETE", `/api/ticket/templates/${id}`);
@@ -153,6 +158,19 @@ export default function PrinterSettings() {
     onSuccess: () => {
       toast({ title: "Template eliminato" });
       queryClient.invalidateQueries({ queryKey: ["/api/ticket/templates"] });
+    },
+    onError: () => {
+      toast({ title: "Errore", description: "Impossibile eliminare il template", variant: "destructive" });
+    },
+  });
+
+  const deleteDigitalTemplateMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest("DELETE", `/api/digital-templates/${id}`);
+    },
+    onSuccess: () => {
+      toast({ title: "Template digitale eliminato" });
+      queryClient.invalidateQueries({ queryKey: ["/api/digital-templates"] });
     },
     onError: () => {
       toast({ title: "Errore", description: "Impossibile eliminare il template", variant: "destructive" });
@@ -473,6 +491,10 @@ export default function PrinterSettings() {
             <Layout className="h-4 w-4 mr-2" />
             Template Biglietti
           </TabsTrigger>
+          <TabsTrigger value="digital-templates" data-testid="tab-digital-templates">
+            <Smartphone className="h-4 w-4 mr-2" />
+            Template Digitali
+          </TabsTrigger>
           {isSuperAdmin && (
             <TabsTrigger value="models" data-testid="tab-models">
               <Settings className="h-4 w-4 mr-2" />
@@ -778,6 +800,96 @@ export default function PrinterSettings() {
                             </div>
                           </TableCell>
                         )}
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="digital-templates">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between gap-2">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <Smartphone className="h-5 w-5" />
+                  Template Biglietti Digitali
+                </CardTitle>
+                <CardDescription>
+                  Template per la visualizzazione digitale dei biglietti su smartphone e PDF
+                </CardDescription>
+              </div>
+              <Link href="/digital-template-builder">
+                <Button data-testid="button-new-digital-template">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Nuovo Template Digitale
+                </Button>
+              </Link>
+            </CardHeader>
+            <CardContent>
+              {digitalTemplatesLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin" />
+                </div>
+              ) : digitalTemplates.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Smartphone className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p>Nessun template digitale disponibile</p>
+                  <p className="text-sm mt-2">Crea il tuo primo template per personalizzare i biglietti digitali</p>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Nome</TableHead>
+                      <TableHead>Azienda</TableHead>
+                      <TableHead>Stile</TableHead>
+                      <TableHead>Stato</TableHead>
+                      <TableHead className="text-right">Azioni</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {digitalTemplates.map((template) => (
+                      <TableRow key={template.id} data-testid={`row-digital-template-${template.id}`}>
+                        <TableCell className="font-medium">{template.name}</TableCell>
+                        <TableCell>
+                          {!template.companyId ? (
+                            <Badge variant="default" className="bg-purple-600">Sistema</Badge>
+                          ) : (
+                            <Badge variant="outline">Azienda</Badge>
+                          )}
+                        </TableCell>
+                        <TableCell className="capitalize">{template.backgroundStyle || "gradient"}</TableCell>
+                        <TableCell>
+                          {template.isActive ? (
+                            <Badge className="bg-green-600"><CheckCircle2 className="h-3 w-3 mr-1" />Attivo</Badge>
+                          ) : (
+                            <Badge variant="secondary"><XCircle className="h-3 w-3 mr-1" />Disattivo</Badge>
+                          )}
+                          {template.isDefault && (
+                            <Badge variant="outline" className="ml-1">Predefinito</Badge>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-1">
+                            <Link href={`/digital-template-builder/${template.id}`}>
+                              <Button size="icon" variant="ghost" data-testid={`button-edit-digital-template-${template.id}`}>
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                            </Link>
+                            <Button 
+                              size="icon" 
+                              variant="ghost" 
+                              onClick={() => deleteDigitalTemplateMutation.mutate(template.id)}
+                              disabled={deleteDigitalTemplateMutation.isPending}
+                              data-testid={`button-delete-digital-template-${template.id}`}
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </div>
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
