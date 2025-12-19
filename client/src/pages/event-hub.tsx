@@ -104,6 +104,7 @@ import {
   Link2,
   Copy,
   ExternalLink,
+  Banknote,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -1643,6 +1644,7 @@ export default function EventHub() {
               {[
                 { id: 'overview', label: 'Panoramica', shortLabel: 'Home', icon: LayoutDashboard },
                 { id: 'ticketing', label: 'Biglietteria', shortLabel: 'Ticket', icon: Ticket },
+                { id: 'cashiers', label: 'Cassieri', shortLabel: 'Casse', icon: Banknote },
                 { id: 'guests', label: 'Liste', shortLabel: 'Liste', icon: Users },
                 { id: 'tables', label: 'Tavoli', shortLabel: 'Tavoli', icon: Armchair },
                 { id: 'staff', label: 'Staff', shortLabel: 'Staff', icon: Users },
@@ -2170,13 +2172,6 @@ export default function EventHub() {
               </Card>
             )}
 
-            {/* Cashier Allocations Section */}
-            {ticketedEvent && (
-              <EventCashierAllocations 
-                eventId={id || ''} 
-                siaeEventId={ticketedEvent?.id}
-              />
-            )}
 
             {/* Biglietti Emessi Section */}
             {ticketedEvent && (
@@ -2388,6 +2383,29 @@ export default function EventHub() {
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
+          </TabsContent>
+
+          <TabsContent value="cashiers">
+            <div className="space-y-4 sm:space-y-6">
+              {ticketedEvent ? (
+                <EventCashierAllocations 
+                  eventId={id || ''} 
+                  siaeEventId={ticketedEvent?.id}
+                />
+              ) : (
+                <Card className="glass-card">
+                  <CardContent className="py-12">
+                    <div className="text-center">
+                      <Banknote className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
+                      <h3 className="font-semibold mb-2">Biglietteria Non Attiva</h3>
+                      <p className="text-sm text-muted-foreground">
+                        Attiva la biglietteria per assegnare i cassieri
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
           </TabsContent>
 
           <TabsContent value="guests">
