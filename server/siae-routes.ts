@@ -44,7 +44,7 @@ import {
 
 // Helper to create validated partial schemas for PATCH operations
 // Uses .strict() to reject unknown fields and .refine() to reject empty payloads
-function makePatchSchema<T extends z.ZodTypeAny>(schema: T) {
+function makePatchSchema<T extends z.AnyZodObject>(schema: T) {
   return schema.partial().strict().refine(
     (obj: Record<string, unknown>) => Object.keys(obj).length > 0,
     { message: "Payload vuoto non permesso" }
@@ -60,7 +60,7 @@ const patchCancellationReasonSchema = makePatchSchema(insertSiaeCancellationReas
 const patchActivationCardSchema = makePatchSchema(insertSiaeActivationCardSchema.omit({ cardCode: true }));
 const patchEmissionChannelSchema = makePatchSchema(insertSiaeEmissionChannelSchema.omit({ companyId: true }));
 const patchSystemConfigSchema = makePatchSchema(insertSiaeSystemConfigSchema.omit({ companyId: true }));
-const patchCustomerSchema = makePatchSchema(insertSiaeCustomerSchema.omit({ companyId: true, customerCode: true }));
+const patchCustomerSchema = makePatchSchema(insertSiaeCustomerSchema.omit({ uniqueCode: true }) as z.AnyZodObject);
 const patchTicketedEventSchema = makePatchSchema(insertSiaeTicketedEventSchema.omit({ companyId: true }));
 const patchEventSectorSchema = makePatchSchema(insertSiaeEventSectorSchema.omit({ ticketedEventId: true }));
 const patchSeatSchema = makePatchSchema(insertSiaeSeatSchema.omit({ sectorId: true }));
@@ -1847,14 +1847,12 @@ router.get("/api/siae/companies/:companyId/reports/xml/daily", requireAuth, requ
     // Create transmission record
     const transmission = await siaeStorage.createSiaeTransmission({
       companyId,
-      activationCardId: activeCard.id,
-      transmissionType: 'daily_report',
-      reportDate: reportDate,
-      xmlContent: xml,
+      transmissionType: 'daily',
+      periodDate: reportDate,
+      fileContent: xml,
       status: 'pending',
-      totalTickets: dayTickets.length,
-      totalAmount: dayTickets.reduce((sum, t) => sum + parseFloat(t.grossAmount || '0'), 0),
-      totalSiaeFee: 0,
+      ticketsCount: dayTickets.length,
+      totalAmount: dayTickets.reduce((sum, t) => sum + parseFloat(t.grossAmount || '0'), 0).toString(),
     });
     
     res.set('Content-Type', 'application/xml');
@@ -2012,7 +2010,7 @@ router.get("/api/siae/companies/:companyId/reports/xml/cancellations", requireAu
       <DataOraAnnullamento>${formatSiaeDateTime(ticket.cancellationDate)}</DataOraAnnullamento>
       <CodiceCausale>${escapeXml(ticket.cancellationReasonCode || '')}</CodiceCausale>
       <DescrizioneCausale>${escapeXml(reason?.name || '')}</DescrizioneCausale>
-      <ImportoRimborsato>${(ticket.refundAmount ? ticket.refundAmount / 100 : 0).toFixed(2)}</ImportoRimborsato>
+      <ImportoRimborsato>${(ticket.refundAmount ? Number(ticket.refundAmount) / 100 : 0).toFixed(2)}</ImportoRimborsato>
     </Annullamento>`;
     }
     
@@ -2020,7 +2018,7 @@ router.get("/api/siae/companies/:companyId/reports/xml/cancellations", requireAu
   </ElencoAnnullamenti>
   <Riepilogo>
     <TotaleAnnullamenti>${cancelledTickets.length}</TotaleAnnullamenti>
-    <TotaleRimborsato>${(cancelledTickets.reduce((sum, t) => sum + (t.refundAmount || 0), 0) / 100).toFixed(2)}</TotaleRimborsato>
+    <TotaleRimborsato>${(cancelledTickets.reduce((sum, t) => sum + (Number(t.refundAmount) || 0), 0) / 100).toFixed(2)}</TotaleRimborsato>
   </Riepilogo>
 </ReportAnnullamenti>`;
     
@@ -2068,7 +2066,7 @@ const smartCardSealLogSchema = z.object({
 // Get current smart card session status
 router.get('/smart-card/status', requireAuth, async (req: Request, res: Response) => {
   try {
-    const userId = req.user?.id;
+    const userId = (req.user as any)?.id;
     if (!userId) {
       return res.status(401).json({ message: "Non autorizzato" });
     }
@@ -2117,7 +2115,7 @@ router.get('/smart-card/status', requireAuth, async (req: Request, res: Response
 // Register a new smart card session
 router.post('/smart-card/sessions', requireAuth, async (req: Request, res: Response) => {
   try {
-    const userId = req.user?.id;
+    const userId = (req.user as any)?.id;
     if (!userId) {
       return res.status(401).json({ message: "Non autorizzato" });
     }
@@ -2162,7 +2160,7 @@ router.post('/smart-card/sessions', requireAuth, async (req: Request, res: Respo
     
     // Log audit - reader connection
     await siaeStorage.createAuditLog({
-      companyId: req.user?.companyId || '',
+      companyId: (req.user as any)?.companyId || '',
       userId,
       action: 'smart_card_connect',
       entityType: 'smart_card_session',
@@ -2175,7 +2173,7 @@ router.post('/smart-card/sessions', requireAuth, async (req: Request, res: Respo
     // Log audit - card insertion if present
     if (hasCard) {
       await siaeStorage.createAuditLog({
-        companyId: req.user?.companyId || '',
+        companyId: (req.user as any)?.companyId || '',
         userId,
         action: 'smart_card_inserted',
         entityType: 'smart_card_session',
@@ -2196,7 +2194,7 @@ router.post('/smart-card/sessions', requireAuth, async (req: Request, res: Respo
 router.patch('/smart-card/sessions/:id', requireAuth, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const userId = req.user?.id;
+    const userId = (req.user as any)?.id;
     
     if (!userId) {
       return res.status(401).json({ message: "Non autorizzato" });
@@ -2252,7 +2250,7 @@ router.patch('/smart-card/sessions/:id', requireAuth, async (req: Request, res: 
     
     if (!wasCardPresent && isCardPresent) {
       await siaeStorage.createAuditLog({
-        companyId: req.user?.companyId || '',
+        companyId: (req.user as any)?.companyId || '',
         userId,
         action: 'smart_card_inserted',
         entityType: 'smart_card_session',
@@ -2263,7 +2261,7 @@ router.patch('/smart-card/sessions/:id', requireAuth, async (req: Request, res: 
       });
     } else if (wasCardPresent && !isCardPresent) {
       await siaeStorage.createAuditLog({
-        companyId: req.user?.companyId || '',
+        companyId: (req.user as any)?.companyId || '',
         userId,
         action: 'smart_card_removed',
         entityType: 'smart_card_session',
@@ -2277,7 +2275,7 @@ router.patch('/smart-card/sessions/:id', requireAuth, async (req: Request, res: 
     // Log errors
     if (updateData.lastError) {
       await siaeStorage.createAuditLog({
-        companyId: req.user?.companyId || '',
+        companyId: (req.user as any)?.companyId || '',
         userId,
         action: 'smart_card_error',
         entityType: 'smart_card_session',
@@ -2298,7 +2296,7 @@ router.patch('/smart-card/sessions/:id', requireAuth, async (req: Request, res: 
 router.delete('/smart-card/sessions/:id', requireAuth, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const userId = req.user?.id;
+    const userId = (req.user as any)?.id;
     
     if (!userId) {
       return res.status(401).json({ message: "Non autorizzato" });
@@ -2318,7 +2316,7 @@ router.delete('/smart-card/sessions/:id', requireAuth, async (req: Request, res:
     
     // Log audit
     await siaeStorage.createAuditLog({
-      companyId: req.user?.companyId || '',
+      companyId: (req.user as any)?.companyId || '',
       userId,
       action: 'smart_card_disconnect',
       entityType: 'smart_card_session',
@@ -2337,7 +2335,7 @@ router.delete('/smart-card/sessions/:id', requireAuth, async (req: Request, res:
 // Verify smart card is ready for ticket emission - CRITICAL FOR SIAE COMPLIANCE
 router.get('/smart-card/verify-emission', requireAuth, async (req: Request, res: Response) => {
   try {
-    const userId = req.user?.id;
+    const userId = (req.user as any)?.id;
     if (!userId) {
       return res.status(401).json({ message: "Non autorizzato" });
     }
@@ -2588,7 +2586,7 @@ router.get('/api/siae/ticketed-events/:id/reports/c2', requireAuth, async (req: 
         id: s.id,
         name: s.name,
         sectorCode: s.sectorCode,
-        ticketTypeCode: s.ticketTypeCode,
+        ticketTypeCode: s.sectorCode,
         capacity: s.capacity,
         ticketsSold: soldCount,
         availableSeats: s.availableSeats,
@@ -2715,7 +2713,7 @@ router.get('/api/siae/ticketed-events/:id/reports/xml', requireAuth, async (req:
 ${sectors.map(s => `    <Settore>
       <CodiceSettore>${s.sectorCode || ''}</CodiceSettore>
       <NomeSettore><![CDATA[${s.name || ''}]]></NomeSettore>
-      <TipoBiglietto>${s.ticketTypeCode || ''}</TipoBiglietto>
+      <TipoBiglietto>${s.sectorCode || ''}</TipoBiglietto>
       <Capienza>${s.capacity || 0}</Capienza>
       <BigliettiVenduti>${s.capacity - s.availableSeats}</BigliettiVenduti>
       <PostiDisponibili>${s.availableSeats || 0}</PostiDisponibili>
@@ -2794,12 +2792,12 @@ router.get('/api/siae/ticketed-events/:id/reports/pdf', requireAuth, async (req:
       sectors: sectors.map(s => ({
         name: s.name,
         sectorCode: s.sectorCode,
-        ticketTypeCode: s.ticketTypeCode,
+        ticketTypeCode: s.sectorCode,
         capacity: s.capacity,
         soldCount: s.capacity - s.availableSeats,
         availableSeats: s.availableSeats,
-        price: Number(s.price) || 0,
-        revenue: (s.capacity - s.availableSeats) * (Number(s.price) || 0),
+        price: Number(s.priceIntero) || 0,
+        revenue: (s.capacity - s.availableSeats) * (Number(s.priceIntero) || 0),
       })),
       ticketsSample: tickets.slice(0, 50).map(t => ({
         ticketCode: t.ticketCode,
@@ -2817,7 +2815,7 @@ router.get('/api/siae/ticketed-events/:id/reports/pdf', requireAuth, async (req:
 // Log seal generation
 router.post('/smart-card/seal-log', requireAuth, async (req: Request, res: Response) => {
   try {
-    const userId = req.user?.id;
+    const userId = (req.user as any)?.id;
     if (!userId) {
       return res.status(401).json({ message: "Non autorizzato" });
     }
@@ -2868,7 +2866,7 @@ router.post('/smart-card/seal-log', requireAuth, async (req: Request, res: Respo
       
       // Log failure
       await siaeStorage.createAuditLog({
-        companyId: req.user?.companyId || '',
+        companyId: (req.user as any)?.companyId || '',
         userId,
         action: 'seal_generation_failed',
         entityType: 'smart_card_seal_log',
@@ -4213,7 +4211,7 @@ router.get("/api/cashier/events/:eventId/quotas", requireAuth, requireCashier, a
         id: s.id,
         name: s.name,
         availableSeats: s.availableSeats,
-        ticketPrice: s.ticketPrice
+        ticketPrice: s.priceIntero
       }))
     });
   } catch (error: any) {
@@ -4763,7 +4761,7 @@ router.post("/api/siae/tickets/:id/print", requireAuth, async (req: Request, res
     
     // Get cashier info if applicable
     if (user.role === 'cassiere') {
-      cashierId = getSiaeCashierId(user);
+      cashierId = getSiaeCashierId(user) || null;
     }
     
     // Verify the specified agent is actually connected
