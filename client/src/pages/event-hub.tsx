@@ -2057,7 +2057,17 @@ export default function EventHub() {
                         <Activity className="h-5 w-5 text-amber-400" />
                         Transazioni Recenti
                       </CardTitle>
-                      <Badge variant="secondary">{siaeTransactions.length} transazioni</Badge>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="secondary">{siaeTransactions.length} transazioni</Badge>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={() => navigate('/siae/transactions')}
+                          data-testid="btn-view-all-transactions"
+                        >
+                          Vedi tutte <ChevronRight className="h-4 w-4 ml-1" />
+                        </Button>
+                      </div>
                     </div>
                   </CardHeader>
                   <CardContent>
@@ -2214,6 +2224,14 @@ export default function EventHub() {
                         data-testid="button-refresh-tickets"
                       >
                         <RefreshCw className="h-4 w-4" />
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={() => navigate('/siae/tickets')}
+                        data-testid="btn-view-all-tickets"
+                      >
+                        Vedi tutti <ChevronRight className="h-4 w-4 ml-1" />
                       </Button>
                     </div>
                   </div>
