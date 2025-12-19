@@ -85,7 +85,7 @@ let lastVerifiedPin = null;  // Store PIN for re-authentication on each seal ope
 
 // Debounce for card removal detection - prevents false positives from intermittent contact
 let cardRemovalCounter = 0;
-const CARD_REMOVAL_THRESHOLD = 3; // Card must be "removed" for 3 consecutive polls (1.5s) to trigger PIN lock
+const CARD_REMOVAL_THRESHOLD = 1; // Card must be "removed" for 1 consecutive poll (1s) to trigger PIN lock - fast detection
 
 // Current status for WebSocket clients
 let currentStatus = {
