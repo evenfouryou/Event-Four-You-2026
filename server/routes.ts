@@ -17,6 +17,7 @@ import prRoutes from "./pr-routes";
 import printerRoutes from "./printer-routes";
 import templateRoutes from "./template-routes";
 import billingRoutes from "./billing-routes";
+import digitalTemplateRoutes from "./digital-template-routes";
 import {
   insertCompanySchema,
   insertLocationSchema,
@@ -124,6 +125,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Register billing management routes
   app.use(billingRoutes);
+  
+  // Register digital ticket template routes
+  app.use(digitalTemplateRoutes);
 
   // Health check endpoint for Replit Deploy
   app.get('/api/health', (_req, res) => {

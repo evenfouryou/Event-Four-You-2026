@@ -111,6 +111,9 @@ import {
   type InsertSchoolBadge,
   type SystemSetting,
   type InsertSystemSetting,
+  digitalTicketTemplates,
+  type DigitalTicketTemplate,
+  type InsertDigitalTicketTemplate,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, ne, and, or, isNull, inArray, sql, desc } from "drizzle-orm";
@@ -406,6 +409,14 @@ export interface IStorage {
   getSystemSetting(key: string): Promise<SystemSetting | undefined>;
   getAllSystemSettings(): Promise<SystemSetting[]>;
   upsertSystemSetting(key: string, value: string, description?: string, updatedBy?: string): Promise<SystemSetting>;
+
+  // ==================== DIGITAL TICKET TEMPLATES ====================
+  getDigitalTicketTemplates(companyId?: string): Promise<DigitalTicketTemplate[]>;
+  getDigitalTicketTemplate(id: string): Promise<DigitalTicketTemplate | undefined>;
+  getDefaultDigitalTicketTemplate(companyId?: string): Promise<DigitalTicketTemplate | undefined>;
+  createDigitalTicketTemplate(data: InsertDigitalTicketTemplate): Promise<DigitalTicketTemplate>;
+  updateDigitalTicketTemplate(id: string, data: Partial<InsertDigitalTicketTemplate>): Promise<DigitalTicketTemplate>;
+  deleteDigitalTicketTemplate(id: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2204,6 +2215,62 @@ ${context ? `Contesto aggiuntivo: ${context}` : ''}`;
         .returning();
       return created;
     }
+  }
+
+  // ==================== DIGITAL TICKET TEMPLATES ====================
+  async getDigitalTicketTemplates(companyId?: string): Promise<DigitalTicketTemplate[]> {
+    if (companyId) {
+      return db.select().from(digitalTicketTemplates)
+        .where(or(
+          eq(digitalTicketTemplates.companyId, companyId),
+          isNull(digitalTicketTemplates.companyId)
+        ))
+        .orderBy(desc(digitalTicketTemplates.createdAt));
+    }
+    return db.select().from(digitalTicketTemplates)
+      .orderBy(desc(digitalTicketTemplates.createdAt));
+  }
+
+  async getDigitalTicketTemplate(id: string): Promise<DigitalTicketTemplate | undefined> {
+    const [template] = await db.select().from(digitalTicketTemplates)
+      .where(eq(digitalTicketTemplates.id, id));
+    return template;
+  }
+
+  async getDefaultDigitalTicketTemplate(companyId?: string): Promise<DigitalTicketTemplate | undefined> {
+    if (companyId) {
+      const [template] = await db.select().from(digitalTicketTemplates)
+        .where(and(
+          eq(digitalTicketTemplates.companyId, companyId),
+          eq(digitalTicketTemplates.isDefault, true),
+          eq(digitalTicketTemplates.isActive, true)
+        ));
+      if (template) return template;
+    }
+    const [globalTemplate] = await db.select().from(digitalTicketTemplates)
+      .where(and(
+        isNull(digitalTicketTemplates.companyId),
+        eq(digitalTicketTemplates.isDefault, true),
+        eq(digitalTicketTemplates.isActive, true)
+      ));
+    return globalTemplate;
+  }
+
+  async createDigitalTicketTemplate(data: InsertDigitalTicketTemplate): Promise<DigitalTicketTemplate> {
+    const [template] = await db.insert(digitalTicketTemplates).values(data).returning();
+    return template;
+  }
+
+  async updateDigitalTicketTemplate(id: string, data: Partial<InsertDigitalTicketTemplate>): Promise<DigitalTicketTemplate> {
+    const [template] = await db.update(digitalTicketTemplates)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(digitalTicketTemplates.id, id))
+      .returning();
+    return template;
+  }
+
+  async deleteDigitalTicketTemplate(id: string): Promise<void> {
+    await db.delete(digitalTicketTemplates).where(eq(digitalTicketTemplates.id, id));
   }
 }
 
