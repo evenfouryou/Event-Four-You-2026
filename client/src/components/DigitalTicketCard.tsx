@@ -37,29 +37,29 @@ interface TicketDetail {
 }
 
 interface DigitalTemplate {
-  primaryColor?: string;
-  secondaryColor?: string;
-  backgroundColor?: string;
-  textColor?: string;
-  accentColor?: string;
-  backgroundStyle?: string;
-  gradientDirection?: string;
-  qrSize?: number;
-  qrPosition?: string;
-  showEventName?: boolean;
-  showEventDate?: boolean;
-  showEventTime?: boolean;
-  showVenue?: boolean;
-  showPrice?: boolean;
-  showTicketType?: boolean;
-  showSector?: boolean;
-  showSeat?: boolean;
-  showBuyerName?: boolean;
-  showFiscalSeal?: boolean;
-  showPerforatedEdge?: boolean;
-  fontFamily?: string;
-  titleFontSize?: number;
-  bodyFontSize?: number;
+  primaryColor?: string | null;
+  secondaryColor?: string | null;
+  backgroundColor?: string | null;
+  textColor?: string | null;
+  accentColor?: string | null;
+  backgroundStyle?: string | null;
+  gradientDirection?: string | null;
+  qrSize?: number | null;
+  qrPosition?: string | null;
+  showEventName?: boolean | null;
+  showEventDate?: boolean | null;
+  showEventTime?: boolean | null;
+  showVenue?: boolean | null;
+  showPrice?: boolean | null;
+  showTicketType?: boolean | null;
+  showSector?: boolean | null;
+  showSeat?: boolean | null;
+  showBuyerName?: boolean | null;
+  showFiscalSeal?: boolean | null;
+  showPerforatedEdge?: boolean | null;
+  fontFamily?: string | null;
+  titleFontSize?: number | null;
+  bodyFontSize?: number | null;
 }
 
 interface DigitalTicketCardProps {

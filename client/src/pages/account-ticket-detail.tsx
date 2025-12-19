@@ -8,6 +8,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
 import { DigitalTicketCard } from "@/components/DigitalTicketCard";
+import type { DigitalTicketTemplate } from '@shared/schema';
 import {
   ChevronLeft,
   Calendar,
@@ -62,6 +63,10 @@ export default function AccountTicketDetail() {
   const { data: ticket, isLoading, isError } = useQuery<TicketDetail>({
     queryKey: [`/api/public/account/tickets/${id}`],
     enabled: !!id,
+  });
+
+  const { data: digitalTemplate } = useQuery<DigitalTicketTemplate | null>({
+    queryKey: ['/api/digital-templates/default'],
   });
 
   const cancelResaleMutation = useMutation({
@@ -225,7 +230,7 @@ export default function AccountTicketDetail() {
 
           {ticket.status === "emitted" && !ticket.isListed && (
             <div className="py-4 sm:py-6 border-y border-border">
-              <DigitalTicketCard ticket={ticket} />
+              <DigitalTicketCard ticket={ticket} template={digitalTemplate} />
             </div>
           )}
 
