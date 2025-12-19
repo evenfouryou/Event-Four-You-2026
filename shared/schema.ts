@@ -1210,6 +1210,8 @@ export const siaeEventSectors = pgTable("siae_event_sectors", {
   ivaRate: decimal("iva_rate", { precision: 5, scale: 2 }).default('22'), // Aliquota IVA
   sortOrder: integer("sort_order").default(0),
   active: boolean("active").notNull().default(true),
+  salesSuspended: boolean("sales_suspended").notNull().default(false), // Vendite sospese per questa tipologia
+  ticketsSold: integer("tickets_sold").notNull().default(0), // Numero biglietti emessi per questa tipologia
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

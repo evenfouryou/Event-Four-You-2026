@@ -1015,6 +1015,25 @@ router.post("/api/siae/event-sectors", requireAuth, requireOrganizer, async (req
 router.patch("/api/siae/event-sectors/:id", requireAuth, requireOrganizer, async (req: Request, res: Response) => {
   try {
     const data = patchEventSectorSchema.parse(req.body);
+    
+    // SIAE rule: block price changes after tickets have been emitted
+    if (data.priceIntero !== undefined || data.priceRidotto !== undefined || data.priceOmaggio !== undefined) {
+      const [ticketCount] = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(siaeTickets)
+        .where(and(
+          eq(siaeTickets.sectorId, req.params.id),
+          sql`${siaeTickets.status} != 'cancelled'`
+        ));
+      
+      if (ticketCount && ticketCount.count > 0) {
+        return res.status(400).json({ 
+          message: "Modifica prezzo non consentita: sono già stati emessi biglietti per questo settore. Crea una nuova tipologia per applicare prezzi diversi.",
+          code: "PRICE_LOCKED"
+        });
+      }
+    }
+    
     const sector = await siaeStorage.updateSiaeEventSector(req.params.id, data);
     if (!sector) {
       return res.status(404).json({ message: "Settore non trovato" });

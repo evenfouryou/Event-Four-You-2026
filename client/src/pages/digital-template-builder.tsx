@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useLocation } from 'wouter';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { apiRequest, queryClient } from '@/lib/queryClient';
@@ -16,10 +16,16 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Slider } from '@/components/ui/slider';
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel } from '@/components/ui/form';
 import { Separator } from '@/components/ui/separator';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Label } from '@/components/ui/label';
 import { 
-  ArrowLeft, Save, Loader2, Palette, Image, QrCode, Layout, Type, Calendar, MapPin, Ticket, User 
+  ArrowLeft, Save, Loader2, Palette, Image, QrCode, Layout, Type, Calendar, MapPin, Ticket, User, Upload, X, Check 
 } from 'lucide-react';
 import type { DigitalTicketTemplate } from '@shared/schema';
+
+const DEFAULT_LOGO_URL = '/logo.png';
+
+type LogoSourceType = 'none' | 'default' | 'url' | 'file';
 
 const templateFormSchema = z.object({
   name: z.string().min(1, "Nome obbligatorio"),
@@ -298,6 +304,10 @@ export default function DigitalTemplateBuilder() {
   const isEditing = !!id;
   const isSuperAdmin = user?.role === 'super_admin';
 
+  const [logoSource, setLogoSource] = useState<LogoSourceType>('none');
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const form = useForm<TemplateFormData>({
     resolver: zodResolver(templateFormSchema),
     defaultValues: {
@@ -386,8 +396,93 @@ export default function DigitalTemplateBuilder() {
         titleFontSize: template.titleFontSize || 24,
         bodyFontSize: template.bodyFontSize || 14,
       });
+
+      if (template.logoUrl) {
+        if (template.logoUrl === DEFAULT_LOGO_URL) {
+          setLogoSource('default');
+        } else if (template.logoUrl.startsWith('data:')) {
+          setLogoSource('file');
+        } else {
+          setLogoSource('url');
+        }
+      } else {
+        setLogoSource('none');
+      }
     }
   }, [template, form]);
+
+  const handleLogoSourceChange = (source: LogoSourceType) => {
+    setLogoSource(source);
+    if (source === 'none') {
+      form.setValue('logoUrl', undefined);
+    } else if (source === 'default') {
+      form.setValue('logoUrl', DEFAULT_LOGO_URL);
+    } else if (source === 'url') {
+      const currentUrl = form.getValues('logoUrl');
+      if (!currentUrl || currentUrl === DEFAULT_LOGO_URL || currentUrl.startsWith('data:')) {
+        form.setValue('logoUrl', '');
+      }
+    }
+  };
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      toast({
+        title: 'Errore',
+        description: 'Per favore seleziona un file immagine',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const maxSize = 2 * 1024 * 1024;
+    if (file.size > maxSize) {
+      toast({
+        title: 'Errore',
+        description: 'Il file è troppo grande. Dimensione massima: 2MB',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsUploadingLogo(true);
+    try {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64String = reader.result as string;
+        form.setValue('logoUrl', base64String);
+        setLogoSource('file');
+        setIsUploadingLogo(false);
+      };
+      reader.onerror = () => {
+        toast({
+          title: 'Errore',
+          description: 'Errore durante la lettura del file',
+          variant: 'destructive',
+        });
+        setIsUploadingLogo(false);
+      };
+      reader.readAsDataURL(file);
+    } catch (error) {
+      toast({
+        title: 'Errore',
+        description: 'Errore durante il caricamento del file',
+        variant: 'destructive',
+      });
+      setIsUploadingLogo(false);
+    }
+  };
+
+  const clearLogo = () => {
+    form.setValue('logoUrl', undefined);
+    setLogoSource('none');
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
 
   const createMutation = useMutation({
     mutationFn: async (data: TemplateFormData) => {
@@ -444,30 +539,33 @@ export default function DigitalTemplateBuilder() {
 
   return (
     <div className="container mx-auto p-4 max-w-7xl">
-      <div className="flex items-center gap-4 mb-6">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => navigate('/printer-settings')}
-          data-testid="button-back"
-        >
-          <ArrowLeft className="w-5 h-5" />
-        </Button>
-        <div className="flex-1">
-          <h1 className="text-2xl font-bold">
-            {isEditing ? 'Modifica Template Digitale' : 'Nuovo Template Digitale'}
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Personalizza l'aspetto del biglietto digitale per telefono e PDF
-          </p>
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 mb-6">
+        <div className="flex items-center gap-3 flex-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => navigate('/printer-settings')}
+            data-testid="button-back"
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </Button>
+          <div className="flex-1 min-w-0">
+            <h1 className="text-lg sm:text-2xl font-bold truncate">
+              {isEditing ? 'Modifica Template' : 'Nuovo Template'}
+            </h1>
+            <p className="text-xs sm:text-sm text-muted-foreground hidden sm:block">
+              Personalizza l'aspetto del biglietto digitale per telefono e PDF
+            </p>
+          </div>
         </div>
         <Button
           onClick={form.handleSubmit(onSubmit)}
           disabled={isPending}
+          className="w-full sm:w-auto"
           data-testid="button-save"
         >
           {isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
-          Salva
+          Salva Template
         </Button>
       </div>
 
@@ -594,13 +692,13 @@ export default function DigitalTemplateBuilder() {
 
                 <TabsContent value="colors">
                   <Card>
-                    <CardHeader>
+                    <CardHeader className="pb-3">
                       <CardTitle className="text-lg flex items-center gap-2">
                         <Palette className="w-5 h-5" />
                         Colori
                       </CardTitle>
                     </CardHeader>
-                    <CardContent className="grid grid-cols-2 gap-4">
+                    <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <FormField
                         control={form.control}
                         name="primaryColor"
@@ -764,69 +862,194 @@ export default function DigitalTemplateBuilder() {
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                      <FormField
-                        control={form.control}
-                        name="logoUrl"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>URL Logo</FormLabel>
-                            <FormControl>
-                              <Input 
-                                {...field} 
-                                placeholder="https://example.com/logo.png"
-                                data-testid="input-logo-url"
+                      <div className="space-y-3">
+                        <FormLabel>Sorgente Logo</FormLabel>
+                        <RadioGroup
+                          value={logoSource}
+                          onValueChange={(value) => handleLogoSourceChange(value as LogoSourceType)}
+                          className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap"
+                          data-testid="radio-logo-source"
+                        >
+                          <div className="flex items-center space-x-2 p-2 sm:p-3 border rounded-lg hover-elevate cursor-pointer">
+                            <RadioGroupItem value="none" id="logo-none" />
+                            <Label htmlFor="logo-none" className="cursor-pointer text-sm">Nessun logo</Label>
+                          </div>
+                          <div className="flex items-center space-x-2 p-2 sm:p-3 border rounded-lg hover-elevate cursor-pointer">
+                            <RadioGroupItem value="default" id="logo-default" />
+                            <Label htmlFor="logo-default" className="cursor-pointer text-sm">Event4U</Label>
+                          </div>
+                          <div className="flex items-center space-x-2 p-2 sm:p-3 border rounded-lg hover-elevate cursor-pointer">
+                            <RadioGroupItem value="file" id="logo-file" />
+                            <Label htmlFor="logo-file" className="cursor-pointer text-sm">Carica file</Label>
+                          </div>
+                          <div className="flex items-center space-x-2 p-2 sm:p-3 border rounded-lg hover-elevate cursor-pointer">
+                            <RadioGroupItem value="url" id="logo-url" />
+                            <Label htmlFor="logo-url" className="cursor-pointer text-sm">URL</Label>
+                          </div>
+                        </RadioGroup>
+                      </div>
+
+                      {logoSource === 'default' && (
+                        <div className="p-4 border rounded-lg bg-muted/30">
+                          <div className="flex items-center gap-3">
+                            <div className="w-16 h-16 flex items-center justify-center bg-background rounded-lg border">
+                              <img 
+                                src={DEFAULT_LOGO_URL} 
+                                alt="Event4U Logo" 
+                                className="max-w-full max-h-full object-contain"
                               />
-                            </FormControl>
-                            <FormDescription>
-                              Inserisci l'URL di un'immagine logo
-                            </FormDescription>
-                          </FormItem>
-                        )}
-                      />
+                            </div>
+                            <div>
+                              <p className="font-medium text-sm">Logo Event4U</p>
+                              <p className="text-xs text-muted-foreground">Logo predefinito dell'applicazione</p>
+                            </div>
+                            <Check className="w-5 h-5 text-green-500 ml-auto" />
+                          </div>
+                        </div>
+                      )}
 
-                      <FormField
-                        control={form.control}
-                        name="logoPosition"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Posizione Logo</FormLabel>
-                            <Select onValueChange={field.onChange} value={field.value}>
-                              <FormControl>
-                                <SelectTrigger data-testid="select-logo-position">
-                                  <SelectValue />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                <SelectItem value="top-left">In alto a sinistra</SelectItem>
-                                <SelectItem value="top-center">In alto al centro</SelectItem>
-                                <SelectItem value="top-right">In alto a destra</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </FormItem>
-                        )}
-                      />
+                      {logoSource === 'file' && (
+                        <div className="space-y-3">
+                          <input
+                            type="file"
+                            ref={fileInputRef}
+                            accept="image/*"
+                            onChange={handleFileUpload}
+                            className="hidden"
+                            data-testid="input-logo-file"
+                          />
+                          
+                          {watchedValues.logoUrl && watchedValues.logoUrl.startsWith('data:') ? (
+                            <div className="p-4 border rounded-lg bg-muted/30">
+                              <div className="flex items-center gap-3">
+                                <div className="w-16 h-16 flex items-center justify-center bg-background rounded-lg border overflow-hidden">
+                                  <img 
+                                    src={watchedValues.logoUrl} 
+                                    alt="Logo caricato" 
+                                    className="max-w-full max-h-full object-contain"
+                                  />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-medium text-sm">Logo caricato</p>
+                                  <p className="text-xs text-muted-foreground truncate">Immagine in base64</p>
+                                </div>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => fileInputRef.current?.click()}
+                                  data-testid="button-change-logo"
+                                >
+                                  <Upload className="w-4 h-4" />
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={clearLogo}
+                                  data-testid="button-remove-logo"
+                                >
+                                  <X className="w-4 h-4" />
+                                </Button>
+                              </div>
+                            </div>
+                          ) : (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => fileInputRef.current?.click()}
+                              disabled={isUploadingLogo}
+                              className="w-full h-24 flex flex-col gap-2"
+                              data-testid="button-upload-logo"
+                            >
+                              {isUploadingLogo ? (
+                                <Loader2 className="w-6 h-6 animate-spin" />
+                              ) : (
+                                <>
+                                  <Upload className="w-6 h-6" />
+                                  <span className="text-sm">Clicca per caricare un logo</span>
+                                  <span className="text-xs text-muted-foreground">PNG, JPG, SVG (max 2MB)</span>
+                                </>
+                              )}
+                            </Button>
+                          )}
+                        </div>
+                      )}
 
-                      <FormField
-                        control={form.control}
-                        name="logoSize"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Dimensione Logo</FormLabel>
-                            <Select onValueChange={field.onChange} value={field.value}>
+                      {logoSource === 'url' && (
+                        <FormField
+                          control={form.control}
+                          name="logoUrl"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>URL Logo</FormLabel>
                               <FormControl>
-                                <SelectTrigger data-testid="select-logo-size">
-                                  <SelectValue />
-                                </SelectTrigger>
+                                <Input 
+                                  {...field}
+                                  value={field.value || ''}
+                                  placeholder="https://example.com/logo.png"
+                                  data-testid="input-logo-url"
+                                />
                               </FormControl>
-                              <SelectContent>
-                                <SelectItem value="small">Piccolo</SelectItem>
-                                <SelectItem value="medium">Medio</SelectItem>
-                                <SelectItem value="large">Grande</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </FormItem>
-                        )}
-                      />
+                              <FormDescription>
+                                Inserisci l'URL di un'immagine logo
+                              </FormDescription>
+                            </FormItem>
+                          )}
+                        />
+                      )}
+
+                      {watchedValues.logoUrl && logoSource !== 'none' && (
+                        <Separator />
+                      )}
+
+                      {watchedValues.logoUrl && logoSource !== 'none' && (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <FormField
+                            control={form.control}
+                            name="logoPosition"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Posizione Logo</FormLabel>
+                                <Select onValueChange={field.onChange} value={field.value}>
+                                  <FormControl>
+                                    <SelectTrigger data-testid="select-logo-position">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    <SelectItem value="top-left">In alto a sinistra</SelectItem>
+                                    <SelectItem value="top-center">In alto al centro</SelectItem>
+                                    <SelectItem value="top-right">In alto a destra</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            control={form.control}
+                            name="logoSize"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Dimensione Logo</FormLabel>
+                                <Select onValueChange={field.onChange} value={field.value}>
+                                  <FormControl>
+                                    <SelectTrigger data-testid="select-logo-size">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    <SelectItem value="small">Piccolo</SelectItem>
+                                    <SelectItem value="medium">Medio</SelectItem>
+                                    <SelectItem value="large">Grande</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
                 </TabsContent>
@@ -904,7 +1127,7 @@ export default function DigitalTemplateBuilder() {
                         )}
                       />
 
-                      <div className="grid grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <FormField
                           control={form.control}
                           name="qrForegroundColor"
@@ -954,14 +1177,14 @@ export default function DigitalTemplateBuilder() {
 
                 <TabsContent value="layout">
                   <Card>
-                    <CardHeader>
+                    <CardHeader className="pb-3">
                       <CardTitle className="text-lg flex items-center gap-2">
                         <Layout className="w-5 h-5" />
                         Layout e Campi
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-6">
-                      <div className="grid grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                         <FormField
                           control={form.control}
                           name="showEventName"

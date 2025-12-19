@@ -92,7 +92,7 @@ export default function CassaBigliettiPage() {
   const smartCardStatus = useSmartCardStatus();
   const [selectedEventId, setSelectedEventId] = useState<string>("");
   const [selectedSectorId, setSelectedSectorId] = useState<string>("");
-  const [ticketType, setTicketType] = useState<string>("intero");
+  const [ticketType, setTicketType] = useState<string>("");
   const [paymentMethod, setPaymentMethod] = useState<string>("cash");
   const [customPrice, setCustomPrice] = useState<string>("");
   const [participantFirstName, setParticipantFirstName] = useState<string>("");
@@ -197,6 +197,52 @@ export default function CassaBigliettiPage() {
       setSelectedSectorId(sectors[0].id);
     }
   }, [isCassiere, currentAllocation, sectors, selectedSectorId]);
+
+  // Get available ticket types for the selected sector
+  const selectedSector = sectors?.find(s => s.id === selectedSectorId);
+  const availableTicketTypes = (() => {
+    if (!selectedSector) return [];
+    const types: { value: string; label: string; price: number; icon: typeof Ticket }[] = [];
+    
+    // Intero is always available
+    types.push({
+      value: "intero",
+      label: "Intero",
+      price: Number(selectedSector.priceIntero) || 0,
+      icon: Ticket,
+    });
+    
+    // Ridotto only if priceRidotto is set and > 0
+    if (selectedSector.priceRidotto && Number(selectedSector.priceRidotto) > 0) {
+      types.push({
+        value: "ridotto",
+        label: "Ridotto",
+        price: Number(selectedSector.priceRidotto),
+        icon: Users,
+      });
+    }
+    
+    // Omaggio is always available (free)
+    types.push({
+      value: "omaggio",
+      label: "Omaggio",
+      price: 0,
+      icon: CheckCircle2,
+    });
+    
+    return types;
+  })();
+
+  // Auto-select ticket type when sector changes or on initial load
+  useEffect(() => {
+    if (availableTicketTypes.length > 0 && selectedSectorId) {
+      // Always select first available type when sector changes or type is empty/invalid
+      const currentTypeAvailable = ticketType && availableTicketTypes.some(t => t.value === ticketType);
+      if (!currentTypeAvailable) {
+        setTicketType(availableTicketTypes[0].value);
+      }
+    }
+  }, [selectedSectorId, availableTicketTypes.length]);
 
   const { data: todayTickets, isLoading: ticketsLoading } = useQuery<SiaeTicket[]>({
     queryKey: ["/api/cashiers/events", selectedEventId, "today-tickets"],
@@ -797,18 +843,81 @@ export default function CassaBigliettiPage() {
                   )}
                 </div>
 
+                {/* Ticket Type Selection - Large Touch-Friendly Buttons */}
                 <div className="space-y-2">
                   <Label>Tipo Biglietto</Label>
-                  <Select value={ticketType} onValueChange={setTicketType}>
-                    <SelectTrigger data-testid="select-ticket-type">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="intero">Intero</SelectItem>
-                      <SelectItem value="ridotto">Ridotto</SelectItem>
-                      <SelectItem value="omaggio">Omaggio</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  {availableTicketTypes.length === 0 ? (
+                    <div className="text-sm text-muted-foreground p-3 bg-muted/30 rounded-md text-center">
+                      Seleziona prima un settore
+                    </div>
+                  ) : availableTicketTypes.length === 1 ? (
+                    // Single type available - show as info only (auto-selected)
+                    <div 
+                      className="flex items-center justify-between p-4 rounded-lg bg-[#FFD700]/10 border-2 border-[#FFD700]"
+                      data-testid="ticket-type-single"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-[#FFD700]/20 flex items-center justify-center">
+                          <Ticket className="w-5 h-5 text-[#FFD700]" />
+                        </div>
+                        <div>
+                          <div className="font-semibold text-foreground">{availableTicketTypes[0].label}</div>
+                          <div className="text-sm text-muted-foreground">Tipo unico disponibile</div>
+                        </div>
+                      </div>
+                      <div className="text-lg font-bold text-[#FFD700]">
+                        €{availableTicketTypes[0].price.toFixed(2)}
+                      </div>
+                    </div>
+                  ) : (
+                    // Multiple types - show as large selectable cards
+                    <div className="grid grid-cols-1 gap-2" data-testid="ticket-type-buttons">
+                      {availableTicketTypes.map((type) => {
+                        const isSelected = ticketType === type.value;
+                        const IconComponent = type.icon;
+                        return (
+                          <button
+                            key={type.value}
+                            type="button"
+                            onClick={() => setTicketType(type.value)}
+                            className={`
+                              flex items-center justify-between p-4 rounded-lg border-2 transition-all
+                              min-h-[64px] touch-manipulation
+                              ${isSelected 
+                                ? 'bg-[#FFD700]/10 border-[#FFD700] shadow-lg shadow-[#FFD700]/20' 
+                                : 'bg-muted/30 border-border hover-elevate active-elevate-2'}
+                            `}
+                            data-testid={`button-ticket-type-${type.value}`}
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className={`
+                                w-10 h-10 rounded-full flex items-center justify-center
+                                ${isSelected ? 'bg-[#FFD700]/20' : 'bg-muted/50'}
+                              `}>
+                                <IconComponent className={`w-5 h-5 ${isSelected ? 'text-[#FFD700]' : 'text-muted-foreground'}`} />
+                              </div>
+                              <div className="text-left">
+                                <div className={`font-semibold ${isSelected ? 'text-foreground' : 'text-muted-foreground'}`}>
+                                  {type.label}
+                                </div>
+                                {type.value === "omaggio" && (
+                                  <div className="text-xs text-muted-foreground">Gratuito</div>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <div className={`text-lg font-bold ${isSelected ? 'text-[#FFD700]' : 'text-muted-foreground'}`}>
+                                {type.price === 0 ? 'Gratis' : `€${type.price.toFixed(2)}`}
+                              </div>
+                              {isSelected && (
+                                <CheckCircle2 className="w-5 h-5 text-[#FFD700]" />
+                              )}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
 
                 <div className="space-y-2">

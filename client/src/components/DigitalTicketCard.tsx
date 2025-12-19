@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
-import { Calendar, MapPin, Ticket, User, QrCode, Loader2 } from "lucide-react";
+import { Calendar, MapPin, Ticket, User, QrCode, Loader2, RotateCcw, Building2, Store, FileText, Hash } from "lucide-react";
 import QRCodeLib from "qrcode";
+import { Button } from "@/components/ui/button";
 
 interface TicketDetail {
   id: string;
@@ -36,6 +37,10 @@ interface TicketDetail {
   isListed: boolean;
   existingResale: { id: string; resalePrice: string } | null;
   hoursToEvent: number;
+  organizerCompany?: string | null;
+  ticketingManager?: string | null;
+  emissionDateTime?: string | null;
+  progressiveNumber?: string | number | null;
 }
 
 interface DigitalTemplate {
@@ -72,6 +77,7 @@ interface DigitalTicketCardProps {
 export function DigitalTicketCard({ ticket, template }: DigitalTicketCardProps) {
   const [qrCodeImage, setQrCodeImage] = useState<string | null>(null);
   const [qrLoading, setQrLoading] = useState(false);
+  const [isFlipped, setIsFlipped] = useState(false);
   
   const t = template || {};
   const eventDate = new Date(ticket.eventStart);
@@ -276,35 +282,160 @@ export function DigitalTicketCard({ ticket, template }: DigitalTicketCardProps) 
                 className="bg-card px-6 py-6 flex flex-col items-center"
                 style={template && t.backgroundColor ? { backgroundColor: t.backgroundColor } : undefined}
               >
-                <div className="bg-white p-4 rounded-xl shadow-lg mb-3">
-                  {qrLoading ? (
+                <div 
+                  className="relative"
+                  style={{ 
+                    perspective: '1000px',
+                    width: qrSize + 32,
+                    height: qrSize + 32,
+                  }}
+                  data-testid="qr-flip-container"
+                >
+                  <div
+                    className="relative w-full h-full transition-transform duration-500"
+                    style={{
+                      transformStyle: 'preserve-3d',
+                      transform: isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)',
+                    }}
+                  >
                     <div 
-                      className="flex items-center justify-center w-40 h-40 sm:w-48 sm:h-48"
-                      style={{ width: qrSize, height: qrSize }}
+                      className="absolute inset-0 bg-white p-4 rounded-xl shadow-lg flex items-center justify-center"
+                      style={{ backfaceVisibility: 'hidden' }}
                     >
-                      <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
+                      {qrLoading ? (
+                        <div 
+                          className="flex items-center justify-center"
+                          style={{ width: qrSize, height: qrSize }}
+                        >
+                          <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
+                        </div>
+                      ) : qrCodeImage ? (
+                        <img
+                          src={qrCodeImage}
+                          alt="QR Code biglietto"
+                          style={{ width: qrSize, height: qrSize }}
+                          className="w-40 h-40 sm:w-48 sm:h-48"
+                          data-testid="ticket-qrcode"
+                        />
+                      ) : (
+                        <div 
+                          className="flex items-center justify-center bg-gray-100 text-gray-400"
+                          style={{ width: qrSize, height: qrSize }}
+                        >
+                          <QrCode className="w-12 h-12" />
+                        </div>
+                      )}
                     </div>
-                  ) : qrCodeImage ? (
-                    <img
-                      src={qrCodeImage}
-                      alt="QR Code biglietto"
-                      style={{ width: qrSize, height: qrSize }}
-                      className="w-40 h-40 sm:w-48 sm:h-48"
-                      data-testid="ticket-qrcode"
-                    />
+
+                    <div 
+                      className="absolute inset-0 bg-card border border-border rounded-xl shadow-lg p-4 flex flex-col"
+                      style={{ 
+                        backfaceVisibility: 'hidden',
+                        transform: 'rotateY(180deg)',
+                      }}
+                    >
+                      <p className="text-xs font-medium text-primary uppercase tracking-wider mb-3 text-center">
+                        Dettagli Biglietto
+                      </p>
+                      
+                      <div className="flex-1 space-y-2 overflow-y-auto">
+                        {ticket.organizerCompany && (
+                          <div className="flex items-start gap-2">
+                            <Building2 className="w-3.5 h-3.5 text-primary mt-0.5 flex-shrink-0" />
+                            <div className="min-w-0">
+                              <p className="text-[10px] text-muted-foreground uppercase">Organizzatore</p>
+                              <p className="text-xs font-medium text-foreground truncate" data-testid="ticket-organizer">
+                                {ticket.organizerCompany}
+                              </p>
+                            </div>
+                          </div>
+                        )}
+
+                        {ticket.ticketingManager && (
+                          <div className="flex items-start gap-2">
+                            <Store className="w-3.5 h-3.5 text-primary mt-0.5 flex-shrink-0" />
+                            <div className="min-w-0">
+                              <p className="text-[10px] text-muted-foreground uppercase">Biglietteria</p>
+                              <p className="text-xs font-medium text-foreground truncate" data-testid="ticket-ticketing-manager">
+                                {ticket.ticketingManager}
+                              </p>
+                            </div>
+                          </div>
+                        )}
+
+                        {(ticket.emissionDateTime || ticket.emittedAt) && (
+                          <div className="flex items-start gap-2">
+                            <Calendar className="w-3.5 h-3.5 text-primary mt-0.5 flex-shrink-0" />
+                            <div className="min-w-0">
+                              <p className="text-[10px] text-muted-foreground uppercase">Data Emissione</p>
+                              <p className="text-xs font-medium text-foreground" data-testid="ticket-emission-date">
+                                {format(new Date(ticket.emissionDateTime || ticket.emittedAt), "d MMM yyyy HH:mm", { locale: it })}
+                              </p>
+                            </div>
+                          </div>
+                        )}
+
+                        {ticket.fiscalSealCode && (
+                          <div className="flex items-start gap-2">
+                            <FileText className="w-3.5 h-3.5 text-primary mt-0.5 flex-shrink-0" />
+                            <div className="min-w-0">
+                              <p className="text-[10px] text-muted-foreground uppercase">Sigillo Fiscale</p>
+                              <p className="text-[10px] font-mono text-foreground break-all" data-testid="ticket-fiscal-seal-back">
+                                {ticket.fiscalSealCode}
+                              </p>
+                            </div>
+                          </div>
+                        )}
+
+                        {ticket.progressiveNumber && (
+                          <div className="flex items-start gap-2">
+                            <Hash className="w-3.5 h-3.5 text-primary mt-0.5 flex-shrink-0" />
+                            <div className="min-w-0">
+                              <p className="text-[10px] text-muted-foreground uppercase">N. Progressivo</p>
+                              <p className="text-xs font-medium text-foreground" data-testid="ticket-progressive-number">
+                                {ticket.progressiveNumber}
+                              </p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="mt-2 w-full text-xs"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setIsFlipped(false);
+                        }}
+                        data-testid="button-flip-back"
+                      >
+                        <RotateCcw className="w-3 h-3 mr-1" />
+                        Mostra QR
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+                
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="mt-3 text-xs"
+                  onClick={() => setIsFlipped(!isFlipped)}
+                  data-testid="button-toggle-flip"
+                >
+                  {isFlipped ? (
+                    <>
+                      <QrCode className="w-4 h-4 mr-2" />
+                      Mostra QR Code
+                    </>
                   ) : (
-                    <div 
-                      className="flex items-center justify-center w-40 h-40 sm:w-48 sm:h-48 bg-gray-100 text-gray-400"
-                      style={{ width: qrSize, height: qrSize }}
-                    >
-                      <QrCode className="w-12 h-12" />
-                    </div>
+                    <>
+                      <FileText className="w-4 h-4 mr-2" />
+                      Mostra Dettagli
+                    </>
                   )}
-                </div>
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <QrCode className="w-4 h-4" />
-                  <span className="text-xs">Mostra all'ingresso</span>
-                </div>
+                </Button>
               </div>
             )}
 

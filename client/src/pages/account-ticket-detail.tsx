@@ -32,6 +32,7 @@ interface TicketDetail {
   participantLastName: string | null;
   status: string;
   emittedAt: string;
+  emissionDate: string;
   qrCode: string | null;
   customText: string | null;
   fiscalSealCode: string | null;
@@ -54,6 +55,10 @@ interface TicketDetail {
   isListed: boolean;
   existingResale: { id: string; resalePrice: string } | null;
   hoursToEvent: number;
+  organizerCompany: string | null;
+  ticketingManager: string | null;
+  progressiveNumber: number | null;
+  emissionDateTime: string | null;
 }
 
 export default function AccountTicketDetail() {

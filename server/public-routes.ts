@@ -23,11 +23,13 @@ import {
   siaeFiscalSeals,
   siaeActivationCards,
   siaeEmissionChannels,
+  siaeSystemConfig,
   publicCartItems,
   publicCheckoutSessions,
   publicCustomerSessions,
   events,
   locations,
+  companies,
   insertPublicCartItemSchema,
   guestListEntries,
   guestLists,
@@ -2439,12 +2441,18 @@ router.get("/api/public/account/tickets/:id", async (req, res) => {
         locationAddress: locations.address,
         allowsChangeName: siaeTicketedEvents.allowsChangeName,
         allowsResale: siaeTicketedEvents.allowsResale,
+        organizerCompany: companies.name,
+        ticketingManager: siaeSystemConfig.businessName,
+        progressiveNumber: siaeFiscalSeals.progressiveNumber,
       })
       .from(siaeTickets)
       .innerJoin(siaeEventSectors, eq(siaeTickets.sectorId, siaeEventSectors.id))
       .innerJoin(siaeTicketedEvents, eq(siaeTickets.ticketedEventId, siaeTicketedEvents.id))
       .innerJoin(events, eq(siaeTicketedEvents.eventId, events.id))
       .innerJoin(locations, eq(events.locationId, locations.id))
+      .innerJoin(companies, eq(events.companyId, companies.id))
+      .leftJoin(siaeSystemConfig, eq(siaeSystemConfig.companyId, events.companyId))
+      .leftJoin(siaeFiscalSeals, eq(siaeFiscalSeals.id, siaeTickets.fiscalSealId))
       .where(and(
         eq(siaeTickets.id, id),
         eq(siaeTickets.customerId, customer.id)
@@ -2476,8 +2484,17 @@ router.get("/api/public/account/tickets/:id", async (req, res) => {
         or(eq(siaeResales.status, 'listed'), eq(siaeResales.status, 'pending'))
       ));
 
+    const emissionDateTime = ticket.emissionDate 
+      ? new Date(ticket.emissionDate).toISOString() 
+      : null;
+
     res.json({
       ...ticket,
+      emittedAt: emissionDateTime,
+      emissionDateTime: emissionDateTime,
+      organizerCompany: ticket.organizerCompany || "Organizzatore",
+      ticketingManager: ticket.ticketingManager || null,
+      progressiveNumber: ticket.progressiveNumber || null,
       canNameChange,
       canResale: canResale && !existingResale,
       isListed: !!existingResale,
