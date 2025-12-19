@@ -3582,7 +3582,7 @@ export type InsertCashierSession = z.infer<typeof insertCashierSessionSchema>;
 // Ticket Templates - Visual ticket layout templates (per-company)
 export const ticketTemplates = pgTable("ticket_templates", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  companyId: varchar("company_id").notNull().references(() => companies.id),
+  companyId: varchar("company_id").references(() => companies.id), // nullable for global/system templates
   name: varchar("name", { length: 255 }).notNull(), // e.g., "Template Standard", "VIP Gold"
   backgroundImageUrl: text("background_image_url"), // Uploaded background image
   paperWidthMm: integer("paper_width_mm").notNull().default(80),

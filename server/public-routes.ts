@@ -1668,7 +1668,7 @@ router.post("/api/public/checkout/confirm", async (req, res) => {
         console.log('[PUBLIC] Starting async PDF/email generation for transaction:', transaction.transactionCode);
         
         // Get default ticket template for the company
-        const [defaultTemplate] = await db
+        let [defaultTemplate] = await db
           .select()
           .from(ticketTemplates)
           .where(
@@ -1680,41 +1680,115 @@ router.post("/api/public/checkout/confirm", async (req, res) => {
           )
           .limit(1);
 
+        // Fallback to global system template if no company-specific template exists
         if (!defaultTemplate) {
-          console.log('[PUBLIC] No default ticket template found for company:', ticketedEvent.companyId);
-          return;
+          console.log('[PUBLIC] No company template found, trying global system template...');
+          const [globalTemplate] = await db
+            .select()
+            .from(ticketTemplates)
+            .where(
+              and(
+                isNull(ticketTemplates.companyId),
+                eq(ticketTemplates.isDefault, true),
+                eq(ticketTemplates.isActive, true)
+              )
+            )
+            .limit(1);
+          
+          if (globalTemplate) {
+            defaultTemplate = globalTemplate;
+            console.log('[PUBLIC] Using global system template:', globalTemplate.name);
+          }
+        }
+
+        // If still no template, use hardcoded basic template
+        if (!defaultTemplate) {
+          console.log('[PUBLIC] No templates found, using hardcoded basic template for company:', ticketedEvent.companyId);
+          // Create a basic template structure for PDF generation
+          defaultTemplate = {
+            id: 'hardcoded-basic',
+            companyId: null,
+            name: 'Template Base Sistema',
+            paperWidthMm: 80,
+            paperHeightMm: 120,
+            dpi: 203,
+            isDefault: true,
+            isActive: true,
+            backgroundImageUrl: null,
+            printOrientation: 'portrait',
+            version: 1,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          } as typeof defaultTemplate;
         }
 
         // Get template elements
-        const elements = await db
+        let elements = await db
           .select()
           .from(ticketTemplateElements)
           .where(eq(ticketTemplateElements.templateId, defaultTemplate.id))
           .orderBy(ticketTemplateElements.zIndex);
 
-        // Parse elements for HTML generation
-        const parsedElements = elements.map((el) => {
-          let content = el.staticValue;
-          if (el.fieldKey && !el.staticValue) {
-            content = `{{${el.fieldKey}}}`;
-          } else if (el.fieldKey && el.staticValue) {
-            content = el.staticValue;
-          }
-          return {
-            type: el.type,
-            x: parseFloat(el.x as any),
-            y: parseFloat(el.y as any),
-            width: parseFloat(el.width as any),
-            height: parseFloat(el.height as any),
-            content,
-            fontSize: el.fontSize,
-            fontFamily: el.fontFamily,
-            fontWeight: el.fontWeight,
-            fontColor: el.color,
-            textAlign: el.textAlign,
-            rotation: el.rotation,
-          };
-        });
+        // If no elements found (hardcoded template or empty template), use default elements
+        let parsedElements: Array<{
+          type: string;
+          x: number;
+          y: number;
+          width: number;
+          height: number;
+          content: string | null;
+          fontSize: number | null;
+          fontFamily: string | null;
+          fontWeight: string | null;
+          fontColor: string | null;
+          textAlign: string | null;
+          rotation: number | null;
+        }>;
+
+        if (elements.length === 0) {
+          console.log('[PUBLIC] No template elements found, using default basic layout');
+          // Default basic ticket layout
+          parsedElements = [
+            { type: 'dynamic', x: 5, y: 5, width: 70, height: 8, content: '{{event_name}}', fontSize: 14, fontFamily: 'Arial', fontWeight: 'bold', fontColor: '#000000', textAlign: 'center', rotation: 0 },
+            { type: 'dynamic', x: 5, y: 16, width: 35, height: 6, content: '{{event_date}}', fontSize: 11, fontFamily: 'Arial', fontWeight: 'normal', fontColor: '#333333', textAlign: 'left', rotation: 0 },
+            { type: 'dynamic', x: 42, y: 16, width: 33, height: 6, content: '{{event_time}}', fontSize: 11, fontFamily: 'Arial', fontWeight: 'normal', fontColor: '#333333', textAlign: 'right', rotation: 0 },
+            { type: 'dynamic', x: 5, y: 24, width: 70, height: 6, content: '{{venue_name}}', fontSize: 10, fontFamily: 'Arial', fontWeight: 'normal', fontColor: '#333333', textAlign: 'center', rotation: 0 },
+            { type: 'line', x: 5, y: 32, width: 70, height: 1, content: null, fontSize: null, fontFamily: null, fontWeight: null, fontColor: '#cccccc', textAlign: null, rotation: 0 },
+            { type: 'dynamic', x: 5, y: 36, width: 40, height: 6, content: '{{sector}}', fontSize: 11, fontFamily: 'Arial', fontWeight: 'bold', fontColor: '#000000', textAlign: 'left', rotation: 0 },
+            { type: 'dynamic', x: 45, y: 36, width: 30, height: 6, content: '{{price}}', fontSize: 12, fontFamily: 'Arial', fontWeight: 'bold', fontColor: '#000000', textAlign: 'right', rotation: 0 },
+            { type: 'dynamic', x: 5, y: 44, width: 70, height: 5, content: '{{buyer_name}}', fontSize: 9, fontFamily: 'Arial', fontWeight: 'normal', fontColor: '#555555', textAlign: 'left', rotation: 0 },
+            { type: 'qrcode', x: 27.5, y: 52, width: 25, height: 25, content: '{{qr_code}}', fontSize: null, fontFamily: null, fontWeight: null, fontColor: null, textAlign: null, rotation: 0 },
+            { type: 'dynamic', x: 5, y: 80, width: 70, height: 4, content: '{{ticket_number}}', fontSize: 8, fontFamily: 'monospace', fontWeight: 'normal', fontColor: '#666666', textAlign: 'center', rotation: 0 },
+            { type: 'dynamic', x: 5, y: 86, width: 70, height: 4, content: '{{fiscal_seal}}', fontSize: 7, fontFamily: 'monospace', fontWeight: 'normal', fontColor: '#888888', textAlign: 'center', rotation: 0 },
+            { type: 'line', x: 5, y: 92, width: 70, height: 1, content: null, fontSize: null, fontFamily: null, fontWeight: null, fontColor: '#cccccc', textAlign: null, rotation: 0 },
+            { type: 'dynamic', x: 5, y: 95, width: 70, height: 4, content: '{{emission_datetime}}', fontSize: 7, fontFamily: 'Arial', fontWeight: 'normal', fontColor: '#999999', textAlign: 'center', rotation: 0 },
+            { type: 'text', x: 5, y: 100, width: 70, height: 4, content: 'Powered by Event4U', fontSize: 7, fontFamily: 'Arial', fontWeight: 'normal', fontColor: '#aaaaaa', textAlign: 'center', rotation: 0 },
+          ];
+        } else {
+          // Parse elements from database
+          parsedElements = elements.map((el) => {
+            let content = el.staticValue;
+            if (el.fieldKey && !el.staticValue) {
+              content = `{{${el.fieldKey}}}`;
+            } else if (el.fieldKey && el.staticValue) {
+              content = el.staticValue;
+            }
+            return {
+              type: el.type,
+              x: parseFloat(el.x as any),
+              y: parseFloat(el.y as any),
+              width: parseFloat(el.width as any),
+              height: parseFloat(el.height as any),
+              content,
+              fontSize: el.fontSize,
+              fontFamily: el.fontFamily,
+              fontWeight: el.fontWeight,
+              fontColor: el.color,
+              textAlign: el.textAlign,
+              rotation: el.rotation,
+            };
+          });
+        }
 
         const ticketHtmls: Array<{ id: string; html: string }> = [];
         const pdfBuffers: Buffer[] = [];

@@ -726,6 +726,7 @@ export default function PrinterSettings() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Nome</TableHead>
+                      <TableHead>Tipo</TableHead>
                       <TableHead>Dimensioni</TableHead>
                       <TableHead>Stato</TableHead>
                       <TableHead>Versione</TableHead>
@@ -736,6 +737,13 @@ export default function PrinterSettings() {
                     {templates.map((template) => (
                       <TableRow key={template.id} data-testid={`row-template-${template.id}`}>
                         <TableCell className="font-medium">{template.name}</TableCell>
+                        <TableCell>
+                          {!template.companyId ? (
+                            <Badge variant="default" className="bg-purple-600">Sistema</Badge>
+                          ) : (
+                            <Badge variant="outline">Azienda</Badge>
+                          )}
+                        </TableCell>
                         <TableCell>
                           {template.paperWidthMm}mm × {template.paperHeightMm}mm
                         </TableCell>

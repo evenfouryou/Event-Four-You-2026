@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { db } from './db';
-import { eq, and, desc } from 'drizzle-orm';
+import { eq, and, desc, or, isNull } from 'drizzle-orm';
 import {
   ticketTemplates,
   ticketTemplateElements,
@@ -43,17 +43,32 @@ function requireSuperAdmin(req: Request, res: Response, next: Function) {
 // ==================== TICKET TEMPLATES ====================
 
 // GET all templates for company (gestore and super_admin can view)
+// Includes global templates (companyId = null) for all users
 router.get('/templates', requireAuth, async (req: Request, res: Response) => {
   try {
     const user = getUser(req);
     const companyId = user?.companyId;
     
-    let query = db.select().from(ticketTemplates);
-    if (companyId && user.role !== 'super_admin') {
-      query = query.where(eq(ticketTemplates.companyId, companyId)) as any;
+    let templates;
+    if (user.role === 'super_admin') {
+      // Super admin sees all templates
+      templates = await db.select().from(ticketTemplates)
+        .orderBy(desc(ticketTemplates.createdAt));
+    } else if (companyId) {
+      // Regular users see their company templates + global templates
+      templates = await db.select().from(ticketTemplates)
+        .where(or(
+          eq(ticketTemplates.companyId, companyId),
+          isNull(ticketTemplates.companyId)
+        ))
+        .orderBy(desc(ticketTemplates.createdAt));
+    } else {
+      // No company, only show global templates
+      templates = await db.select().from(ticketTemplates)
+        .where(isNull(ticketTemplates.companyId))
+        .orderBy(desc(ticketTemplates.createdAt));
     }
     
-    const templates = await query.orderBy(desc(ticketTemplates.createdAt));
     res.json(templates);
   } catch (error) {
     console.error('Error fetching ticket templates:', error);
@@ -62,6 +77,7 @@ router.get('/templates', requireAuth, async (req: Request, res: Response) => {
 });
 
 // GET single template with elements (gestore and super_admin can view)
+// Allows access to global templates (companyId = null) for all users
 router.get('/templates/:id', requireAuth, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
@@ -75,8 +91,12 @@ router.get('/templates/:id', requireAuth, async (req: Request, res: Response) =>
       return res.status(404).json({ error: 'Template non trovato' });
     }
     
-    // Check company access
-    if (user.role !== 'super_admin' && template.companyId !== user.companyId) {
+    // Check company access - allow access to global templates (companyId = null)
+    const isGlobalTemplate = template.companyId === null;
+    const hasCompanyAccess = template.companyId === user.companyId;
+    const isSuperAdmin = user.role === 'super_admin';
+    
+    if (!isSuperAdmin && !isGlobalTemplate && !hasCompanyAccess) {
       return res.status(403).json({ error: 'Accesso negato' });
     }
     
@@ -96,21 +116,38 @@ router.post('/templates', requireSuperAdmin, async (req: Request, res: Response)
   try {
     const user = getUser(req);
     const validated = insertTicketTemplateSchema.parse(req.body);
+    const isGlobalRequest = (req.body as any).isGlobal === true;
     
-    // Use user's company if not super_admin
-    const companyId = user.role === 'super_admin' 
-      ? (validated.companyId || user.companyId)
-      : user.companyId;
+    // Determine companyId based on request - IMPORTANT: explicitly handle to prevent accidental globals
+    let finalCompanyId: string | null = null;
     
-    if (!companyId) {
-      return res.status(400).json({ error: 'companyId richiesto' });
+    if (isGlobalRequest) {
+      // Only super_admin can create global templates with explicit isGlobal flag
+      if (user.role !== 'super_admin') {
+        return res.status(403).json({ error: 'Solo super admin può creare template globali' });
+      }
+      finalCompanyId = null;
+      console.log('[Template] Creating global system template');
+    } else {
+      // Regular template - must have a valid company
+      // Priority: explicitly provided companyId > user's companyId
+      const requestedCompanyId = validated.companyId || user.companyId;
+      
+      if (!requestedCompanyId) {
+        return res.status(400).json({ error: 'companyId richiesto per template aziendali. Usa isGlobal:true per template di sistema.' });
+      }
+      finalCompanyId = requestedCompanyId;
     }
     
+    // Build insert payload explicitly, stripping companyId from validated and setting our own
+    const { companyId: _ignored, ...templateData } = validated;
+    
     const [template] = await db.insert(ticketTemplates).values({
-      ...validated,
-      companyId,
+      ...templateData,
+      companyId: finalCompanyId,
     }).returning();
     
+    console.log('[Template] Created template:', template.id, 'companyId:', finalCompanyId || 'GLOBAL');
     res.status(201).json(template);
   } catch (error) {
     console.error('Error creating ticket template:', error);

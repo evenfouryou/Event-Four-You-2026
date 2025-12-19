@@ -194,9 +194,15 @@ export default function TemplateBuilder() {
         isActive: true,
       };
       
-      // Super admin must provide companyId for new templates
+      // Super admin must provide companyId for new templates (or __GLOBAL__ for system templates)
       if (isSuperAdmin && !id && selectedCompanyId) {
-        templateData.companyId = selectedCompanyId;
+        // If __GLOBAL__, set companyId to null for system-wide template
+        if (selectedCompanyId === '__GLOBAL__') {
+          templateData.companyId = null;
+          templateData.isGlobal = true;
+        } else {
+          templateData.companyId = selectedCompanyId;
+        }
       }
 
       let templateId = id;
@@ -207,7 +213,7 @@ export default function TemplateBuilder() {
       } else {
         // Create new template - check companyId for super_admin
         if (isSuperAdmin && !selectedCompanyId) {
-          throw new Error('Seleziona un\'azienda');
+          throw new Error('Seleziona un tipo (Sistema o Azienda)');
         }
         const res = await apiRequest('POST', '/api/ticket/templates', templateData);
         const newTemplate = await res.json();
@@ -453,10 +459,13 @@ export default function TemplateBuilder() {
           {/* Company selector for super_admin creating new template */}
           {isSuperAdmin && !id && (
             <Select value={selectedCompanyId} onValueChange={setSelectedCompanyId}>
-              <SelectTrigger className="w-48" data-testid="select-company-template">
-                <SelectValue placeholder="Seleziona azienda..." />
+              <SelectTrigger className="w-56" data-testid="select-company-template">
+                <SelectValue placeholder="Seleziona tipo..." />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="__GLOBAL__">
+                  <span className="font-semibold text-purple-600">Template di Sistema</span>
+                </SelectItem>
                 {companies.map((company) => (
                   <SelectItem key={company.id} value={company.id}>
                     {company.name}
