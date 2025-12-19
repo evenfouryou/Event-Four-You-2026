@@ -2049,66 +2049,39 @@ export default function EventHub() {
                   </CardContent>
                 </Card>
 
-                {/* Transazioni Recenti */}
-                <Card className="glass-card">
-                  <CardHeader>
-                    <div className="flex items-center justify-between flex-wrap gap-2">
-                      <CardTitle className="flex items-center gap-2">
-                        <Activity className="h-5 w-5 text-amber-400" />
-                        Transazioni Recenti
-                      </CardTitle>
-                      <div className="flex items-center gap-2">
-                        <Badge variant="secondary">{siaeTransactions.length} transazioni</Badge>
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          onClick={() => navigate('/siae/transactions')}
-                          data-testid="btn-view-all-transactions"
-                        >
-                          Vedi tutte <ChevronRight className="h-4 w-4 ml-1" />
-                        </Button>
+                {/* Quick Navigation Buttons */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <Button 
+                    variant="outline" 
+                    className="h-auto py-6 flex items-center justify-between gap-4 hover-elevate"
+                    onClick={() => navigate('/siae/transactions')}
+                    data-testid="btn-view-all-transactions"
+                  >
+                    <div className="flex items-center gap-3">
+                      <Activity className="h-6 w-6 text-amber-400" />
+                      <div className="text-left">
+                        <div className="font-medium">Transazioni</div>
+                        <div className="text-xs text-muted-foreground">{siaeTransactions.length} registrate</div>
                       </div>
                     </div>
-                  </CardHeader>
-                  <CardContent>
-                    {siaeTransactions.length > 0 ? (
-                      <ScrollArea className="h-[300px]">
-                        <div className="space-y-3">
-                          {siaeTransactions.slice(0, 20).map((tx) => (
-                            <div 
-                              key={tx.id} 
-                              className="flex items-center justify-between p-3 rounded-lg bg-background/50 border"
-                              data-testid={`transaction-${tx.id}`}
-                            >
-                              <div>
-                                <div className="font-medium text-sm">{tx.transactionCode}</div>
-                                <div className="text-xs text-muted-foreground">
-                                  {tx.ticketsCount} bigliett{tx.ticketsCount === 1 ? 'o' : 'i'} • {tx.paymentMethod || 'N/D'}
-                                </div>
-                              </div>
-                              <div className="text-right">
-                                <div className="font-bold text-emerald-400">€{Number(tx.totalAmount).toFixed(2)}</div>
-                                <Badge 
-                                  variant={tx.status === 'completed' ? 'default' : tx.status === 'pending' ? 'secondary' : 'destructive'}
-                                  className="text-xs"
-                                >
-                                  {tx.status === 'completed' ? 'Completata' : 
-                                   tx.status === 'pending' ? 'In attesa' : 
-                                   tx.status === 'refunded' ? 'Rimborsata' : 'Fallita'}
-                                </Badge>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </ScrollArea>
-                    ) : (
-                      <div className="text-center py-8 text-muted-foreground">
-                        <Activity className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                        <p>Nessuna transazione registrata</p>
+                    <ChevronRight className="h-5 w-5" />
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    className="h-auto py-6 flex items-center justify-between gap-4 hover-elevate"
+                    onClick={() => navigate('/siae/tickets')}
+                    data-testid="btn-view-all-tickets"
+                  >
+                    <div className="flex items-center gap-3">
+                      <Ticket className="h-6 w-6 text-emerald-400" />
+                      <div className="text-left">
+                        <div className="font-medium">Biglietti Emessi</div>
+                        <div className="text-xs text-muted-foreground">{siaeTickets.length} totali</div>
                       </div>
-                    )}
-                  </CardContent>
-                </Card>
+                    </div>
+                    <ChevronRight className="h-5 w-5" />
+                  </Button>
+                </div>
 
                 {/* Dialog Modifica Quantità */}
                 <Dialog open={!!editingSector} onOpenChange={(open) => !open && setEditingSector(null)}>
@@ -2183,162 +2156,6 @@ export default function EventHub() {
             )}
 
 
-            {/* Biglietti Emessi Section */}
-            {ticketedEvent && (
-              <Card className="glass-card" data-testid="card-biglietti-emessi">
-                <CardHeader>
-                  <div className="flex items-center justify-between gap-2 flex-wrap">
-                    <CardTitle className="flex items-center gap-2">
-                      <Ticket className="h-5 w-5 text-amber-400" />
-                      Biglietti Emessi
-                    </CardTitle>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <Select value={ticketSectorFilter} onValueChange={setTicketSectorFilter}>
-                        <SelectTrigger className="w-[160px]" data-testid="select-sector-filter">
-                          <SelectValue placeholder="Tutti i Settori" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">Tutti i Settori</SelectItem>
-                          {ticketedEvent.sectors?.map((sector) => (
-                            <SelectItem key={sector.id} value={sector.id}>
-                              {sector.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <Select value={ticketStatusFilter} onValueChange={setTicketStatusFilter}>
-                        <SelectTrigger className="w-[140px]" data-testid="select-status-filter">
-                          <SelectValue placeholder="Tutti gli Stati" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">Tutti gli Stati</SelectItem>
-                          <SelectItem value="valid">Valido</SelectItem>
-                          <SelectItem value="used">Usato</SelectItem>
-                          <SelectItem value="cancelled">Annullato</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <Button 
-                        variant="outline" 
-                        size="icon" 
-                        onClick={() => refetchTickets()}
-                        data-testid="button-refresh-tickets"
-                      >
-                        <RefreshCw className="h-4 w-4" />
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={() => navigate('/siae/tickets')}
-                        data-testid="btn-view-all-tickets"
-                      >
-                        Vedi tutti <ChevronRight className="h-4 w-4 ml-1" />
-                      </Button>
-                    </div>
-                  </div>
-                  <CardDescription>
-                    {filteredTickets.length} bigliett{filteredTickets.length === 1 ? 'o' : 'i'} 
-                    {ticketSectorFilter !== "all" || ticketStatusFilter !== "all" ? " (filtrati)" : " totali"}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {ticketsLoading ? (
-                    <div className="space-y-3">
-                      {[1, 2, 3, 4, 5].map((i) => (
-                        <div key={i} className="flex items-center gap-4">
-                          <Skeleton className="h-4 w-24" />
-                          <Skeleton className="h-4 w-20" />
-                          <Skeleton className="h-4 w-16" />
-                          <Skeleton className="h-4 w-20" />
-                          <Skeleton className="h-4 w-16" />
-                        </div>
-                      ))}
-                    </div>
-                  ) : filteredTickets.length === 0 ? (
-                    <div className="text-center py-8">
-                      <Ticket className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
-                      <h3 className="font-semibold mb-2">Nessun Biglietto</h3>
-                      <p className="text-sm text-muted-foreground">
-                        {ticketSectorFilter !== "all" || ticketStatusFilter !== "all" 
-                          ? "Nessun biglietto corrisponde ai filtri selezionati"
-                          : "Non ci sono biglietti emessi per questo evento"}
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
-                      <Table className="min-w-[700px]">
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead className="whitespace-nowrap">Codice</TableHead>
-                            <TableHead className="whitespace-nowrap">Settore</TableHead>
-                            <TableHead className="whitespace-nowrap">Tipo</TableHead>
-                            <TableHead className="whitespace-nowrap">Prezzo</TableHead>
-                            <TableHead className="whitespace-nowrap hidden sm:table-cell">Data</TableHead>
-                            <TableHead className="whitespace-nowrap">Stato</TableHead>
-                            <TableHead className="whitespace-nowrap hidden sm:table-cell">Canale</TableHead>
-                            <TableHead className="text-right whitespace-nowrap">Azioni</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {displayedTickets.map((ticket) => (
-                            <TableRow key={ticket.id} data-testid={`ticket-row-${ticket.id}`}>
-                              <TableCell className="font-mono text-sm" data-testid={`ticket-code-${ticket.id}`}>
-                                {ticket.fiscalSealCode || ticket.progressiveNumber || ticket.id.slice(0, 8)}
-                              </TableCell>
-                              <TableCell>{getSectorName(ticket.sectorId)}</TableCell>
-                              <TableCell>
-                                <Badge variant="secondary" className="text-xs">
-                                  {ticket.ticketTypeCode === 'INT' || ticket.ticketTypeCode === '01' ? 'Intero' : 
-                                   ticket.ticketTypeCode === 'RID' || ticket.ticketTypeCode === '02' ? 'Ridotto' : 
-                                   ticket.ticketTypeCode}
-                                </Badge>
-                              </TableCell>
-                              <TableCell className="font-medium">
-                                €{Number(ticket.grossAmount || 0).toFixed(2)}
-                              </TableCell>
-                              <TableCell className="text-sm text-muted-foreground hidden sm:table-cell">
-                                {ticket.emissionDate ? format(new Date(ticket.emissionDate), 'dd/MM/yyyy HH:mm', { locale: it }) : 'N/A'}
-                              </TableCell>
-                              <TableCell data-testid={`ticket-status-${ticket.id}`}>
-                                {getTicketStatusBadge(ticket.status)}
-                              </TableCell>
-                              <TableCell className="text-sm text-muted-foreground hidden sm:table-cell">
-                                {ticket.emissionChannelCode || ticket.cardCode || "N/A"}
-                              </TableCell>
-                              <TableCell className="text-right">
-                                {ticket.status === 'valid' && (
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => handleCancelTicket(ticket)}
-                                    className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
-                                    data-testid={`button-cancel-ticket-${ticket.id}`}
-                                  >
-                                    <X className="h-4 w-4 mr-1" />
-                                    Annulla
-                                  </Button>
-                                )}
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                      
-                      {filteredTickets.length > ticketsDisplayLimit && (
-                        <div className="flex justify-center mt-4">
-                          <Button
-                            variant="outline"
-                            onClick={() => setTicketsDisplayLimit(prev => prev + 20)}
-                            data-testid="button-load-more-tickets"
-                          >
-                            Carica altri ({filteredTickets.length - ticketsDisplayLimit} rimanenti)
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            )}
 
             {/* Cancel Ticket Dialog */}
             <AlertDialog open={cancelTicketDialogOpen} onOpenChange={setCancelTicketDialogOpen}>
