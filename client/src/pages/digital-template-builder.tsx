@@ -20,7 +20,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { 
   ArrowLeft, Save, Loader2, Palette, Image, QrCode, Layout, Type, Calendar, MapPin, Ticket, User, Upload, X, Check,
-  RotateCcw, Building2, FileText
+  RotateCcw, Building2, FileText, Store
 } from 'lucide-react';
 import type { DigitalTicketTemplate } from '@shared/schema';
 
@@ -80,6 +80,7 @@ const SAMPLE_DATA = {
   fiscalSeal: "SIAE-2024-A1B2C3D4",
   ticketCode: "TKT-2024-001234",
   organizerCompany: "Eventi Italia S.r.l.",
+  systemOwner: "Biglietteria Event4U",
   emissionDate: "15 Dicembre 2024 14:30"
 };
 
@@ -339,6 +340,16 @@ function DigitalTicketPreview({ config }: { config: TemplateFormData }) {
                   <p className="text-xs opacity-60 uppercase">Organizzatore</p>
                   <p className="font-medium" data-testid="preview-organizer">
                     {SAMPLE_DATA.organizerCompany}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3">
+                <Store className="w-5 h-5 flex-shrink-0 mt-0.5" style={{ color: config.accentColor }} />
+                <div>
+                  <p className="text-xs opacity-60 uppercase">Biglietteria</p>
+                  <p className="font-medium" data-testid="preview-ticketing-manager">
+                    {SAMPLE_DATA.systemOwner}
                   </p>
                 </div>
               </div>
