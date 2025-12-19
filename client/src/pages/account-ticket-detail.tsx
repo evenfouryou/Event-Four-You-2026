@@ -233,7 +233,7 @@ export default function AccountTicketDetail() {
             </div>
           )}
 
-          {ticket.status === "emitted" && !ticket.isListed && (
+          {(ticket.status === "emitted" || ticket.status === "active") && !ticket.isListed && (
             <div className="py-4 sm:py-6 border-y border-border">
               <DigitalTicketCard ticket={ticket} template={digitalTemplate} />
             </div>
@@ -256,7 +256,7 @@ export default function AccountTicketDetail() {
             )}
           </div>
 
-          {ticket.status === "emitted" && (
+          {(ticket.status === "emitted" || ticket.status === "active") && (
             <div className="space-y-3 pt-4 border-t border-border">
               {ticket.isListed && ticket.existingResale ? (
                 <div className="space-y-3">
