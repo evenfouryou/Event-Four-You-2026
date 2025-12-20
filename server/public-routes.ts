@@ -1150,31 +1150,24 @@ router.post("/api/public/checkout/create-payment-intent", async (req, res) => {
 
     // CRITICAL: Verifica smart card SIAE PRIMA di creare il payment intent
     // Non permettiamo pagamenti se non possiamo emettere sigilli fiscali
-    // EXCEPTION: In test mode (SIAE_TEST_MODE=true), bypass this check
-    // SECURITY: Test mode only allowed in development environment
-    const isTestMode = process.env.SIAE_TEST_MODE === 'true' && process.env.NODE_ENV !== 'production';
-    
-    if (!isTestMode) {
-      // Uso versione async che richiede uno status fresco dal bridge se necessario
-      const cardReadiness = await ensureCardReadyForSeals();
-      if (!cardReadiness.ready) {
-        console.log(`[PUBLIC] Create payment intent blocked: Card not ready - ${cardReadiness.error}`);
-        
-        // Determina il codice errore appropriato
-        const errorCode = !isBridgeConnected() ? "SEAL_BRIDGE_OFFLINE" : "SEAL_CARD_NOT_READY";
-        const errorMessage = !isBridgeConnected() 
-          ? "Sistema sigilli fiscali non disponibile. L'app desktop Event4U deve essere connessa con la smart card SIAE inserita."
-          : `Smart card SIAE non pronta: ${cardReadiness.error}`;
-        
-        return res.status(503).json({ 
-          message: errorMessage,
-          code: errorCode
-        });
-      }
-      console.log("[PUBLIC] Smart card check passed, proceeding with payment intent creation");
-    } else {
-      console.log("[PUBLIC] TEST MODE: Skipping smart card check for payment intent");
+    // Uso versione async che richiede uno status fresco dal bridge se necessario
+    const cardReadiness = await ensureCardReadyForSeals();
+    if (!cardReadiness.ready) {
+      console.log(`[PUBLIC] Create payment intent blocked: Card not ready - ${cardReadiness.error}`);
+      
+      // Determina il codice errore appropriato
+      const errorCode = !isBridgeConnected() ? "SEAL_BRIDGE_OFFLINE" : "SEAL_CARD_NOT_READY";
+      const errorMessage = !isBridgeConnected() 
+        ? "Sistema sigilli fiscali non disponibile. L'app desktop Event4U deve essere connessa con la smart card SIAE inserita."
+        : `Smart card SIAE non pronta: ${cardReadiness.error}`;
+      
+      return res.status(503).json({ 
+        message: errorMessage,
+        code: errorCode
+      });
     }
+    
+    console.log("[PUBLIC] Smart card check passed, proceeding with payment intent creation");
 
     // Se l'utente non ha un profilo SIAE, crealo automaticamente
     if (customer._isUserWithoutSiaeProfile && customer.userId) {
@@ -1296,13 +1289,10 @@ router.post("/api/public/checkout/confirm", async (req, res) => {
 
     // CRITICAL: Verifica che la smart card SIAE sia disponibile
     // Se il pagamento è già andato a buon fine ma la smart card non è pronta, STORNIAMO
-    // EXCEPTION: In test mode (SIAE_TEST_MODE=true), bypass this check
-    // SECURITY: Test mode only allowed in development environment
-    const isTestMode = process.env.SIAE_TEST_MODE === 'true' && process.env.NODE_ENV !== 'production';
     const bridgeConnected = isBridgeConnected();
     const cardReadiness = isCardReadyForSeals();
 
-    if (!isTestMode && (!bridgeConnected || !cardReadiness.ready)) {
+    if (!bridgeConnected || !cardReadiness.ready) {
       const errorReason = !bridgeConnected 
         ? "Desktop bridge non connesso" 
         : `Smart card non pronta: ${cardReadiness.error}`;
@@ -1445,34 +1435,19 @@ router.post("/api/public/checkout/confirm", async (req, res) => {
       for (let i = 0; i < item.quantity; i++) {
         // RICHIEDI SIGILLO FISCALE REALE DALLA SMART CARD SIAE
         // Questo è il cuore del sistema - senza sigillo, niente biglietto
-        // EXCEPTION: In test mode, generate synthetic seals
         const priceInCents = Math.round(parseFloat(item.unitPrice) * 100);
         
         let sealData: FiscalSealData;
-        
-        if (isTestMode) {
-          // TEST MODE: Generate synthetic seal
-          const testCounter = Date.now() % 1000000;
-          sealData = {
-            sealCode: `TEST${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).substr(2, 6).toUpperCase()}`,
-            sealNumber: `TESTSEAL${testCounter}`,
-            serialNumber: 'TEST_CARD_001',
-            counter: testCounter,
-            mac: 'TEST_MAC_SIGNATURE',
-            dateTime: new Date().toISOString(),
-          };
-          console.log(`[PUBLIC] TEST MODE: Generated synthetic seal for ticket ${i + 1}/${item.quantity}: ${sealData.sealCode}`);
-        } else {
-          try {
-            console.log(`[PUBLIC] Requesting fiscal seal for ticket ${i + 1}/${item.quantity}, price: ${priceInCents} cents`);
-            sealData = await requestFiscalSeal(priceInCents);
-            console.log(`[PUBLIC] Seal received: ${sealData.sealCode}, counter: ${sealData.counter}`);
-          } catch (sealError: any) {
-            console.error(`[PUBLIC] Failed to get fiscal seal:`, sealError.message);
+        try {
+          console.log(`[PUBLIC] Requesting fiscal seal for ticket ${i + 1}/${item.quantity}, price: ${priceInCents} cents`);
+          sealData = await requestFiscalSeal(priceInCents);
+          console.log(`[PUBLIC] Seal received: ${sealData.sealCode}, counter: ${sealData.counter}`);
+        } catch (sealError: any) {
+          console.error(`[PUBLIC] Failed to get fiscal seal:`, sealError.message);
           
-            // CRITICAL: Se il sigillo fallisce DOPO il pagamento, dobbiamo STORNARE il pagamento
-            // Senza sigillo fiscale non possiamo emettere biglietti validi SIAE
-            try {
+          // CRITICAL: Se il sigillo fallisce DOPO il pagamento, dobbiamo STORNARE il pagamento
+          // Senza sigillo fiscale non possiamo emettere biglietti validi SIAE
+          try {
             console.log(`[PUBLIC] Initiating refund for payment intent ${paymentIntentId} due to seal failure`);
             const stripe = await getUncachableStripeClient();
             
@@ -1535,7 +1510,6 @@ router.post("/api/public/checkout/confirm", async (req, res) => {
               refunded: false,
               ticketsCreated: tickets.length,
             });
-            }
           }
         }
 
@@ -1544,102 +1518,53 @@ router.post("/api/public/checkout/confirm", async (req, res) => {
         const emissionTimeStr = now.toTimeString().slice(0, 5).replace(":", "");
 
         // Trova la carta nel database usando il serialNumber dal bridge
-        // In test mode, skip DB operations for cards and use synthetic data
         let cardId = card?.id;
-        let fiscalSealId: string | null = null;
-        
-        if (isTestMode) {
-          // TEST MODE: Use first available card or create entry only if needed for FK
-          if (!cardId) {
-            const [anyCard] = await db
-              .select()
-              .from(siaeActivationCards)
-              .where(eq(siaeActivationCards.companyId, ticketedEvent.companyId))
-              .limit(1);
-            cardId = anyCard?.id;
-            
-            // If no card exists at all, we need one for FK constraint - create a test placeholder
-            if (!cardId) {
-              const [testCard] = await db
-                .insert(siaeActivationCards)
-                .values({
-                  cardCode: 'TEST_CARD_PLACEHOLDER',
-                  systemCode: "TEST01",
-                  companyId: ticketedEvent.companyId,
-                  status: "test",
-                  activationDate: new Date(),
-                  progressiveCounter: 0,
-                })
-                .returning();
-              cardId = testCard.id;
-              console.log(`[PUBLIC] TEST MODE: Created placeholder card: ${cardId}`);
-            }
-          }
+        if (!cardId && sealData.serialNumber) {
+          console.log(`[PUBLIC] Looking up card by serialNumber: ${sealData.serialNumber}`);
+          const [bridgeCard] = await db
+            .select()
+            .from(siaeActivationCards)
+            .where(eq(siaeActivationCards.cardCode, sealData.serialNumber))
+            .limit(1);
           
-          // Create synthetic fiscal seal for test mode
-          const [fiscalSeal] = await db
-            .insert(siaeFiscalSeals)
-            .values({
-              cardId: cardId,
-              sealCode: sealData.sealCode,
-              progressiveNumber: sealData.counter,
-              emissionDate: now.toISOString().slice(5, 10).replace("-", ""),
-              emissionTime: emissionTimeStr,
-              amount: item.unitPrice.toString().padStart(8, "0"),
-            })
-            .returning();
-          fiscalSealId = fiscalSeal.id;
-          console.log(`[PUBLIC] TEST MODE: Created synthetic fiscal seal: ${fiscalSealId}`);
-        } else {
-          // PRODUCTION: Normal card lookup and creation
-          if (!cardId && sealData.serialNumber) {
-            console.log(`[PUBLIC] Looking up card by serialNumber: ${sealData.serialNumber}`);
-            const [bridgeCard] = await db
-              .select()
-              .from(siaeActivationCards)
-              .where(eq(siaeActivationCards.cardCode, sealData.serialNumber))
-              .limit(1);
-            
-            if (bridgeCard) {
-              cardId = bridgeCard.id;
-              console.log(`[PUBLIC] Found card by serialNumber: ${cardId}`);
-            } else {
-              // Se la carta non esiste nel DB, creala automaticamente
-              console.log(`[PUBLIC] Card not found, creating new card for serialNumber: ${sealData.serialNumber}`);
-              const [newCard] = await db
-                .insert(siaeActivationCards)
-                .values({
-                  cardCode: sealData.serialNumber,
-                  systemCode: "BRIDGE01",
-                  companyId: ticketedEvent.companyId,
-                  status: "active",
-                  activationDate: new Date(),
-                  progressiveCounter: sealData.counter,
-                })
-                .returning();
-              cardId = newCard.id;
-              console.log(`[PUBLIC] Created new card: ${cardId}`);
-            }
+          if (bridgeCard) {
+            cardId = bridgeCard.id;
+            console.log(`[PUBLIC] Found card by serialNumber: ${cardId}`);
+          } else {
+            // Se la carta non esiste nel DB, creala automaticamente
+            console.log(`[PUBLIC] Card not found, creating new card for serialNumber: ${sealData.serialNumber}`);
+            const [newCard] = await db
+              .insert(siaeActivationCards)
+              .values({
+                cardCode: sealData.serialNumber,
+                systemCode: "BRIDGE01",
+                companyId: ticketedEvent.companyId,
+                status: "active",
+                activationDate: new Date(),
+                progressiveCounter: sealData.counter,
+              })
+              .returning();
+            cardId = newCard.id;
+            console.log(`[PUBLIC] Created new card: ${cardId}`);
           }
-
-          if (!cardId) {
-            throw new Error("Nessuna carta SIAE disponibile per generare il sigillo fiscale");
-          }
-
-          // Salva sigillo fiscale reale nel database
-          const [fiscalSeal] = await db
-            .insert(siaeFiscalSeals)
-            .values({
-              cardId: cardId,
-              sealCode: sealData.sealCode,
-              progressiveNumber: sealData.counter,
-              emissionDate: now.toISOString().slice(5, 10).replace("-", ""),
-              emissionTime: emissionTimeStr,
-              amount: item.unitPrice.toString().padStart(8, "0"),
-            })
-            .returning();
-          fiscalSealId = fiscalSeal.id;
         }
+
+        if (!cardId) {
+          throw new Error("Nessuna carta SIAE disponibile per generare il sigillo fiscale");
+        }
+
+        // Salva sigillo fiscale reale nel database
+        const [fiscalSeal] = await db
+          .insert(siaeFiscalSeals)
+          .values({
+            cardId: cardId,
+            sealCode: sealData.sealCode,
+            progressiveNumber: sealData.counter,
+            emissionDate: now.toISOString().slice(5, 10).replace("-", ""),
+            emissionTime: emissionTimeStr,
+            amount: item.unitPrice.toString().padStart(8, "0"),
+          })
+          .returning();
 
         // Genera QR code con dati sigillo reale
         const qrData = JSON.stringify({
@@ -1652,7 +1577,7 @@ router.post("/api/public/checkout/confirm", async (req, res) => {
           mac: sealData.mac,
         });
 
-        // Crea biglietto con sigillo fiscale
+        // Crea biglietto con sigillo fiscale REALE
         const [ticket] = await db
           .insert(siaeTickets)
           .values({
@@ -1660,7 +1585,7 @@ router.post("/api/public/checkout/confirm", async (req, res) => {
             sectorId: item.sectorId,
             transactionId: transaction.id,
             customerId: customer.id,
-            fiscalSealId: fiscalSealId,
+            fiscalSealId: fiscalSeal.id,
             fiscalSealCode: sealData.sealCode,
             progressiveNumber: sealData.counter,
             cardCode: sealData.serialNumber,
