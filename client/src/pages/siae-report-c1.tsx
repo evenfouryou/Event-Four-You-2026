@@ -2,7 +2,8 @@ import { useQuery } from "@tanstack/react-query";
 import { useParams, useLocation } from "wouter";
 import { useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Printer, Download } from "lucide-react";
+import { ArrowLeft, Printer, RefreshCw } from "lucide-react";
+import { queryClient } from "@/lib/queryClient";
 
 interface C1ReportData {
   reportType: string;
@@ -55,12 +56,29 @@ export default function SiaeReportC1() {
   const isMonthly = reportType === 'mensile';
 
   const { data: report, isLoading, error } = useQuery<C1ReportData>({
-    queryKey: [`/api/siae/ticketed-events/${id}/reports/c1?type=${reportType}`],
+    queryKey: ['/api/siae/ticketed-events', id, 'reports', 'c1', reportType],
+    queryFn: async () => {
+      const res = await fetch(`/api/siae/ticketed-events/${id}/reports/c1?type=${reportType}`, {
+        credentials: 'include',
+      });
+      if (!res.ok) {
+        throw new Error('Errore nel caricamento del report');
+      }
+      return res.json();
+    },
     enabled: !!id,
+    refetchOnMount: 'always',
+    staleTime: 0,
   });
 
   const handlePrint = () => {
     window.print();
+  };
+
+  const handleRefresh = () => {
+    queryClient.invalidateQueries({ 
+      queryKey: ['/api/siae/ticketed-events', id, 'reports', 'c1', reportType] 
+    });
   };
 
   if (isLoading) {
@@ -119,6 +137,9 @@ export default function SiaeReportC1() {
           <ArrowLeft className="w-4 h-4 mr-2" /> Indietro
         </Button>
         <div className="flex gap-2">
+          <Button variant="outline" onClick={handleRefresh} data-testid="button-refresh">
+            <RefreshCw className="w-4 h-4 mr-2" /> Aggiorna
+          </Button>
           <Button variant="outline" onClick={handlePrint} data-testid="button-print">
             <Printer className="w-4 h-4 mr-2" /> Stampa
           </Button>
