@@ -1151,7 +1151,8 @@ router.post("/api/public/checkout/create-payment-intent", async (req, res) => {
     // CRITICAL: Verifica smart card SIAE PRIMA di creare il payment intent
     // Non permettiamo pagamenti se non possiamo emettere sigilli fiscali
     // EXCEPTION: In test mode (SIAE_TEST_MODE=true), bypass this check
-    const isTestMode = process.env.SIAE_TEST_MODE === 'true';
+    // SECURITY: Test mode only allowed in development environment
+    const isTestMode = process.env.SIAE_TEST_MODE === 'true' && process.env.NODE_ENV !== 'production';
     
     if (!isTestMode) {
       // Uso versione async che richiede uno status fresco dal bridge se necessario
@@ -1296,7 +1297,8 @@ router.post("/api/public/checkout/confirm", async (req, res) => {
     // CRITICAL: Verifica che la smart card SIAE sia disponibile
     // Se il pagamento è già andato a buon fine ma la smart card non è pronta, STORNIAMO
     // EXCEPTION: In test mode (SIAE_TEST_MODE=true), bypass this check
-    const isTestMode = process.env.SIAE_TEST_MODE === 'true';
+    // SECURITY: Test mode only allowed in development environment
+    const isTestMode = process.env.SIAE_TEST_MODE === 'true' && process.env.NODE_ENV !== 'production';
     const bridgeConnected = isBridgeConnected();
     const cardReadiness = isCardReadyForSeals();
 
@@ -1542,53 +1544,102 @@ router.post("/api/public/checkout/confirm", async (req, res) => {
         const emissionTimeStr = now.toTimeString().slice(0, 5).replace(":", "");
 
         // Trova la carta nel database usando il serialNumber dal bridge
+        // In test mode, skip DB operations for cards and use synthetic data
         let cardId = card?.id;
-        if (!cardId && sealData.serialNumber) {
-          console.log(`[PUBLIC] Looking up card by serialNumber: ${sealData.serialNumber}`);
-          const [bridgeCard] = await db
-            .select()
-            .from(siaeActivationCards)
-            .where(eq(siaeActivationCards.cardCode, sealData.serialNumber))
-            .limit(1);
-          
-          if (bridgeCard) {
-            cardId = bridgeCard.id;
-            console.log(`[PUBLIC] Found card by serialNumber: ${cardId}`);
-          } else {
-            // Se la carta non esiste nel DB, creala automaticamente
-            console.log(`[PUBLIC] Card not found, creating new card for serialNumber: ${sealData.serialNumber}`);
-            const [newCard] = await db
-              .insert(siaeActivationCards)
-              .values({
-                cardCode: sealData.serialNumber,
-                systemCode: "BRIDGE01",
-                companyId: ticketedEvent.companyId,
-                status: "active",
-                activationDate: new Date(),
-                progressiveCounter: sealData.counter,
-              })
-              .returning();
-            cardId = newCard.id;
-            console.log(`[PUBLIC] Created new card: ${cardId}`);
+        let fiscalSealId: string | null = null;
+        
+        if (isTestMode) {
+          // TEST MODE: Use first available card or create entry only if needed for FK
+          if (!cardId) {
+            const [anyCard] = await db
+              .select()
+              .from(siaeActivationCards)
+              .where(eq(siaeActivationCards.companyId, ticketedEvent.companyId))
+              .limit(1);
+            cardId = anyCard?.id;
+            
+            // If no card exists at all, we need one for FK constraint - create a test placeholder
+            if (!cardId) {
+              const [testCard] = await db
+                .insert(siaeActivationCards)
+                .values({
+                  cardCode: 'TEST_CARD_PLACEHOLDER',
+                  systemCode: "TEST01",
+                  companyId: ticketedEvent.companyId,
+                  status: "test",
+                  activationDate: new Date(),
+                  progressiveCounter: 0,
+                })
+                .returning();
+              cardId = testCard.id;
+              console.log(`[PUBLIC] TEST MODE: Created placeholder card: ${cardId}`);
+            }
           }
-        }
+          
+          // Create synthetic fiscal seal for test mode
+          const [fiscalSeal] = await db
+            .insert(siaeFiscalSeals)
+            .values({
+              cardId: cardId,
+              sealCode: sealData.sealCode,
+              progressiveNumber: sealData.counter,
+              emissionDate: now.toISOString().slice(5, 10).replace("-", ""),
+              emissionTime: emissionTimeStr,
+              amount: item.unitPrice.toString().padStart(8, "0"),
+            })
+            .returning();
+          fiscalSealId = fiscalSeal.id;
+          console.log(`[PUBLIC] TEST MODE: Created synthetic fiscal seal: ${fiscalSealId}`);
+        } else {
+          // PRODUCTION: Normal card lookup and creation
+          if (!cardId && sealData.serialNumber) {
+            console.log(`[PUBLIC] Looking up card by serialNumber: ${sealData.serialNumber}`);
+            const [bridgeCard] = await db
+              .select()
+              .from(siaeActivationCards)
+              .where(eq(siaeActivationCards.cardCode, sealData.serialNumber))
+              .limit(1);
+            
+            if (bridgeCard) {
+              cardId = bridgeCard.id;
+              console.log(`[PUBLIC] Found card by serialNumber: ${cardId}`);
+            } else {
+              // Se la carta non esiste nel DB, creala automaticamente
+              console.log(`[PUBLIC] Card not found, creating new card for serialNumber: ${sealData.serialNumber}`);
+              const [newCard] = await db
+                .insert(siaeActivationCards)
+                .values({
+                  cardCode: sealData.serialNumber,
+                  systemCode: "BRIDGE01",
+                  companyId: ticketedEvent.companyId,
+                  status: "active",
+                  activationDate: new Date(),
+                  progressiveCounter: sealData.counter,
+                })
+                .returning();
+              cardId = newCard.id;
+              console.log(`[PUBLIC] Created new card: ${cardId}`);
+            }
+          }
 
-        if (!cardId) {
-          throw new Error("Nessuna carta SIAE disponibile per generare il sigillo fiscale");
-        }
+          if (!cardId) {
+            throw new Error("Nessuna carta SIAE disponibile per generare il sigillo fiscale");
+          }
 
-        // Salva sigillo fiscale reale nel database
-        const [fiscalSeal] = await db
-          .insert(siaeFiscalSeals)
-          .values({
-            cardId: cardId,
-            sealCode: sealData.sealCode,
-            progressiveNumber: sealData.counter,
-            emissionDate: now.toISOString().slice(5, 10).replace("-", ""),
-            emissionTime: emissionTimeStr,
-            amount: item.unitPrice.toString().padStart(8, "0"),
-          })
-          .returning();
+          // Salva sigillo fiscale reale nel database
+          const [fiscalSeal] = await db
+            .insert(siaeFiscalSeals)
+            .values({
+              cardId: cardId,
+              sealCode: sealData.sealCode,
+              progressiveNumber: sealData.counter,
+              emissionDate: now.toISOString().slice(5, 10).replace("-", ""),
+              emissionTime: emissionTimeStr,
+              amount: item.unitPrice.toString().padStart(8, "0"),
+            })
+            .returning();
+          fiscalSealId = fiscalSeal.id;
+        }
 
         // Genera QR code con dati sigillo reale
         const qrData = JSON.stringify({
@@ -1601,7 +1652,7 @@ router.post("/api/public/checkout/confirm", async (req, res) => {
           mac: sealData.mac,
         });
 
-        // Crea biglietto con sigillo fiscale REALE
+        // Crea biglietto con sigillo fiscale
         const [ticket] = await db
           .insert(siaeTickets)
           .values({
@@ -1609,7 +1660,7 @@ router.post("/api/public/checkout/confirm", async (req, res) => {
             sectorId: item.sectorId,
             transactionId: transaction.id,
             customerId: customer.id,
-            fiscalSealId: fiscalSeal.id,
+            fiscalSealId: fiscalSealId,
             fiscalSealCode: sealData.sealCode,
             progressiveNumber: sealData.counter,
             cardCode: sealData.serialNumber,
