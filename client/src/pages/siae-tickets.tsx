@@ -771,7 +771,7 @@ export default function SiaeTicketsPage() {
                               Stampa
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
-                            {ticket.status === "valid" && (
+                            {(ticket.status === "valid" || ticket.status === "active") && (
                               <>
                                 <DropdownMenuItem
                                   onClick={() => {
@@ -841,7 +841,7 @@ export default function SiaeTicketsPage() {
                           <Eye className="w-4 h-4 mr-2" />
                           Visualizza
                         </DropdownMenuItem>
-                        {ticket.status === "valid" && (
+                        {(ticket.status === "valid" || ticket.status === "active") && (
                           <>
                             <DropdownMenuItem
                               onClick={() => {

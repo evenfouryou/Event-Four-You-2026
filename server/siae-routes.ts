@@ -2470,6 +2470,19 @@ router.get('/api/siae/ticketed-events/:id/reports/c1', requireAuth, async (req: 
       bySector: Record<string, { name: string; quantity: number; amount: number }>;
     }> = {};
 
+    // Helper function to get ticket price with fallback
+    const getTicketPrice = (t: typeof activeTickets[0]) => Number(t.ticketPrice) || Number(t.grossAmount) || 0;
+    
+    // Helper function to derive ticketType with fallback from ticketTypeCode
+    const getTicketType = (t: typeof activeTickets[0]) => {
+      if (t.ticketType) return t.ticketType;
+      // Fallback from ticketTypeCode
+      if (t.ticketTypeCode === 'INT') return 'intero';
+      if (t.ticketTypeCode === 'RID') return 'ridotto';
+      if (t.ticketTypeCode === 'OMG' || t.ticketTypeCode === 'OMA') return 'omaggio';
+      return 'intero'; // default
+    };
+
     // Process ALL tickets (including those without transactions - cashier tickets)
     for (const ticket of activeTickets) {
       const dateStr = ticket.emissionDate 
@@ -2486,11 +2499,12 @@ router.get('/api/siae/ticketed-events/:id/reports/c1', requireAuth, async (req: 
         };
       }
       
+      const price = getTicketPrice(ticket);
       salesByDate[dateStr].ticketsSold += 1;
-      salesByDate[dateStr].totalAmount += Number(ticket.ticketPrice) || 0;
+      salesByDate[dateStr].totalAmount += price;
 
       // Aggregate by ticket type
-      const ticketType = ticket.ticketType || 'intero';
+      const ticketType = getTicketType(ticket);
       if (!salesByDate[dateStr].byTicketType[ticketType]) {
         salesByDate[dateStr].byTicketType[ticketType] = { 
           name: ticketType === 'intero' ? 'Intero' : ticketType === 'ridotto' ? 'Ridotto' : ticketType === 'omaggio' ? 'Omaggio' : ticketType, 
@@ -2499,7 +2513,7 @@ router.get('/api/siae/ticketed-events/:id/reports/c1', requireAuth, async (req: 
         };
       }
       salesByDate[dateStr].byTicketType[ticketType].quantity += 1;
-      salesByDate[dateStr].byTicketType[ticketType].amount += Number(ticket.ticketPrice) || 0;
+      salesByDate[dateStr].byTicketType[ticketType].amount += price;
 
       // Aggregate by sector
       const sector = sectors.find(s => s.id === ticket.sectorId);
@@ -2508,14 +2522,14 @@ router.get('/api/siae/ticketed-events/:id/reports/c1', requireAuth, async (req: 
         salesByDate[dateStr].bySector[sectorName] = { name: sectorName, quantity: 0, amount: 0 };
       }
       salesByDate[dateStr].bySector[sectorName].quantity += 1;
-      salesByDate[dateStr].bySector[sectorName].amount += Number(ticket.ticketPrice) || 0;
+      salesByDate[dateStr].bySector[sectorName].amount += price;
     }
 
     const dailySales = Object.values(salesByDate).sort((a, b) => a.date.localeCompare(b.date));
     
-    // Calculate totals
+    // Calculate totals using helper function for fallback
     const totalTicketsSold = activeTickets.length;
-    const totalRevenue = activeTickets.reduce((sum, t) => sum + (Number(t.ticketPrice) || 0), 0);
+    const totalRevenue = activeTickets.reduce((sum, t) => sum + getTicketPrice(t), 0);
     
     // Calculate VAT
     const vatRate = event.vatRate || 10;
@@ -2551,21 +2565,21 @@ router.get('/api/siae/ticketed-events/:id/reports/c1', requireAuth, async (req: 
           soldCount: sectorActiveTickets.length,
           priceIntero: Number(s.priceIntero) || 0,
           priceRidotto: Number(s.priceRidotto) || 0,
-          revenue: sectorActiveTickets.reduce((sum, t) => sum + (Number(t.ticketPrice) || 0), 0),
+          revenue: sectorActiveTickets.reduce((sum, t) => sum + getTicketPrice(t), 0),
           cancelledCount: sectorCancelledTickets.length,
         };
       }),
       ticketTypes: {
         intero: {
-          count: activeTickets.filter(t => t.ticketType === 'intero').length,
-          amount: activeTickets.filter(t => t.ticketType === 'intero').reduce((s, t) => s + (Number(t.ticketPrice) || 0), 0)
+          count: activeTickets.filter(t => getTicketType(t) === 'intero').length,
+          amount: activeTickets.filter(t => getTicketType(t) === 'intero').reduce((s, t) => s + getTicketPrice(t), 0)
         },
         ridotto: {
-          count: activeTickets.filter(t => t.ticketType === 'ridotto').length,
-          amount: activeTickets.filter(t => t.ticketType === 'ridotto').reduce((s, t) => s + (Number(t.ticketPrice) || 0), 0)
+          count: activeTickets.filter(t => getTicketType(t) === 'ridotto').length,
+          amount: activeTickets.filter(t => getTicketType(t) === 'ridotto').reduce((s, t) => s + getTicketPrice(t), 0)
         },
         omaggio: {
-          count: activeTickets.filter(t => t.ticketType === 'omaggio').length,
+          count: activeTickets.filter(t => getTicketType(t) === 'omaggio').length,
           amount: 0
         }
       }
