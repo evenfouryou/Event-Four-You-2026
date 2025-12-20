@@ -57,6 +57,12 @@ router.post("/api/digital-templates", requireAuth, requireGestore, async (req: R
     const user = req.user as any;
     const data = insertDigitalTicketTemplateSchema.parse(req.body);
     
+    // Global templates (companyId = null/undefined) can only be created by super_admin
+    if (!data.companyId && user.role !== "super_admin") {
+      return res.status(403).json({ message: "Solo super admin può creare template globali" });
+    }
+    
+    // Non super_admin can only create templates for their own company
     if (user.role !== "super_admin" && data.companyId !== user.companyId) {
       return res.status(403).json({ message: "Non puoi creare template per altre aziende" });
     }
@@ -78,7 +84,13 @@ router.patch("/api/digital-templates/:id", requireAuth, requireGestore, async (r
       return res.status(404).json({ message: "Template non trovato" });
     }
     
-    if (user.role !== "super_admin" && existing.companyId !== user.companyId) {
+    // Global templates (companyId = null) can only be modified by super_admin
+    if (!existing.companyId && user.role !== "super_admin") {
+      return res.status(403).json({ message: "Solo super admin può modificare template globali" });
+    }
+    
+    // Non super_admin can only modify templates for their own company
+    if (existing.companyId && user.role !== "super_admin" && existing.companyId !== user.companyId) {
       return res.status(403).json({ message: "Non puoi modificare questo template" });
     }
     

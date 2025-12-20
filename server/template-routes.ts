@@ -710,7 +710,13 @@ router.get('/templates/:templateId/agents', requireSuperAdmin, async (req: Reque
     }
     
     // Use template's company to get connected agents
-    const agents = getConnectedAgents(template.companyId);
+    // For global templates (companyId = null), use the user's company if available
+    const effectiveCompanyId = template.companyId || user.companyId;
+    if (!effectiveCompanyId) {
+      // No company context available - return empty array
+      return res.json([]);
+    }
+    const agents = getConnectedAgents(effectiveCompanyId);
     res.json(agents);
   } catch (error) {
     console.error('Error fetching connected agents:', error);
