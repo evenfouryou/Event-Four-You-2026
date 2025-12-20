@@ -2290,9 +2290,11 @@ router.get("/api/public/account/tickets", async (req, res) => {
     // Separa biglietti futuri/passati/annullati
     const now = new Date();
     const cancelled = tickets.filter(t => t.status === 'cancelled');
-    const active = tickets.filter(t => t.status !== 'cancelled');
-    const upcoming = active.filter(t => t.eventStart && new Date(t.eventStart) >= now && t.status === 'emitted');
-    const past = active.filter(t => !t.eventStart || new Date(t.eventStart) < now || t.status !== 'emitted');
+    const activeTickets = tickets.filter(t => t.status !== 'cancelled');
+    // Include both 'emitted' and 'active' status for valid tickets
+    const validStatuses = ['emitted', 'active'];
+    const upcoming = activeTickets.filter(t => t.eventStart && new Date(t.eventStart) >= now && validStatuses.includes(t.status || ''));
+    const past = activeTickets.filter(t => !t.eventStart || new Date(t.eventStart) < now || !validStatuses.includes(t.status || ''));
 
     // Ordina per data evento decrescente
     upcoming.sort((a, b) => (b.eventStart ? new Date(b.eventStart).getTime() : 0) - (a.eventStart ? new Date(a.eventStart).getTime() : 0));
