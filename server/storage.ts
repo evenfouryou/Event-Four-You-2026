@@ -2257,11 +2257,49 @@ ${context ? `Contesto aggiuntivo: ${context}` : ''}`;
   }
 
   async createDigitalTicketTemplate(data: InsertDigitalTicketTemplate): Promise<DigitalTicketTemplate> {
+    // If creating as default, first unset all other defaults for the same company
+    if (data.isDefault === true) {
+      if (data.companyId) {
+        await db.update(digitalTicketTemplates)
+          .set({ isDefault: false })
+          .where(eq(digitalTicketTemplates.companyId, data.companyId));
+      } else {
+        // Global template - reset all global templates
+        await db.update(digitalTicketTemplates)
+          .set({ isDefault: false })
+          .where(isNull(digitalTicketTemplates.companyId));
+      }
+    }
+    
     const [template] = await db.insert(digitalTicketTemplates).values(data).returning();
     return template;
   }
 
   async updateDigitalTicketTemplate(id: string, data: Partial<InsertDigitalTicketTemplate>): Promise<DigitalTicketTemplate> {
+    // If setting as default, first unset all other defaults for the same company
+    if (data.isDefault === true) {
+      const existing = await this.getDigitalTicketTemplate(id);
+      if (existing) {
+        // Reset isDefault for all templates in the same scope (same company or global)
+        if (existing.companyId) {
+          await db.update(digitalTicketTemplates)
+            .set({ isDefault: false })
+            .where(and(
+              eq(digitalTicketTemplates.companyId, existing.companyId),
+              ne(digitalTicketTemplates.id, id)
+            ));
+        } else {
+          // Global template - reset all global templates
+          await db.update(digitalTicketTemplates)
+            .set({ isDefault: false })
+            .where(and(
+              isNull(digitalTicketTemplates.companyId),
+              ne(digitalTicketTemplates.id, id)
+            ));
+        }
+      }
+    }
+    
     const [template] = await db.update(digitalTicketTemplates)
       .set({ ...data, updatedAt: new Date() })
       .where(eq(digitalTicketTemplates.id, id))
