@@ -35,6 +35,9 @@ import {
   guestLists,
   tableBookings,
   eventTables,
+  venueFloorPlans,
+  floorPlanZones,
+  eventZoneMappings,
 } from "@shared/schema";
 import { eq, and, gt, lt, desc, sql, gte, lte, or, isNull } from "drizzle-orm";
 import { getUncachableStripeClient, getStripePublishableKey } from "./stripeClient";
@@ -347,6 +350,63 @@ router.get("/api/public/all-locations", async (req, res) => {
   } catch (error: any) {
     console.error("[PUBLIC] Error fetching locations:", error);
     res.status(500).json({ message: "Errore nel caricamento locations" });
+  }
+});
+
+// Planimetria pubblica di una location
+router.get("/api/public/locations/:locationId/floor-plan", async (req, res) => {
+  try {
+    const { locationId } = req.params;
+    const { eventId } = req.query;
+
+    // Trova la planimetria principale della location
+    const [floorPlan] = await db
+      .select()
+      .from(venueFloorPlans)
+      .where(
+        and(
+          eq(venueFloorPlans.locationId, locationId),
+          eq(venueFloorPlans.isDefault, true)
+        )
+      )
+      .limit(1);
+
+    if (!floorPlan) {
+      return res.status(404).json({ message: "Nessuna planimetria disponibile" });
+    }
+
+    // Carica le zone della planimetria
+    const zones = await db
+      .select()
+      .from(floorPlanZones)
+      .where(eq(floorPlanZones.floorPlanId, floorPlan.id))
+      .orderBy(floorPlanZones.sortOrder);
+
+    // Se è specificato un eventId, carica anche le mappature evento-zona
+    let zoneMappings: any[] = [];
+    if (eventId) {
+      zoneMappings = await db
+        .select()
+        .from(eventZoneMappings)
+        .where(eq(eventZoneMappings.ticketedEventId, eventId as string));
+    }
+
+    // Combina zone con mappature evento
+    const zonesWithMappings = zones.map(zone => {
+      const mapping = zoneMappings.find(m => m.zoneId === zone.id);
+      return {
+        ...zone,
+        eventMapping: mapping || null,
+      };
+    });
+
+    res.json({
+      ...floorPlan,
+      zones: zonesWithMappings,
+    });
+  } catch (error: any) {
+    console.error("[PUBLIC] Error fetching floor plan:", error);
+    res.status(500).json({ message: "Errore nel caricamento planimetria" });
   }
 });
 

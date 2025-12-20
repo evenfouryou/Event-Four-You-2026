@@ -24,6 +24,7 @@ import {
   Music,
   Star,
   Zap,
+  Map,
 } from "lucide-react";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
@@ -47,6 +48,32 @@ interface Sector {
   isNumbered: boolean;
   sectorCode: string;
   seats: Seat[];
+}
+
+interface FloorPlanZone {
+  id: string;
+  name: string;
+  zoneType: string;
+  coordinates: { x: number; y: number }[];
+  fillColor: string | null;
+  strokeColor: string | null;
+  opacity: string | null;
+  capacity: number | null;
+  defaultSectorCode: string | null;
+  isSelectable: boolean;
+  eventMapping?: {
+    sectorId: string;
+    customPrice: string | null;
+  } | null;
+}
+
+interface FloorPlan {
+  id: string;
+  name: string;
+  imageUrl: string | null;
+  imageWidth: number;
+  imageHeight: number;
+  zones: FloorPlanZone[];
 }
 
 interface EventDetail {
@@ -74,6 +101,144 @@ interface EventDetail {
   sectors: Sector[];
 }
 
+function FloorPlanViewer({
+  floorPlan,
+  sectors,
+  selectedZoneId,
+  onZoneClick,
+}: {
+  floorPlan: FloorPlan;
+  sectors: Sector[];
+  selectedZoneId: string | null;
+  onZoneClick: (zoneId: string, sectorCode: string | null) => void;
+}) {
+  const renderZonePolygon = (zone: FloorPlanZone) => {
+    const coords = zone.coordinates;
+    if (!coords || coords.length < 3) return null;
+    
+    const points = coords.map(p => `${p.x},${p.y}`).join(' ');
+    const isSelected = selectedZoneId === zone.id;
+    
+    // Use eventMapping.sectorId if available, otherwise fall back to defaultSectorCode
+    const sectorId = zone.eventMapping?.sectorId;
+    const linkedSector = sectorId 
+      ? sectors.find(s => s.id === sectorId)
+      : sectors.find(s => s.sectorCode === zone.defaultSectorCode);
+    const isAvailable = linkedSector ? linkedSector.availableSeats > 0 : false;
+    
+    // Use custom price from eventMapping if available
+    const displayPrice = zone.eventMapping?.customPrice 
+      ? Number(zone.eventMapping.customPrice) 
+      : (linkedSector ? Number(linkedSector.priceIntero) : null);
+    
+    return (
+      <g key={zone.id}>
+        <polygon
+          points={points}
+          fill={isSelected ? '#22c55e' : (zone.fillColor || '#3b82f6')}
+          stroke={isSelected ? '#16a34a' : (zone.strokeColor || '#1d4ed8')}
+          strokeWidth="2"
+          opacity={isSelected ? 0.7 : (Number(zone.opacity) || 0.4)}
+          className={`transition-all duration-200 ${
+            zone.isSelectable && isAvailable 
+              ? 'cursor-pointer hover:opacity-60' 
+              : isAvailable ? 'cursor-default' : 'cursor-not-allowed opacity-20'
+          }`}
+          onClick={() => {
+            if (zone.isSelectable && isAvailable && linkedSector) {
+              onZoneClick(zone.id, linkedSector.sectorCode);
+            }
+          }}
+          data-testid={`zone-polygon-${zone.id}`}
+        />
+        <text
+          x={coords.reduce((sum, p) => sum + p.x, 0) / coords.length}
+          y={coords.reduce((sum, p) => sum + p.y, 0) / coords.length}
+          fill="white"
+          fontSize="10"
+          textAnchor="middle"
+          dominantBaseline="middle"
+          className="pointer-events-none font-semibold"
+          style={{ textShadow: '1px 1px 2px rgba(0,0,0,0.8)' }}
+        >
+          {zone.name}
+        </text>
+        {displayPrice !== null && (
+          <text
+            x={coords.reduce((sum, p) => sum + p.x, 0) / coords.length}
+            y={coords.reduce((sum, p) => sum + p.y, 0) / coords.length + 12}
+            fill="rgba(255,255,255,0.8)"
+            fontSize="8"
+            textAnchor="middle"
+            dominantBaseline="middle"
+            className="pointer-events-none"
+            style={{ textShadow: '1px 1px 2px rgba(0,0,0,0.8)' }}
+          >
+            €{displayPrice.toFixed(0)}
+          </text>
+        )}
+      </g>
+    );
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.35 }}
+    >
+      <Card className="bg-card/50 border-border p-4 sm:p-6 rounded-xl sm:rounded-2xl backdrop-blur-sm overflow-hidden">
+        <div className="flex items-center gap-2 mb-4">
+          <Map className="w-5 h-5 text-primary" />
+          <h3 className="text-base sm:text-lg font-semibold text-foreground">Mappa della Venue</h3>
+        </div>
+        <p className="text-sm text-muted-foreground mb-4">
+          Clicca su una zona per selezionarla e vedere i dettagli del biglietto
+        </p>
+        
+        <div className="relative w-full aspect-video bg-muted/30 rounded-lg overflow-hidden">
+          {floorPlan.imageUrl ? (
+            <img 
+              src={floorPlan.imageUrl} 
+              alt={floorPlan.name}
+              className="absolute inset-0 w-full h-full object-contain"
+              draggable={false}
+            />
+          ) : (
+            <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-purple-900/30 to-blue-900/30">
+              <Map className="w-16 h-16 text-muted-foreground" />
+            </div>
+          )}
+          
+          <svg
+            className="absolute inset-0 w-full h-full"
+            viewBox="0 0 100 100"
+            preserveAspectRatio="none"
+            style={{ zIndex: 10 }}
+          >
+            {floorPlan.zones.map(zone => renderZonePolygon(zone))}
+          </svg>
+        </div>
+
+        <div className="flex flex-wrap gap-2 mt-4">
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <div className="w-3 h-3 rounded bg-blue-500 opacity-50" />
+            <span>Disponibile</span>
+          </div>
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <div className="w-3 h-3 rounded bg-green-500 opacity-70" />
+            <span>Selezionato</span>
+          </div>
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <div className="w-3 h-3 rounded bg-gray-500 opacity-20" />
+            <span>Esaurito</span>
+          </div>
+        </div>
+      </Card>
+    </motion.div>
+  );
+}
+
 function SectorCard({
   sector,
   ticketedEventId,
@@ -81,6 +246,7 @@ function SectorCard({
   onAddToCart,
   isAdding,
   justAdded,
+  isHighlighted,
 }: {
   sector: Sector;
   ticketedEventId: string;
@@ -88,6 +254,7 @@ function SectorCard({
   onAddToCart: (data: any) => Promise<void>;
   isAdding: boolean;
   justAdded: string | null;
+  isHighlighted?: boolean;
 }) {
   const [quantity, setQuantity] = useState(1);
   const [ticketType, setTicketType] = useState("intero");
@@ -135,6 +302,8 @@ function SectorCard({
         className={`relative overflow-hidden transition-all duration-500 ${
           wasJustAdded 
             ? "bg-gradient-to-br from-emerald-900/40 to-teal-900/30 border-emerald-500/50 shadow-lg shadow-emerald-500/20" 
+            : isHighlighted
+            ? "bg-gradient-to-br from-primary/20 to-blue-900/30 border-primary ring-2 ring-primary/50 shadow-lg shadow-primary/20"
             : "bg-gradient-to-br from-card/80 to-card/60 border-border hover:border-primary/30"
         }`}
         data-testid={`card-sector-${sector.id}`}
@@ -368,10 +537,52 @@ export default function PublicEventDetailPage() {
   const [isAdding, setIsAdding] = useState(false);
   const [justAddedSector, setJustAddedSector] = useState<string | null>(null);
   const [cartCount, setCartCount] = useState(0);
+  const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
+  const [highlightedSectorCode, setHighlightedSectorCode] = useState<string | null>(null);
 
   const { data: event, isLoading, error } = useQuery<EventDetail>({
     queryKey: ["/api/public/events", params.id],
   });
+
+  const { data: floorPlan } = useQuery<FloorPlan>({
+    queryKey: ["/api/public/locations", event?.locationId, "floor-plan", event?.id],
+    queryFn: async () => {
+      const res = await fetch(`/api/public/locations/${event?.locationId}/floor-plan?eventId=${event?.id}`, {
+        credentials: "include",
+      });
+      if (res.status === 404) {
+        return null;
+      }
+      if (!res.ok) {
+        const text = await res.text();
+        let message = text;
+        try {
+          const json = JSON.parse(text);
+          message = json.message || text;
+        } catch {
+          // Not JSON
+        }
+        throw new Error(message);
+      }
+      return res.json();
+    },
+    enabled: !!event?.locationId && !!event?.id,
+    retry: false,
+  });
+
+  const handleZoneClick = (zoneId: string, sectorCode: string | null) => {
+    setSelectedZoneId(zoneId);
+    setHighlightedSectorCode(sectorCode);
+    
+    if (sectorCode) {
+      setTimeout(() => {
+        const sectorElement = document.querySelector(`[data-sector-code="${sectorCode}"]`);
+        if (sectorElement) {
+          sectorElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 100);
+    }
+  };
 
   const handleAddToCart = async (data: any) => {
     setIsAdding(true);
@@ -585,6 +796,15 @@ export default function PublicEventDetailPage() {
               </motion.div>
             )}
 
+            {floorPlan && floorPlan.zones && floorPlan.zones.length > 0 && (
+              <FloorPlanViewer
+                floorPlan={floorPlan}
+                sectors={event.sectors}
+                selectedZoneId={selectedZoneId}
+                onZoneClick={handleZoneClick}
+              />
+            )}
+
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -601,6 +821,7 @@ export default function PublicEventDetailPage() {
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.5 + index * 0.1 }}
+                    data-sector-code={sector.sectorCode}
                   >
                     <SectorCard
                       sector={sector}
@@ -609,6 +830,7 @@ export default function PublicEventDetailPage() {
                       onAddToCart={handleAddToCart}
                       isAdding={isAdding}
                       justAdded={justAddedSector}
+                      isHighlighted={highlightedSectorCode === sector.sectorCode}
                     />
                   </motion.div>
                 ))}
