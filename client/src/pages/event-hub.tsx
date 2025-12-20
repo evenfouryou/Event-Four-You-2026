@@ -181,11 +181,11 @@ interface AlertItem {
 
 function LiveIndicator({ isLive }: { isLive: boolean }) {
   return (
-    <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium ${
+    <div className={`flex items-center gap-1 sm:gap-2 px-1.5 sm:px-3 py-1 sm:py-1.5 rounded-full text-[10px] sm:text-xs font-medium ${
       isLive ? 'bg-red-500/20 text-red-400' : 'bg-slate-500/20 text-slate-400'
     }`}>
-      <span className={`w-2 h-2 rounded-full ${isLive ? 'bg-red-500 animate-pulse' : 'bg-slate-500'}`} />
-      {isLive ? 'LIVE' : 'OFFLINE'}
+      <span className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full flex-shrink-0 ${isLive ? 'bg-red-500 animate-pulse' : 'bg-slate-500'}`} />
+      <span className="hidden sm:inline">{isLive ? 'LIVE' : 'OFFLINE'}</span>
     </div>
   );
 }
@@ -218,24 +218,24 @@ function KPICard({
       whileHover={{ scale: 1.02 }}
       whileTap={{ scale: 0.98 }}
       onClick={onClick}
-      className={`glass-card p-3 sm:p-4 ${onClick ? 'cursor-pointer' : ''}`}
+      className={`glass-card p-2.5 sm:p-4 ${onClick ? 'cursor-pointer' : ''}`}
       data-testid={testId}
     >
-      <div className="flex items-start justify-between mb-3">
-        <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${gradient} flex items-center justify-center`}>
-          <Icon className="h-5 w-5 text-white" />
+      <div className="flex items-start justify-between mb-2 sm:mb-3">
+        <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br ${gradient} flex items-center justify-center`}>
+          <Icon className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
         </div>
         {trend && (
-          <div className={`flex items-center gap-1 text-xs ${trend.isPositive ? 'text-emerald-400' : 'text-rose-400'}`}>
+          <div className={`hidden sm:flex items-center gap-1 text-xs ${trend.isPositive ? 'text-emerald-400' : 'text-rose-400'}`}>
             {trend.isPositive ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
             {trend.value}%
           </div>
         )}
       </div>
-      <div className="text-2xl font-bold mb-1">{value}</div>
-      {subValue && <div className="text-xs text-muted-foreground">{subValue}</div>}
+      <div className="text-xl sm:text-2xl font-bold mb-0.5 sm:mb-1">{value}</div>
+      {subValue && <div className="text-[10px] sm:text-xs text-muted-foreground">{subValue}</div>}
       {progress !== undefined && (
-        <Progress value={progress} className="h-1.5 mt-3" />
+        <Progress value={progress} className="h-1 sm:h-1.5 mt-2 sm:mt-3" />
       )}
     </motion.div>
   );
@@ -267,11 +267,11 @@ function QuickActionButton({
     <button
       onClick={onClick}
       disabled={disabled}
-      className={`flex flex-col items-center justify-center gap-2 p-4 min-h-11 rounded-xl transition-all ${variantStyles[variant]} ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+      className={`flex flex-col items-center justify-center gap-1 sm:gap-2 p-2 sm:p-4 min-h-11 rounded-xl transition-all ${variantStyles[variant]} ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
       data-testid={testId}
     >
-      <Icon className="h-6 w-6" />
-      <span className="text-xs font-medium text-center">{label}</span>
+      <Icon className="h-5 w-5 sm:h-6 sm:w-6" />
+      <span className="text-[10px] sm:text-xs font-medium text-center">{label}</span>
     </button>
   );
 }
@@ -290,18 +290,18 @@ function ActivityLogEntry({ item }: { item: ActivityLogItem }) {
   const { icon: Icon, color } = iconMap[item.type];
 
   return (
-    <div className="flex items-start gap-3 py-2">
-      <div className={`p-1.5 rounded-lg bg-white/5 ${color}`}>
-        <Icon className="h-3.5 w-3.5" />
+    <div className="flex items-start gap-2 sm:gap-3 py-1.5 sm:py-2">
+      <div className={`p-1 sm:p-1.5 rounded-lg bg-white/5 ${color}`}>
+        <Icon className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-sm">{item.message}</p>
-        <div className="flex items-center gap-2 mt-0.5">
-          <span className="text-xs text-muted-foreground">
+        <p className="text-xs sm:text-sm">{item.message}</p>
+        <div className="flex items-center gap-1.5 sm:gap-2 mt-0.5">
+          <span className="text-[10px] sm:text-xs text-muted-foreground">
             {format(item.timestamp, 'HH:mm', { locale: it })}
           </span>
           {item.user && (
-            <span className="text-xs text-muted-foreground">• {item.user}</span>
+            <span className="text-[10px] sm:text-xs text-muted-foreground">• {item.user}</span>
           )}
         </div>
       </div>
@@ -1320,8 +1320,8 @@ export default function EventHub() {
     return (
       <div className="p-3 sm:p-4 md:p-6 max-w-7xl mx-auto">
         <Skeleton className="h-20 w-full mb-4 sm:mb-6" />
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 mb-4 sm:mb-6">
-          {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-32" />)}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-4 mb-4 sm:mb-6">
+          {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-28 sm:h-32" />)}
         </div>
         <Skeleton className="h-96" />
       </div>
@@ -1366,27 +1366,38 @@ export default function EventHub() {
 
       <div className="sticky top-0 z-40 bg-background/80 backdrop-blur-xl border-b">
         <div className="p-3 sm:p-4 md:p-6 max-w-7xl mx-auto">
-          <div className="flex items-start justify-between gap-3 sm:gap-4">
-            <div className="flex items-center gap-2 sm:gap-3">
+          <div className="flex items-start justify-between gap-2 sm:gap-4">
+            <div className="flex items-start gap-2 sm:gap-3 min-w-0 flex-1">
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={() => navigate('/events')}
-                className="rounded-xl"
+                className="rounded-xl flex-shrink-0"
                 data-testid="button-back"
               >
                 <ArrowLeft className="h-5 w-5" />
               </Button>
-              <div>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <h1 className="text-lg sm:text-xl md:text-2xl font-bold" data-testid="event-title">{event.name}</h1>
-                  <Badge className={`${status.bgColor} ${status.color}`}>
-                    <StatusIcon className="h-3 w-3 mr-1" />
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1.5 sm:gap-2">
+                  <h1 className="text-base sm:text-xl md:text-2xl font-bold truncate" data-testid="event-title">{event.name}</h1>
+                  <div className="flex-shrink-0 sm:hidden">
+                    {isLive && <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />}
+                  </div>
+                  <div className="hidden sm:flex items-center gap-2">
+                    <Badge className={`${status.bgColor} ${status.color}`}>
+                      <StatusIcon className="h-3 w-3 mr-1" />
+                      {status.label}
+                    </Badge>
+                    <LiveIndicator isLive={isLive} />
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5 mt-1 sm:hidden">
+                  <Badge className={`${status.bgColor} ${status.color} text-xs px-1.5 py-0.5`}>
+                    <StatusIcon className="h-2.5 w-2.5 mr-0.5" />
                     {status.label}
                   </Badge>
-                  <LiveIndicator isLive={isLive} />
                 </div>
-                <div className="flex items-center gap-3 mt-1 text-sm text-muted-foreground flex-wrap">
+                <div className="hidden sm:flex items-center gap-3 mt-1 text-sm text-muted-foreground flex-wrap">
                   <span className="flex items-center gap-1">
                     <Calendar className="h-3.5 w-3.5" />
                     {format(new Date(event.startDatetime), "EEEE d MMMM", { locale: it })}
@@ -1403,42 +1414,59 @@ export default function EventHub() {
                     </span>
                   )}
                 </div>
+                <div className="flex sm:hidden items-center gap-2 mt-1 text-xs text-muted-foreground">
+                  <span className="flex items-center gap-0.5">
+                    <Calendar className="h-3 w-3" />
+                    {format(new Date(event.startDatetime), "d/MM", { locale: it })}
+                  </span>
+                  <span className="flex items-center gap-0.5">
+                    <Clock className="h-3 w-3" />
+                    {format(new Date(event.startDatetime), "HH:mm", { locale: it })}
+                  </span>
+                  {location && (
+                    <span className="flex items-center gap-0.5 truncate max-w-[80px]">
+                      <MapPin className="h-3 w-3 flex-shrink-0" />
+                      <span className="truncate">{location.name}</span>
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
               {(user?.role === 'super_admin' || user?.role === 'gestore') && (
                 <Button
                   variant="destructive"
                   size="icon"
                   onClick={() => setDeleteDialogOpen(true)}
+                  className="h-8 w-8 sm:h-9 sm:w-9"
                   data-testid="button-delete-event"
                 >
-                  <Trash2 className="h-4 w-4" />
+                  <Trash2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                 </Button>
               )}
               
               {currentTransition && (
                 <Button
                   onClick={() => setStatusChangeDialogOpen(true)}
-                  className={`bg-gradient-to-r ${status.gradient} text-white`}
+                  className={`bg-gradient-to-r ${status.gradient} text-white h-8 sm:h-9 px-2 sm:px-3`}
                   data-testid="button-change-status"
                 >
-                  <currentTransition.icon className="h-4 w-4 mr-2" />
+                  <currentTransition.icon className="h-3.5 w-3.5 sm:h-4 sm:w-4 sm:mr-2" />
                   <span className="hidden sm:inline">{currentTransition.label}</span>
                 </Button>
               )}
 
               <Sheet open={quickActionsOpen} onOpenChange={setQuickActionsOpen}>
                 <SheetTrigger asChild>
-                  <Button variant="outline" size="icon" data-testid="button-quick-actions">
-                    <Zap className="h-4 w-4" />
+                  <Button variant="outline" size="icon" className="h-8 w-8 sm:h-9 sm:w-9" data-testid="button-quick-actions">
+                    <Zap className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                   </Button>
                 </SheetTrigger>
-                <SheetContent>
-                  <SheetHeader>
-                    <SheetTitle>Azioni Rapide</SheetTitle>
-                    <SheetDescription>
+                <SheetContent className="p-4 sm:p-6">
+                  <SheetHeader className="pb-3 sm:pb-4">
+                    <SheetTitle className="text-base sm:text-lg">Azioni Rapide</SheetTitle>
+                    <SheetDescription className="text-xs sm:text-sm">
                       Operazioni veloci per gestire l'evento
                     </SheetDescription>
                   </SheetHeader>
@@ -1562,8 +1590,8 @@ export default function EventHub() {
 
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" data-testid="button-more-options">
-                    <MoreHorizontal className="h-4 w-4" />
+                  <Button variant="ghost" size="icon" className="h-8 w-8 sm:h-9 sm:w-9" data-testid="button-more-options">
+                    <MoreHorizontal className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
@@ -1595,7 +1623,7 @@ export default function EventHub() {
       </div>
 
       <div className="p-3 sm:p-4 md:p-6 max-w-7xl mx-auto">
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 mb-4 sm:mb-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-4 mb-4 sm:mb-6">
           <KPICard
             title="Biglietti"
             value={ticketedEvent?.ticketsSold || 0}
@@ -1639,40 +1667,44 @@ export default function EventHub() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 sm:space-y-6">
-          <div className="overflow-x-auto scrollbar-hide -mx-3 px-3 sm:-mx-4 sm:px-4 md:mx-0 md:px-0 pb-1" data-testid="tabs-scroll-container">
-            <TabsList className="inline-flex justify-start bg-transparent gap-1 p-0 min-w-max">
-              {[
-                { id: 'overview', label: 'Panoramica', shortLabel: 'Home', icon: LayoutDashboard },
-                { id: 'ticketing', label: 'Biglietteria', shortLabel: 'Ticket', icon: Ticket },
-                { id: 'cashiers', label: 'Cassieri', shortLabel: 'Casse', icon: Banknote },
-                { id: 'guests', label: 'Liste', shortLabel: 'Liste', icon: Users },
-                { id: 'tables', label: 'Tavoli', shortLabel: 'Tavoli', icon: Armchair },
-                { id: 'staff', label: 'Staff', shortLabel: 'Staff', icon: Users },
-                { id: 'pr', label: 'PR', shortLabel: 'PR', icon: Megaphone },
-                { id: 'access', label: 'Controllo Accessi', shortLabel: 'Accessi', icon: Shield },
-                { id: 'inventory', label: 'Inventario', shortLabel: 'Stock', icon: Package },
-                { id: 'finance', label: 'Incassi', shortLabel: 'Incassi', icon: Euro },
-                { id: 'report', label: 'Report', shortLabel: 'Report', icon: BarChart3 },
-              ].map(tab => (
-                <TabsTrigger
-                  key={tab.id}
-                  value={tab.id}
-                  className="flex items-center gap-1.5 px-2.5 py-2 min-h-9 rounded-lg shrink-0 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground whitespace-nowrap text-xs sm:text-sm sm:px-3 sm:min-h-10"
-                  data-testid={`tab-${tab.id}`}
-                >
-                  <tab.icon className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0" />
-                  <span className="sm:hidden">{tab.shortLabel}</span>
-                  <span className="hidden sm:inline">{tab.label}</span>
-                </TabsTrigger>
-              ))}
-            </TabsList>
+          <div className="relative" data-testid="tabs-scroll-wrapper">
+            <div className="absolute left-0 top-0 bottom-0 w-4 bg-gradient-to-r from-background to-transparent pointer-events-none z-10 sm:hidden" />
+            <div className="absolute right-0 top-0 bottom-0 w-4 bg-gradient-to-l from-background to-transparent pointer-events-none z-10 sm:hidden" />
+            <div className="overflow-x-auto scrollbar-hide -mx-3 px-3 sm:-mx-4 sm:px-4 md:mx-0 md:px-0 pb-1" data-testid="tabs-scroll-container">
+              <TabsList className="inline-flex justify-start bg-transparent gap-0.5 sm:gap-1 p-0 min-w-max">
+                {[
+                  { id: 'overview', label: 'Panoramica', shortLabel: 'Home', icon: LayoutDashboard },
+                  { id: 'ticketing', label: 'Biglietteria', shortLabel: 'Ticket', icon: Ticket },
+                  { id: 'cashiers', label: 'Cassieri', shortLabel: 'Casse', icon: Banknote },
+                  { id: 'guests', label: 'Liste', shortLabel: 'Liste', icon: Users },
+                  { id: 'tables', label: 'Tavoli', shortLabel: 'Tavoli', icon: Armchair },
+                  { id: 'staff', label: 'Staff', shortLabel: 'Staff', icon: Users },
+                  { id: 'pr', label: 'PR', shortLabel: 'PR', icon: Megaphone },
+                  { id: 'access', label: 'Controllo Accessi', shortLabel: 'Acc.', icon: Shield },
+                  { id: 'inventory', label: 'Inventario', shortLabel: 'Stock', icon: Package },
+                  { id: 'finance', label: 'Incassi', shortLabel: '€', icon: Euro },
+                  { id: 'report', label: 'Report', shortLabel: 'Rep.', icon: BarChart3 },
+                ].map(tab => (
+                  <TabsTrigger
+                    key={tab.id}
+                    value={tab.id}
+                    className="flex items-center gap-1 sm:gap-1.5 px-2 py-1.5 sm:px-2.5 sm:py-2 min-h-8 sm:min-h-9 rounded-lg shrink-0 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground whitespace-nowrap text-[10px] sm:text-sm sm:px-3 sm:min-h-10"
+                    data-testid={`tab-${tab.id}`}
+                  >
+                    <tab.icon className="h-3 w-3 sm:h-3.5 sm:w-3.5 shrink-0" />
+                    <span className="sm:hidden">{tab.shortLabel}</span>
+                    <span className="hidden sm:inline">{tab.label}</span>
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </div>
           </div>
 
           <TabsContent value="overview" className="space-y-4 sm:space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
               <div className="md:col-span-1 lg:col-span-2 space-y-4 sm:space-y-6">
                 <Card className="glass-card">
-                  <CardHeader className="pb-3">
+                  <CardHeader className="pb-3 px-3 sm:px-4 md:px-6">
                     <div className="flex items-center justify-between">
                       <CardTitle className="text-lg flex items-center gap-2">
                         <Activity className="h-5 w-5 text-primary" />
@@ -1680,8 +1712,8 @@ export default function EventHub() {
                       </CardTitle>
                     </div>
                   </CardHeader>
-                  <CardContent>
-                    <div className="flex items-center gap-2">
+                  <CardContent className="px-3 sm:px-4 md:px-6">
+                    <div className="flex items-center gap-1 sm:gap-2">
                       {Object.entries(statusConfig).map(([key, config], index) => {
                         const isActive = event.status === key;
                         const isPassed = Object.keys(statusConfig).indexOf(event.status) > index;
@@ -1690,21 +1722,21 @@ export default function EventHub() {
                         return (
                           <div key={key} className="flex items-center flex-1">
                             <div className="flex flex-col items-center gap-1 flex-1">
-                              <div className={`flex items-center justify-center w-10 h-10 rounded-full border-2 transition-all ${
+                              <div className={`flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 rounded-full border-2 transition-all ${
                                 isActive 
                                   ? 'border-primary bg-primary text-primary-foreground scale-110' 
                                   : isPassed 
                                   ? 'border-primary bg-primary/20 text-primary' 
                                   : 'border-muted bg-muted/20 text-muted-foreground'
                               }`}>
-                                <IconComponent className="h-5 w-5" />
+                                <IconComponent className="h-4 w-4 sm:h-5 sm:w-5" />
                               </div>
-                              <span className={`text-xs text-center ${isActive ? 'font-semibold text-primary' : 'text-muted-foreground'}`}>
+                              <span className={`text-[10px] sm:text-xs text-center ${isActive ? 'font-semibold text-primary' : 'text-muted-foreground'}`}>
                                 {config.label}
                               </span>
                             </div>
                             {index < 3 && (
-                              <div className={`h-0.5 w-full mx-2 rounded-full ${
+                              <div className={`h-0.5 w-full mx-1 sm:mx-2 rounded-full ${
                                 isPassed ? 'bg-primary' : 'bg-muted'
                               }`} />
                             )}
@@ -1716,7 +1748,7 @@ export default function EventHub() {
                 </Card>
 
                 <Card className="glass-card">
-                  <CardHeader className="pb-3">
+                  <CardHeader className="pb-3 px-3 sm:px-4 md:px-6">
                     <div className="flex items-center justify-between">
                       <CardTitle className="text-lg flex items-center gap-2">
                         <Zap className="h-5 w-5 text-amber-400" />
@@ -1724,8 +1756,8 @@ export default function EventHub() {
                       </CardTitle>
                     </div>
                   </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                  <CardContent className="px-3 sm:px-4 md:px-6">
+                    <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-2 sm:gap-3">
                       <QuickActionButton
                         icon={QrCode}
                         label="Scansiona"
@@ -1768,13 +1800,13 @@ export default function EventHub() {
 
                 {event.notes && (
                   <Card className="glass-card">
-                    <CardHeader className="pb-3">
+                    <CardHeader className="pb-3 px-3 sm:px-4 md:px-6">
                       <CardTitle className="text-lg flex items-center gap-2">
                         <FileText className="h-5 w-5 text-muted-foreground" />
                         Note Evento
                       </CardTitle>
                     </CardHeader>
-                    <CardContent>
+                    <CardContent className="px-3 sm:px-4 md:px-6">
                       <p className="text-sm text-muted-foreground whitespace-pre-wrap">{event.notes}</p>
                     </CardContent>
                   </Card>
@@ -1796,7 +1828,7 @@ export default function EventHub() {
               <div className="space-y-4 sm:space-y-6">
                 <TopConsumptionsWidget eventId={id || ''} />
                 <Card className="glass-card">
-                  <CardHeader className="pb-3">
+                  <CardHeader className="pb-3 px-3 sm:px-4 md:px-6">
                     <div className="flex items-center justify-between">
                       <CardTitle className="text-lg flex items-center gap-2">
                         <Activity className="h-5 w-5 text-emerald-400" />
@@ -1805,8 +1837,8 @@ export default function EventHub() {
                       <LiveIndicator isLive={isLive} />
                     </div>
                   </CardHeader>
-                  <CardContent>
-                    <ScrollArea className="h-[300px] pr-4">
+                  <CardContent className="px-3 sm:px-4 md:px-6">
+                    <ScrollArea className="h-[200px] sm:h-[280px] pr-4">
                       {activityLog.length === 0 ? (
                         <div className="text-center text-muted-foreground py-8">
                           <Activity className="h-8 w-8 mx-auto mb-2 opacity-50" />
@@ -1825,38 +1857,38 @@ export default function EventHub() {
                 </Card>
 
                 <Card className="glass-card">
-                  <CardHeader className="pb-3">
+                  <CardHeader className="pb-3 px-3 sm:px-4 md:px-6">
                     <CardTitle className="text-lg flex items-center gap-2">
                       <Bell className="h-5 w-5 text-amber-400" />
                       Avvisi
                     </CardTitle>
                   </CardHeader>
-                  <CardContent>
-                    <div className="space-y-3">
+                  <CardContent className="px-3 sm:px-4 md:px-6">
+                    <div className="space-y-2 sm:space-y-3">
                       {alerts.length === 0 && eventStocks.length < 5 && (
-                        <div className="flex items-center gap-3 p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
-                          <AlertTriangle className="h-5 w-5 text-amber-400" />
+                        <div className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                          <AlertTriangle className="h-4 w-4 sm:h-5 sm:w-5 text-amber-400 flex-shrink-0" />
                           <div>
-                            <p className="text-sm font-medium text-amber-400">Scorte Basse</p>
-                            <p className="text-xs text-muted-foreground">Meno di 5 prodotti in evento</p>
+                            <p className="text-xs sm:text-sm font-medium text-amber-400">Scorte Basse</p>
+                            <p className="text-[10px] sm:text-xs text-muted-foreground">Meno di 5 prodotti in evento</p>
                           </div>
                         </div>
                       )}
                       {alerts.length === 0 && tables.length > 0 && bookedTables === tables.length && (
-                        <div className="flex items-center gap-3 p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
-                          <CheckCircle2 className="h-5 w-5 text-emerald-400" />
+                        <div className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
+                          <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-400 flex-shrink-0" />
                           <div>
-                            <p className="text-sm font-medium text-emerald-400">Tavoli Completi</p>
-                            <p className="text-xs text-muted-foreground">Tutti i tavoli sono prenotati</p>
+                            <p className="text-xs sm:text-sm font-medium text-emerald-400">Tavoli Completi</p>
+                            <p className="text-[10px] sm:text-xs text-muted-foreground">Tutti i tavoli sono prenotati</p>
                           </div>
                         </div>
                       )}
                       {alerts.length === 0 && !ticketedEvent && guestLists.length === 0 && (
-                        <div className="flex items-center gap-3 p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
-                          <Bell className="h-5 w-5 text-blue-400" />
+                        <div className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
+                          <Bell className="h-4 w-4 sm:h-5 sm:w-5 text-blue-400 flex-shrink-0" />
                           <div>
-                            <p className="text-sm font-medium text-blue-400">Configura Evento</p>
-                            <p className="text-xs text-muted-foreground">Aggiungi liste o biglietteria</p>
+                            <p className="text-xs sm:text-sm font-medium text-blue-400">Configura Evento</p>
+                            <p className="text-[10px] sm:text-xs text-muted-foreground">Aggiungi liste o biglietteria</p>
                           </div>
                         </div>
                       )}
@@ -1917,10 +1949,11 @@ export default function EventHub() {
 
                 {/* Elenco Biglietti (Sectors) */}
                 <Card className="glass-card">
-                  <CardHeader className="flex flex-row items-center justify-between gap-2">
-                    <CardTitle className="flex items-center gap-2">
-                      <FileText className="h-5 w-5 text-cyan-400" />
-                      Tipologie Biglietti
+                  <CardHeader className="flex flex-row items-center justify-between gap-2 px-3 sm:px-4 md:px-6">
+                    <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                      <FileText className="h-4 w-4 sm:h-5 sm:w-5 text-cyan-400" />
+                      <span className="hidden sm:inline">Tipologie Biglietti</span>
+                      <span className="sm:hidden">Biglietti</span>
                     </CardTitle>
                     <Button
                       variant="outline"
@@ -1928,41 +1961,41 @@ export default function EventHub() {
                       onClick={() => navigate(`/siae/ticket-types/${ticketedEvent?.id}`)}
                       data-testid="btn-manage-ticket-types"
                     >
-                      <Settings className="h-4 w-4 mr-2" />
-                      Gestisci
+                      <Settings className="h-4 w-4 sm:mr-2" />
+                      <span className="hidden sm:inline">Gestisci</span>
                     </Button>
                   </CardHeader>
-                  <CardContent>
+                  <CardContent className="px-3 sm:px-4 md:px-6">
                     {ticketedEvent.sectors && ticketedEvent.sectors.length > 0 ? (
-                      <div className="space-y-3">
+                      <div className="space-y-2 sm:space-y-3">
                         {ticketedEvent.sectors.map((sector) => {
                           const soldCount = sector.capacity - sector.availableSeats;
                           return (
                             <div 
                               key={sector.id} 
-                              className="flex items-center justify-between p-4 rounded-lg bg-background/50 border"
+                              className="flex items-center justify-between p-2 sm:p-3 md:p-4 rounded-lg bg-background/50 border gap-2 sm:gap-4"
                               data-testid={`ticket-row-${sector.id}`}
                             >
-                              <div className="flex-1">
-                                <div className="flex items-center gap-3">
-                                  <h4 className="font-medium">{sector.name}</h4>
-                                  <Badge variant={sector.active ? 'default' : 'secondary'} className="text-xs">
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-1.5 sm:gap-3 flex-wrap">
+                                  <h4 className="font-medium text-sm sm:text-base truncate">{sector.name}</h4>
+                                  <Badge variant={sector.active ? 'default' : 'secondary'} className="text-[10px] sm:text-xs px-1.5 sm:px-2">
                                     {sector.active ? 'Attivo' : 'Disattivato'}
                                   </Badge>
                                 </div>
-                                <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
-                                  <span>Intero: €{Number(sector.priceIntero).toFixed(2)}</span>
-                                  {sector.priceRidotto && <span>Ridotto: €{Number(sector.priceRidotto).toFixed(2)}</span>}
-                                  {sector.prevendita && Number(sector.prevendita) > 0 && <span>DDP: €{Number(sector.prevendita).toFixed(2)}</span>}
+                                <div className="flex items-center gap-2 sm:gap-4 mt-1 text-[10px] sm:text-sm text-muted-foreground flex-wrap">
+                                  <span>€{Number(sector.priceIntero).toFixed(2)}</span>
+                                  {sector.priceRidotto && <span className="hidden sm:inline">Ridotto: €{Number(sector.priceRidotto).toFixed(2)}</span>}
+                                  {sector.prevendita && Number(sector.prevendita) > 0 && <span className="hidden sm:inline">DDP: €{Number(sector.prevendita).toFixed(2)}</span>}
                                 </div>
                               </div>
-                              <div className="flex items-center gap-4">
+                              <div className="flex items-center gap-2 sm:gap-4">
                                 <div className="text-right">
-                                  <div className="text-sm">
+                                  <div className="text-xs sm:text-sm">
                                     <span className="font-bold text-blue-400">{soldCount}</span>
-                                    <span className="text-muted-foreground"> / {sector.capacity}</span>
+                                    <span className="text-muted-foreground">/{sector.capacity}</span>
                                   </div>
-                                  <div className="text-xs text-muted-foreground">
+                                  <div className="text-[10px] sm:text-xs text-muted-foreground hidden sm:block">
                                     {sector.availableSeats} disponibili
                                   </div>
                                 </div>
@@ -1988,14 +2021,14 @@ export default function EventHub() {
 
                 {/* Pulsanti Report */}
                 <Card className="glass-card">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <BarChart3 className="h-5 w-5 text-purple-400" />
+                  <CardHeader className="px-3 sm:px-4 md:px-6">
+                    <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                      <BarChart3 className="h-4 w-4 sm:h-5 sm:w-5 text-purple-400" />
                       Report SIAE
                     </CardTitle>
                   </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <CardContent className="px-3 sm:px-4 md:px-6">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button 
@@ -2093,16 +2126,16 @@ export default function EventHub() {
 
                 {/* Dialog Modifica Quantità */}
                 <Dialog open={!!editingSector} onOpenChange={(open) => !open && setEditingSector(null)}>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Modifica Quantità</DialogTitle>
-                      <DialogDescription>
+                  <DialogContent className="max-w-[95vw] sm:max-w-lg md:max-w-xl p-4 sm:p-6">
+                    <DialogHeader className="pb-3 sm:pb-4">
+                      <DialogTitle className="text-base sm:text-lg">Modifica Quantità</DialogTitle>
+                      <DialogDescription className="text-xs sm:text-sm">
                         Modifica la quantità disponibile per "{editingSector?.name}"
                       </DialogDescription>
                     </DialogHeader>
-                    <div className="space-y-4 py-4">
+                    <div className="space-y-3 sm:space-y-4 py-3 sm:py-4">
                       <div className="space-y-2">
-                        <Label htmlFor="capacity">Quantità Totale</Label>
+                        <Label htmlFor="capacity" className="text-xs sm:text-sm">Quantità Totale</Label>
                         <Input
                           id="capacity"
                           type="number"
@@ -2118,8 +2151,8 @@ export default function EventHub() {
                         )}
                       </div>
                     </div>
-                    <DialogFooter>
-                      <Button variant="outline" onClick={() => setEditingSector(null)} data-testid="btn-cancel-edit">
+                    <DialogFooter className="flex-col-reverse sm:flex-row gap-2 sm:gap-3">
+                      <Button variant="outline" onClick={() => setEditingSector(null)} data-testid="btn-cancel-edit" className="w-full sm:w-auto">
                         Annulla
                       </Button>
                       <Button 
@@ -2135,6 +2168,7 @@ export default function EventHub() {
                         }}
                         disabled={updateSectorCapacityMutation.isPending}
                         data-testid="btn-save-capacity"
+                        className="w-full sm:w-auto"
                       >
                         {updateSectorCapacityMutation.isPending ? (
                           <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Salvataggio...</>
@@ -2167,10 +2201,10 @@ export default function EventHub() {
 
             {/* Cancel Ticket Dialog */}
             <AlertDialog open={cancelTicketDialogOpen} onOpenChange={setCancelTicketDialogOpen}>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Annulla Biglietto</AlertDialogTitle>
-                  <AlertDialogDescription>
+              <AlertDialogContent className="max-w-[90vw] sm:max-w-md p-4 sm:p-6">
+                <AlertDialogHeader className="pb-3 sm:pb-4">
+                  <AlertDialogTitle className="text-base sm:text-lg">Annulla Biglietto</AlertDialogTitle>
+                  <AlertDialogDescription className="text-xs sm:text-sm">
                     Stai per annullare il biglietto{' '}
                     <span className="font-mono font-semibold">
                       {ticketToCancel?.fiscalSealCode || ticketToCancel?.progressiveNumber || ticketToCancel?.id.slice(0, 8)}
@@ -2178,9 +2212,9 @@ export default function EventHub() {
                     Questa azione non può essere annullata.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
-                <div className="space-y-4 py-4">
+                <div className="space-y-3 sm:space-y-4 py-3 sm:py-4">
                   <div className="space-y-2">
-                    <Label htmlFor="cancel-reason">Causale Annullamento</Label>
+                    <Label htmlFor="cancel-reason" className="text-xs sm:text-sm">Causale Annullamento</Label>
                     <Select value={cancelReason} onValueChange={setCancelReason}>
                       <SelectTrigger data-testid="select-cancel-reason">
                         <SelectValue placeholder="Seleziona causale" />
@@ -2195,22 +2229,22 @@ export default function EventHub() {
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="cancel-note">Note aggiuntive (opzionale)</Label>
+                    <Label htmlFor="cancel-note" className="text-xs sm:text-sm">Note aggiuntive (opzionale)</Label>
                     <Textarea
                       id="cancel-note"
                       value={cancelNote}
                       onChange={(e) => setCancelNote(e.target.value)}
                       placeholder="Descrivi il motivo dell'annullamento..."
-                      className="resize-none"
+                      className="resize-none min-h-[80px]"
                       data-testid="input-cancel-note"
                     />
                   </div>
                 </div>
-                <AlertDialogFooter>
-                  <AlertDialogCancel data-testid="button-cancel-dialog-close">Annulla</AlertDialogCancel>
+                <AlertDialogFooter className="flex-col-reverse sm:flex-row gap-2 sm:gap-3">
+                  <AlertDialogCancel data-testid="button-cancel-dialog-close" className="w-full sm:w-auto">Annulla</AlertDialogCancel>
                   <AlertDialogAction
                     onClick={confirmCancelTicket}
-                    className="bg-red-600 hover:bg-red-700"
+                    className="bg-red-600 hover:bg-red-700 w-full sm:w-auto"
                     disabled={cancelTicketMutation.isPending}
                     data-testid="button-confirm-cancel-ticket"
                   >
@@ -2279,30 +2313,30 @@ export default function EventHub() {
               )}
 
               <Card className="glass-card">
-                <CardHeader>
+                <CardHeader className="px-3 sm:px-4 md:px-6">
                   <div className="flex items-center justify-between gap-2 flex-wrap">
-                    <CardTitle className="flex items-center gap-2">
-                      <Users className="h-5 w-5 text-cyan-400" />
+                    <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                      <Users className="h-4 w-4 sm:h-5 sm:w-5 text-cyan-400" />
                       Liste Ospiti
                     </CardTitle>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5 sm:gap-2">
                       <Button 
                         onClick={() => setShowCreateListDialog(true)} 
                         size="sm"
                         data-testid="btn-create-list"
                       >
-                        <Plus className="h-4 w-4 mr-1" />
-                        Nuova Lista
+                        <Plus className="h-4 w-4 sm:mr-1" />
+                        <span className="hidden sm:inline">Nuova Lista</span>
                       </Button>
                       <Button onClick={() => navigate(`/pr/guest-lists?eventId=${id}`)} variant="outline" size="sm" data-testid="btn-manage-lists">
-                        Gestisci <ChevronRight className="h-4 w-4 ml-1" />
+                        <span className="hidden sm:inline">Gestisci</span> <ChevronRight className="h-4 w-4 sm:ml-1" />
                       </Button>
                     </div>
                   </div>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="px-3 sm:px-4 md:px-6">
                   {(e4uLists.length > 0 || guestLists.length > 0) ? (
-                    <div className="space-y-4">
+                    <div className="space-y-2 sm:space-y-3 md:space-y-4">
                       {(e4uLists.length > 0 ? e4uLists : guestLists).map((list: any) => {
                         const entryCount = list.entryCount || list.currentCount || 0;
                         const checkedIn = list.checkedInCount || 0;
@@ -2312,49 +2346,51 @@ export default function EventHub() {
                         return (
                           <div 
                             key={list.id} 
-                            className="flex items-center justify-between gap-4 p-4 rounded-lg bg-background/50 border hover:border-cyan-500/50 transition-colors"
+                            className="flex items-center justify-between gap-2 sm:gap-4 p-2 sm:p-3 md:p-4 rounded-lg bg-background/50 border hover:border-cyan-500/50 transition-colors"
                             data-testid={`list-item-${list.id}`}
                           >
                             <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <h4 className="font-medium">{list.name}</h4>
+                              <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                                <h4 className="font-medium text-sm sm:text-base truncate">{list.name}</h4>
                                 {list.price && (
-                                  <Badge variant="secondary" className="text-xs">€{list.price}</Badge>
+                                  <Badge variant="secondary" className="text-[10px] sm:text-xs px-1.5 sm:px-2">€{list.price}</Badge>
                                 )}
                               </div>
-                              <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
+                              <div className="flex items-center gap-2 sm:gap-4 mt-1 text-[10px] sm:text-sm text-muted-foreground">
                                 <span className="flex items-center gap-1">
                                   <Users className="h-3 w-3" />
-                                  {entryCount} iscritti
+                                  {entryCount}
                                 </span>
                                 <span className="flex items-center gap-1 text-emerald-400">
                                   <CheckCircle2 className="h-3 w-3" />
-                                  {checkedIn} check-in
+                                  {checkedIn}
                                 </span>
                               </div>
                               {maxCapacity > 0 && (
-                                <div className="mt-2">
-                                  <Progress value={capacityPercent} className="h-1.5" />
-                                  <p className="text-xs text-muted-foreground mt-1">{entryCount}/{maxCapacity} ({Math.round(capacityPercent)}%)</p>
+                                <div className="mt-1.5 sm:mt-2">
+                                  <Progress value={capacityPercent} className="h-1 sm:h-1.5" />
+                                  <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5 sm:mt-1">{entryCount}/{maxCapacity}</p>
                                 </div>
                               )}
                             </div>
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-1 sm:gap-2">
                               <Button 
                                 variant="ghost" 
                                 size="icon"
+                                className="h-7 w-7 sm:h-8 sm:w-8"
                                 onClick={() => navigate(`/pr/guest-lists?eventId=${id}&listId=${list.id}`)}
                                 data-testid={`btn-view-list-${list.id}`}
                               >
-                                <Eye className="h-4 w-4" />
+                                <Eye className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                               </Button>
                               <Button 
                                 variant="ghost" 
                                 size="icon"
+                                className="h-7 w-7 sm:h-8 sm:w-8"
                                 onClick={() => navigate(`/pr/guest-lists?eventId=${id}&listId=${list.id}&add=true`)}
                                 data-testid={`btn-add-to-list-${list.id}`}
                               >
-                                <UserPlus className="h-4 w-4" />
+                                <UserPlus className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                               </Button>
                             </div>
                           </div>
@@ -2411,30 +2447,31 @@ export default function EventHub() {
                     )}
 
                     <Card className="glass-card">
-                      <CardHeader>
+                      <CardHeader className="px-3 sm:px-4 md:px-6">
                         <div className="flex items-center justify-between gap-2 flex-wrap">
-                          <CardTitle className="flex items-center gap-2">
-                            <Armchair className="h-5 w-5 text-purple-400" />
-                            Tipologie Tavoli
+                          <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                            <Armchair className="h-4 w-4 sm:h-5 sm:w-5 text-purple-400" />
+                            <span className="hidden sm:inline">Tipologie Tavoli</span>
+                            <span className="sm:hidden">Tavoli</span>
                           </CardTitle>
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1.5 sm:gap-2">
                             <Button 
                               onClick={() => setShowCreateTableTypeDialog(true)} 
                               size="sm"
                               data-testid="btn-create-table-type"
                             >
-                              <Plus className="h-4 w-4 mr-1" />
-                              Nuova Tipologia
+                              <Plus className="h-4 w-4 sm:mr-1" />
+                              <span className="hidden sm:inline">Nuova Tipologia</span>
                             </Button>
                             <Button onClick={() => navigate(`/pr/tables?eventId=${id}`)} variant="outline" size="sm" data-testid="btn-manage-tables">
-                              Gestisci <ChevronRight className="h-4 w-4 ml-1" />
+                              <span className="hidden sm:inline">Gestisci</span> <ChevronRight className="h-4 w-4 sm:ml-1" />
                             </Button>
                           </div>
                         </div>
                       </CardHeader>
-                      <CardContent>
+                      <CardContent className="px-3 sm:px-4 md:px-6">
                         {(e4uTableTypes.length > 0 || tables.length > 0) ? (
-                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3 md:gap-4">
                             {(e4uTableTypes.length > 0 ? e4uTableTypes : Array.from(new Set(tables.map(t => t.tableType))).map(type => ({
                               id: type,
                               name: type,
@@ -2447,22 +2484,22 @@ export default function EventHub() {
                               return (
                                 <div 
                                   key={tableType.id} 
-                                  className="p-4 rounded-lg bg-background/50 border hover:border-purple-500/50 transition-colors"
+                                  className="p-2 sm:p-3 md:p-4 rounded-lg bg-background/50 border hover:border-purple-500/50 transition-colors"
                                   data-testid={`table-type-${tableType.id}`}
                                 >
-                                  <div className="flex items-center justify-between mb-2">
-                                    <h4 className="font-medium capitalize">{tableType.name}</h4>
+                                  <div className="flex items-center justify-between mb-1.5 sm:mb-2 gap-2">
+                                    <h4 className="font-medium capitalize text-sm sm:text-base truncate">{tableType.name}</h4>
                                     {tableType.price && (
-                                      <Badge className="bg-purple-500/20 text-purple-400">€{tableType.price}</Badge>
+                                      <Badge className="bg-purple-500/20 text-purple-400 text-[10px] sm:text-xs px-1.5 sm:px-2">€{tableType.price}</Badge>
                                     )}
                                   </div>
-                                  <div className="text-sm text-muted-foreground mb-2">
-                                    {tableType.maxGuests && <span>{tableType.maxGuests} ospiti max • </span>}
+                                  <div className="text-[10px] sm:text-sm text-muted-foreground mb-1.5 sm:mb-2">
+                                    {tableType.maxGuests && <span className="hidden sm:inline">{tableType.maxGuests} max • </span>}
                                     <span className={available > 0 ? 'text-emerald-400' : 'text-rose-400'}>
-                                      {available} disponibili
-                                    </span> / {tableType.totalQuantity} totali
+                                      {available}
+                                    </span>/{tableType.totalQuantity}
                                   </div>
-                                  <Progress value={100 - availablePercent} className="h-1.5" />
+                                  <Progress value={100 - availablePercent} className="h-1 sm:h-1.5" />
                                 </div>
                               );
                             })}
@@ -2485,30 +2522,31 @@ export default function EventHub() {
 
                     {pendingReservations.length > 0 && (
                       <Card className="glass-card border-amber-500/30">
-                        <CardHeader>
-                          <CardTitle className="flex items-center gap-2 text-amber-400">
-                            <Clock className="h-5 w-5" />
-                            Prenotazioni in Attesa ({pendingReservations.length})
+                        <CardHeader className="px-3 sm:px-4 md:px-6">
+                          <CardTitle className="flex items-center gap-2 text-amber-400 text-base sm:text-lg">
+                            <Clock className="h-4 w-4 sm:h-5 sm:w-5" />
+                            <span className="hidden sm:inline">Prenotazioni in Attesa</span>
+                            <span className="sm:hidden">In Attesa</span> ({pendingReservations.length})
                           </CardTitle>
                         </CardHeader>
-                        <CardContent>
-                          <div className="space-y-3">
+                        <CardContent className="px-3 sm:px-4 md:px-6">
+                          <div className="space-y-2 sm:space-y-3">
                             {pendingReservations.map((reservation: any) => (
                               <div 
                                 key={reservation.id}
-                                className="flex items-center justify-between gap-4 p-4 rounded-lg bg-amber-500/10 border border-amber-500/20"
+                                className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4 p-2 sm:p-3 md:p-4 rounded-lg bg-amber-500/10 border border-amber-500/20"
                                 data-testid={`pending-reservation-${reservation.id}`}
                               >
                                 <div className="flex-1 min-w-0">
-                                  <div className="flex items-center gap-2 flex-wrap">
-                                    <span className="font-medium">{reservation.customerName}</span>
-                                    <Badge variant="secondary">{reservation.tableTypeName || reservation.tableType}</Badge>
+                                  <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                                    <span className="font-medium text-sm sm:text-base truncate">{reservation.customerName}</span>
+                                    <Badge variant="secondary" className="text-[10px] sm:text-xs px-1.5 sm:px-2">{reservation.tableTypeName || reservation.tableType}</Badge>
                                   </div>
-                                  <div className="text-sm text-muted-foreground mt-1">
-                                    {reservation.guestsCount} ospiti • {reservation.phone || reservation.email || 'N/D'}
+                                  <div className="text-[10px] sm:text-sm text-muted-foreground mt-0.5 sm:mt-1">
+                                    {reservation.guestsCount} ospiti <span className="hidden sm:inline">• {reservation.phone || reservation.email || 'N/D'}</span>
                                   </div>
                                 </div>
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-1.5 sm:gap-2">
                                   <Button 
                                     size="sm"
                                     onClick={() => approveReservationMutation.mutate(reservation.id)}
@@ -2518,9 +2556,9 @@ export default function EventHub() {
                                     {approveReservationMutation.isPending ? (
                                       <Loader2 className="h-4 w-4 animate-spin" />
                                     ) : (
-                                      <CheckCircle2 className="h-4 w-4 mr-1" />
+                                      <CheckCircle2 className="h-4 w-4 sm:mr-1" />
                                     )}
-                                    Approva
+                                    <span className="hidden sm:inline">Approva</span>
                                   </Button>
                                   <Button 
                                     variant="outline" 
@@ -2529,8 +2567,8 @@ export default function EventHub() {
                                     disabled={rejectReservationMutation.isPending}
                                     data-testid={`btn-reject-${reservation.id}`}
                                   >
-                                    <X className="h-4 w-4 mr-1" />
-                                    Rifiuta
+                                    <X className="h-4 w-4 sm:mr-1" />
+                                    <span className="hidden sm:inline">Rifiuta</span>
                                   </Button>
                                 </div>
                               </div>
@@ -2542,31 +2580,32 @@ export default function EventHub() {
 
                     {approvedReservations.length > 0 && (
                       <Card className="glass-card">
-                        <CardHeader>
-                          <CardTitle className="flex items-center gap-2">
-                            <CheckCircle2 className="h-5 w-5 text-emerald-400" />
-                            Prenotazioni Confermate ({approvedReservations.length})
+                        <CardHeader className="px-3 sm:px-4 md:px-6">
+                          <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                            <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-400" />
+                            <span className="hidden sm:inline">Prenotazioni Confermate</span>
+                            <span className="sm:hidden">Confermate</span> ({approvedReservations.length})
                           </CardTitle>
                         </CardHeader>
-                        <CardContent>
-                          <div className="space-y-3">
+                        <CardContent className="px-3 sm:px-4 md:px-6">
+                          <div className="space-y-2 sm:space-y-3">
                             {approvedReservations.slice(0, 5).map((reservation: any) => (
                               <div 
                                 key={reservation.id}
-                                className="flex items-center justify-between gap-4 p-3 rounded-lg bg-background/50 border"
+                                className="flex items-center justify-between gap-2 sm:gap-4 p-2 sm:p-3 rounded-lg bg-background/50 border"
                                 data-testid={`approved-reservation-${reservation.id}`}
                               >
-                                <div>
-                                  <span className="font-medium">{reservation.customerName}</span>
-                                  <span className="text-sm text-muted-foreground ml-2">
-                                    {reservation.guestsCount} ospiti • {reservation.tableTypeName || reservation.tableType}
+                                <div className="flex-1 min-w-0">
+                                  <span className="font-medium text-sm sm:text-base truncate block">{reservation.customerName}</span>
+                                  <span className="text-[10px] sm:text-sm text-muted-foreground">
+                                    {reservation.guestsCount} <span className="hidden sm:inline">ospiti •</span> {reservation.tableTypeName || reservation.tableType}
                                   </span>
                                 </div>
-                                <Badge className="bg-emerald-500/20 text-emerald-400">Confermata</Badge>
+                                <Badge className="bg-emerald-500/20 text-emerald-400 text-[10px] sm:text-xs px-1.5 sm:px-2">Confermata</Badge>
                               </div>
                             ))}
                             {approvedReservations.length > 5 && (
-                              <Button variant="ghost" className="w-full" onClick={() => navigate(`/pr/tables?eventId=${id}`)}>
+                              <Button variant="ghost" className="w-full text-sm" onClick={() => navigate(`/pr/tables?eventId=${id}`)}>
                                 Vedi tutte ({approvedReservations.length})
                               </Button>
                             )}
@@ -2583,19 +2622,19 @@ export default function EventHub() {
           <TabsContent value="staff">
             <div className="space-y-4 sm:space-y-6">
               {/* Stats Grid */}
-              <div className="grid grid-cols-2 sm:grid-cols-1 gap-3 sm:gap-4">
-                <div className="p-3 sm:p-4 rounded-lg bg-teal-500/10 border border-teal-500/30" data-testid="stat-staff-count">
-                  <div className="text-xl sm:text-2xl font-bold text-teal-400">{e4uStaff.length}</div>
-                  <div className="text-xs sm:text-sm text-muted-foreground">Staff Attivi</div>
+              <div className="grid grid-cols-2 sm:grid-cols-1 gap-2 sm:gap-3 md:gap-4">
+                <div className="p-2 sm:p-3 md:p-4 rounded-lg bg-teal-500/10 border border-teal-500/30" data-testid="stat-staff-count">
+                  <div className="text-lg sm:text-xl md:text-2xl font-bold text-teal-400">{e4uStaff.length}</div>
+                  <div className="text-[10px] sm:text-xs md:text-sm text-muted-foreground">Staff Attivi</div>
                 </div>
               </div>
 
               {/* Staff Section */}
               <Card className="glass-card">
-                <CardHeader>
+                <CardHeader className="px-3 sm:px-4 md:px-6">
                   <div className="flex items-center justify-between gap-2 flex-wrap">
-                    <CardTitle className="flex items-center gap-2">
-                      <Users className="h-5 w-5 text-teal-400" />
+                    <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                      <Users className="h-4 w-4 sm:h-5 sm:w-5 text-teal-400" />
                       Staff
                     </CardTitle>
                     <Button 
@@ -2603,14 +2642,14 @@ export default function EventHub() {
                       size="sm"
                       data-testid="btn-assign-staff"
                     >
-                      <Plus className="h-4 w-4 mr-1" />
-                      Assegna Staff
+                      <Plus className="h-4 w-4 sm:mr-1" />
+                      <span className="hidden sm:inline">Assegna Staff</span>
                     </Button>
                   </div>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="px-3 sm:px-4 md:px-6">
                   {e4uStaff.length > 0 ? (
-                    <div className="space-y-3">
+                    <div className="space-y-2 sm:space-y-3">
                       {e4uStaff.map((staff: any) => {
                         const staffUser = users.find(u => u.id === staff.userId);
                         const staffPrs = e4uPr.filter((pr: any) => pr.staffUserId === staff.userId);
@@ -2618,30 +2657,30 @@ export default function EventHub() {
                         return (
                           <div 
                             key={staff.id} 
-                            className="p-4 rounded-lg bg-background/50 border hover:border-teal-500/50 transition-colors"
+                            className="p-2 sm:p-3 md:p-4 rounded-lg bg-background/50 border hover:border-teal-500/50 transition-colors"
                             data-testid={`staff-item-${staff.id}`}
                           >
-                            <div className="flex items-start justify-between gap-4">
-                              <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-teal-500 to-cyan-600 flex items-center justify-center text-white font-medium">
+                            <div className="flex items-start justify-between gap-2 sm:gap-4">
+                              <div className="flex items-center gap-2 sm:gap-3">
+                                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-gradient-to-br from-teal-500 to-cyan-600 flex items-center justify-center text-white font-medium text-xs sm:text-sm">
                                   {staffUser?.firstName?.[0]}{staffUser?.lastName?.[0]}
                                 </div>
-                                <div>
-                                  <div className="font-medium">
+                                <div className="min-w-0">
+                                  <div className="font-medium text-sm sm:text-base truncate">
                                     {staffUser ? `${staffUser.firstName} ${staffUser.lastName}` : 'Utente sconosciuto'}
                                   </div>
-                                  <div className="flex items-center gap-1 mt-1 flex-wrap">
+                                  <div className="flex items-center gap-1 mt-0.5 sm:mt-1 flex-wrap">
                                     {staff.canManageLists && (
-                                      <Badge variant="secondary" className="text-xs">Liste</Badge>
+                                      <Badge variant="secondary" className="text-[10px] sm:text-xs px-1 sm:px-2">Liste</Badge>
                                     )}
                                     {staff.canManageTables && (
-                                      <Badge variant="secondary" className="text-xs">Tavoli</Badge>
+                                      <Badge variant="secondary" className="text-[10px] sm:text-xs px-1 sm:px-2">Tavoli</Badge>
                                     )}
                                     {staff.canCreatePr && (
-                                      <Badge variant="secondary" className="text-xs bg-orange-500/20 text-orange-400">Crea PR</Badge>
+                                      <Badge variant="secondary" className="text-[10px] sm:text-xs px-1 sm:px-2 bg-orange-500/20 text-orange-400">PR</Badge>
                                     )}
                                     {staff.canApproveTables && (
-                                      <Badge variant="secondary" className="text-xs bg-purple-500/20 text-purple-400">Approva Tavoli</Badge>
+                                      <Badge variant="secondary" className="text-[10px] sm:text-xs px-1 sm:px-2 bg-purple-500/20 text-purple-400 hidden sm:inline-flex">Approva</Badge>
                                     )}
                                   </div>
                                 </div>
@@ -2649,35 +2688,36 @@ export default function EventHub() {
                               <Button 
                                 variant="ghost" 
                                 size="icon"
+                                className="h-7 w-7 sm:h-8 sm:w-8"
                                 onClick={() => removeStaffMutation.mutate(staff.id)}
                                 disabled={removeStaffMutation.isPending}
                                 data-testid={`btn-remove-staff-${staff.id}`}
                               >
-                                <X className="h-4 w-4" />
+                                <X className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                               </Button>
                             </div>
                             
                             {/* PR under this staff */}
                             {staffPrs.length > 0 && (
-                              <div className="mt-3 ml-12 space-y-2">
-                                <div className="text-xs text-muted-foreground flex items-center gap-1">
+                              <div className="mt-2 sm:mt-3 ml-10 sm:ml-12 space-y-1.5 sm:space-y-2">
+                                <div className="text-[10px] sm:text-xs text-muted-foreground flex items-center gap-1">
                                   <Megaphone className="h-3 w-3" />
-                                  PR gestiti ({staffPrs.length})
+                                  PR ({staffPrs.length})
                                 </div>
                                 {staffPrs.map((pr: any) => {
                                   const prUser = users.find(u => u.id === pr.userId);
                                   return (
                                     <div 
                                       key={pr.id}
-                                      className="flex items-center justify-between gap-2 p-2 rounded-md bg-orange-500/5 border border-orange-500/20"
+                                      className="flex items-center justify-between gap-2 p-1.5 sm:p-2 rounded-md bg-orange-500/5 border border-orange-500/20"
                                       data-testid={`staff-pr-${pr.id}`}
                                     >
-                                      <span className="text-sm">
+                                      <span className="text-xs sm:text-sm truncate">
                                         {prUser ? `${prUser.firstName} ${prUser.lastName}` : 'PR sconosciuto'}
                                       </span>
                                       <div className="flex items-center gap-1">
-                                        {pr.canAddToLists && <Badge variant="outline" className="text-xs">Liste</Badge>}
-                                        {pr.canProposeTables && <Badge variant="outline" className="text-xs">Tavoli</Badge>}
+                                        {pr.canAddToLists && <Badge variant="outline" className="text-[10px] sm:text-xs px-1 sm:px-2">Liste</Badge>}
+                                        {pr.canProposeTables && <Badge variant="outline" className="text-[10px] sm:text-xs px-1 sm:px-2 hidden sm:inline-flex">Tavoli</Badge>}
                                       </div>
                                     </div>
                                   );
@@ -2709,19 +2749,19 @@ export default function EventHub() {
           <TabsContent value="pr">
             <div className="space-y-4 sm:space-y-6">
               {/* Stats Grid */}
-              <div className="grid grid-cols-2 sm:grid-cols-1 gap-3 sm:gap-4">
-                <div className="p-3 sm:p-4 rounded-lg bg-orange-500/10 border border-orange-500/30" data-testid="stat-pr-count">
-                  <div className="text-xl sm:text-2xl font-bold text-orange-400">{e4uPr.length}</div>
-                  <div className="text-xs sm:text-sm text-muted-foreground">PR Attivi</div>
+              <div className="grid grid-cols-2 sm:grid-cols-1 gap-2 sm:gap-3 md:gap-4">
+                <div className="p-2 sm:p-3 md:p-4 rounded-lg bg-orange-500/10 border border-orange-500/30" data-testid="stat-pr-count">
+                  <div className="text-lg sm:text-xl md:text-2xl font-bold text-orange-400">{e4uPr.length}</div>
+                  <div className="text-[10px] sm:text-xs md:text-sm text-muted-foreground">PR Attivi</div>
                 </div>
               </div>
 
               {/* PR Section */}
               <Card className="glass-card">
-                <CardHeader>
+                <CardHeader className="px-3 sm:px-4 md:px-6">
                   <div className="flex items-center justify-between gap-2 flex-wrap">
-                    <CardTitle className="flex items-center gap-2">
-                      <Megaphone className="h-5 w-5 text-orange-400" />
+                    <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                      <Megaphone className="h-4 w-4 sm:h-5 sm:w-5 text-orange-400" />
                       PR
                     </CardTitle>
                     <Button 
@@ -2729,14 +2769,14 @@ export default function EventHub() {
                       size="sm"
                       data-testid="btn-assign-pr"
                     >
-                      <Plus className="h-4 w-4 mr-1" />
-                      Assegna PR
+                      <Plus className="h-4 w-4 sm:mr-1" />
+                      <span className="hidden sm:inline">Assegna PR</span>
                     </Button>
                   </div>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="px-3 sm:px-4 md:px-6">
                   {e4uPr.length > 0 ? (
-                    <div className="space-y-3">
+                    <div className="space-y-2 sm:space-y-3">
                       {e4uPr.map((prData: any) => {
                         const pr = prData.assignment || prData;
                         const prUser = prData.user || users.find(u => u.id === pr.userId);
@@ -2752,28 +2792,28 @@ export default function EventHub() {
                         return (
                           <div 
                             key={pr.id} 
-                            className="flex items-center justify-between gap-4 p-4 rounded-lg bg-background/50 border hover:border-orange-500/50 transition-colors"
+                            className="flex items-center justify-between gap-2 sm:gap-4 p-2 sm:p-3 md:p-4 rounded-lg bg-background/50 border hover:border-orange-500/50 transition-colors"
                             data-testid={`pr-item-${pr.id}`}
                           >
-                            <div className="flex items-center gap-3">
-                              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-orange-500 to-amber-600 flex items-center justify-center text-white font-medium">
+                            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-gradient-to-br from-orange-500 to-amber-600 flex items-center justify-center text-white font-medium text-xs sm:text-sm flex-shrink-0">
                                 {initials}{initials2}
                               </div>
-                              <div>
-                                <div className="font-medium">
+                              <div className="min-w-0">
+                                <div className="font-medium text-sm sm:text-base truncate">
                                   {displayName}
                                 </div>
                                 {supervisorUser && (
-                                  <div className="text-xs text-muted-foreground">
-                                    Supervisore: {supervisorUser.firstName} {supervisorUser.lastName}
+                                  <div className="text-[10px] sm:text-xs text-muted-foreground truncate">
+                                    <span className="hidden sm:inline">Supervisore: </span>{supervisorUser.firstName} {supervisorUser.lastName}
                                   </div>
                                 )}
-                                <div className="flex items-center gap-1 mt-1 flex-wrap">
+                                <div className="flex items-center gap-1 mt-0.5 sm:mt-1 flex-wrap">
                                   {pr.canAddToLists && (
-                                    <Badge variant="secondary" className="text-xs">Liste</Badge>
+                                    <Badge variant="secondary" className="text-[10px] sm:text-xs px-1 sm:px-2">Liste</Badge>
                                   )}
                                   {pr.canProposeTables && (
-                                    <Badge variant="secondary" className="text-xs">Tavoli</Badge>
+                                    <Badge variant="secondary" className="text-[10px] sm:text-xs px-1 sm:px-2">Tavoli</Badge>
                                   )}
                                 </div>
                               </div>
@@ -2781,11 +2821,12 @@ export default function EventHub() {
                             <Button 
                               variant="ghost" 
                               size="icon"
+                              className="h-7 w-7 sm:h-8 sm:w-8 flex-shrink-0"
                               onClick={() => removePrMutation.mutate(pr.id)}
                               disabled={removePrMutation.isPending}
                               data-testid={`btn-remove-pr-${pr.id}`}
                             >
-                              <X className="h-4 w-4" />
+                              <X className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                             </Button>
                           </div>
                         );
@@ -2812,19 +2853,19 @@ export default function EventHub() {
           <TabsContent value="access">
             <div className="space-y-4 sm:space-y-6">
               {/* Stats Grid */}
-              <div className="grid grid-cols-2 sm:grid-cols-1 gap-3 sm:gap-4">
-                <div className="p-3 sm:p-4 rounded-lg bg-emerald-500/10 border border-emerald-500/30" data-testid="stat-access-scanner-count">
-                  <div className="text-xl sm:text-2xl font-bold text-emerald-400">{e4uScanners.length}</div>
-                  <div className="text-xs sm:text-sm text-muted-foreground">Scanner Attivi</div>
+              <div className="grid grid-cols-2 sm:grid-cols-1 gap-2 sm:gap-3 md:gap-4">
+                <div className="p-2 sm:p-3 md:p-4 rounded-lg bg-emerald-500/10 border border-emerald-500/30" data-testid="stat-access-scanner-count">
+                  <div className="text-lg sm:text-xl md:text-2xl font-bold text-emerald-400">{e4uScanners.length}</div>
+                  <div className="text-[10px] sm:text-xs md:text-sm text-muted-foreground">Scanner Attivi</div>
                 </div>
               </div>
 
               {/* Scanner Section */}
               <Card className="glass-card">
-                <CardHeader>
+                <CardHeader className="px-3 sm:px-4 md:px-6">
                   <div className="flex items-center justify-between gap-2 flex-wrap">
-                    <CardTitle className="flex items-center gap-2">
-                      <QrCode className="h-5 w-5 text-emerald-400" />
+                    <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                      <QrCode className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-400" />
                       Scanner
                     </CardTitle>
                     <Button 
@@ -2832,14 +2873,14 @@ export default function EventHub() {
                       size="sm"
                       data-testid="btn-assign-scanner"
                     >
-                      <Plus className="h-4 w-4 mr-1" />
-                      Assegna Scanner
+                      <Plus className="h-4 w-4 sm:mr-1" />
+                      <span className="hidden sm:inline">Assegna Scanner</span>
                     </Button>
                   </div>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="px-3 sm:px-4 md:px-6">
                   {e4uScanners.length > 0 ? (
-                    <div className="space-y-3">
+                    <div className="space-y-2 sm:space-y-3">
                       {e4uScanners.map((scanner: any) => {
                         const scannerUser = scanner.user || users.find(u => u.id === (scanner.scanner?.userId || scanner.userId));
                         const scannerData = scanner.scanner || scanner;
@@ -2848,33 +2889,33 @@ export default function EventHub() {
                         return (
                           <div 
                             key={scannerData.id} 
-                            className="flex items-center justify-between gap-4 p-4 rounded-lg bg-background/50 border hover:border-emerald-500/50 transition-colors"
+                            className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4 p-2 sm:p-3 md:p-4 rounded-lg bg-background/50 border hover:border-emerald-500/50 transition-colors"
                             data-testid={`scanner-item-${scannerData.id}`}
                           >
-                            <div className="flex items-center gap-3">
-                              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-500 to-green-600 flex items-center justify-center text-white font-medium">
+                            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-gradient-to-br from-emerald-500 to-green-600 flex items-center justify-center text-white font-medium text-xs sm:text-sm flex-shrink-0">
                                 {scannerUser?.firstName?.[0]}{scannerUser?.lastName?.[0]}
                               </div>
-                              <div>
-                                <div className="font-medium">
+                              <div className="min-w-0">
+                                <div className="font-medium text-sm sm:text-base truncate">
                                   {scannerUser ? `${scannerUser.firstName} ${scannerUser.lastName}` : 'Utente sconosciuto'}
                                 </div>
-                                <div className="flex items-center gap-1 mt-1 flex-wrap">
+                                <div className="flex items-center gap-1 mt-0.5 sm:mt-1 flex-wrap">
                                   {scannerData.canScanLists && (
-                                    <Badge variant="secondary" className="text-xs bg-cyan-500/20 text-cyan-400">Liste</Badge>
+                                    <Badge variant="secondary" className="text-[10px] sm:text-xs px-1 sm:px-2 bg-cyan-500/20 text-cyan-400">Liste</Badge>
                                   )}
                                   {scannerData.canScanTables && (
-                                    <Badge variant="secondary" className="text-xs bg-purple-500/20 text-purple-400">Tavoli</Badge>
+                                    <Badge variant="secondary" className="text-[10px] sm:text-xs px-1 sm:px-2 bg-purple-500/20 text-purple-400">Tavoli</Badge>
                                   )}
                                   {scannerData.canScanTickets && (
-                                    <Badge variant="secondary" className="text-xs bg-amber-500/20 text-amber-400">Biglietti</Badge>
+                                    <Badge variant="secondary" className="text-[10px] sm:text-xs px-1 sm:px-2 bg-amber-500/20 text-amber-400">Biglietti</Badge>
                                   )}
                                 </div>
                                 {scannerData.canScanTickets && ticketedEvent?.sectors && ticketedEvent.sectors.length > 0 && (
-                                  <div className="mt-2">
+                                  <div className="mt-1 sm:mt-2">
                                     <Badge 
                                       variant="outline" 
-                                      className={`text-xs cursor-pointer ${sectorDisplay.color}`}
+                                      className={`text-[10px] sm:text-xs px-1 sm:px-2 cursor-pointer ${sectorDisplay.color}`}
                                       onClick={() => openScannerAccessDialog(scanner)}
                                       data-testid={`badge-scanner-sectors-${scannerData.id}`}
                                     >
@@ -2884,7 +2925,7 @@ export default function EventHub() {
                                 )}
                               </div>
                             </div>
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-1.5 sm:gap-2 ml-10 sm:ml-0">
                               {scannerData.canScanTickets && ticketedEvent?.sectors && ticketedEvent.sectors.length > 0 && (
                                 <Button 
                                   variant="outline" 
@@ -2892,18 +2933,19 @@ export default function EventHub() {
                                   onClick={() => openScannerAccessDialog(scanner)}
                                   data-testid={`button-configure-scanner-access-${scannerData.id}`}
                                 >
-                                  <Settings className="h-4 w-4 mr-1" />
-                                  Configura Accesso
+                                  <Settings className="h-4 w-4 sm:mr-1" />
+                                  <span className="hidden sm:inline">Configura</span>
                                 </Button>
                               )}
                               <Button 
                                 variant="ghost" 
                                 size="icon"
+                                className="h-7 w-7 sm:h-8 sm:w-8"
                                 onClick={() => removeScannerMutation.mutate(scannerData.id)}
                                 disabled={removeScannerMutation.isPending}
                                 data-testid={`btn-remove-scanner-${scannerData.id}`}
                               >
-                                <X className="h-4 w-4" />
+                                <X className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                               </Button>
                             </div>
                           </div>
@@ -2930,38 +2972,39 @@ export default function EventHub() {
 
           <TabsContent value="inventory">
             <Card className="glass-card">
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle className="flex items-center gap-2">
-                    <Package className="h-5 w-5 text-indigo-400" />
-                    Inventario Evento
+              <CardHeader className="px-3 sm:px-4 md:px-6">
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                    <Package className="h-4 w-4 sm:h-5 sm:w-5 text-indigo-400" />
+                    <span className="hidden sm:inline">Inventario Evento</span>
+                    <span className="sm:hidden">Inventario</span>
                   </CardTitle>
                   <Button onClick={() => navigate(`/events/${id}`)} variant="outline" size="sm">
-                    Gestisci Stock <ChevronRight className="h-4 w-4 ml-1" />
+                    <span className="hidden sm:inline">Gestisci Stock</span> <ChevronRight className="h-4 w-4 sm:ml-1" />
                   </Button>
                 </div>
               </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-4 sm:mb-6">
-                  <div className="p-3 sm:p-4 rounded-lg bg-background/50 border text-center">
-                    <div className="text-2xl sm:text-3xl font-bold text-indigo-400">{eventStocks.length}</div>
-                    <div className="text-xs sm:text-sm text-muted-foreground">Prodotti</div>
+              <CardContent className="px-3 sm:px-4 md:px-6">
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 md:gap-4 mb-3 sm:mb-4 md:mb-6">
+                  <div className="p-2 sm:p-3 md:p-4 rounded-lg bg-background/50 border text-center">
+                    <div className="text-lg sm:text-2xl md:text-3xl font-bold text-indigo-400">{eventStocks.length}</div>
+                    <div className="text-[10px] sm:text-xs md:text-sm text-muted-foreground">Prodotti</div>
                   </div>
-                  <div className="p-3 sm:p-4 rounded-lg bg-background/50 border text-center">
-                    <div className="text-2xl sm:text-3xl font-bold text-emerald-400">{eventStations.length}</div>
-                    <div className="text-xs sm:text-sm text-muted-foreground">Postazioni</div>
+                  <div className="p-2 sm:p-3 md:p-4 rounded-lg bg-background/50 border text-center">
+                    <div className="text-lg sm:text-2xl md:text-3xl font-bold text-emerald-400">{eventStations.length}</div>
+                    <div className="text-[10px] sm:text-xs md:text-sm text-muted-foreground">Postazioni</div>
                   </div>
-                  <div className="p-3 sm:p-4 rounded-lg bg-background/50 border text-center">
-                    <div className="text-2xl sm:text-3xl font-bold text-amber-400">
+                  <div className="p-2 sm:p-3 md:p-4 rounded-lg bg-background/50 border text-center">
+                    <div className="text-lg sm:text-2xl md:text-3xl font-bold text-amber-400">
                       {eventStocks.reduce((acc, s) => acc + Number(s.quantity || 0), 0).toFixed(0)}
                     </div>
-                    <div className="text-xs sm:text-sm text-muted-foreground">Unità Totali</div>
+                    <div className="text-[10px] sm:text-xs md:text-sm text-muted-foreground">Unità</div>
                   </div>
-                  <div className="p-3 sm:p-4 rounded-lg bg-background/50 border text-center">
-                    <div className="text-2xl sm:text-3xl font-bold text-cyan-400">
+                  <div className="p-2 sm:p-3 md:p-4 rounded-lg bg-background/50 border text-center">
+                    <div className="text-lg sm:text-2xl md:text-3xl font-bold text-cyan-400">
                       {new Set(eventStations.flatMap(s => s.bartenderIds || [])).size}
                     </div>
-                    <div className="text-xs sm:text-sm text-muted-foreground">Baristi</div>
+                    <div className="text-[10px] sm:text-xs md:text-sm text-muted-foreground">Baristi</div>
                   </div>
                 </div>
                 {eventStocks.length === 0 && (
@@ -2982,38 +3025,39 @@ export default function EventHub() {
 
           <TabsContent value="finance">
             <Card className="glass-card">
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle className="flex items-center gap-2">
-                    <Euro className="h-5 w-5 text-amber-400" />
-                    Incassi e Finanze
+              <CardHeader className="px-3 sm:px-4 md:px-6">
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                    <Euro className="h-4 w-4 sm:h-5 sm:w-5 text-amber-400" />
+                    <span className="hidden sm:inline">Incassi e Finanze</span>
+                    <span className="sm:hidden">Finanze</span>
                   </CardTitle>
                   <Button onClick={() => navigate(`/reports?eventId=${id}`)} variant="outline" size="sm">
-                    Report Completo <ChevronRight className="h-4 w-4 ml-1" />
+                    <span className="hidden sm:inline">Report</span> <ChevronRight className="h-4 w-4 sm:ml-1" />
                   </Button>
                 </div>
               </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-4 sm:mb-6">
-                  <div className="p-3 sm:p-4 rounded-lg bg-gradient-to-br from-amber-500/20 to-orange-500/20 border border-amber-500/30">
-                    <div className="text-2xl sm:text-3xl font-bold text-amber-400">€{totalRevenue.toFixed(0)}</div>
-                    <div className="text-xs sm:text-sm text-muted-foreground">Incasso Totale</div>
+              <CardContent className="px-3 sm:px-4 md:px-6">
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 md:gap-4 mb-3 sm:mb-4 md:mb-6">
+                  <div className="p-2 sm:p-3 md:p-4 rounded-lg bg-gradient-to-br from-amber-500/20 to-orange-500/20 border border-amber-500/30">
+                    <div className="text-lg sm:text-2xl md:text-3xl font-bold text-amber-400">€{totalRevenue.toFixed(0)}</div>
+                    <div className="text-[10px] sm:text-xs md:text-sm text-muted-foreground">Incasso</div>
                   </div>
-                  <div className="p-3 sm:p-4 rounded-lg bg-background/50 border">
-                    <div className="text-xl sm:text-2xl font-bold text-blue-400">
+                  <div className="p-2 sm:p-3 md:p-4 rounded-lg bg-background/50 border">
+                    <div className="text-lg sm:text-xl md:text-2xl font-bold text-blue-400">
                       €{Number(ticketedEvent?.totalRevenue || 0).toFixed(0)}
                     </div>
-                    <div className="text-xs sm:text-sm text-muted-foreground">Biglietti</div>
+                    <div className="text-[10px] sm:text-xs md:text-sm text-muted-foreground">Biglietti</div>
                   </div>
-                  <div className="p-3 sm:p-4 rounded-lg bg-background/50 border">
-                    <div className="text-xl sm:text-2xl font-bold text-purple-400">
+                  <div className="p-2 sm:p-3 md:p-4 rounded-lg bg-background/50 border">
+                    <div className="text-lg sm:text-xl md:text-2xl font-bold text-purple-400">
                       €{bookings.filter(b => b.status !== 'cancelled').reduce((acc, b) => acc + Number(b.depositPaid || 0), 0).toFixed(0)}
                     </div>
-                    <div className="text-xs sm:text-sm text-muted-foreground">Caparre Tavoli</div>
+                    <div className="text-[10px] sm:text-xs md:text-sm text-muted-foreground">Caparre</div>
                   </div>
-                  <div className="p-3 sm:p-4 rounded-lg bg-background/50 border">
-                    <div className="text-xl sm:text-2xl font-bold text-emerald-400">--</div>
-                    <div className="text-xs sm:text-sm text-muted-foreground">Consumazioni</div>
+                  <div className="p-2 sm:p-3 md:p-4 rounded-lg bg-background/50 border">
+                    <div className="text-lg sm:text-xl md:text-2xl font-bold text-emerald-400">--</div>
+                    <div className="text-[10px] sm:text-xs md:text-sm text-muted-foreground">Consumi</div>
                   </div>
                 </div>
                 <div className="text-center py-8 border-t">
@@ -3031,123 +3075,123 @@ export default function EventHub() {
           </TabsContent>
 
           <TabsContent value="report" className="space-y-4 sm:space-y-6">
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 md:gap-4">
               <div 
-                className="p-3 sm:p-4 rounded-lg bg-gradient-to-br from-amber-500/20 to-orange-500/20 border border-amber-500/30"
+                className="p-2 sm:p-3 md:p-4 rounded-lg bg-gradient-to-br from-amber-500/20 to-orange-500/20 border border-amber-500/30"
                 data-testid="stats-total-checkins"
               >
-                <div className="text-2xl sm:text-3xl font-bold text-amber-400">
+                <div className="text-lg sm:text-2xl md:text-3xl font-bold text-amber-400">
                   {e4uReport?.overview?.totalCheckIns || 0}
                 </div>
-                <div className="text-xs sm:text-sm text-muted-foreground">Totale Ingressi</div>
+                <div className="text-[10px] sm:text-xs md:text-sm text-muted-foreground">Ingressi</div>
               </div>
               <div 
-                className="p-3 sm:p-4 rounded-lg bg-gradient-to-br from-orange-500/20 to-red-500/20 border border-orange-500/30"
+                className="p-2 sm:p-3 md:p-4 rounded-lg bg-gradient-to-br from-orange-500/20 to-red-500/20 border border-orange-500/30"
                 data-testid="stats-checkin-rate"
               >
-                <div className="text-2xl sm:text-3xl font-bold text-orange-400">
+                <div className="text-lg sm:text-2xl md:text-3xl font-bold text-orange-400">
                   {e4uReport?.overview?.checkInRate || 0}%
                 </div>
-                <div className="text-xs sm:text-sm text-muted-foreground">Tasso Check-in</div>
+                <div className="text-[10px] sm:text-xs md:text-sm text-muted-foreground">Check-in</div>
               </div>
               <div 
-                className="p-3 sm:p-4 rounded-lg bg-background/50 border"
+                className="p-2 sm:p-3 md:p-4 rounded-lg bg-background/50 border"
                 data-testid="stats-list-revenue"
               >
-                <div className="text-xl sm:text-2xl font-bold text-cyan-400">
+                <div className="text-lg sm:text-xl md:text-2xl font-bold text-cyan-400">
                   €{(e4uReport?.overview?.listRevenue || 0).toFixed(0)}
                 </div>
-                <div className="text-xs sm:text-sm text-muted-foreground">Incasso Liste</div>
+                <div className="text-[10px] sm:text-xs md:text-sm text-muted-foreground">Liste</div>
               </div>
               <div 
-                className="p-3 sm:p-4 rounded-lg bg-background/50 border"
+                className="p-2 sm:p-3 md:p-4 rounded-lg bg-background/50 border"
                 data-testid="stats-table-revenue"
               >
-                <div className="text-xl sm:text-2xl font-bold text-purple-400">
+                <div className="text-lg sm:text-xl md:text-2xl font-bold text-purple-400">
                   €{(e4uReport?.overview?.tableRevenue || 0).toFixed(0)}
                 </div>
-                <div className="text-xs sm:text-sm text-muted-foreground">Incasso Tavoli</div>
+                <div className="text-[10px] sm:text-xs md:text-sm text-muted-foreground">Tavoli</div>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4 md:gap-6">
               <Card className="glass-card" data-testid="table-staff-performance">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Users className="h-5 w-5 text-amber-400" />
-                    Performance Staff
+                <CardHeader className="px-3 sm:px-4 md:px-6">
+                  <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                    <Users className="h-4 w-4 sm:h-5 sm:w-5 text-amber-400" />
+                    <span className="hidden sm:inline">Performance</span> Staff
                   </CardTitle>
-                  <CardDescription>Statistiche per ogni staff assegnato</CardDescription>
+                  <CardDescription className="text-xs sm:text-sm">Statistiche staff</CardDescription>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="px-3 sm:px-4 md:px-6">
                   {e4uReport?.staffPerformance && e4uReport.staffPerformance.length > 0 ? (
-                    <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
-                      <table className="w-full text-sm min-w-[500px]">
+                    <div className="overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0">
+                      <table className="w-full text-xs sm:text-sm min-w-[400px] sm:min-w-[500px]">
                         <thead>
                           <tr className="border-b border-border">
-                            <th className="text-left py-2 px-2 font-medium text-muted-foreground whitespace-nowrap">Staff</th>
-                            <th className="text-center py-2 px-2 font-medium text-muted-foreground whitespace-nowrap">Liste</th>
-                            <th className="text-center py-2 px-2 font-medium text-muted-foreground whitespace-nowrap">Pers.</th>
-                            <th className="text-center py-2 px-2 font-medium text-muted-foreground whitespace-nowrap">T.Prop.</th>
-                            <th className="text-center py-2 px-2 font-medium text-muted-foreground whitespace-nowrap">T.Appr.</th>
-                            <th className="text-center py-2 px-2 font-medium text-muted-foreground whitespace-nowrap">Check-in</th>
+                            <th className="text-left py-1.5 sm:py-2 px-1 sm:px-2 font-medium text-muted-foreground whitespace-nowrap">Staff</th>
+                            <th className="text-center py-1.5 sm:py-2 px-1 sm:px-2 font-medium text-muted-foreground whitespace-nowrap">Liste</th>
+                            <th className="text-center py-1.5 sm:py-2 px-1 sm:px-2 font-medium text-muted-foreground whitespace-nowrap">Pers.</th>
+                            <th className="text-center py-1.5 sm:py-2 px-1 sm:px-2 font-medium text-muted-foreground whitespace-nowrap hidden sm:table-cell">T.Prop.</th>
+                            <th className="text-center py-1.5 sm:py-2 px-1 sm:px-2 font-medium text-muted-foreground whitespace-nowrap hidden sm:table-cell">T.Appr.</th>
+                            <th className="text-center py-1.5 sm:py-2 px-1 sm:px-2 font-medium text-muted-foreground whitespace-nowrap">Check</th>
                           </tr>
                         </thead>
                         <tbody>
                           {e4uReport.staffPerformance.map((staff: any) => (
                             <tr key={staff.staffId} className="border-b border-border/50 hover:bg-white/5">
-                              <td className="py-2 px-2 font-medium">{staff.staffName}</td>
-                              <td className="text-center py-2 px-2">
-                                <Badge variant="secondary" className="bg-cyan-500/20 text-cyan-400">
+                              <td className="py-1.5 sm:py-2 px-1 sm:px-2 font-medium text-xs sm:text-sm truncate max-w-[80px] sm:max-w-none">{staff.staffName}</td>
+                              <td className="text-center py-1.5 sm:py-2 px-1 sm:px-2">
+                                <Badge variant="secondary" className="bg-cyan-500/20 text-cyan-400 text-[10px] sm:text-xs px-1 sm:px-2">
                                   {staff.listsCreated}
                                 </Badge>
                               </td>
-                              <td className="text-center py-2 px-2">
-                                <Badge variant="secondary" className="bg-blue-500/20 text-blue-400">
+                              <td className="text-center py-1.5 sm:py-2 px-1 sm:px-2">
+                                <Badge variant="secondary" className="bg-blue-500/20 text-blue-400 text-[10px] sm:text-xs px-1 sm:px-2">
                                   {staff.entriesAdded}
                                 </Badge>
                               </td>
-                              <td className="text-center py-2 px-2">
-                                <Badge variant="secondary" className="bg-purple-500/20 text-purple-400">
+                              <td className="text-center py-1.5 sm:py-2 px-1 sm:px-2 hidden sm:table-cell">
+                                <Badge variant="secondary" className="bg-purple-500/20 text-purple-400 text-[10px] sm:text-xs px-1 sm:px-2">
                                   {staff.tablesProposed}
                                 </Badge>
                               </td>
-                              <td className="text-center py-2 px-2">
-                                <Badge variant="secondary" className="bg-emerald-500/20 text-emerald-400">
+                              <td className="text-center py-1.5 sm:py-2 px-1 sm:px-2 hidden sm:table-cell">
+                                <Badge variant="secondary" className="bg-emerald-500/20 text-emerald-400 text-[10px] sm:text-xs px-1 sm:px-2">
                                   {staff.tablesApproved}
                                 </Badge>
                               </td>
-                              <td className="text-center py-2 px-2">
-                                <Badge variant="secondary" className="bg-amber-500/20 text-amber-400">
+                              <td className="text-center py-1.5 sm:py-2 px-1 sm:px-2">
+                                <Badge variant="secondary" className="bg-amber-500/20 text-amber-400 text-[10px] sm:text-xs px-1 sm:px-2">
                                   {staff.prCheckIns}
                                 </Badge>
                               </td>
                             </tr>
                           ))}
                           <tr className="bg-white/5 font-semibold">
-                            <td className="py-2 px-2">Totale</td>
-                            <td className="text-center py-2 px-2">
-                              <Badge className="bg-cyan-500/30 text-cyan-300">
+                            <td className="py-1.5 sm:py-2 px-1 sm:px-2 text-xs sm:text-sm">Tot.</td>
+                            <td className="text-center py-1.5 sm:py-2 px-1 sm:px-2">
+                              <Badge className="bg-cyan-500/30 text-cyan-300 text-[10px] sm:text-xs px-1 sm:px-2">
                                 {e4uReport.staffPerformance.reduce((acc: number, s: any) => acc + s.listsCreated, 0)}
                               </Badge>
                             </td>
-                            <td className="text-center py-2 px-2">
-                              <Badge className="bg-blue-500/30 text-blue-300">
+                            <td className="text-center py-1.5 sm:py-2 px-1 sm:px-2">
+                              <Badge className="bg-blue-500/30 text-blue-300 text-[10px] sm:text-xs px-1 sm:px-2">
                                 {e4uReport.staffPerformance.reduce((acc: number, s: any) => acc + s.entriesAdded, 0)}
                               </Badge>
                             </td>
-                            <td className="text-center py-2 px-2">
-                              <Badge className="bg-purple-500/30 text-purple-300">
+                            <td className="text-center py-1.5 sm:py-2 px-1 sm:px-2 hidden sm:table-cell">
+                              <Badge className="bg-purple-500/30 text-purple-300 text-[10px] sm:text-xs px-1 sm:px-2">
                                 {e4uReport.staffPerformance.reduce((acc: number, s: any) => acc + s.tablesProposed, 0)}
                               </Badge>
                             </td>
-                            <td className="text-center py-2 px-2">
-                              <Badge className="bg-emerald-500/30 text-emerald-300">
+                            <td className="text-center py-1.5 sm:py-2 px-1 sm:px-2 hidden sm:table-cell">
+                              <Badge className="bg-emerald-500/30 text-emerald-300 text-[10px] sm:text-xs px-1 sm:px-2">
                                 {e4uReport.staffPerformance.reduce((acc: number, s: any) => acc + s.tablesApproved, 0)}
                               </Badge>
                             </td>
-                            <td className="text-center py-2 px-2">
-                              <Badge className="bg-amber-500/30 text-amber-300">
+                            <td className="text-center py-1.5 sm:py-2 px-1 sm:px-2">
+                              <Badge className="bg-amber-500/30 text-amber-300 text-[10px] sm:text-xs px-1 sm:px-2">
                                 {e4uReport.staffPerformance.reduce((acc: number, s: any) => acc + s.prCheckIns, 0)}
                               </Badge>
                             </td>
@@ -3156,83 +3200,83 @@ export default function EventHub() {
                       </table>
                     </div>
                   ) : (
-                    <div className="text-center py-8">
-                      <Users className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
-                      <p className="text-sm text-muted-foreground">Nessuno staff assegnato</p>
+                    <div className="text-center py-6 sm:py-8">
+                      <Users className="h-10 w-10 sm:h-12 sm:w-12 mx-auto mb-3 sm:mb-4 text-muted-foreground opacity-50" />
+                      <p className="text-xs sm:text-sm text-muted-foreground">Nessuno staff assegnato</p>
                     </div>
                   )}
                 </CardContent>
               </Card>
 
               <Card className="glass-card" data-testid="table-pr-performance">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Megaphone className="h-5 w-5 text-orange-400" />
-                    Performance PR
+                <CardHeader className="px-3 sm:px-4 md:px-6">
+                  <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                    <Megaphone className="h-4 w-4 sm:h-5 sm:w-5 text-orange-400" />
+                    <span className="hidden sm:inline">Performance</span> PR
                   </CardTitle>
-                  <CardDescription>Statistiche per ogni PR assegnato</CardDescription>
+                  <CardDescription className="text-xs sm:text-sm">Statistiche PR</CardDescription>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="px-3 sm:px-4 md:px-6">
                   {e4uReport?.prPerformance && e4uReport.prPerformance.length > 0 ? (
-                    <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
-                      <table className="w-full text-sm min-w-[500px]">
+                    <div className="overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0">
+                      <table className="w-full text-xs sm:text-sm min-w-[350px] sm:min-w-[500px]">
                         <thead>
                           <tr className="border-b border-border">
-                            <th className="text-left py-2 px-2 font-medium text-muted-foreground whitespace-nowrap">PR</th>
-                            <th className="text-left py-2 px-2 font-medium text-muted-foreground whitespace-nowrap">Staff</th>
-                            <th className="text-center py-2 px-2 font-medium text-muted-foreground whitespace-nowrap">Lista</th>
-                            <th className="text-center py-2 px-2 font-medium text-muted-foreground whitespace-nowrap">Ingr.</th>
-                            <th className="text-center py-2 px-2 font-medium text-muted-foreground whitespace-nowrap">T.Prop.</th>
-                            <th className="text-center py-2 px-2 font-medium text-muted-foreground whitespace-nowrap">T.Appr.</th>
+                            <th className="text-left py-1.5 sm:py-2 px-1 sm:px-2 font-medium text-muted-foreground whitespace-nowrap">PR</th>
+                            <th className="text-left py-1.5 sm:py-2 px-1 sm:px-2 font-medium text-muted-foreground whitespace-nowrap hidden sm:table-cell">Staff</th>
+                            <th className="text-center py-1.5 sm:py-2 px-1 sm:px-2 font-medium text-muted-foreground whitespace-nowrap">Lista</th>
+                            <th className="text-center py-1.5 sm:py-2 px-1 sm:px-2 font-medium text-muted-foreground whitespace-nowrap">Ingr.</th>
+                            <th className="text-center py-1.5 sm:py-2 px-1 sm:px-2 font-medium text-muted-foreground whitespace-nowrap hidden sm:table-cell">T.Prop.</th>
+                            <th className="text-center py-1.5 sm:py-2 px-1 sm:px-2 font-medium text-muted-foreground whitespace-nowrap hidden sm:table-cell">T.Appr.</th>
                           </tr>
                         </thead>
                         <tbody>
                           {e4uReport.prPerformance.map((pr: any) => (
                             <tr key={pr.prId} className="border-b border-border/50 hover:bg-white/5">
-                              <td className="py-2 px-2 font-medium">{pr.prName}</td>
-                              <td className="py-2 px-2 text-muted-foreground text-xs">{pr.staffName}</td>
-                              <td className="text-center py-2 px-2">
-                                <Badge variant="secondary" className="bg-cyan-500/20 text-cyan-400">
+                              <td className="py-1.5 sm:py-2 px-1 sm:px-2 font-medium text-xs sm:text-sm truncate max-w-[80px] sm:max-w-none">{pr.prName}</td>
+                              <td className="py-1.5 sm:py-2 px-1 sm:px-2 text-muted-foreground text-[10px] sm:text-xs hidden sm:table-cell">{pr.staffName}</td>
+                              <td className="text-center py-1.5 sm:py-2 px-1 sm:px-2">
+                                <Badge variant="secondary" className="bg-cyan-500/20 text-cyan-400 text-[10px] sm:text-xs px-1 sm:px-2">
                                   {pr.entriesAdded}
                                 </Badge>
                               </td>
-                              <td className="text-center py-2 px-2">
-                                <Badge variant="secondary" className="bg-emerald-500/20 text-emerald-400">
+                              <td className="text-center py-1.5 sm:py-2 px-1 sm:px-2">
+                                <Badge variant="secondary" className="bg-emerald-500/20 text-emerald-400 text-[10px] sm:text-xs px-1 sm:px-2">
                                   {pr.checkIns}
                                 </Badge>
                               </td>
-                              <td className="text-center py-2 px-2">
-                                <Badge variant="secondary" className="bg-purple-500/20 text-purple-400">
+                              <td className="text-center py-1.5 sm:py-2 px-1 sm:px-2 hidden sm:table-cell">
+                                <Badge variant="secondary" className="bg-purple-500/20 text-purple-400 text-[10px] sm:text-xs px-1 sm:px-2">
                                   {pr.tablesProposed}
                                 </Badge>
                               </td>
-                              <td className="text-center py-2 px-2">
-                                <Badge variant="secondary" className="bg-amber-500/20 text-amber-400">
+                              <td className="text-center py-1.5 sm:py-2 px-1 sm:px-2 hidden sm:table-cell">
+                                <Badge variant="secondary" className="bg-amber-500/20 text-amber-400 text-[10px] sm:text-xs px-1 sm:px-2">
                                   {pr.tablesApproved}
                                 </Badge>
                               </td>
                             </tr>
                           ))}
                           <tr className="bg-white/5 font-semibold">
-                            <td className="py-2 px-2">Totale</td>
-                            <td className="py-2 px-2">-</td>
-                            <td className="text-center py-2 px-2">
-                              <Badge className="bg-cyan-500/30 text-cyan-300">
+                            <td className="py-1.5 sm:py-2 px-1 sm:px-2 text-xs sm:text-sm">Tot.</td>
+                            <td className="py-1.5 sm:py-2 px-1 sm:px-2 hidden sm:table-cell">-</td>
+                            <td className="text-center py-1.5 sm:py-2 px-1 sm:px-2">
+                              <Badge className="bg-cyan-500/30 text-cyan-300 text-[10px] sm:text-xs px-1 sm:px-2">
                                 {e4uReport.prPerformance.reduce((acc: number, p: any) => acc + p.entriesAdded, 0)}
                               </Badge>
                             </td>
-                            <td className="text-center py-2 px-2">
-                              <Badge className="bg-emerald-500/30 text-emerald-300">
+                            <td className="text-center py-1.5 sm:py-2 px-1 sm:px-2">
+                              <Badge className="bg-emerald-500/30 text-emerald-300 text-[10px] sm:text-xs px-1 sm:px-2">
                                 {e4uReport.prPerformance.reduce((acc: number, p: any) => acc + p.checkIns, 0)}
                               </Badge>
                             </td>
-                            <td className="text-center py-2 px-2">
-                              <Badge className="bg-purple-500/30 text-purple-300">
+                            <td className="text-center py-1.5 sm:py-2 px-1 sm:px-2 hidden sm:table-cell">
+                              <Badge className="bg-purple-500/30 text-purple-300 text-[10px] sm:text-xs px-1 sm:px-2">
                                 {e4uReport.prPerformance.reduce((acc: number, p: any) => acc + p.tablesProposed, 0)}
                               </Badge>
                             </td>
-                            <td className="text-center py-2 px-2">
-                              <Badge className="bg-amber-500/30 text-amber-300">
+                            <td className="text-center py-1.5 sm:py-2 px-1 sm:px-2 hidden sm:table-cell">
+                              <Badge className="bg-amber-500/30 text-amber-300 text-[10px] sm:text-xs px-1 sm:px-2">
                                 {e4uReport.prPerformance.reduce((acc: number, p: any) => acc + p.tablesApproved, 0)}
                               </Badge>
                             </td>
@@ -3241,9 +3285,9 @@ export default function EventHub() {
                       </table>
                     </div>
                   ) : (
-                    <div className="text-center py-8">
-                      <Megaphone className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
-                      <p className="text-sm text-muted-foreground">Nessun PR assegnato</p>
+                    <div className="text-center py-6 sm:py-8">
+                      <Megaphone className="h-10 w-10 sm:h-12 sm:w-12 mx-auto mb-3 sm:mb-4 text-muted-foreground opacity-50" />
+                      <p className="text-xs sm:text-sm text-muted-foreground">Nessun PR assegnato</p>
                     </div>
                   )}
                 </CardContent>
@@ -3251,18 +3295,19 @@ export default function EventHub() {
             </div>
 
             <Card className="glass-card">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <TrendingUp className="h-5 w-5 text-amber-400" />
-                  Check-in per Ora
+              <CardHeader className="px-3 sm:px-4 md:px-6">
+                <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                  <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5 text-amber-400" />
+                  <span className="hidden sm:inline">Check-in per Ora</span>
+                  <span className="sm:hidden">Check-in/Ora</span>
                 </CardTitle>
-                <CardDescription>Distribuzione degli ingressi durante l'evento</CardDescription>
+                <CardDescription className="text-xs sm:text-sm">Distribuzione ingressi</CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="px-3 sm:px-4 md:px-6">
                 {e4uReport?.hourlyCheckIns && e4uReport.hourlyCheckIns.length > 0 ? (
-                  <div className="h-[200px]">
+                  <div className="h-[150px] sm:h-[200px]">
                     <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart data={e4uReport.hourlyCheckIns} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                      <AreaChart data={e4uReport.hourlyCheckIns} margin={{ top: 5, right: 5, left: 0, bottom: 0 }}>
                         <defs>
                           <linearGradient id="checkInsGradient" x1="0" y1="0" x2="0" y2="1">
                             <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.3} />
@@ -3315,21 +3360,21 @@ export default function EventHub() {
       </div>
 
       <AlertDialog open={statusChangeDialogOpen} onOpenChange={setStatusChangeDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Conferma Cambio Stato</AlertDialogTitle>
-            <AlertDialogDescription>
+        <AlertDialogContent className="max-w-[90vw] sm:max-w-md p-4 sm:p-6">
+          <AlertDialogHeader className="pb-3 sm:pb-4">
+            <AlertDialogTitle className="text-base sm:text-lg">Conferma Cambio Stato</AlertDialogTitle>
+            <AlertDialogDescription className="text-xs sm:text-sm">
               {currentTransition && (
                 <>Vuoi {currentTransition.label.toLowerCase()} "{event.name}"?</>
               )}
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Annulla</AlertDialogCancel>
+          <AlertDialogFooter className="flex-col-reverse sm:flex-row gap-2 sm:gap-3">
+            <AlertDialogCancel className="w-full sm:w-auto">Annulla</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => currentTransition && changeStatusMutation.mutate(currentTransition.next)}
               disabled={changeStatusMutation.isPending}
-              className={`bg-gradient-to-r ${status.gradient}`}
+              className={`bg-gradient-to-r ${status.gradient} w-full sm:w-auto`}
             >
               {changeStatusMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               Conferma
@@ -3339,19 +3384,19 @@ export default function EventHub() {
       </AlertDialog>
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Elimina Evento</AlertDialogTitle>
-            <AlertDialogDescription>
+        <AlertDialogContent className="max-w-[90vw] sm:max-w-md p-4 sm:p-6">
+          <AlertDialogHeader className="pb-3 sm:pb-4">
+            <AlertDialogTitle className="text-base sm:text-lg">Elimina Evento</AlertDialogTitle>
+            <AlertDialogDescription className="text-xs sm:text-sm">
               Questa azione eliminerà l'evento "{event?.name}" e tutti i dati correlati (postazioni, scorte, prenotazioni, liste ospiti, ecc.)
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Annulla</AlertDialogCancel>
+          <AlertDialogFooter className="flex-col-reverse sm:flex-row gap-2 sm:gap-3">
+            <AlertDialogCancel className="w-full sm:w-auto">Annulla</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => deleteEventMutation.mutate()}
               disabled={deleteEventMutation.isPending}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90 w-full sm:w-auto"
             >
               {deleteEventMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               Elimina
@@ -3361,18 +3406,18 @@ export default function EventHub() {
       </AlertDialog>
 
       <AlertDialog open={pauseTicketingDialogOpen} onOpenChange={setPauseTicketingDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2 text-amber-400">
-              <Pause className="h-5 w-5" />
+        <AlertDialogContent className="max-w-[90vw] sm:max-w-md p-4 sm:p-6">
+          <AlertDialogHeader className="pb-3 sm:pb-4">
+            <AlertDialogTitle className="flex items-center gap-2 text-amber-400 text-base sm:text-lg">
+              <Pause className="h-4 w-4 sm:h-5 sm:w-5" />
               Pausa Vendite Biglietti
             </AlertDialogTitle>
-            <AlertDialogDescription>
+            <AlertDialogDescription className="text-xs sm:text-sm">
               Vuoi sospendere temporaneamente la vendita dei biglietti? Gli utenti non potranno acquistare biglietti finché non riprenderai le vendite.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Annulla</AlertDialogCancel>
+          <AlertDialogFooter className="flex-col-reverse sm:flex-row gap-2 sm:gap-3">
+            <AlertDialogCancel className="w-full sm:w-auto">Annulla</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
                 toast({
@@ -3381,7 +3426,7 @@ export default function EventHub() {
                 });
                 setPauseTicketingDialogOpen(false);
               }}
-              className="bg-amber-500 hover:bg-amber-600"
+              className="bg-amber-500 hover:bg-amber-600 w-full sm:w-auto"
             >
               Sospendi Vendite
             </AlertDialogAction>
@@ -3401,8 +3446,8 @@ export default function EventHub() {
           }
         }}
       >
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-          <DialogHeader className="relative pr-8">
+        <DialogContent className="max-w-[95vw] sm:max-w-lg md:max-w-2xl max-h-[80vh] overflow-y-auto p-4 sm:p-6">
+          <DialogHeader className="relative pr-8 pb-3 sm:pb-4">
             <Button
               variant="ghost"
               size="icon"
@@ -3413,11 +3458,11 @@ export default function EventHub() {
               <X className="h-4 w-4" />
               <span className="sr-only">Chiudi</span>
             </Button>
-            <DialogTitle className="flex items-center gap-2">
-              <FileText className="h-5 w-5" />
+            <DialogTitle className="flex items-center gap-2 text-base sm:text-lg">
+              <FileText className="h-4 w-4 sm:h-5 sm:w-5" />
               {reportType === 'C1' ? 'Report C1 - Registro Giornaliero' : 'Report C2 - Riepilogo Evento'}
             </DialogTitle>
-            <DialogDescription>
+            <DialogDescription className="text-xs sm:text-sm">
               Evento: {reportData?.eventName || event?.name || 'N/D'} - {reportData?.eventDate ? new Date(reportData.eventDate).toLocaleDateString('it-IT') : event?.startDatetime ? new Date(event.startDatetime).toLocaleDateString('it-IT') : 'N/D'}
             </DialogDescription>
           </DialogHeader>
@@ -3572,8 +3617,8 @@ export default function EventHub() {
             </div>
           )}
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setReportDialogOpen(false)} data-testid="btn-close-report">
+          <DialogFooter className="flex-col-reverse sm:flex-row gap-2 sm:gap-3">
+            <Button variant="outline" onClick={() => setReportDialogOpen(false)} data-testid="btn-close-report" className="w-full sm:w-auto">
               Chiudi
             </Button>
           </DialogFooter>
@@ -3581,19 +3626,19 @@ export default function EventHub() {
       </Dialog>
 
       <Dialog open={showCreateListDialog} onOpenChange={setShowCreateListDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Users className="h-5 w-5 text-cyan-400" />
+        <DialogContent className="max-w-[95vw] sm:max-w-lg md:max-w-xl p-4 sm:p-6">
+          <DialogHeader className="pb-3 sm:pb-4">
+            <DialogTitle className="flex items-center gap-2 text-base sm:text-lg">
+              <Users className="h-4 w-4 sm:h-5 sm:w-5 text-cyan-400" />
               Nuova Lista Ospiti
             </DialogTitle>
-            <DialogDescription>
+            <DialogDescription className="text-xs sm:text-sm">
               Crea una nuova lista ospiti per questo evento
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
+          <div className="space-y-3 sm:space-y-4 py-3 sm:py-4">
             <div className="space-y-2">
-              <Label htmlFor="list-name">Nome Lista *</Label>
+              <Label htmlFor="list-name" className="text-xs sm:text-sm">Nome Lista *</Label>
               <Input
                 id="list-name"
                 placeholder="es. Lista VIP, Lista PR Marco..."
@@ -3602,9 +3647,9 @@ export default function EventHub() {
                 data-testid="input-list-name"
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-3 sm:gap-4">
               <div className="space-y-2">
-                <Label htmlFor="list-capacity">Capienza Max</Label>
+                <Label htmlFor="list-capacity" className="text-xs sm:text-sm">Capienza Max</Label>
                 <Input
                   id="list-capacity"
                   type="number"
@@ -3615,7 +3660,7 @@ export default function EventHub() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="list-price">Prezzo Ingresso</Label>
+                <Label htmlFor="list-price" className="text-xs sm:text-sm">Prezzo Ingresso</Label>
                 <Input
                   id="list-price"
                   placeholder="es. 15.00"
@@ -3626,7 +3671,7 @@ export default function EventHub() {
               </div>
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="flex-col-reverse sm:flex-row gap-2 sm:gap-3">
             <Button 
               variant="outline" 
               onClick={() => {
@@ -3634,6 +3679,7 @@ export default function EventHub() {
                 setNewListData({ name: '', maxCapacity: '', price: '' });
               }}
               data-testid="btn-cancel-create-list"
+              className="w-full sm:w-auto"
             >
               Annulla
             </Button>
@@ -3651,6 +3697,7 @@ export default function EventHub() {
               }}
               disabled={createListMutation.isPending}
               data-testid="btn-confirm-create-list"
+              className="w-full sm:w-auto"
             >
               {createListMutation.isPending ? (
                 <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Creazione...</>
@@ -3663,19 +3710,19 @@ export default function EventHub() {
       </Dialog>
 
       <Dialog open={showCreateTableTypeDialog} onOpenChange={setShowCreateTableTypeDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Armchair className="h-5 w-5 text-purple-400" />
+        <DialogContent className="max-w-[95vw] sm:max-w-lg md:max-w-xl p-4 sm:p-6">
+          <DialogHeader className="pb-3 sm:pb-4">
+            <DialogTitle className="flex items-center gap-2 text-base sm:text-lg">
+              <Armchair className="h-4 w-4 sm:h-5 sm:w-5 text-purple-400" />
               Nuova Tipologia Tavolo
             </DialogTitle>
-            <DialogDescription>
+            <DialogDescription className="text-xs sm:text-sm">
               Crea una nuova tipologia di tavoli per questo evento
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
+          <div className="space-y-3 sm:space-y-4 py-3 sm:py-4">
             <div className="space-y-2">
-              <Label htmlFor="table-type-name">Nome Tipologia *</Label>
+              <Label htmlFor="table-type-name" className="text-xs sm:text-sm">Nome Tipologia *</Label>
               <Input
                 id="table-type-name"
                 placeholder="es. VIP, Privé, Standard..."
@@ -3684,9 +3731,9 @@ export default function EventHub() {
                 data-testid="input-table-type-name"
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-3 sm:gap-4">
               <div className="space-y-2">
-                <Label htmlFor="table-type-price">Prezzo *</Label>
+                <Label htmlFor="table-type-price" className="text-xs sm:text-sm">Prezzo *</Label>
                 <Input
                   id="table-type-price"
                   placeholder="es. 500.00"
@@ -3696,7 +3743,7 @@ export default function EventHub() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="table-type-guests">Ospiti Max *</Label>
+                <Label htmlFor="table-type-guests" className="text-xs sm:text-sm">Ospiti Max *</Label>
                 <Input
                   id="table-type-guests"
                   type="number"
@@ -3708,7 +3755,7 @@ export default function EventHub() {
               </div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="table-type-quantity">Quantità Totale *</Label>
+              <Label htmlFor="table-type-quantity" className="text-xs sm:text-sm">Quantità Totale *</Label>
               <Input
                 id="table-type-quantity"
                 type="number"
@@ -3719,7 +3766,7 @@ export default function EventHub() {
               />
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="flex-col-reverse sm:flex-row gap-2 sm:gap-3">
             <Button 
               variant="outline" 
               onClick={() => {
@@ -3727,6 +3774,7 @@ export default function EventHub() {
                 setNewTableTypeData({ name: '', price: '', maxGuests: '', totalQuantity: '' });
               }}
               data-testid="btn-cancel-create-table-type"
+              className="w-full sm:w-auto"
             >
               Annulla
             </Button>
@@ -3745,6 +3793,7 @@ export default function EventHub() {
               }}
               disabled={createTableTypeMutation.isPending}
               data-testid="btn-confirm-create-table-type"
+              className="w-full sm:w-auto"
             >
               {createTableTypeMutation.isPending ? (
                 <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Creazione...</>
@@ -3758,22 +3807,22 @@ export default function EventHub() {
 
       {/* Assign Staff Dialog */}
       <Dialog open={showAssignStaffDialog} onOpenChange={setShowAssignStaffDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Users className="h-5 w-5 text-teal-400" />
+        <DialogContent className="max-w-[95vw] sm:max-w-lg md:max-w-xl p-4 sm:p-6">
+          <DialogHeader className="pb-3 sm:pb-4">
+            <DialogTitle className="flex items-center gap-2 text-base sm:text-lg">
+              <Users className="h-4 w-4 sm:h-5 sm:w-5 text-teal-400" />
               Assegna Staff
             </DialogTitle>
-            <DialogDescription>
+            <DialogDescription className="text-xs sm:text-sm">
               Seleziona un membro dello staff da assegnare a questo evento
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
+          <div className="space-y-3 sm:space-y-4 py-3 sm:py-4">
             <div className="space-y-2">
-              <Label htmlFor="staff-user">Seleziona Utente *</Label>
+              <Label htmlFor="staff-user" className="text-xs sm:text-sm">Seleziona Utente *</Label>
               <select
                 id="staff-user"
-                className="w-full h-10 px-3 rounded-md border bg-background"
+                className="w-full min-h-10 px-3 rounded-md border bg-background text-sm"
                 value={newStaffData.userId}
                 onChange={(e) => setNewStaffData(prev => ({ ...prev, userId: e.target.value }))}
                 data-testid="select-staff-user"
@@ -3789,12 +3838,12 @@ export default function EventHub() {
                   ))}
               </select>
             </div>
-            <div className="space-y-3">
-              <Label>Permessi</Label>
-              <div className="flex items-center justify-between p-3 rounded-lg bg-background/50 border">
-                <div>
-                  <div className="font-medium text-sm">Gestione Liste</div>
-                  <div className="text-xs text-muted-foreground">Può gestire le liste ospiti</div>
+            <div className="space-y-2 sm:space-y-3">
+              <Label className="text-xs sm:text-sm">Permessi</Label>
+              <div className="flex items-center justify-between gap-3 p-2.5 sm:p-3 rounded-lg bg-background/50 border">
+                <div className="min-w-0">
+                  <div className="font-medium text-xs sm:text-sm">Gestione Liste</div>
+                  <div className="text-[10px] sm:text-xs text-muted-foreground">Può gestire le liste ospiti</div>
                 </div>
                 <Switch
                   checked={newStaffData.canManageLists}
@@ -3802,10 +3851,10 @@ export default function EventHub() {
                   data-testid="switch-staff-lists"
                 />
               </div>
-              <div className="flex items-center justify-between p-3 rounded-lg bg-background/50 border">
-                <div>
-                  <div className="font-medium text-sm">Gestione Tavoli</div>
-                  <div className="text-xs text-muted-foreground">Può gestire i tavoli</div>
+              <div className="flex items-center justify-between gap-3 p-2.5 sm:p-3 rounded-lg bg-background/50 border">
+                <div className="min-w-0">
+                  <div className="font-medium text-xs sm:text-sm">Gestione Tavoli</div>
+                  <div className="text-[10px] sm:text-xs text-muted-foreground">Può gestire i tavoli</div>
                 </div>
                 <Switch
                   checked={newStaffData.canManageTables}
@@ -3813,10 +3862,10 @@ export default function EventHub() {
                   data-testid="switch-staff-tables"
                 />
               </div>
-              <div className="flex items-center justify-between p-3 rounded-lg bg-background/50 border">
-                <div>
-                  <div className="font-medium text-sm">Crea PR</div>
-                  <div className="text-xs text-muted-foreground">Può creare e gestire PR</div>
+              <div className="flex items-center justify-between gap-3 p-2.5 sm:p-3 rounded-lg bg-background/50 border">
+                <div className="min-w-0">
+                  <div className="font-medium text-xs sm:text-sm">Crea PR</div>
+                  <div className="text-[10px] sm:text-xs text-muted-foreground">Può creare e gestire PR</div>
                 </div>
                 <Switch
                   checked={newStaffData.canCreatePr}
@@ -3824,10 +3873,10 @@ export default function EventHub() {
                   data-testid="switch-staff-create-pr"
                 />
               </div>
-              <div className="flex items-center justify-between p-3 rounded-lg bg-background/50 border">
-                <div>
-                  <div className="font-medium text-sm">Approva Tavoli</div>
-                  <div className="text-xs text-muted-foreground">Può approvare prenotazioni tavoli</div>
+              <div className="flex items-center justify-between gap-3 p-2.5 sm:p-3 rounded-lg bg-background/50 border">
+                <div className="min-w-0">
+                  <div className="font-medium text-xs sm:text-sm">Approva Tavoli</div>
+                  <div className="text-[10px] sm:text-xs text-muted-foreground">Può approvare prenotazioni tavoli</div>
                 </div>
                 <Switch
                   checked={newStaffData.canApproveTables}
@@ -3837,7 +3886,7 @@ export default function EventHub() {
               </div>
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="flex-col-reverse sm:flex-row gap-2 sm:gap-3">
             <Button 
               variant="outline" 
               onClick={() => {
@@ -3845,6 +3894,7 @@ export default function EventHub() {
                 setNewStaffData({ userId: '', canManageLists: true, canManageTables: true, canCreatePr: false, canApproveTables: false });
               }}
               data-testid="btn-cancel-assign-staff"
+              className="w-full sm:w-auto"
             >
               Annulla
             </Button>
@@ -3858,6 +3908,7 @@ export default function EventHub() {
               }}
               disabled={assignStaffMutation.isPending}
               data-testid="btn-confirm-assign-staff"
+              className="w-full sm:w-auto"
             >
               {assignStaffMutation.isPending ? (
                 <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Assegnazione...</>
@@ -3871,22 +3922,22 @@ export default function EventHub() {
 
       {/* Assign PR Dialog */}
       <Dialog open={showAssignPrDialog} onOpenChange={setShowAssignPrDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Megaphone className="h-5 w-5 text-orange-400" />
+        <DialogContent className="max-w-[95vw] sm:max-w-lg md:max-w-xl p-4 sm:p-6">
+          <DialogHeader className="pb-3 sm:pb-4">
+            <DialogTitle className="flex items-center gap-2 text-base sm:text-lg">
+              <Megaphone className="h-4 w-4 sm:h-5 sm:w-5 text-orange-400" />
               Assegna PR
             </DialogTitle>
-            <DialogDescription>
+            <DialogDescription className="text-xs sm:text-sm">
               Seleziona un PR da assegnare a questo evento
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
+          <div className="space-y-3 sm:space-y-4 py-3 sm:py-4">
             <div className="space-y-2">
-              <Label htmlFor="pr-user">Seleziona PR *</Label>
+              <Label htmlFor="pr-user" className="text-xs sm:text-sm">Seleziona PR *</Label>
               <select
                 id="pr-user"
-                className="w-full h-10 px-3 rounded-md border bg-background"
+                className="w-full min-h-10 px-3 rounded-md border bg-background text-sm"
                 value={newPrData.userId}
                 onChange={(e) => setNewPrData(prev => ({ ...prev, userId: e.target.value }))}
                 data-testid="select-pr-user"
@@ -3903,10 +3954,10 @@ export default function EventHub() {
               </select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="pr-supervisor">Supervisore Staff (opzionale)</Label>
+              <Label htmlFor="pr-supervisor" className="text-xs sm:text-sm">Supervisore Staff (opzionale)</Label>
               <select
                 id="pr-supervisor"
-                className="w-full h-10 px-3 rounded-md border bg-background"
+                className="w-full min-h-10 px-3 rounded-md border bg-background text-sm"
                 value={newPrData.staffUserId}
                 onChange={(e) => setNewPrData(prev => ({ ...prev, staffUserId: e.target.value }))}
                 data-testid="select-pr-supervisor"
@@ -3922,12 +3973,12 @@ export default function EventHub() {
                 })}
               </select>
             </div>
-            <div className="space-y-3">
-              <Label>Permessi</Label>
-              <div className="flex items-center justify-between p-3 rounded-lg bg-background/50 border">
-                <div>
-                  <div className="font-medium text-sm">Aggiungere alle Liste</div>
-                  <div className="text-xs text-muted-foreground">Può aggiungere ospiti alle liste</div>
+            <div className="space-y-2 sm:space-y-3">
+              <Label className="text-xs sm:text-sm">Permessi</Label>
+              <div className="flex items-center justify-between gap-3 p-2.5 sm:p-3 rounded-lg bg-background/50 border">
+                <div className="min-w-0">
+                  <div className="font-medium text-xs sm:text-sm">Aggiungere alle Liste</div>
+                  <div className="text-[10px] sm:text-xs text-muted-foreground">Può aggiungere ospiti alle liste</div>
                 </div>
                 <Switch
                   checked={newPrData.canAddToLists}
@@ -3935,10 +3986,10 @@ export default function EventHub() {
                   data-testid="switch-pr-lists"
                 />
               </div>
-              <div className="flex items-center justify-between p-3 rounded-lg bg-background/50 border">
-                <div>
-                  <div className="font-medium text-sm">Proporre Tavoli</div>
-                  <div className="text-xs text-muted-foreground">Può proporre prenotazioni tavoli</div>
+              <div className="flex items-center justify-between gap-3 p-2.5 sm:p-3 rounded-lg bg-background/50 border">
+                <div className="min-w-0">
+                  <div className="font-medium text-xs sm:text-sm">Proporre Tavoli</div>
+                  <div className="text-[10px] sm:text-xs text-muted-foreground">Può proporre prenotazioni tavoli</div>
                 </div>
                 <Switch
                   checked={newPrData.canProposeTables}
@@ -3948,7 +3999,7 @@ export default function EventHub() {
               </div>
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="flex-col-reverse sm:flex-row gap-2 sm:gap-3">
             <Button 
               variant="outline" 
               onClick={() => {
@@ -3956,6 +4007,7 @@ export default function EventHub() {
                 setNewPrData({ userId: '', staffUserId: '', canAddToLists: true, canProposeTables: false });
               }}
               data-testid="btn-cancel-assign-pr"
+              className="w-full sm:w-auto"
             >
               Annulla
             </Button>
@@ -3974,6 +4026,7 @@ export default function EventHub() {
               }}
               disabled={assignPrMutation.isPending}
               data-testid="btn-confirm-assign-pr"
+              className="w-full sm:w-auto"
             >
               {assignPrMutation.isPending ? (
                 <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Assegnazione...</>
@@ -3987,22 +4040,22 @@ export default function EventHub() {
 
       {/* Assign Scanner Dialog */}
       <Dialog open={showAssignScannerDialog} onOpenChange={setShowAssignScannerDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <QrCode className="h-5 w-5 text-emerald-400" />
+        <DialogContent className="max-w-[95vw] sm:max-w-lg md:max-w-xl p-4 sm:p-6">
+          <DialogHeader className="pb-3 sm:pb-4">
+            <DialogTitle className="flex items-center gap-2 text-base sm:text-lg">
+              <QrCode className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-400" />
               Assegna Scanner
             </DialogTitle>
-            <DialogDescription>
+            <DialogDescription className="text-xs sm:text-sm">
               Seleziona un addetto scanner per questo evento
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
+          <div className="space-y-3 sm:space-y-4 py-3 sm:py-4">
             <div className="space-y-2">
-              <Label htmlFor="scanner-user">Seleziona Utente *</Label>
+              <Label htmlFor="scanner-user" className="text-xs sm:text-sm">Seleziona Utente *</Label>
               <select
                 id="scanner-user"
-                className="w-full h-10 px-3 rounded-md border bg-background"
+                className="w-full min-h-10 px-3 rounded-md border bg-background text-sm"
                 value={newScannerData.userId}
                 onChange={(e) => setNewScannerData(prev => ({ ...prev, userId: e.target.value }))}
                 data-testid="select-scanner-user"
@@ -4017,12 +4070,12 @@ export default function EventHub() {
                   ))}
               </select>
             </div>
-            <div className="space-y-3">
-              <Label>Permessi di Scansione</Label>
-              <div className="flex items-center justify-between p-3 rounded-lg bg-background/50 border">
-                <div>
-                  <div className="font-medium text-sm">Scansione Liste</div>
-                  <div className="text-xs text-muted-foreground">Può scansionare ospiti delle liste</div>
+            <div className="space-y-2 sm:space-y-3">
+              <Label className="text-xs sm:text-sm">Permessi di Scansione</Label>
+              <div className="flex items-center justify-between gap-3 p-2.5 sm:p-3 rounded-lg bg-background/50 border">
+                <div className="min-w-0">
+                  <div className="font-medium text-xs sm:text-sm">Scansione Liste</div>
+                  <div className="text-[10px] sm:text-xs text-muted-foreground">Può scansionare ospiti delle liste</div>
                 </div>
                 <Switch
                   checked={newScannerData.canScanLists}
@@ -4030,10 +4083,10 @@ export default function EventHub() {
                   data-testid="switch-scanner-lists"
                 />
               </div>
-              <div className="flex items-center justify-between p-3 rounded-lg bg-background/50 border">
-                <div>
-                  <div className="font-medium text-sm">Scansione Tavoli</div>
-                  <div className="text-xs text-muted-foreground">Può scansionare prenotazioni tavoli</div>
+              <div className="flex items-center justify-between gap-3 p-2.5 sm:p-3 rounded-lg bg-background/50 border">
+                <div className="min-w-0">
+                  <div className="font-medium text-xs sm:text-sm">Scansione Tavoli</div>
+                  <div className="text-[10px] sm:text-xs text-muted-foreground">Può scansionare prenotazioni tavoli</div>
                 </div>
                 <Switch
                   checked={newScannerData.canScanTables}
@@ -4041,10 +4094,10 @@ export default function EventHub() {
                   data-testid="switch-scanner-tables"
                 />
               </div>
-              <div className="flex items-center justify-between p-3 rounded-lg bg-background/50 border">
-                <div>
-                  <div className="font-medium text-sm">Scansione Biglietti</div>
-                  <div className="text-xs text-muted-foreground">Può scansionare biglietti SIAE</div>
+              <div className="flex items-center justify-between gap-3 p-2.5 sm:p-3 rounded-lg bg-background/50 border">
+                <div className="min-w-0">
+                  <div className="font-medium text-xs sm:text-sm">Scansione Biglietti</div>
+                  <div className="text-[10px] sm:text-xs text-muted-foreground">Può scansionare biglietti SIAE</div>
                 </div>
                 <Switch
                   checked={newScannerData.canScanTickets}
@@ -4054,7 +4107,7 @@ export default function EventHub() {
               </div>
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="flex-col-reverse sm:flex-row gap-2 sm:gap-3">
             <Button 
               variant="outline" 
               onClick={() => {
@@ -4062,6 +4115,7 @@ export default function EventHub() {
                 setNewScannerData({ userId: '', canScanLists: true, canScanTables: true, canScanTickets: true });
               }}
               data-testid="btn-cancel-assign-scanner"
+              className="w-full sm:w-auto"
             >
               Annulla
             </Button>
@@ -4075,6 +4129,7 @@ export default function EventHub() {
               }}
               disabled={assignScannerMutation.isPending}
               data-testid="btn-confirm-assign-scanner"
+              className="w-full sm:w-auto"
             >
               {assignScannerMutation.isPending ? (
                 <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Assegnazione...</>
@@ -4088,13 +4143,13 @@ export default function EventHub() {
 
       {/* Scanner Access Configuration Dialog */}
       <Dialog open={showScannerAccessDialog} onOpenChange={setShowScannerAccessDialog}>
-        <DialogContent data-testid="dialog-scanner-access">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Settings className="h-5 w-5 text-emerald-400" />
+        <DialogContent className="max-w-[95vw] sm:max-w-lg md:max-w-xl p-4 sm:p-6" data-testid="dialog-scanner-access">
+          <DialogHeader className="pb-3 sm:pb-4">
+            <DialogTitle className="flex items-center gap-2 text-base sm:text-lg">
+              <Settings className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-400" />
               Configura Accesso Scanner
             </DialogTitle>
-            <DialogDescription>
+            <DialogDescription className="text-xs sm:text-sm">
               {selectedScannerForAccess && (
                 <>
                   Configura i settori che{' '}
@@ -4106,11 +4161,11 @@ export default function EventHub() {
               )}
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="flex items-center justify-between p-3 rounded-lg bg-background/50 border">
-              <div>
-                <div className="font-medium text-sm">Accesso a tutti i settori</div>
-                <div className="text-xs text-muted-foreground">
+          <div className="space-y-3 sm:space-y-4 py-3 sm:py-4">
+            <div className="flex items-center justify-between gap-3 p-2.5 sm:p-3 rounded-lg bg-background/50 border">
+              <div className="min-w-0">
+                <div className="font-medium text-xs sm:text-sm">Accesso a tutti i settori</div>
+                <div className="text-[10px] sm:text-xs text-muted-foreground">
                   Può scansionare biglietti di tutti i settori
                 </div>
               </div>
@@ -4127,15 +4182,15 @@ export default function EventHub() {
             </div>
             
             {!scannerAccessAllSectors && ticketedEvent?.sectors && ticketedEvent.sectors.length > 0 && (
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <Label className="text-sm font-medium">Seleziona i settori autorizzati</Label>
+              <div className="space-y-2 sm:space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <Label className="text-xs sm:text-sm font-medium">Seleziona i settori autorizzati</Label>
                   <div className="flex items-center gap-2">
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={() => toggleAllSectors(true)}
-                      className="text-xs"
+                      className="text-[10px] sm:text-xs h-7 sm:h-8"
                     >
                       Seleziona tutti
                     </Button>
@@ -4143,17 +4198,17 @@ export default function EventHub() {
                       variant="ghost"
                       size="sm"
                       onClick={() => toggleAllSectors(false)}
-                      className="text-xs"
+                      className="text-[10px] sm:text-xs h-7 sm:h-8"
                     >
                       Deseleziona
                     </Button>
                   </div>
                 </div>
-                <div className="space-y-2 max-h-60 overflow-y-auto">
+                <div className="space-y-2 max-h-48 sm:max-h-60 overflow-y-auto">
                   {ticketedEvent.sectors.map((sector) => (
                     <div
                       key={sector.id}
-                      className="flex items-center gap-3 p-3 rounded-lg bg-background/50 border cursor-pointer hover:bg-background/70 transition-colors"
+                      className="flex items-center gap-3 p-2.5 sm:p-3 rounded-lg bg-background/50 border cursor-pointer hover:bg-background/70 transition-colors"
                       onClick={() => toggleSectorSelection(sector.id)}
                     >
                       <input
@@ -4163,10 +4218,10 @@ export default function EventHub() {
                         className="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
                         data-testid={`checkbox-sector-${sector.id}`}
                       />
-                      <div className="flex-1">
-                        <div className="font-medium text-sm">{sector.name}</div>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-xs sm:text-sm">{sector.name}</div>
                         {sector.priceIntero && (
-                          <div className="text-xs text-muted-foreground">
+                          <div className="text-[10px] sm:text-xs text-muted-foreground">
                             €{Number(sector.priceIntero).toFixed(2)}
                           </div>
                         )}
@@ -4175,7 +4230,7 @@ export default function EventHub() {
                   ))}
                 </div>
                 {scannerAccessSelectedSectors.length > 0 && (
-                  <div className="text-xs text-muted-foreground pt-2">
+                  <div className="text-[10px] sm:text-xs text-muted-foreground pt-2">
                     {scannerAccessSelectedSectors.length} settori selezionati
                   </div>
                 )}
@@ -4184,18 +4239,19 @@ export default function EventHub() {
             
             {!scannerAccessAllSectors && (!ticketedEvent?.sectors || ticketedEvent.sectors.length === 0) && (
               <div className="text-center py-4 text-muted-foreground">
-                <p className="text-sm">Nessun settore configurato per questo evento.</p>
-                <p className="text-xs mt-1">Configura i settori nella sezione Biglietti per abilitare le restrizioni.</p>
+                <p className="text-xs sm:text-sm">Nessun settore configurato per questo evento.</p>
+                <p className="text-[10px] sm:text-xs mt-1">Configura i settori nella sezione Biglietti per abilitare le restrizioni.</p>
               </div>
             )}
           </div>
-          <DialogFooter>
+          <DialogFooter className="flex-col-reverse sm:flex-row gap-2 sm:gap-3">
             <Button
               variant="outline"
               onClick={() => {
                 setShowScannerAccessDialog(false);
                 setSelectedScannerForAccess(null);
               }}
+              className="w-full sm:w-auto"
             >
               Annulla
             </Button>
@@ -4203,6 +4259,7 @@ export default function EventHub() {
               onClick={handleSaveScannerAccess}
               disabled={updateScannerAccessMutation.isPending || (!scannerAccessAllSectors && scannerAccessSelectedSectors.length === 0)}
               data-testid="button-save-scanner-access"
+              className="w-full sm:w-auto"
             >
               {updateScannerAccessMutation.isPending ? (
                 <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Salvataggio...</>
