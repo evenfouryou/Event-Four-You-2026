@@ -2553,10 +2553,32 @@ router.get('/api/siae/ticketed-events/:id/reports/c1', requireAuth, async (req: 
     const sectors = await siaeStorage.getSiaeEventSectors(id);
     const allTickets = await siaeStorage.getSiaeTicketsByEvent(id);
     
-    // Both daily and monthly reports show ALL tickets for the event
-    // (As per SIAE normativa - complete data for both report types)
+    // Get today's date in YYYY-MM-DD format
+    const today = new Date().toISOString().split('T')[0];
+    
+    // For daily report: filter tickets by today's emission date
+    // For monthly report: show ALL tickets for the event
     let tickets = allTickets;
     let cancelledTickets = allTickets.filter(t => t.status === 'cancelled');
+    
+    if (!isMonthly) {
+      // Daily report: only tickets emitted today
+      tickets = allTickets.filter(t => {
+        if (!t.emissionDate) return false;
+        const ticketDate = new Date(t.emissionDate).toISOString().split('T')[0];
+        return ticketDate === today;
+      });
+      // Also filter cancelled tickets for today
+      cancelledTickets = allTickets.filter(t => {
+        if (t.status !== 'cancelled') return false;
+        // Check if cancelled today
+        if (t.cancellationDate) {
+          const cancelDate = new Date(t.cancellationDate).toISOString().split('T')[0];
+          return cancelDate === today;
+        }
+        return false;
+      });
+    }
     
     // Filter only active/emitted tickets for sales calculations
     const activeTickets = tickets.filter(t => t.status !== 'cancelled');
@@ -2638,6 +2660,7 @@ router.get('/api/siae/ticketed-events/:id/reports/c1', requireAuth, async (req: 
     res.json({
       reportType: isMonthly ? 'mensile' : 'giornaliero',
       reportName: isMonthly ? 'Riepilogo Mensile' : 'Registro Giornaliero',
+      reportDate: isMonthly ? null : today,
       eventId: id,
       eventName: event.eventName,
       eventCode: event.eventCode,

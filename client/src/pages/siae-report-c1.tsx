@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 interface C1ReportData {
   reportType: string;
   reportName: string;
+  reportDate: string | null;
   eventId: string;
   eventName: string;
   eventCode: string;
@@ -21,7 +22,7 @@ interface C1ReportData {
   vatRate: number;
   vatAmount: number;
   netRevenue: number;
-  cancelledTickets: number;
+  cancelledTicketsCount: number;
   dailySales: Array<{
     date: string;
     ticketsSold: number;
@@ -102,7 +103,9 @@ export default function SiaeReportC1() {
   }
 
   const eventDate = report.eventDate ? new Date(report.eventDate) : new Date();
-  const formattedDate = eventDate.toLocaleDateString('it-IT');
+  // For daily report use today's date (reportDate), for monthly use event date
+  const reportDisplayDate = report.reportDate ? new Date(report.reportDate) : eventDate;
+  const formattedDate = reportDisplayDate.toLocaleDateString('it-IT');
   const transmissionDate = new Date().toLocaleDateString('it-IT');
   const monthName = eventDate.toLocaleDateString('it-IT', { month: 'long', year: 'numeric' });
 
@@ -319,7 +322,7 @@ export default function SiaeReportC1() {
                 <td className="border border-black p-1 text-right">{totalRicavoLordo.toFixed(2)}</td>
                 <td className="border border-black p-1 text-right">{impostaIntrattenimento.toFixed(2)}</td>
                 <td className="border border-black p-1 text-right">{imponibileIva.toFixed(2)}</td>
-                <td className="border border-black p-1 text-center">{report.cancelledTickets}</td>
+                <td className="border border-black p-1 text-center">{report.cancelledTicketsCount}</td>
                 <td className="border border-black p-1 text-right">{ivaLorda.toFixed(2)}</td>
               </tr>
             </tbody>
