@@ -418,21 +418,21 @@ export function DigitalTicketCard({ ticket, template }: DigitalTicketCardProps) 
                 </div>
                 
                 <Button
-                  variant="ghost"
-                  size="sm"
-                  className="mt-3 text-xs"
+                  variant="outline"
+                  size="default"
+                  className="mt-4 w-full bg-card/80 backdrop-blur-sm border-primary/30 hover:bg-primary/10 hover:border-primary/50"
                   onClick={() => setIsFlipped(!isFlipped)}
                   data-testid="button-toggle-flip"
                 >
                   {isFlipped ? (
                     <>
-                      <QrCode className="w-4 h-4 mr-2" />
-                      Mostra QR Code
+                      <QrCode className="w-5 h-5 mr-2" />
+                      Mostra Fronte (QR Code)
                     </>
                   ) : (
                     <>
-                      <FileText className="w-4 h-4 mr-2" />
-                      Mostra Dettagli
+                      <RotateCcw className="w-5 h-5 mr-2" />
+                      Gira Biglietto (Retro)
                     </>
                   )}
                 </Button>

@@ -22,7 +22,9 @@ import {
   Loader2,
   Clock,
   Download,
+  Smartphone,
 } from "lucide-react";
+import { SiApple, SiGoogle } from "react-icons/si";
 
 interface TicketDetail {
   id: string;
@@ -279,19 +281,45 @@ export default function AccountTicketDetail() {
             <div className="py-4 sm:py-6 border-y border-border space-y-4">
               <DigitalTicketCard ticket={ticket} template={digitalTemplate} />
               
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={handleDownloadPdf}
+                  disabled={isDownloading}
+                  data-testid="button-download-pdf"
+                >
+                  {isDownloading ? (
+                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                  ) : (
+                    <Download className="w-4 h-4 mr-2" />
+                  )}
+                  Scarica PDF
+                </Button>
+                
+                <Button
+                  variant="outline"
+                  className="w-full bg-black text-white hover:bg-black/90 border-black"
+                  onClick={() => {
+                    window.open(`/api/public/account/tickets/${id}/wallet/apple`, '_blank');
+                  }}
+                  data-testid="button-add-apple-wallet"
+                >
+                  <SiApple className="w-4 h-4 mr-2" />
+                  Apple Wallet
+                </Button>
+              </div>
+              
               <Button
                 variant="outline"
-                className="w-full"
-                onClick={handleDownloadPdf}
-                disabled={isDownloading}
-                data-testid="button-download-pdf"
+                className="w-full bg-gradient-to-r from-blue-500 to-green-500 text-white hover:from-blue-600 hover:to-green-600 border-0"
+                onClick={() => {
+                  window.open(`/api/public/account/tickets/${id}/wallet/google`, '_blank');
+                }}
+                data-testid="button-add-google-wallet"
               >
-                {isDownloading ? (
-                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                ) : (
-                  <Download className="w-4 h-4 mr-2" />
-                )}
-                Scarica PDF
+                <SiGoogle className="w-4 h-4 mr-2" />
+                Aggiungi a Google Wallet
               </Button>
             </div>
           )}

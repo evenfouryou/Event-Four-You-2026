@@ -39,7 +39,7 @@ import {
 import { eq, and, gt, lt, desc, sql, gte, lte, or, isNull } from "drizzle-orm";
 import { getUncachableStripeClient, getStripePublishableKey } from "./stripeClient";
 import { generateTicketHtml } from "./template-routes";
-import { generateTicketPdf } from "./pdf-service";
+import { generateTicketPdf, generateWalletImage } from "./pdf-service";
 import { sendTicketEmail, sendPasswordResetEmail } from "./email-service";
 import { ticketTemplates, ticketTemplateElements } from "@shared/schema";
 import { sendOTP as sendMSG91OTP, verifyOTP as verifyMSG91OTP, resendOTP as resendMSG91OTP, isMSG91Configured } from "./msg91-service";
@@ -2705,6 +2705,121 @@ router.get("/api/public/account/tickets/:id/pdf", async (req, res) => {
   } catch (error: any) {
     console.error("[PUBLIC] Download ticket PDF error:", error);
     res.status(500).json({ message: "Errore nella generazione del PDF" });
+  }
+});
+
+// Genera immagine biglietto per Apple Wallet
+router.get("/api/public/account/tickets/:id/wallet/apple", async (req, res) => {
+  try {
+    const customer = await getAuthenticatedCustomer(req);
+    if (!customer) {
+      return res.status(401).json({ message: "Non autenticato" });
+    }
+
+    const { id } = req.params;
+
+    // Get ticket with all needed info
+    const [ticket] = await db
+      .select({
+        id: siaeTickets.id,
+        ticketCode: siaeTickets.ticketCode,
+        ticketType: siaeTickets.ticketType,
+        ticketPrice: siaeTickets.ticketPrice,
+        grossAmount: siaeTickets.grossAmount,
+        participantFirstName: siaeTickets.participantFirstName,
+        participantLastName: siaeTickets.participantLastName,
+        status: siaeTickets.status,
+        qrCode: siaeTickets.qrCode,
+        fiscalSealCode: siaeTickets.fiscalSealCode,
+        sectorCode: siaeTickets.sectorCode,
+        ticketedEventId: siaeTickets.ticketedEventId,
+        eventName: events.name,
+        eventStart: events.startDatetime,
+        locationName: locations.name,
+        sectorName: siaeEventSectors.name,
+      })
+      .from(siaeTickets)
+      .innerJoin(siaeEventSectors, eq(siaeTickets.sectorId, siaeEventSectors.id))
+      .innerJoin(siaeTicketedEvents, eq(siaeTickets.ticketedEventId, siaeTicketedEvents.id))
+      .innerJoin(events, eq(siaeTicketedEvents.eventId, events.id))
+      .innerJoin(locations, eq(events.locationId, locations.id))
+      .where(and(
+        eq(siaeTickets.id, id),
+        eq(siaeTickets.customerId, customer.id)
+      ));
+
+    if (!ticket) {
+      return res.status(404).json({ message: "Biglietto non trovato" });
+    }
+
+    if (ticket.status !== 'active' && ticket.status !== 'emitted') {
+      return res.status(400).json({ message: "Biglietto non valido per wallet" });
+    }
+
+    const eventDate = ticket.eventStart ? new Date(ticket.eventStart) : new Date();
+    const holderName = `${ticket.participantFirstName || ''} ${ticket.participantLastName || ''}`.trim() || 'Ospite';
+    const price = parseFloat(ticket.grossAmount || ticket.ticketPrice || '0').toFixed(2);
+
+    // Generate wallet image using pdf-service
+    const imageBuffer = await generateWalletImage({
+      eventName: ticket.eventName || 'Evento',
+      eventDate,
+      locationName: ticket.locationName || '',
+      sectorName: ticket.sectorName || '',
+      holderName,
+      price,
+      ticketCode: ticket.ticketCode || ticket.id.slice(-8).toUpperCase(),
+      qrCode: ticket.qrCode || `TICKET-${ticket.id}`,
+    });
+
+    res.setHeader('Content-Type', 'image/png');
+    res.setHeader('Content-Disposition', `attachment; filename="wallet-ticket-${ticket.ticketCode}.png"`);
+    res.send(imageBuffer);
+
+  } catch (error: any) {
+    console.error("[PUBLIC] Generate Apple Wallet image error:", error);
+    res.status(500).json({ message: "Errore nella generazione dell'immagine wallet" });
+  }
+});
+
+// Genera link per Google Wallet (redirect a pagina con istruzioni)
+router.get("/api/public/account/tickets/:id/wallet/google", async (req, res) => {
+  try {
+    const customer = await getAuthenticatedCustomer(req);
+    if (!customer) {
+      return res.status(401).json({ message: "Non autenticato" });
+    }
+
+    const { id } = req.params;
+
+    // Verifica che il biglietto esista e appartenga al cliente
+    const [ticket] = await db
+      .select({
+        id: siaeTickets.id,
+        ticketCode: siaeTickets.ticketCode,
+        status: siaeTickets.status,
+      })
+      .from(siaeTickets)
+      .where(and(
+        eq(siaeTickets.id, id),
+        eq(siaeTickets.customerId, customer.id)
+      ));
+
+    if (!ticket) {
+      return res.status(404).json({ message: "Biglietto non trovato" });
+    }
+
+    if (ticket.status !== 'active' && ticket.status !== 'emitted') {
+      return res.status(400).json({ message: "Biglietto non valido per wallet" });
+    }
+
+    // Per ora, reindirizza all'endpoint Apple che genera l'immagine
+    // In futuro si potrebbe integrare con Google Wallet API
+    res.redirect(`/api/public/account/tickets/${id}/wallet/apple`);
+
+  } catch (error: any) {
+    console.error("[PUBLIC] Generate Google Wallet error:", error);
+    res.status(500).json({ message: "Errore nella generazione del pass Google Wallet" });
   }
 });
 
