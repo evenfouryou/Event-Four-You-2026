@@ -1163,7 +1163,7 @@ export default function SiaeTicketsPage() {
                 <SelectContent>
                   {cancellationReasons?.map((reason) => (
                     <SelectItem key={reason.code} value={reason.code}>
-                      {reason.code} - {reason.description}
+                      {reason.code} - {reason.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
