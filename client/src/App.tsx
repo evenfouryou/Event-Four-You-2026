@@ -78,6 +78,9 @@ import PublicCheckoutSuccess from "@/pages/public-checkout-success";
 import PublicVenues from "@/pages/public-venues";
 import PublicVenueDetail from "@/pages/public-venue-detail";
 import AccountPage from "@/pages/account";
+import AccountTicketDetail from "@/pages/account-ticket-detail";
+import AccountNameChange from "@/pages/account-name-change";
+import { AccountLayout } from "@/components/account-layout";
 import PrGuestLists from "@/pages/pr-guest-lists";
 import PrTables from "@/pages/pr-tables";
 import PrScanner from "@/pages/pr-scanner";
@@ -166,8 +169,18 @@ function Router() {
 
   // Customer portal routes (role: cliente)
   if ((user as any)?.role === 'cliente') {
+    // Wrapper component to provide AccountLayout for standalone pages
+    const AccountTicketDetailWithLayout = () => (
+      <AccountLayout><AccountTicketDetail /></AccountLayout>
+    );
+    const AccountNameChangeWithLayout = () => (
+      <AccountLayout><AccountNameChange /></AccountLayout>
+    );
+    
     return (
       <Switch>
+        <Route path="/account/tickets/:id/name-change" component={AccountNameChangeWithLayout} />
+        <Route path="/account/tickets/:id" component={AccountTicketDetailWithLayout} />
         <Route path="/account/:rest*" component={AccountPage} />
         <Route path="/account" component={AccountPage} />
         <Route path="/acquista/:id" component={PublicEventDetail} />
