@@ -35,7 +35,11 @@ interface Seat {
   id: string;
   row: string;
   seatNumber: string;
+  seatLabel?: string;
+  posX?: string | null;
+  posY?: string | null;
   status: string;
+  isAccessible?: boolean;
 }
 
 interface Sector {
@@ -105,13 +109,74 @@ function FloorPlanViewer({
   floorPlan,
   sectors,
   selectedZoneId,
+  selectedSeatIds,
   onZoneClick,
+  onSeatClick,
 }: {
   floorPlan: FloorPlan;
   sectors: Sector[];
   selectedZoneId: string | null;
+  selectedSeatIds: string[];
   onZoneClick: (zoneId: string, sectorCode: string | null) => void;
+  onSeatClick: (seatId: string, seat: Seat) => void;
 }) {
+  // Colori per stato posto
+  const getSeatColor = (status: string, isSelected: boolean, isAccessible?: boolean) => {
+    if (isSelected) return '#22c55e'; // verde - selezionato
+    if (isAccessible) return '#3b82f6'; // blu - accessibile
+    switch (status) {
+      case 'available': return '#10b981'; // verde chiaro - disponibile
+      case 'sold': return '#ef4444'; // rosso - venduto
+      case 'reserved': return '#f59e0b'; // arancione - riservato
+      case 'blocked': return '#6b7280'; // grigio - bloccato
+      default: return '#9ca3af';
+    }
+  };
+
+  // Render singolo posto
+  const renderSeat = (seat: Seat, sectorCode: string) => {
+    if (!seat.posX || !seat.posY) return null;
+    
+    const x = Number(seat.posX);
+    const y = Number(seat.posY);
+    const isSelected = selectedSeatIds.includes(seat.id);
+    const isAvailable = seat.status === 'available';
+    
+    return (
+      <g key={seat.id}>
+        <circle
+          cx={x}
+          cy={y}
+          r={0.8}
+          fill={getSeatColor(seat.status, isSelected, seat.isAccessible)}
+          stroke={isSelected ? '#16a34a' : 'rgba(0,0,0,0.3)'}
+          strokeWidth={isSelected ? 0.3 : 0.1}
+          className={`transition-all duration-150 ${
+            isAvailable ? 'cursor-pointer hover:r-1' : 'cursor-not-allowed'
+          }`}
+          onClick={(e) => {
+            e.stopPropagation();
+            if (isAvailable) {
+              onSeatClick(seat.id, seat);
+            }
+          }}
+          data-testid={`seat-${seat.id}`}
+        />
+        {isSelected && (
+          <circle
+            cx={x}
+            cy={y}
+            r={1.2}
+            fill="none"
+            stroke="#22c55e"
+            strokeWidth={0.15}
+            className="pointer-events-none animate-pulse"
+          />
+        )}
+      </g>
+    );
+  };
+
   const renderZonePolygon = (zone: FloorPlanZone) => {
     const coords = zone.coordinates;
     if (!coords || coords.length < 3) return null;
@@ -216,22 +281,36 @@ function FloorPlanViewer({
             preserveAspectRatio="none"
             style={{ zIndex: 10 }}
           >
+            {/* Render zone polygons */}
             {floorPlan.zones.map(zone => renderZonePolygon(zone))}
+            
+            {/* Render individual seats for numbered sectors */}
+            {sectors.filter(s => s.isNumbered && s.seats?.length > 0).map(sector => 
+              sector.seats.map(seat => renderSeat(seat, sector.sectorCode))
+            )}
           </svg>
         </div>
 
-        <div className="flex flex-wrap gap-2 mt-4">
+        <div className="flex flex-wrap gap-3 mt-4">
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <div className="w-3 h-3 rounded bg-blue-500 opacity-50" />
+            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: '#10b981' }} />
             <span>Disponibile</span>
           </div>
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <div className="w-3 h-3 rounded bg-green-500 opacity-70" />
+            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: '#22c55e', boxShadow: '0 0 4px #22c55e' }} />
             <span>Selezionato</span>
           </div>
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <div className="w-3 h-3 rounded bg-gray-500 opacity-20" />
-            <span>Esaurito</span>
+            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: '#ef4444' }} />
+            <span>Venduto</span>
+          </div>
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: '#f59e0b' }} />
+            <span>Riservato</span>
+          </div>
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: '#3b82f6' }} />
+            <span>Accessibile</span>
           </div>
         </div>
       </Card>
@@ -247,6 +326,8 @@ function SectorCard({
   isAdding,
   justAdded,
   isHighlighted,
+  mapSelectedSeatIds,
+  onSeatSelectFromCard,
 }: {
   sector: Sector;
   ticketedEventId: string;
@@ -255,12 +336,22 @@ function SectorCard({
   isAdding: boolean;
   justAdded: string | null;
   isHighlighted?: boolean;
+  mapSelectedSeatIds?: string[];
+  onSeatSelectFromCard?: (seatId: string, seat: Seat) => void;
 }) {
   const [quantity, setQuantity] = useState(1);
   const [ticketType, setTicketType] = useState("intero");
-  const [selectedSeat, setSelectedSeat] = useState<Seat | null>(null);
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
+  
+  // Find the selected seat for this sector from map selection
+  const selectedSeat = sector.seats.find(s => mapSelectedSeatIds?.includes(s.id)) || null;
+  
+  const handleSeatClick = (seat: Seat) => {
+    if (onSeatSelectFromCard) {
+      onSeatSelectFromCard(seat.id, seat);
+    }
+  };
 
   const price = ticketType === "ridotto" && sector.priceRidotto
     ? Number(sector.priceRidotto)
@@ -415,7 +506,7 @@ function SectorCard({
                     {sector.seats.map((seat) => (
                       <button
                         key={seat.id}
-                        onClick={() => setSelectedSeat(seat)}
+                        onClick={() => handleSeatClick(seat)}
                         disabled={seat.status !== "available"}
                         className={`p-2 text-xs rounded-lg font-medium transition-all ${
                           seat.status !== "available"
@@ -539,6 +630,7 @@ export default function PublicEventDetailPage() {
   const [cartCount, setCartCount] = useState(0);
   const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
   const [highlightedSectorCode, setHighlightedSectorCode] = useState<string | null>(null);
+  const [selectedSeatIds, setSelectedSeatIds] = useState<string[]>([]);
 
   const { data: event, isLoading, error } = useQuery<EventDetail>({
     queryKey: ["/api/public/events", params.id],
@@ -581,6 +673,27 @@ export default function PublicEventDetailPage() {
           sectorElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
       }, 100);
+    }
+  };
+
+  const handleSeatClick = (seatId: string, seat: Seat) => {
+    setSelectedSeatIds(prev => {
+      if (prev.includes(seatId)) {
+        return prev.filter(id => id !== seatId);
+      } else {
+        return [...prev, seatId];
+      }
+    });
+    
+    // Find the sector for this seat and highlight it
+    const sector = event?.sectors.find(s => s.seats.some(st => st.id === seatId));
+    if (sector) {
+      setHighlightedSectorCode(sector.sectorCode);
+      
+      toast({
+        title: selectedSeatIds.includes(seatId) ? "Posto deselezionato" : "Posto selezionato",
+        description: `${seat.seatLabel || `${seat.row}${seat.seatNumber}`}`,
+      });
     }
   };
 
@@ -801,7 +914,9 @@ export default function PublicEventDetailPage() {
                 floorPlan={floorPlan}
                 sectors={event.sectors}
                 selectedZoneId={selectedZoneId}
+                selectedSeatIds={selectedSeatIds}
                 onZoneClick={handleZoneClick}
+                onSeatClick={handleSeatClick}
               />
             )}
 
@@ -831,6 +946,8 @@ export default function PublicEventDetailPage() {
                       isAdding={isAdding}
                       justAdded={justAddedSector}
                       isHighlighted={highlightedSectorCode === sector.sectorCode}
+                      mapSelectedSeatIds={selectedSeatIds}
+                      onSeatSelectFromCard={handleSeatClick}
                     />
                   </motion.div>
                 ))}

@@ -1081,6 +1081,125 @@ router.post("/api/siae/seats/bulk", requireAuth, requireOrganizer, async (req: R
   }
 });
 
+// Genera posti in griglia automaticamente per un settore
+const generateSeatsGridSchema = z.object({
+  sectorId: z.string().min(1, "ID settore richiesto"),
+  rows: z.number().min(1).max(50), // Max 50 file
+  seatsPerRow: z.number().min(1).max(100), // Max 100 posti per fila
+  startRow: z.string().default("A"), // Prima fila (A, B, C... o 1, 2, 3...)
+  startSeat: z.number().default(1), // Primo numero posto
+  // Posizione sulla planimetria (opzionale - coordinate del settore)
+  startX: z.number().min(0).max(100).optional(), // X iniziale (percentuale)
+  startY: z.number().min(0).max(100).optional(), // Y iniziale (percentuale)
+  endX: z.number().min(0).max(100).optional(), // X finale (percentuale)
+  endY: z.number().min(0).max(100).optional(), // Y finale (percentuale)
+  clearExisting: z.boolean().default(false), // Se true, elimina posti esistenti prima
+});
+
+router.post("/api/siae/seats/generate-grid", requireAuth, requireOrganizer, async (req: Request, res: Response) => {
+  try {
+    const data = generateSeatsGridSchema.parse(req.body);
+    
+    // Verifica che il settore esista
+    const sector = await siaeStorage.getSiaeEventSector(data.sectorId);
+    if (!sector) {
+      return res.status(404).json({ message: "Settore non trovato" });
+    }
+    
+    // Se richiesto, elimina posti esistenti
+    if (data.clearExisting) {
+      await siaeStorage.deleteSiaeSeatsBySector(data.sectorId);
+    }
+    
+    // Genera array di posti
+    const seats: any[] = [];
+    const isNumericRow = /^\d+$/.test(data.startRow);
+    let currentRowNum = isNumericRow ? parseInt(data.startRow) : 0;
+    let currentRowChar = isNumericRow ? "" : data.startRow;
+    
+    // Calcola spacing per posizioni sulla planimetria
+    const hasPositions = data.startX !== undefined && data.startY !== undefined && 
+                         data.endX !== undefined && data.endY !== undefined;
+    const xSpacing = hasPositions ? (data.endX! - data.startX!) / Math.max(data.seatsPerRow - 1, 1) : 0;
+    const ySpacing = hasPositions ? (data.endY! - data.startY!) / Math.max(data.rows - 1, 1) : 0;
+    
+    for (let r = 0; r < data.rows; r++) {
+      const rowLabel = isNumericRow 
+        ? String(currentRowNum + r)
+        : String.fromCharCode(currentRowChar.charCodeAt(0) + r);
+      
+      for (let s = 0; s < data.seatsPerRow; s++) {
+        const seatNumber = String(data.startSeat + s);
+        const seatLabel = `${rowLabel}${seatNumber}`;
+        
+        const seat: any = {
+          sectorId: data.sectorId,
+          row: rowLabel,
+          seatNumber: seatNumber,
+          seatLabel: seatLabel,
+          status: 'available',
+        };
+        
+        // Aggiungi posizioni se disponibili
+        if (hasPositions) {
+          seat.posX = String(data.startX! + s * xSpacing);
+          seat.posY = String(data.startY! + r * ySpacing);
+        }
+        
+        seats.push(seat);
+      }
+    }
+    
+    // Crea posti in batch
+    const createdSeats = await siaeStorage.createSiaeSeats(seats);
+    
+    // Aggiorna capacità settore se isNumbered
+    if (sector.isNumbered) {
+      await siaeStorage.updateSiaeEventSector(data.sectorId, {
+        capacity: createdSeats.length + (data.clearExisting ? 0 : (sector.capacity || 0)),
+        availableSeats: createdSeats.length + (data.clearExisting ? 0 : (sector.availableSeats || 0)),
+      });
+    }
+    
+    res.status(201).json({
+      message: `Creati ${createdSeats.length} posti (${data.rows} file x ${data.seatsPerRow} posti)`,
+      seats: createdSeats,
+      totalSeats: createdSeats.length,
+    });
+  } catch (error: any) {
+    console.error("[SIAE-ROUTES] Error generating seat grid:", error);
+    res.status(400).json({ message: error.message });
+  }
+});
+
+// Elimina tutti i posti di un settore
+router.delete("/api/siae/sectors/:sectorId/seats", requireAuth, requireOrganizer, async (req: Request, res: Response) => {
+  try {
+    const { sectorId } = req.params;
+    
+    // Verifica che il settore esista
+    const sector = await siaeStorage.getSiaeEventSector(sectorId);
+    if (!sector) {
+      return res.status(404).json({ message: "Settore non trovato" });
+    }
+    
+    // Verifica che non ci siano biglietti venduti per i posti
+    const seats = await siaeStorage.getSiaeSeats(sectorId);
+    const soldSeats = seats.filter(s => s.status === 'sold');
+    if (soldSeats.length > 0) {
+      return res.status(400).json({ 
+        message: `Impossibile eliminare: ${soldSeats.length} posti già venduti` 
+      });
+    }
+    
+    await siaeStorage.deleteSiaeSeatsBySector(sectorId);
+    
+    res.json({ message: `Eliminati ${seats.length} posti dal settore` });
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
 // ==================== Tickets (Organizer / Box Office) ====================
 
 // Schema minimo per emissione manuale - sigillo generato server-side

@@ -1233,10 +1233,16 @@ export const siaeEventSectorsRelations = relations(siaeEventSectors, ({ one, man
 export const siaeSeats = pgTable("siae_seats", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   sectorId: varchar("sector_id").notNull().references(() => siaeEventSectors.id),
+  floorPlanSeatId: varchar("floor_plan_seat_id"), // Collegamento a posto sulla planimetria (no FK per evitare dipendenza circolare)
   row: varchar("row", { length: 10 }),
   seatNumber: varchar("seat_number", { length: 10 }).notNull(),
+  seatLabel: varchar("seat_label", { length: 30 }), // Etichetta completa es. "Fila A Posto 12"
+  // Posizione sulla planimetria (percentuale 0-100)
+  posX: decimal("pos_x", { precision: 10, scale: 4 }),
+  posY: decimal("pos_y", { precision: 10, scale: 4 }),
   status: varchar("status", { length: 20 }).notNull().default('available'), // available, reserved, sold, blocked
   ticketId: varchar("ticket_id"), // No FK reference to avoid circular dependency - relationship is via siaeTickets.seatId
+  isAccessible: boolean("is_accessible").notNull().default(false), // Posto accessibile disabili
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

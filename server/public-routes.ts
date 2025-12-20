@@ -526,6 +526,60 @@ router.get("/api/public/events/:id", async (req, res) => {
   }
 });
 
+// Posti di un settore per visualizzazione planimetria (include stato disponibilità)
+router.get("/api/public/sectors/:sectorId/seats", async (req, res) => {
+  try {
+    const { sectorId } = req.params;
+    
+    // Verifica che il settore esista e sia attivo
+    const [sector] = await db
+      .select()
+      .from(siaeEventSectors)
+      .where(eq(siaeEventSectors.id, sectorId));
+    
+    if (!sector || !sector.active) {
+      return res.status(404).json({ message: "Settore non trovato" });
+    }
+    
+    // Carica tutti i posti del settore con le loro posizioni e stato
+    const seats = await db
+      .select({
+        id: siaeSeats.id,
+        row: siaeSeats.row,
+        seatNumber: siaeSeats.seatNumber,
+        seatLabel: siaeSeats.seatLabel,
+        posX: siaeSeats.posX,
+        posY: siaeSeats.posY,
+        status: siaeSeats.status,
+        isAccessible: siaeSeats.isAccessible,
+      })
+      .from(siaeSeats)
+      .where(eq(siaeSeats.sectorId, sectorId))
+      .orderBy(siaeSeats.row, siaeSeats.seatNumber);
+    
+    // Conta posti per stato
+    const summary = {
+      total: seats.length,
+      available: seats.filter(s => s.status === 'available').length,
+      sold: seats.filter(s => s.status === 'sold').length,
+      reserved: seats.filter(s => s.status === 'reserved').length,
+      blocked: seats.filter(s => s.status === 'blocked').length,
+    };
+    
+    res.json({
+      sectorId,
+      sectorName: sector.name,
+      sectorCode: sector.sectorCode,
+      isNumbered: sector.isNumbered,
+      seats,
+      summary,
+    });
+  } catch (error: any) {
+    console.error("[PUBLIC] Error fetching sector seats:", error);
+    res.status(500).json({ message: "Errore nel caricamento posti" });
+  }
+});
+
 // ==================== AUTENTICAZIONE CLIENTE ====================
 
 // Schema registrazione cliente

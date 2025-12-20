@@ -191,6 +191,7 @@ export interface ISiaeStorage {
   getSiaeSeat(id: string): Promise<SiaeSeat | undefined>;
   createSiaeSeats(seats: InsertSiaeSeat[]): Promise<SiaeSeat[]>;
   updateSiaeSeat(id: string, seat: Partial<SiaeSeat>): Promise<SiaeSeat | undefined>;
+  deleteSiaeSeatsBySector(sectorId: string): Promise<void>;
   
   // ==================== Fiscal Seals ====================
   
@@ -877,6 +878,10 @@ export class SiaeStorage implements ISiaeStorage {
       .where(eq(siaeSeats.id, id))
       .returning();
     return updated;
+  }
+  
+  async deleteSiaeSeatsBySector(sectorId: string): Promise<void> {
+    await db.delete(siaeSeats).where(eq(siaeSeats.sectorId, sectorId));
   }
   
   // ==================== Fiscal Seals ====================
