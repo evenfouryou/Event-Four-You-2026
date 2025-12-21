@@ -865,8 +865,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(401).json({ message: "Credenziali non valide" });
         }
 
-        // Super admin can login without email verification
-        if (!user.emailVerified && user.role !== 'super_admin') {
+        // Roles that don't require email verification (super_admin, scanner, and other staff roles)
+        const rolesWithoutEmailVerification = ['super_admin', 'scanner', 'bartender', 'cassiere', 'warehouse', 'pr', 'capo_staff'];
+        if (!user.emailVerified && !rolesWithoutEmailVerification.includes(user.role)) {
           return res.status(403).json({ message: "Email non verificata" });
         }
 
