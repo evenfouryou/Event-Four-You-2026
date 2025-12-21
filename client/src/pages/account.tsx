@@ -20,19 +20,24 @@ export default function AccountPage() {
   useEffect(() => {
     if (user && (user as any).role === 'scanner') {
       navigate("/scanner");
+      return;
     }
   }, [user, navigate]);
 
+  // Only fetch customer data if NOT a scanner
+  const isScanner = user && (user as any).role === 'scanner';
+  
   const { data: customer, isLoading, isError } = useQuery({
     queryKey: ["/api/public/customers/me"],
+    enabled: !isScanner,
     retry: false,
   });
 
   useEffect(() => {
-    if (!isLoading && (isError || !customer)) {
+    if (!isLoading && !isScanner && (isError || !customer)) {
       navigate("/login?redirect=" + encodeURIComponent(location));
     }
-  }, [isLoading, isError, customer, navigate, location]);
+  }, [isLoading, isError, customer, navigate, location, isScanner]);
 
   useEffect(() => {
     if (location === "/account" || location === "/account/") {

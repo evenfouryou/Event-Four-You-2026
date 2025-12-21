@@ -6,6 +6,27 @@ Event4U is an event management and inventory tracking system for event organizer
 ## User Preferences
 Preferred communication style: Simple, everyday language.
 
+## Recent Changes (2025-12-21)
+
+### Scanner Account Loading Loop - FIXED
+**Problem**: Scanner accounts were stuck in infinite loading loop when accessing account page.
+**Root Cause**: In `account.tsx`, the query for customer data (`/api/public/customers/me`) was being executed for all users, including scanners. When scanners tried to access account page, they would:
+1. Try to fetch customer data
+2. Get error (scanners aren't customers)
+3. Redirect to login
+4. Enter infinite redirect loop
+
+**Solution Applied**:
+- Modified `account.tsx` to disable the customer query for scanner users (`enabled: !isScanner`)
+- Added check in second useEffect to skip redirect logic if user is scanner
+- Scanners now redirect directly to `/scanner` without triggering the problematic query
+
+**Files Modified**:
+- `client/src/pages/account.tsx` - Added isScanner variable, made query conditional, updated useEffect dependencies
+
+### Outstanding Issues
+- **Gestore "Page not found" error**: Gestore users see "Page not found" when accessing. Need to clarify which URL causes this (is it "/" home or a specific route?).
+
 ## System Architecture
 
 ### Frontend
