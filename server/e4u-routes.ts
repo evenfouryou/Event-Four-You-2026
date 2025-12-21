@@ -1103,6 +1103,238 @@ router.delete("/api/e4u/scanners/:id", requireAuth, requireGestore, async (req: 
   }
 });
 
+// GET /api/e4u/events/:eventId/scan-stats - Get scan statistics for event
+router.get("/api/e4u/events/:eventId/scan-stats", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const { eventId } = req.params;
+    const user = req.user as any;
+    
+    // SECURITY: Verify user has access to this event
+    const isGestore = await isGestoreForEvent(user, eventId);
+    if (!isGestore) {
+      // Check if user is an assigned scanner for this event
+      const [scannerAssignment] = await db.select()
+        .from(eventScanners)
+        .where(and(eq(eventScanners.userId, user.id), eq(eventScanners.eventId, eventId)));
+      
+      if (!scannerAssignment) {
+        return res.status(403).json({ message: "Non hai accesso a questo evento" });
+      }
+    }
+    
+    // Get lists stats
+    const lists = await db.select().from(eventLists).where(eq(eventLists.eventId, eventId));
+    const listIds = lists.map(l => l.id);
+    
+    let totalLists = 0;
+    let checkedInLists = 0;
+    
+    if (listIds.length > 0) {
+      for (const listId of listIds) {
+        const entries = await db.select().from(listEntries).where(eq(listEntries.listId, listId));
+        totalLists += entries.length;
+        checkedInLists += entries.filter(e => e.status === 'checked_in').length;
+      }
+    }
+    
+    // Get table stats
+    const reservations = await db.select()
+      .from(tableReservations)
+      .where(eq(tableReservations.eventId, eventId));
+    
+    let totalTables = 0;
+    let checkedInTables = 0;
+    
+    for (const reservation of reservations) {
+      const guests = await db.select()
+        .from(tableGuests)
+        .where(eq(tableGuests.reservationId, reservation.id));
+      totalTables += guests.length;
+      checkedInTables += guests.filter(g => g.status === 'checked_in').length;
+    }
+    
+    // Get ticket stats
+    const [ticketedEvent] = await db.select()
+      .from(siaeTicketedEvents)
+      .where(eq(siaeTicketedEvents.eventId, eventId));
+    
+    let totalTickets = 0;
+    let checkedInTickets = 0;
+    
+    if (ticketedEvent) {
+      const tickets = await db.select()
+        .from(siaeTickets)
+        .where(eq(siaeTickets.ticketedEventId, ticketedEvent.id));
+      
+      totalTickets = tickets.filter(t => t.status !== 'cancelled').length;
+      checkedInTickets = tickets.filter(t => t.status === 'used').length;
+    }
+    
+    res.json({
+      totalLists,
+      checkedInLists,
+      totalTables,
+      checkedInTables,
+      totalTickets,
+      checkedInTickets,
+    });
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// GET /api/e4u/events/:eventId/checked-in - Get checked in people for event
+router.get("/api/e4u/events/:eventId/checked-in", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const { eventId } = req.params;
+    const checkedInPeople: any[] = [];
+    
+    // Get list entries that are checked in
+    const lists = await db.select().from(eventLists).where(eq(eventLists.eventId, eventId));
+    for (const list of lists) {
+      const entries = await db.select()
+        .from(listEntries)
+        .where(and(eq(listEntries.listId, list.id), eq(listEntries.status, 'checked_in')));
+      
+      for (const entry of entries) {
+        checkedInPeople.push({
+          id: entry.id,
+          firstName: entry.firstName,
+          lastName: entry.lastName,
+          phone: entry.phone,
+          type: 'list',
+          checkedInAt: entry.checkedInAt,
+          listName: list.name,
+        });
+      }
+    }
+    
+    // Get table guests that are checked in
+    const reservations = await db.select()
+      .from(tableReservations)
+      .where(eq(tableReservations.eventId, eventId));
+    
+    for (const reservation of reservations) {
+      const guests = await db.select()
+        .from(tableGuests)
+        .where(and(eq(tableGuests.reservationId, reservation.id), eq(tableGuests.status, 'checked_in')));
+      
+      for (const guest of guests) {
+        checkedInPeople.push({
+          id: guest.id,
+          firstName: guest.firstName,
+          lastName: guest.lastName,
+          phone: guest.phone,
+          type: 'table',
+          checkedInAt: guest.checkedInAt,
+          tableName: reservation.reservationName,
+        });
+      }
+    }
+    
+    // Get tickets that are checked in (used)
+    const [ticketedEvent] = await db.select()
+      .from(siaeTicketedEvents)
+      .where(eq(siaeTicketedEvents.eventId, eventId));
+    
+    if (ticketedEvent) {
+      const tickets = await db.select()
+        .from(siaeTickets)
+        .where(and(eq(siaeTickets.ticketedEventId, ticketedEvent.id), eq(siaeTickets.status, 'used')));
+      
+      for (const ticket of tickets) {
+        checkedInPeople.push({
+          id: ticket.id,
+          firstName: ticket.participantFirstName || '',
+          lastName: ticket.participantLastName || '',
+          phone: '',
+          type: 'ticket',
+          checkedInAt: ticket.usedAt,
+          ticketType: ticket.ticketType,
+        });
+      }
+    }
+    
+    // Sort by check-in time (most recent first)
+    checkedInPeople.sort((a, b) => 
+      new Date(b.checkedInAt || 0).getTime() - new Date(a.checkedInAt || 0).getTime()
+    );
+    
+    res.json(checkedInPeople);
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// GET /api/e4u/scanner/total-stats - Get total scan stats for scanner (all events)
+router.get("/api/e4u/scanner/total-stats", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const user = req.user as any;
+    
+    // Get all events the scanner has access to
+    const scannerAssignments = await db.select()
+      .from(eventScanners)
+      .where(eq(eventScanners.userId, user.id));
+    
+    let totalLists = 0;
+    let checkedInLists = 0;
+    let totalTables = 0;
+    let checkedInTables = 0;
+    let totalTickets = 0;
+    let checkedInTickets = 0;
+    
+    for (const assignment of scannerAssignments) {
+      const eventId = assignment.eventId;
+      
+      // Get lists stats
+      const lists = await db.select().from(eventLists).where(eq(eventLists.eventId, eventId));
+      for (const list of lists) {
+        const entries = await db.select().from(listEntries).where(eq(listEntries.listId, list.id));
+        totalLists += entries.length;
+        checkedInLists += entries.filter(e => e.status === 'checked_in').length;
+      }
+      
+      // Get table stats
+      const reservations = await db.select()
+        .from(tableReservations)
+        .where(eq(tableReservations.eventId, eventId));
+      
+      for (const reservation of reservations) {
+        const guests = await db.select()
+          .from(tableGuests)
+          .where(eq(tableGuests.reservationId, reservation.id));
+        totalTables += guests.length;
+        checkedInTables += guests.filter(g => g.status === 'checked_in').length;
+      }
+      
+      // Get ticket stats
+      const [ticketedEvent] = await db.select()
+        .from(siaeTicketedEvents)
+        .where(eq(siaeTicketedEvents.eventId, eventId));
+      
+      if (ticketedEvent) {
+        const tickets = await db.select()
+          .from(siaeTickets)
+          .where(eq(siaeTickets.ticketedEventId, ticketedEvent.id));
+        
+        totalTickets += tickets.filter(t => t.status !== 'cancelled').length;
+        checkedInTickets += tickets.filter(t => t.status === 'used').length;
+      }
+    }
+    
+    res.json({
+      totalLists,
+      checkedInLists,
+      totalTables,
+      checkedInTables,
+      totalTickets,
+      checkedInTickets,
+    });
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
 // GET /api/e4u/scanners/assignments - Get all scanner assignments for company
 router.get("/api/e4u/scanners/assignments", requireAuth, requireGestore, async (req: Request, res: Response) => {
   try {
