@@ -850,14 +850,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { email, password } = req.body;
       
       if (!email || !password) {
-        return res.status(400).json({ message: "Email e password richiesti" });
+        return res.status(400).json({ message: "Email/Username e password richiesti" });
       }
 
-      const normalizedEmail = email.toLowerCase().trim();
+      const normalizedInput = email.toLowerCase().trim();
+      const isEmail = normalizedInput.includes('@');
       
       // First, try to find in users table (admin/gestore/staff)
-      const user = await storage.getUserByEmail(normalizedEmail);
-      console.log('[Login] Email:', normalizedEmail, 'User Found:', !!user);
+      // For username-based login (scanner, etc.), search by email field which stores the username
+      const user = await storage.getUserByEmail(normalizedInput);
+      console.log('[Login] Input:', normalizedInput, 'IsEmail:', isEmail, 'User Found:', !!user);
       
       if (user && user.passwordHash) {
         const isValidPassword = await bcrypt.compare(password, user.passwordHash);
@@ -896,47 +898,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      // If not found in users, try siae_customers table
-      const [customer] = await db
-        .select()
-        .from(siaeCustomers)
-        .where(eq(siaeCustomers.email, normalizedEmail));
-      
-      console.log('[Login] Customer Found:', !!customer);
-      
-      if (customer && customer.passwordHash) {
-        const isValidPassword = await bcrypt.compare(password, customer.passwordHash);
-        if (!isValidPassword) {
-          return res.status(401).json({ message: "Credenziali non valide" });
-        }
-
-        if (!customer.registrationCompleted) {
-          return res.status(403).json({ message: "Completa la registrazione con OTP" });
-        }
-
-        // Create session for customer
-        return (req as any).login({ 
-          claims: { sub: customer.id, email: customer.email },
-          role: 'cliente',
-          customerId: customer.id,
-          accountType: 'customer'
-        }, (err: any) => {
-          if (err) {
-            console.error("Session creation error:", err);
-            return res.status(500).json({ message: "Login failed" });
+      // If not found in users and input looks like email, try siae_customers table
+      if (normalizedInput.includes('@')) {
+        const [customer] = await db
+          .select()
+          .from(siaeCustomers)
+          .where(eq(siaeCustomers.email, normalizedInput));
+        
+        console.log('[Login] Customer Found:', !!customer);
+        
+        if (customer && customer.passwordHash) {
+          const isValidPassword = await bcrypt.compare(password, customer.passwordHash);
+          if (!isValidPassword) {
+            return res.status(401).json({ message: "Credenziali non valide" });
           }
-          
-          res.json({ 
-            message: "Login successful",
-            user: {
-              id: customer.id,
-              email: customer.email,
-              firstName: customer.firstName,
-              lastName: customer.lastName,
-              role: 'cliente',
+
+          if (!customer.registrationCompleted) {
+            return res.status(403).json({ message: "Completa la registrazione con OTP" });
+          }
+
+          // Create session for customer
+          return (req as any).login({ 
+            claims: { sub: customer.id, email: customer.email },
+            role: 'cliente',
+            customerId: customer.id,
+            accountType: 'customer'
+          }, (err: any) => {
+            if (err) {
+              console.error("Session creation error:", err);
+              return res.status(500).json({ message: "Login failed" });
             }
+            
+            res.json({ 
+              message: "Login successful",
+              user: {
+                id: customer.id,
+                email: customer.email,
+                firstName: customer.firstName,
+                lastName: customer.lastName,
+                role: 'cliente',
+              }
+            });
           });
-        });
+        }
       }
       
       // Neither user nor customer found

@@ -30,25 +30,33 @@ export default function Login() {
     setIsLoading(true);
 
     try {
-      // Check if input is email or username (cashier)
-      const isEmail = email.includes('@');
-      
-      if (isEmail) {
-        // Unified login - works for both admin/gestore and customers
+      // Try unified login first (works for email, username, and all user types)
+      try {
         const response: any = await apiRequest('POST', '/api/auth/login', { email, password });
         
         // Redirect based on user role and redirect parameter
         if (response.user?.role === 'cliente') {
-          // For customers, use redirect param or default to /account
           window.location.href = redirectTo || '/account';
+        } else if (response.user?.role === 'scanner') {
+          window.location.href = '/scanner';
         } else {
-          // For admin/gestore, use redirect param or default to dashboard
           window.location.href = redirectTo || '/';
         }
-      } else {
-        // Cashier login with username - redirect to cashier dashboard
-        await apiRequest('POST', '/api/cashiers/login', { username: email, password });
-        window.location.href = '/cashier/dashboard';
+        return;
+      } catch (loginErr: any) {
+        // If login failed with non-email input, try cashier login
+        const isEmail = email.includes('@');
+        if (!isEmail) {
+          try {
+            await apiRequest('POST', '/api/cashiers/login', { username: email, password });
+            window.location.href = '/cashier/dashboard';
+            return;
+          } catch (cashierErr: any) {
+            // Both failed, throw original error
+            throw loginErr;
+          }
+        }
+        throw loginErr;
       }
     } catch (err: any) {
       setError(err.message || "Credenziali non valide");
