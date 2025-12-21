@@ -3901,7 +3901,11 @@ export const eventScanners = pgTable("event_scanners", {
   canScanLists: boolean("can_scan_lists").notNull().default(true),
   canScanTables: boolean("can_scan_tables").notNull().default(true),
   canScanTickets: boolean("can_scan_tickets").notNull().default(true),
+  allowedListIds: text().array().default(sql`ARRAY[]::text[]`), // Empty array = all lists allowed
+  allowedTableTypeIds: text().array().default(sql`ARRAY[]::text[]`), // Empty array = all table types allowed
   allowedSectorIds: text().array().default(sql`ARRAY[]::text[]`), // Empty array = all sectors allowed
+  startTime: varchar("start_time", { length: 5 }), // HH:MM format
+  endTime: varchar("end_time", { length: 5 }), // HH:MM format
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow(),
 });

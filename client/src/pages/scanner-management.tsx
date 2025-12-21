@@ -52,6 +52,9 @@ import {
   EyeOff,
   RefreshCw,
   Users,
+  Clock,
+  List,
+  Table2,
 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -88,9 +91,13 @@ export default function ScannerManagement() {
   const [selectedScanner, setSelectedScanner] = useState<UserType | null>(null);
   const [selectedEventId, setSelectedEventId] = useState<string>("");
   const [selectedSectorIds, setSelectedSectorIds] = useState<string[]>([]);
+  const [selectedListIds, setSelectedListIds] = useState<string[]>([]);
+  const [selectedTableTypeIds, setSelectedTableTypeIds] = useState<string[]>([]);
   const [canScanLists, setCanScanLists] = useState(true);
   const [canScanTables, setCanScanTables] = useState(true);
   const [canScanTickets, setCanScanTickets] = useState(true);
+  const [startTime, setStartTime] = useState("");
+  const [endTime, setEndTime] = useState("");
   const [showPassword, setShowPassword] = useState(false);
 
   const form = useForm<CreateScannerData>({
@@ -122,6 +129,18 @@ export default function ScannerManagement() {
   const { data: eventSectors } = useQuery<SectorOption[]>({
     queryKey: ['/api/siae/ticketed-events', selectedEventId, 'sectors'],
     enabled: !!selectedEventId && canScanTickets,
+  });
+
+  // Query liste dell'evento selezionato
+  const { data: eventLists } = useQuery<{ id: string; name: string }[]>({
+    queryKey: ['/api/e4u/events', selectedEventId, 'lists'],
+    enabled: !!selectedEventId && canScanLists,
+  });
+
+  // Query tipi tavolo dell'evento selezionato
+  const { data: eventTableTypes } = useQuery<{ id: string; name: string }[]>({
+    queryKey: ['/api/e4u/events', selectedEventId, 'table-types'],
+    enabled: !!selectedEventId && canScanTables,
   });
 
   const filteredScanners = useMemo(() => {
@@ -162,13 +181,23 @@ export default function ScannerManagement() {
   });
 
   const assignScannerMutation = useMutation({
-    mutationFn: async ({ scannerId, eventId, sectors }: { scannerId: string; eventId: string; sectors: string[] }) => {
+    mutationFn: async ({ scannerId, eventId, sectors, lists, tableTypes }: { 
+      scannerId: string; 
+      eventId: string; 
+      sectors: string[];
+      lists: string[];
+      tableTypes: string[];
+    }) => {
       const response = await apiRequest("POST", `/api/e4u/events/${eventId}/scanners`, {
         userId: scannerId,
         canScanLists,
         canScanTables,
         canScanTickets,
+        allowedListIds: canScanLists ? lists : [],
+        allowedTableTypeIds: canScanTables ? tableTypes : [],
         allowedSectorIds: canScanTickets ? sectors : [],
+        startTime: startTime || null,
+        endTime: endTime || null,
       });
       return response.json();
     },
@@ -230,9 +259,13 @@ export default function ScannerManagement() {
     setSelectedScanner(null);
     setSelectedEventId("");
     setSelectedSectorIds([]);
+    setSelectedListIds([]);
+    setSelectedTableTypeIds([]);
     setCanScanLists(true);
     setCanScanTables(true);
     setCanScanTickets(true);
+    setStartTime("");
+    setEndTime("");
   };
 
   const openAssignDialog = (scanner: UserType) => {
@@ -247,6 +280,8 @@ export default function ScannerManagement() {
       scannerId: selectedScanner.id,
       eventId: selectedEventId,
       sectors: selectedSectorIds,
+      lists: selectedListIds,
+      tableTypes: selectedTableTypeIds,
     });
   };
 
@@ -255,6 +290,22 @@ export default function ScannerManagement() {
       prev.includes(sectorId)
         ? prev.filter(id => id !== sectorId)
         : [...prev, sectorId]
+    );
+  };
+
+  const toggleList = (listId: string) => {
+    setSelectedListIds(prev =>
+      prev.includes(listId)
+        ? prev.filter(id => id !== listId)
+        : [...prev, listId]
+    );
+  };
+
+  const toggleTableType = (tableTypeId: string) => {
+    setSelectedTableTypeIds(prev =>
+      prev.includes(tableTypeId)
+        ? prev.filter(id => id !== tableTypeId)
+        : [...prev, tableTypeId]
     );
   };
 
@@ -701,13 +752,95 @@ export default function ScannerManagement() {
               </div>
             </div>
 
+            {/* Selezione Liste */}
+            {canScanLists && selectedEventId && eventLists && eventLists.length > 0 && (
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <List className="h-4 w-4 text-cyan-400" />
+                  Liste Consentite
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Seleziona quali liste questo scanner può validare. Lascia vuoto per consentire tutte.
+                </p>
+                <div className="space-y-2 max-h-32 overflow-y-auto">
+                  {eventLists.map(list => (
+                    <div 
+                      key={list.id}
+                      className="flex items-center gap-2 p-2 bg-background/30 rounded-lg"
+                    >
+                      <Checkbox
+                        id={`list-${list.id}`}
+                        checked={selectedListIds.includes(list.id)}
+                        onCheckedChange={() => toggleList(list.id)}
+                        data-testid={`checkbox-list-${list.id}`}
+                      />
+                      <label 
+                        htmlFor={`list-${list.id}`}
+                        className="text-sm cursor-pointer flex-1"
+                      >
+                        {list.name}
+                      </label>
+                    </div>
+                  ))}
+                </div>
+                {selectedListIds.length > 0 && (
+                  <p className="text-xs text-cyan-400">
+                    {selectedListIds.length} liste selezionate
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Selezione Tipi Tavolo */}
+            {canScanTables && selectedEventId && eventTableTypes && eventTableTypes.length > 0 && (
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <Table2 className="h-4 w-4 text-purple-400" />
+                  Tipi Tavolo Consentiti
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Seleziona quali tipi di tavolo questo scanner può validare. Lascia vuoto per consentire tutti.
+                </p>
+                <div className="space-y-2 max-h-32 overflow-y-auto">
+                  {eventTableTypes.map(tableType => (
+                    <div 
+                      key={tableType.id}
+                      className="flex items-center gap-2 p-2 bg-background/30 rounded-lg"
+                    >
+                      <Checkbox
+                        id={`tabletype-${tableType.id}`}
+                        checked={selectedTableTypeIds.includes(tableType.id)}
+                        onCheckedChange={() => toggleTableType(tableType.id)}
+                        data-testid={`checkbox-tabletype-${tableType.id}`}
+                      />
+                      <label 
+                        htmlFor={`tabletype-${tableType.id}`}
+                        className="text-sm cursor-pointer flex-1"
+                      >
+                        {tableType.name}
+                      </label>
+                    </div>
+                  ))}
+                </div>
+                {selectedTableTypeIds.length > 0 && (
+                  <p className="text-xs text-purple-400">
+                    {selectedTableTypeIds.length} tipi tavolo selezionati
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Selezione Settori Biglietti */}
             {canScanTickets && selectedEventId && eventSectors && eventSectors.length > 0 && (
               <div className="space-y-2">
-                <Label>Tipologie Biglietto Consentite</Label>
+                <Label className="flex items-center gap-2">
+                  <Ticket className="h-4 w-4 text-amber-400" />
+                  Tipologie Biglietto Consentite
+                </Label>
                 <p className="text-xs text-muted-foreground">
                   Seleziona quali tipologie questo scanner può validare. Lascia vuoto per consentire tutte.
                 </p>
-                <div className="space-y-2 max-h-40 overflow-y-auto">
+                <div className="space-y-2 max-h-32 overflow-y-auto">
                   {eventSectors.map(sector => (
                     <div 
                       key={sector.id}
@@ -734,6 +867,41 @@ export default function ScannerManagement() {
                     {selectedSectorIds.length} tipologie selezionate
                   </p>
                 )}
+              </div>
+            )}
+
+            {/* Orario di Lavoro */}
+            {selectedEventId && (
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <Clock className="h-4 w-4 text-green-400" />
+                  Orario di Lavoro (opzionale)
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Imposta l'orario in cui lo scanner può operare. Lascia vuoto per nessun limite.
+                </p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Inizio</Label>
+                    <Input
+                      type="time"
+                      value={startTime}
+                      onChange={(e) => setStartTime(e.target.value)}
+                      className="mt-1"
+                      data-testid="input-start-time"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Fine</Label>
+                    <Input
+                      type="time"
+                      value={endTime}
+                      onChange={(e) => setEndTime(e.target.value)}
+                      className="mt-1"
+                      data-testid="input-end-time"
+                    />
+                  </div>
+                </div>
               </div>
             )}
           </div>

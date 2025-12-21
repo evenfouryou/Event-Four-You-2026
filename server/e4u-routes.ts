@@ -154,8 +154,53 @@ async function checkTablePermission(userId: string, eventId: string, action: 'ma
   return false;
 }
 
-// Check if user has scanner permission for event
-async function checkScannerPermission(userId: string, eventId: string, scanType: 'lists' | 'tables' | 'tickets'): Promise<boolean> {
+// Check if current time is within scanner's allowed work hours
+function isWithinWorkHours(startTime: string | null, endTime: string | null): boolean {
+  if (!startTime && !endTime) return true; // No time restrictions
+  
+  const now = new Date();
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+  
+  const parseTime = (time: string): number => {
+    const [hours, minutes] = time.split(':').map(Number);
+    return hours * 60 + minutes;
+  };
+  
+  if (startTime && endTime) {
+    const start = parseTime(startTime);
+    const end = parseTime(endTime);
+    
+    // Handle overnight shifts (e.g., 22:00 - 06:00)
+    if (end < start) {
+      return currentMinutes >= start || currentMinutes <= end;
+    }
+    return currentMinutes >= start && currentMinutes <= end;
+  }
+  
+  if (startTime) {
+    return currentMinutes >= parseTime(startTime);
+  }
+  
+  if (endTime) {
+    return currentMinutes <= parseTime(endTime);
+  }
+  
+  return true;
+}
+
+// Check if user has scanner permission for event (with granular checks)
+interface ScannerPermissionResult {
+  allowed: boolean;
+  scanner?: typeof eventScanners.$inferSelect;
+  reason?: string;
+}
+
+async function checkScannerPermissionGranular(
+  userId: string, 
+  eventId: string, 
+  scanType: 'lists' | 'tables' | 'tickets',
+  itemId?: string // listId, tableTypeId, or sectorId
+): Promise<ScannerPermissionResult> {
   const [scanner] = await db.select()
     .from(eventScanners)
     .where(and(
@@ -164,14 +209,68 @@ async function checkScannerPermission(userId: string, eventId: string, scanType:
       eq(eventScanners.isActive, true)
     ));
   
-  if (!scanner) return false;
-  
-  switch (scanType) {
-    case 'lists': return scanner.canScanLists;
-    case 'tables': return scanner.canScanTables;
-    case 'tickets': return scanner.canScanTickets;
-    default: return false;
+  if (!scanner) {
+    return { allowed: false, reason: "Non sei assegnato a questo evento" };
   }
+  
+  // Check work hours
+  if (!isWithinWorkHours(scanner.startTime, scanner.endTime)) {
+    return { 
+      allowed: false, 
+      scanner,
+      reason: `Puoi operare solo dalle ${scanner.startTime || '00:00'} alle ${scanner.endTime || '23:59'}`
+    };
+  }
+  
+  // Check scan type permission
+  switch (scanType) {
+    case 'lists':
+      if (!scanner.canScanLists) {
+        return { allowed: false, scanner, reason: "Non hai i permessi per scansionare liste" };
+      }
+      // Check specific list permission
+      if (itemId && scanner.allowedListIds && scanner.allowedListIds.length > 0) {
+        if (!scanner.allowedListIds.includes(itemId)) {
+          return { allowed: false, scanner, reason: "Non hai i permessi per questa lista specifica" };
+        }
+      }
+      break;
+      
+    case 'tables':
+      if (!scanner.canScanTables) {
+        return { allowed: false, scanner, reason: "Non hai i permessi per scansionare tavoli" };
+      }
+      // Check specific table type permission
+      if (itemId && scanner.allowedTableTypeIds && scanner.allowedTableTypeIds.length > 0) {
+        if (!scanner.allowedTableTypeIds.includes(itemId)) {
+          return { allowed: false, scanner, reason: "Non hai i permessi per questo tipo di tavolo" };
+        }
+      }
+      break;
+      
+    case 'tickets':
+      if (!scanner.canScanTickets) {
+        return { allowed: false, scanner, reason: "Non hai i permessi per scansionare biglietti" };
+      }
+      // Check specific sector permission
+      if (itemId && scanner.allowedSectorIds && scanner.allowedSectorIds.length > 0) {
+        if (!scanner.allowedSectorIds.includes(itemId)) {
+          return { allowed: false, scanner, reason: "Non hai i permessi per questo settore" };
+        }
+      }
+      break;
+      
+    default:
+      return { allowed: false, scanner, reason: "Tipo di scansione non riconosciuto" };
+  }
+  
+  return { allowed: true, scanner };
+}
+
+// Legacy function for backward compatibility
+async function checkScannerPermission(userId: string, eventId: string, scanType: 'lists' | 'tables' | 'tickets'): Promise<boolean> {
+  const result = await checkScannerPermissionGranular(userId, eventId, scanType);
+  return result.allowed;
 }
 
 // Check if user is gestore/super_admin or has event assignment
@@ -1441,13 +1540,13 @@ router.post("/api/e4u/scan", requireAuth, async (req: Request, res: Response) =>
         .from(siaeEventSectors)
         .where(eq(siaeEventSectors.id, ticket.sectorId));
       
-      // SECURITY: Verifica permessi scanner per questo evento
+      // SECURITY: Verifica permessi scanner per questo evento (con verifica settore)
       const isGestore = await isGestoreForEvent(user, ticketedEvent.eventId);
       if (!isGestore) {
-        const canScan = await checkScannerPermission(user.id, ticketedEvent.eventId, 'tickets');
-        if (!canScan) {
+        const permResult = await checkScannerPermissionGranular(user.id, ticketedEvent.eventId, 'tickets', ticket.sectorId);
+        if (!permResult.allowed) {
           return res.status(403).json({ 
-            message: "Non hai i permessi di scansione biglietti per questo evento. Contatta l'organizzatore.",
+            message: permResult.reason || "Non hai i permessi di scansione biglietti per questo evento. Contatta l'organizzatore.",
             errorCode: "SCANNER_PERMISSION_DENIED"
           });
         }
@@ -1529,14 +1628,14 @@ router.post("/api/e4u/scan", requireAuth, async (req: Request, res: Response) =>
         return res.status(400).json({ message: "QR code non valido per questo evento" });
       }
       
-      // SECURITY: Verifica permessi scanner per questo evento
+      // SECURITY: Verifica permessi scanner per questo evento (con verifica lista specifica)
       // PR semplice NON può accedere senza permesso esplicito di scansione
       const isGestore = await isGestoreForEvent(user, entry.eventId);
       if (!isGestore) {
-        const canScan = await checkScannerPermission(user.id, entry.eventId, 'lists');
-        if (!canScan) {
+        const permResult = await checkScannerPermissionGranular(user.id, entry.eventId, 'lists', entry.listId);
+        if (!permResult.allowed) {
           return res.status(403).json({ 
-            message: "Non hai i permessi di scansione per questo evento. Contatta l'organizzatore.",
+            message: permResult.reason || "Non hai i permessi di scansione per questo evento. Contatta l'organizzatore.",
             errorCode: "SCANNER_PERMISSION_DENIED"
           });
         }
@@ -1579,14 +1678,23 @@ router.post("/api/e4u/scan", requireAuth, async (req: Request, res: Response) =>
         return res.status(400).json({ message: "QR code non valido per questo evento" });
       }
       
-      // SECURITY: Verifica permessi scanner per questo evento
+      // Get table type from reservation for granular permission check
+      let tableTypeId: string | undefined;
+      if (guest.reservationId) {
+        const [reservation] = await db.select({ tableTypeId: tableReservations.tableTypeId })
+          .from(tableReservations)
+          .where(eq(tableReservations.id, guest.reservationId));
+        tableTypeId = reservation?.tableTypeId;
+      }
+      
+      // SECURITY: Verifica permessi scanner per questo evento (con verifica tipo tavolo)
       // PR semplice NON può accedere senza permesso esplicito di scansione
       const isGestore = await isGestoreForEvent(user, guest.eventId);
       if (!isGestore) {
-        const canScan = await checkScannerPermission(user.id, guest.eventId, 'tables');
-        if (!canScan) {
+        const permResult = await checkScannerPermissionGranular(user.id, guest.eventId, 'tables', tableTypeId);
+        if (!permResult.allowed) {
           return res.status(403).json({ 
-            message: "Non hai i permessi di scansione per questo evento. Contatta l'organizzatore.",
+            message: permResult.reason || "Non hai i permessi di scansione per questo evento. Contatta l'organizzatore.",
             errorCode: "SCANNER_PERMISSION_DENIED"
           });
         }
