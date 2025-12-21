@@ -1068,11 +1068,10 @@ router.patch("/api/e4u/scanners/:id/access", requireAuth, requireGestore, async 
     }
     
     // Sanitize: filter falsy values, remove duplicates, ensure strings only
-    const sanitizedSectorIds = [...new Set(
-      rawSectorIds
-        .filter((id: unknown) => id && typeof id === 'string')
-        .map((id: string) => id.trim())
-    )];
+    const filteredIds = rawSectorIds
+      .filter((id: unknown) => id && typeof id === 'string')
+      .map((id: string) => id.trim());
+    const sanitizedSectorIds = Array.from(new Set(filteredIds));
     
     // Update the scanner with sanitized sector access
     const [updated] = await db.update(eventScanners)
@@ -1099,6 +1098,38 @@ router.delete("/api/e4u/scanners/:id", requireAuth, requireGestore, async (req: 
       return res.status(404).json({ message: "Scanner non trovato" });
     }
     res.json({ message: "Scanner rimosso dall'evento" });
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// GET /api/e4u/scanners/assignments - Get all scanner assignments for company
+router.get("/api/e4u/scanners/assignments", requireAuth, requireGestore, async (req: Request, res: Response) => {
+  try {
+    const user = req.user as any;
+    const companyId = user.companyId;
+    
+    // Always require company scope for gestore
+    if (!companyId) {
+      if (user.role !== 'super_admin') {
+        return res.status(403).json({ message: "Nessuna company associata" });
+      }
+    }
+    
+    // For gestore, always scope to their company
+    // For super_admin without company, return empty (they should pick a context)
+    if (!companyId && user.role === 'super_admin') {
+      // Super admin without company context - return empty
+      return res.json([]);
+    }
+    
+    // Query only assignments for the user's company
+    const assignments = await db.select()
+      .from(eventScanners)
+      .where(eq(eventScanners.companyId, companyId))
+      .orderBy(desc(eventScanners.createdAt));
+    
+    res.json(assignments);
   } catch (error: any) {
     res.status(500).json({ message: error.message });
   }

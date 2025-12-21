@@ -339,6 +339,12 @@ export function AppSidebar() {
         group: "Gestione",
       },
       {
+        title: "Scanner",
+        icon: ScanLine,
+        url: "/scanner-management",
+        group: "Gestione",
+      },
+      {
         title: "Badge Scuola",
         icon: GraduationCap,
         url: "/school-badges",

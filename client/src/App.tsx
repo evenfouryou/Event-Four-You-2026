@@ -105,6 +105,7 @@ import StaffPrEventPanel from "@/pages/staff-pr-event-panel";
 import CassaBiglietti from "@/pages/cassa-biglietti";
 import CashierManagement from "@/pages/cashier-management";
 import CashierDashboard from "@/pages/cashier-dashboard";
+import ScannerManagement from "@/pages/scanner-management";
 import EventShortLink from "@/pages/event-short-link";
 import AdminSiteSettings from "@/pages/admin-site-settings";
 import AdminBillingPlans from "@/pages/admin-billing-plans";
@@ -299,6 +300,7 @@ function Router() {
               <Route path="/cassa-biglietti" component={CassaBiglietti} />
               <Route path="/cashier/management" component={CashierManagement} />
               <Route path="/cashier/dashboard" component={CashierDashboard} />
+              <Route path="/scanner-management" component={ScannerManagement} />
               <Route path="/e/:shortId" component={EventShortLink} />
               <Route path="/accedi">
                 <Redirect to="/" />

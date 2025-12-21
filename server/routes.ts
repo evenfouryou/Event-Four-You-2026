@@ -3494,6 +3494,67 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // GET /api/users/scanners - Get all scanner users for the company
+  app.get('/api/users/scanners', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub || req.user?.id;
+      const currentUser = await storage.getUser(userId);
+      
+      if (!currentUser) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      if (currentUser.role !== 'super_admin' && currentUser.role !== 'gestore') {
+        return res.status(403).json({ message: "Forbidden: Admin access required" });
+      }
+
+      const companyId = currentUser.companyId;
+      
+      // Query only scanner role users directly from database - sanitized output
+      const { db } = await import("./db");
+      const { users } = await import("@shared/schema");
+      const { eq, and } = await import("drizzle-orm");
+      
+      let scanners;
+      if (currentUser.role === 'super_admin') {
+        scanners = await db.select({
+          id: users.id,
+          email: users.email,
+          firstName: users.firstName,
+          lastName: users.lastName,
+          role: users.role,
+          companyId: users.companyId,
+          phone: users.phone,
+          isActive: users.isActive,
+          createdAt: users.createdAt,
+        })
+          .from(users)
+          .where(eq(users.role, 'scanner'));
+      } else if (companyId) {
+        scanners = await db.select({
+          id: users.id,
+          email: users.email,
+          firstName: users.firstName,
+          lastName: users.lastName,
+          role: users.role,
+          companyId: users.companyId,
+          phone: users.phone,
+          isActive: users.isActive,
+          createdAt: users.createdAt,
+        })
+          .from(users)
+          .where(and(eq(users.role, 'scanner'), eq(users.companyId, companyId)));
+      } else {
+        return res.status(403).json({ message: "No company associated" });
+      }
+      
+      res.json(scanners);
+    } catch (error) {
+      console.error("Error fetching scanners:", error);
+      res.status(500).json({ message: "Failed to fetch scanners" });
+    }
+  });
+
   app.post('/api/users', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub || req.user?.id;
