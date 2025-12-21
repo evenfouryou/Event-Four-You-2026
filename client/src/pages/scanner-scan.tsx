@@ -333,35 +333,157 @@ export default function ScannerScanPage() {
           </TabsList>
         </div>
 
-        <TabsContent value="scan" className="p-4 space-y-4 mt-0">
+        <TabsContent value="scan" className="px-3 pb-4 space-y-3 mt-0">
+          {/* Barra ricerca PRIMA della fotocamera - ottimizzata per mobile */}
+          <Card className="border-0 bg-card/50 backdrop-blur-sm">
+            <CardContent className="p-3">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                <Input
+                  ref={inputRef}
+                  placeholder="QR code, nome o telefono..."
+                  value={searchQuery}
+                  onChange={(e) => {
+                    setSearchQuery(e.target.value);
+                    handleSearch(e.target.value);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && searchQuery.trim()) {
+                      if (searchQuery.startsWith('E4U-')) {
+                        handleScan(searchQuery.trim());
+                      }
+                    }
+                  }}
+                  className="h-12 text-base pl-10 pr-12 rounded-xl bg-muted/30 border-white/10"
+                  data-testid="input-search"
+                />
+                {isSearching && (
+                  <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 animate-spin text-muted-foreground" />
+                )}
+                {searchQuery && !isSearching && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8"
+                    onClick={() => {
+                      setSearchQuery("");
+                      setSearchResults([]);
+                      setScanResult(null);
+                    }}
+                  >
+                    <XCircle className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
+              
+              {searchQuery.startsWith('E4U-') && (
+                <Button
+                  onClick={() => handleScan(searchQuery.trim())}
+                  disabled={scanMutation.isPending || !searchQuery.trim() || isProcessing}
+                  className="w-full h-11 mt-2 bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 rounded-xl"
+                  data-testid="button-scan"
+                >
+                  {scanMutation.isPending || isProcessing ? (
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                  ) : (
+                    <>
+                      <ScanLine className="w-5 h-5 mr-2" />
+                      Verifica QR
+                    </>
+                  )}
+                </Button>
+              )}
+              
+              {searchResults.length > 0 && (
+                <div className="space-y-2 mt-3 max-h-[40vh] overflow-y-auto">
+                  {searchResults.map((result) => (
+                    <motion.div
+                      key={`${result.type}-${result.id}`}
+                      initial={{ opacity: 0, y: 5 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className={`p-2.5 rounded-lg cursor-pointer transition-all active:scale-[0.98] ${
+                        result.status === 'checked_in' 
+                          ? 'bg-amber-500/10 border border-amber-500/20' 
+                          : 'bg-muted/30 border border-white/5'
+                      }`}
+                      onClick={() => handleSearchResultClick(result)}
+                      data-testid={`search-result-${result.id}`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
+                            result.type === 'lista' 
+                              ? 'bg-blue-500/20' 
+                              : 'bg-purple-500/20'
+                          }`}>
+                            {result.type === 'lista' ? (
+                              <Users className="w-4 h-4 text-blue-400" />
+                            ) : (
+                              <Armchair className="w-4 h-4 text-purple-400" />
+                            )}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="font-medium text-sm truncate">
+                              {result.firstName} {result.lastName}
+                            </p>
+                            <p className="text-xs text-muted-foreground truncate">
+                              {result.type === 'lista' ? result.listName : result.tableName}
+                            </p>
+                          </div>
+                        </div>
+                        {result.status === 'checked_in' ? (
+                          <Badge className="bg-amber-500/20 text-amber-400 border-amber-500/30 shrink-0 text-xs px-2">
+                            Entrato
+                          </Badge>
+                        ) : (
+                          <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 shrink-0 text-xs px-2">
+                            Check-in
+                          </Badge>
+                        )}
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              )}
+              
+              {searchQuery.length >= 2 && !searchQuery.startsWith('E4U-') && !isSearching && searchResults.length === 0 && (
+                <div className="p-3 mt-2 rounded-lg bg-muted/20 text-center">
+                  <p className="text-sm text-muted-foreground">
+                    Nessun risultato
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Fotocamera - compatta quando c'è la tastiera */}
           <Card className="overflow-hidden border-0 bg-gradient-to-br from-card to-card/80 shadow-xl">
             <CardContent className="p-0">
               <div className="relative">
                 <div 
                   id={scannerContainerId} 
-                  className={`w-full aspect-square bg-black/90 ${cameraActive ? '' : 'hidden'}`}
+                  className={`w-full aspect-[4/3] bg-black/90 ${cameraActive ? '' : 'hidden'}`}
                 />
                 
                 {!cameraActive && (
-                  <div className="w-full aspect-square bg-gradient-to-br from-slate-900 to-slate-800 flex flex-col items-center justify-center">
+                  <div className="w-full aspect-[4/3] bg-gradient-to-br from-slate-900 to-slate-800 flex flex-col items-center justify-center">
                     <motion.div
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
-                      className="text-center p-6"
+                      className="text-center p-4"
                     >
-                      <div className="w-24 h-24 rounded-full bg-emerald-500/10 flex items-center justify-center mx-auto mb-4 border-2 border-dashed border-emerald-500/30">
-                        <QrCode className="w-12 h-12 text-emerald-400" />
+                      <div className="w-16 h-16 rounded-full bg-emerald-500/10 flex items-center justify-center mx-auto mb-3 border-2 border-dashed border-emerald-500/30">
+                        <QrCode className="w-8 h-8 text-emerald-400" />
                       </div>
-                      <p className="text-muted-foreground mb-4">
+                      <p className="text-sm text-muted-foreground mb-3">
                         Tocca per attivare la fotocamera
                       </p>
                       <Button
                         onClick={startCamera}
-                        size="lg"
-                        className="bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 rounded-full px-8"
+                        className="bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 rounded-full px-6"
                         data-testid="button-start-camera"
                       >
-                        <Camera className="w-5 h-5 mr-2" />
+                        <Camera className="w-4 h-4 mr-2" />
                         Attiva Fotocamera
                       </Button>
                     </motion.div>
@@ -369,7 +491,7 @@ export default function ScannerScanPage() {
                 )}
 
                 {cameraActive && (
-                  <div className="absolute bottom-4 left-1/2 -translate-x-1/2">
+                  <div className="absolute bottom-3 left-1/2 -translate-x-1/2">
                     <Button
                       onClick={stopCamera}
                       variant="secondary"
@@ -385,132 +507,13 @@ export default function ScannerScanPage() {
               </div>
 
               {cameraError && (
-                <div className="p-4 bg-rose-500/10 border-t border-rose-500/20">
+                <div className="p-3 bg-rose-500/10 border-t border-rose-500/20">
                   <p className="text-sm text-rose-400 text-center flex items-center justify-center gap-2">
                     <Shield className="w-4 h-4" />
                     {cameraError}
                   </p>
                 </div>
               )}
-
-              <div className="p-3 space-y-3 border-t border-white/5">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                  <Input
-                    ref={inputRef}
-                    placeholder="QR code, nome o telefono..."
-                    value={searchQuery}
-                    onChange={(e) => {
-                      setSearchQuery(e.target.value);
-                      handleSearch(e.target.value);
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && searchQuery.trim()) {
-                        if (searchQuery.startsWith('E4U-')) {
-                          handleScan(searchQuery.trim());
-                        }
-                      }
-                    }}
-                    className="h-12 text-base pl-10 pr-12 rounded-xl bg-muted/30 border-white/10"
-                    data-testid="input-search"
-                  />
-                  {isSearching && (
-                    <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 animate-spin text-muted-foreground" />
-                  )}
-                  {searchQuery && !isSearching && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8"
-                      onClick={() => {
-                        setSearchQuery("");
-                        setSearchResults([]);
-                        setScanResult(null);
-                      }}
-                    >
-                      <XCircle className="h-4 w-4" />
-                    </Button>
-                  )}
-                </div>
-                
-                {searchQuery.startsWith('E4U-') && (
-                  <Button
-                    onClick={() => handleScan(searchQuery.trim())}
-                    disabled={scanMutation.isPending || !searchQuery.trim() || isProcessing}
-                    className="w-full h-11 bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 rounded-xl"
-                    data-testid="button-scan"
-                  >
-                    {scanMutation.isPending || isProcessing ? (
-                      <Loader2 className="w-5 h-5 animate-spin" />
-                    ) : (
-                      <>
-                        <ScanLine className="w-5 h-5 mr-2" />
-                        Verifica QR
-                      </>
-                    )}
-                  </Button>
-                )}
-                
-                {searchResults.length > 0 && (
-                  <div className="space-y-2 max-h-48 overflow-y-auto">
-                    {searchResults.map((result) => (
-                      <motion.div
-                        key={`${result.type}-${result.id}`}
-                        initial={{ opacity: 0, y: 5 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className={`p-2.5 rounded-lg cursor-pointer transition-all active:scale-[0.98] ${
-                          result.status === 'checked_in' 
-                            ? 'bg-amber-500/10 border border-amber-500/20' 
-                            : 'bg-muted/30 border border-white/5'
-                        }`}
-                        onClick={() => handleSearchResultClick(result)}
-                        data-testid={`search-result-${result.id}`}
-                      >
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
-                              result.type === 'lista' 
-                                ? 'bg-blue-500/20' 
-                                : 'bg-purple-500/20'
-                            }`}>
-                              {result.type === 'lista' ? (
-                                <Users className="w-4 h-4 text-blue-400" />
-                              ) : (
-                                <Armchair className="w-4 h-4 text-purple-400" />
-                              )}
-                            </div>
-                            <div className="min-w-0">
-                              <p className="font-medium text-sm truncate">
-                                {result.firstName} {result.lastName}
-                              </p>
-                              <p className="text-xs text-muted-foreground truncate">
-                                {result.type === 'lista' ? result.listName : result.tableName}
-                              </p>
-                            </div>
-                          </div>
-                          {result.status === 'checked_in' ? (
-                            <Badge className="bg-amber-500/20 text-amber-400 border-amber-500/30 shrink-0 text-xs px-2">
-                              Entrato
-                            </Badge>
-                          ) : (
-                            <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 shrink-0 text-xs px-2">
-                              Check-in
-                            </Badge>
-                          )}
-                        </div>
-                      </motion.div>
-                    ))}
-                  </div>
-                )}
-                
-                {searchQuery.length >= 2 && !searchQuery.startsWith('E4U-') && !isSearching && searchResults.length === 0 && (
-                  <div className="p-3 rounded-lg bg-muted/20 text-center">
-                    <p className="text-sm text-muted-foreground">
-                      Nessun risultato
-                    </p>
-                  </div>
-                )}
-              </div>
             </CardContent>
           </Card>
 
