@@ -78,7 +78,7 @@ const userFormSchema = z.object({
   password: z.string().optional(),
   firstName: z.string().min(1, "Nome richiesto"),
   lastName: z.string().min(1, "Cognome richiesto"),
-  role: z.enum(['super_admin', 'gestore', 'gestore_covisione', 'capo_staff', 'pr', 'warehouse', 'bartender', 'cassiere', 'scanner']),
+  role: z.enum(['super_admin', 'gestore', 'gestore_covisione', 'capo_staff', 'pr', 'warehouse', 'bartender', 'cassiere']),
   companyId: z.string().optional().nullable(),
   phone: z.string().optional(),
   isEditing: z.boolean().optional(),
@@ -802,7 +802,6 @@ export default function UsersPage() {
                               <SelectItem value="warehouse">Magazzino</SelectItem>
                               <SelectItem value="bartender">Bartender</SelectItem>
                               <SelectItem value="cassiere">Cassiere</SelectItem>
-                              <SelectItem value="scanner">Scanner</SelectItem>
                             </>
                           )}
                           {isAdmin && (
@@ -813,7 +812,6 @@ export default function UsersPage() {
                               <SelectItem value="warehouse">Magazzino</SelectItem>
                               <SelectItem value="bartender">Bartender</SelectItem>
                               <SelectItem value="cassiere">Cassiere</SelectItem>
-                              <SelectItem value="scanner">Scanner</SelectItem>
                             </>
                           )}
                           {isCapoStaff && (
@@ -825,7 +823,7 @@ export default function UsersPage() {
                     </FormItem>
                   )}
                 />
-                {(watchRole === 'pr' || watchRole === 'scanner') && (
+                {watchRole === 'pr' && (
                   <FormField
                     control={form.control}
                     name="phone"
