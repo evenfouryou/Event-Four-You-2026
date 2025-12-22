@@ -6,9 +6,11 @@ import { motion, AnimatePresence } from "framer-motion";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { type SiaeTransmission } from "@shared/schema";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -19,6 +21,23 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import {
   MobileAppLayout,
   MobileHeader,
@@ -46,6 +65,7 @@ import {
   Mail,
   Zap,
   TestTube,
+  Plus,
 } from "lucide-react";
 
 const springTransition = {
@@ -57,6 +77,7 @@ const springTransition = {
 export default function SiaeTransmissionsPage() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const isMobile = useIsMobile();
   const [selectedTransmission, setSelectedTransmission] = useState<SiaeTransmission | null>(null);
   const [isDetailSheetOpen, setIsDetailSheetOpen] = useState(false);
   const [isCreateSheetOpen, setIsCreateSheetOpen] = useState(false);
@@ -64,6 +85,11 @@ export default function SiaeTransmissionsPage() {
   const [isTestEmailSheetOpen, setIsTestEmailSheetOpen] = useState(false);
   const [isSendDailySheetOpen, setIsSendDailySheetOpen] = useState(false);
   const [isConfirmReceiptSheetOpen, setIsConfirmReceiptSheetOpen] = useState(false);
+  const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isSendDailyDialogOpen, setIsSendDailyDialogOpen] = useState(false);
+  const [isTestEmailDialogOpen, setIsTestEmailDialogOpen] = useState(false);
+  const [isConfirmReceiptDialogOpen, setIsConfirmReceiptDialogOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [transmissionType, setTransmissionType] = useState<string>("daily");
@@ -312,6 +338,417 @@ export default function SiaeTransmissionsPage() {
 
   const activeFiltersCount = (statusFilter !== "all" ? 1 : 0) + (typeFilter !== "all" ? 1 : 0);
 
+  // Desktop version
+  if (!isMobile) {
+    return (
+      <div className="container mx-auto p-6 space-y-6" data-testid="page-siae-transmissions">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">Trasmissioni SIAE</h1>
+            <p className="text-muted-foreground">Gestione trasmissioni XML verso SIAE</p>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setIsTestEmailDialogOpen(true)} data-testid="button-test-email">
+              <TestTube className="w-4 h-4 mr-2" />
+              Test Email
+            </Button>
+            <Button variant="outline" onClick={() => setIsCreateDialogOpen(true)} data-testid="button-create">
+              <Upload className="w-4 h-4 mr-2" />
+              Genera XML
+            </Button>
+            <Button onClick={() => setIsSendDailyDialogOpen(true)} data-testid="button-send-daily">
+              <Zap className="w-4 h-4 mr-2" />
+              Invia Trasmissione Giornaliera
+            </Button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-5 gap-4">
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-2xl font-bold">{stats.total}</div>
+              <p className="text-sm text-muted-foreground">Totale</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-2xl font-bold text-amber-500">{stats.pending}</div>
+              <p className="text-sm text-muted-foreground">In Attesa</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-2xl font-bold text-blue-500">{stats.sent}</div>
+              <p className="text-sm text-muted-foreground">Inviate</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-2xl font-bold text-green-500">{stats.received}</div>
+              <p className="text-sm text-muted-foreground">Ricevute</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-2xl font-bold text-red-500">{stats.error}</div>
+              <p className="text-sm text-muted-foreground">Errori</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle>Elenco Trasmissioni</CardTitle>
+              <div className="flex gap-2">
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger className="w-[150px]">
+                    <SelectValue placeholder="Stato" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Tutti gli stati</SelectItem>
+                    <SelectItem value="pending">In Attesa</SelectItem>
+                    <SelectItem value="sent">Inviata</SelectItem>
+                    <SelectItem value="received">Ricevuta</SelectItem>
+                    <SelectItem value="error">Errore</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={typeFilter} onValueChange={setTypeFilter}>
+                  <SelectTrigger className="w-[150px]">
+                    <SelectValue placeholder="Tipo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Tutti i tipi</SelectItem>
+                    <SelectItem value="daily">Giornaliera</SelectItem>
+                    <SelectItem value="monthly">Mensile</SelectItem>
+                    <SelectItem value="corrective">Correttiva</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <div className="space-y-2">
+                {[1, 2, 3].map(i => <Skeleton key={i} className="h-12 w-full" />)}
+              </div>
+            ) : filteredTransmissions && filteredTransmissions.length > 0 ? (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Data</TableHead>
+                    <TableHead>Tipo</TableHead>
+                    <TableHead>Biglietti</TableHead>
+                    <TableHead>Importo</TableHead>
+                    <TableHead>Stato</TableHead>
+                    <TableHead>Protocollo</TableHead>
+                    <TableHead className="text-right">Azioni</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredTransmissions.map((trans) => {
+                    const statusConfig = getStatusConfig(trans.status);
+                    return (
+                      <TableRow key={trans.id} data-testid={`row-transmission-${trans.id}`}>
+                        <TableCell>
+                          {trans.periodDate && format(new Date(trans.periodDate), "dd/MM/yyyy", { locale: it })}
+                        </TableCell>
+                        <TableCell>{getTypeLabel(trans.transmissionType)}</TableCell>
+                        <TableCell>{trans.ticketsCount}</TableCell>
+                        <TableCell>€{Number(trans.totalAmount || 0).toFixed(2)}</TableCell>
+                        <TableCell>{statusConfig.badge}</TableCell>
+                        <TableCell className="font-mono text-sm">
+                          {trans.receiptProtocol || "-"}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setSelectedTransmission(trans);
+                                setIsDetailDialogOpen(true);
+                              }}
+                            >
+                              <Eye className="w-4 h-4" />
+                            </Button>
+                            {trans.fileContent && (
+                              <Button variant="ghost" size="sm">
+                                <Download className="w-4 h-4" />
+                              </Button>
+                            )}
+                            {trans.status === "pending" && trans.fileContent && (
+                              <Button
+                                size="sm"
+                                onClick={() => {
+                                  sendEmailMutation.mutate({
+                                    id: trans.id,
+                                    toEmail: "servertest2@batest.siae.it",
+                                  });
+                                }}
+                                disabled={sendEmailMutation.isPending}
+                              >
+                                <Mail className="w-4 h-4 mr-1" />
+                                Invia
+                              </Button>
+                            )}
+                            {trans.status === "sent" && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => {
+                                  setSelectedTransmission(trans);
+                                  setIsConfirmReceiptDialogOpen(true);
+                                }}
+                              >
+                                <CheckCircle2 className="w-4 h-4 mr-1" />
+                                Conferma
+                              </Button>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                <FileText className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                <p>Nessuna trasmissione trovata</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Genera Trasmissione XML</DialogTitle>
+              <DialogDescription>Crea un nuovo file XML per la trasmissione SIAE</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div>
+                <Label>Tipo Trasmissione</Label>
+                <Select value={transmissionType} onValueChange={setTransmissionType}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="daily">Giornaliera</SelectItem>
+                    <SelectItem value="monthly">Mensile</SelectItem>
+                    <SelectItem value="corrective">Correttiva</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Data Periodo</Label>
+                <Input type="date" value={periodDate} onChange={(e) => setPeriodDate(e.target.value)} />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>Annulla</Button>
+              <Button
+                onClick={() => {
+                  createTransmissionMutation.mutate({ transmissionType, periodDate });
+                  setIsCreateDialogOpen(false);
+                }}
+                disabled={!periodDate || createTransmissionMutation.isPending}
+              >
+                {createTransmissionMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                Genera XML
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={isSendDailyDialogOpen} onOpenChange={setIsSendDailyDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Trasmissione Giornaliera Automatica</DialogTitle>
+              <DialogDescription>Genera e invia automaticamente la trasmissione XML</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div>
+                <Label>Data</Label>
+                <Input type="date" value={dailyDate} onChange={(e) => setDailyDate(e.target.value)} />
+              </div>
+              <div>
+                <Label>Email Destinatario SIAE</Label>
+                <Input type="email" value={dailyEmail} onChange={(e) => setDailyEmail(e.target.value)} />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsSendDailyDialogOpen(false)}>Annulla</Button>
+              <Button
+                onClick={() => {
+                  sendDailyMutation.mutate({ date: dailyDate, toEmail: dailyEmail });
+                }}
+                disabled={!dailyDate || !dailyEmail || sendDailyMutation.isPending}
+              >
+                {sendDailyMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                Genera e Invia
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={isTestEmailDialogOpen} onOpenChange={setIsTestEmailDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Test Invio Email</DialogTitle>
+              <DialogDescription>Verifica la configurazione email SIAE</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div>
+                <Label>Email Destinatario</Label>
+                <Input type="email" value={testEmail} onChange={(e) => setTestEmail(e.target.value)} />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsTestEmailDialogOpen(false)}>Annulla</Button>
+              <Button
+                onClick={() => {
+                  testEmailMutation.mutate(testEmail);
+                  setIsTestEmailDialogOpen(false);
+                }}
+                disabled={!testEmail || testEmailMutation.isPending}
+              >
+                {testEmailMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                Invia Test
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={isConfirmReceiptDialogOpen} onOpenChange={setIsConfirmReceiptDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Conferma Ricezione SIAE</DialogTitle>
+              <DialogDescription>Registra la conferma ricevuta da SIAE</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div>
+                <Label>Protocollo Ricezione *</Label>
+                <Input
+                  value={receiptProtocol}
+                  onChange={(e) => setReceiptProtocol(e.target.value)}
+                  placeholder="Es: SIAE-2025-001234"
+                />
+              </div>
+              <div>
+                <Label>Contenuto Ricevuta (opzionale)</Label>
+                <Input
+                  value={receiptContent}
+                  onChange={(e) => setReceiptContent(e.target.value)}
+                  placeholder="Note o riferimenti"
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => {
+                setIsConfirmReceiptDialogOpen(false);
+                setReceiptProtocol("");
+                setReceiptContent("");
+              }}>Annulla</Button>
+              <Button
+                onClick={() => {
+                  if (selectedTransmission) {
+                    confirmReceiptMutation.mutate({
+                      id: selectedTransmission.id,
+                      receiptProtocol,
+                      receiptContent: receiptContent || undefined,
+                    });
+                    setIsConfirmReceiptDialogOpen(false);
+                  }
+                }}
+                disabled={!receiptProtocol || confirmReceiptMutation.isPending}
+              >
+                {confirmReceiptMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                Conferma Ricezione
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Dettaglio Trasmissione</DialogTitle>
+            </DialogHeader>
+            {selectedTransmission && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-muted-foreground">Tipo</Label>
+                    <p className="font-medium">{getTypeLabel(selectedTransmission.transmissionType)}</p>
+                  </div>
+                  <div>
+                    <Label className="text-muted-foreground">Data Periodo</Label>
+                    <p className="font-medium">
+                      {selectedTransmission.periodDate && format(new Date(selectedTransmission.periodDate), "dd/MM/yyyy", { locale: it })}
+                    </p>
+                  </div>
+                  <div>
+                    <Label className="text-muted-foreground">Biglietti</Label>
+                    <p className="font-medium">{selectedTransmission.ticketsCount}</p>
+                  </div>
+                  <div>
+                    <Label className="text-muted-foreground">Importo Totale</Label>
+                    <p className="font-medium">€{Number(selectedTransmission.totalAmount || 0).toFixed(2)}</p>
+                  </div>
+                  <div>
+                    <Label className="text-muted-foreground">Stato</Label>
+                    <div className="mt-1">{getStatusConfig(selectedTransmission.status).badge}</div>
+                  </div>
+                  {selectedTransmission.receiptProtocol && (
+                    <div>
+                      <Label className="text-muted-foreground">Protocollo SIAE</Label>
+                      <p className="font-mono text-green-600">{selectedTransmission.receiptProtocol}</p>
+                    </div>
+                  )}
+                  {selectedTransmission.sentAt && (
+                    <div>
+                      <Label className="text-muted-foreground">Data Invio</Label>
+                      <p className="font-medium">{format(new Date(selectedTransmission.sentAt), "dd/MM/yyyy HH:mm", { locale: it })}</p>
+                    </div>
+                  )}
+                  {selectedTransmission.receivedAt && (
+                    <div>
+                      <Label className="text-muted-foreground">Data Ricezione</Label>
+                      <p className="font-medium">{format(new Date(selectedTransmission.receivedAt), "dd/MM/yyyy HH:mm", { locale: it })}</p>
+                    </div>
+                  )}
+                </div>
+                {selectedTransmission.errorMessage && (
+                  <div className="bg-red-50 dark:bg-red-950 p-4 rounded-lg">
+                    <Label className="text-red-600">Messaggio Errore</Label>
+                    <p className="text-red-700 dark:text-red-400">{selectedTransmission.errorMessage}</p>
+                  </div>
+                )}
+              </div>
+            )}
+            <DialogFooter>
+              {selectedTransmission?.status === "sent" && (
+                <Button
+                  onClick={() => {
+                    setIsDetailDialogOpen(false);
+                    setIsConfirmReceiptDialogOpen(true);
+                  }}
+                >
+                  <CheckCircle2 className="w-4 h-4 mr-2" />
+                  Conferma Ricezione
+                </Button>
+              )}
+              <Button variant="outline" onClick={() => setIsDetailDialogOpen(false)}>Chiudi</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+    );
+  }
+
+  // Mobile version
   const header = (
     <MobileHeader
       title="Trasmissioni SIAE"
