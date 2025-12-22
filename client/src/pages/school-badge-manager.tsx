@@ -342,6 +342,8 @@ export default function SchoolBadgeManager() {
     <MobileHeader
       title="Badge Scuole"
       subtitle={`${landings.length} landing`}
+      showBackButton
+      showMenuButton
     />
   );
 

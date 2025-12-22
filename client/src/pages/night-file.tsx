@@ -323,26 +323,11 @@ export default function NightFilePage() {
   }
 
   return (
-    <MobileAppLayout contentClassName="pb-24">
+    <MobileAppLayout 
+      header={<MobileHeader title="File della Serata" showBackButton showMenuButton />}
+      contentClassName="pb-24"
+    >
       <div className="py-4">
-        <motion.div 
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={springTransition}
-          className="flex items-center gap-4 mb-6"
-        >
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center glow-golden flex-shrink-0">
-            <FileText className="h-7 w-7 text-white" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold" data-testid="text-night-file-title">
-              File della Serata
-            </h1>
-            <p className="text-muted-foreground text-sm">
-              Seleziona un evento
-            </p>
-          </div>
-        </motion.div>
 
         {activeEvents.length === 0 ? (
           <motion.div

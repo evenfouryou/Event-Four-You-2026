@@ -35,6 +35,7 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
+import { useSidebar } from "@/components/ui/sidebar";
 import {
   Printer,
   Monitor,
@@ -53,6 +54,7 @@ import {
   Download,
   Key,
   Copy,
+  Menu,
   Check,
   Layout,
   Smartphone,
@@ -238,6 +240,7 @@ function AgentCard({ agent, profiles, onManageProfiles, onDelete }: AgentCardPro
 export default function PrinterSettings() {
   const { toast } = useToast();
   const { user } = useAuth();
+  const { toggleSidebar } = useSidebar();
   const [, navigate] = useLocation();
   const isSuperAdmin = user?.role === "super_admin";
   
@@ -1012,27 +1015,39 @@ export default function PrinterSettings() {
         <MobileHeader
           title={getSectionTitle()}
           leftAction={
-            activeSection ? (
-              <HapticButton
-                variant="ghost"
-                size="icon"
-                onClick={() => setActiveSection(null)}
-                className="min-h-[44px] min-w-[44px]"
-              >
-                <ArrowLeft className="w-5 h-5" />
-              </HapticButton>
-            ) : undefined
-          }
-          rightAction={
             <HapticButton
               variant="ghost"
               size="icon"
-              onClick={handleRefresh}
+              onClick={() => activeSection ? setActiveSection(null) : window.history.back()}
               className="min-h-[44px] min-w-[44px]"
-              data-testid="button-refresh-printers"
+              data-testid="button-back"
             >
-              <RefreshCw className="w-5 h-5" />
+              <ArrowLeft className="w-5 h-5" />
             </HapticButton>
+          }
+          rightAction={
+            <div className="flex items-center gap-1">
+              <HapticButton
+                variant="ghost"
+                size="icon"
+                onClick={handleRefresh}
+                className="min-h-[44px] min-w-[44px]"
+                data-testid="button-refresh-printers"
+              >
+                <RefreshCw className="w-5 h-5" />
+              </HapticButton>
+              {!activeSection && (
+                <HapticButton
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => toggleSidebar()}
+                  className="min-h-[44px] min-w-[44px]"
+                  data-testid="button-menu"
+                >
+                  <Menu className="w-5 h-5" />
+                </HapticButton>
+              )}
+            </div>
           }
         />
       }

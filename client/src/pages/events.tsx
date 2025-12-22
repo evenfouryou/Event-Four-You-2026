@@ -20,6 +20,7 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   MobileAppLayout,
+  MobileHeader,
   HapticButton, 
   FloatingActionButton,
   triggerHaptic,
@@ -409,7 +410,7 @@ export default function Events() {
 
   return (
     <MobileAppLayout
-      header={<EventsHeader totalCount={filterCounts.all} />}
+      header={<MobileHeader title="Eventi" showBackButton showMenuButton />}
       noPadding
       contentClassName="pb-24"
     >

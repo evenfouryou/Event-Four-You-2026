@@ -278,6 +278,8 @@ export default function CashierManagementPage() {
       header={
         <MobileHeader
           title="Gestione Cassieri"
+          showBackButton
+          showMenuButton
           leftAction={
             <div className="w-10 h-10 rounded-full bg-[#FFD700]/20 flex items-center justify-center">
               <Store className="w-5 h-5 text-[#FFD700]" />
