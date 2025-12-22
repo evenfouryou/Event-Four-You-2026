@@ -28,6 +28,7 @@ import {
   QrCode,
 } from "lucide-react";
 import { SiApple, SiGoogle } from "react-icons/si";
+import { DigitalTicketCard } from "@/components/DigitalTicketCard";
 
 interface TicketDetail {
   id: string;
@@ -412,37 +413,23 @@ export default function AccountTicketDetail() {
           </motion.div>
         )}
 
-        {showQrCode && (
-          <motion.div 
-            className="flex flex-col items-center px-4 py-6"
-            variants={scaleIn}
-          >
-            <div className="bg-white p-4 rounded-2xl shadow-xl">
-              {qrLoading ? (
-                <div className="w-[280px] h-[280px] flex items-center justify-center">
-                  <Loader2 className="w-12 h-12 animate-spin text-gray-400" />
-                </div>
-              ) : qrCodeImage ? (
-                <motion.img
-                  src={qrCodeImage}
-                  alt="QR Code biglietto"
-                  className="w-[280px] h-[280px]"
-                  data-testid="ticket-qrcode"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ duration: 0.3 }}
-                />
-              ) : (
-                <div className="w-[280px] h-[280px] flex items-center justify-center bg-gray-100 rounded-lg">
-                  <QrCode className="w-16 h-16 text-gray-400" />
-                </div>
-              )}
-            </div>
-            <p className="text-sm text-muted-foreground mt-3 font-mono" data-testid="text-ticket-code">
-              {ticket.ticketCode}
-            </p>
-          </motion.div>
-        )}
+        <motion.div 
+          className="px-4 py-4"
+          variants={scaleIn}
+        >
+          <DigitalTicketCard 
+            ticket={{
+              ...ticket,
+              allowNameChange: ticket.allowNameChange,
+              allowResale: ticket.allowResale,
+              organizerCompany: ticket.organizerCompany,
+              ticketingManager: ticket.ticketingManager,
+              emissionDateTime: ticket.emissionDateTime,
+              progressiveNumber: ticket.progressiveNumber,
+            }} 
+            template={digitalTemplate}
+          />
+        </motion.div>
 
         <motion.div 
           className="px-4 space-y-3"
