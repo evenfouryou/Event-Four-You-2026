@@ -1844,7 +1844,7 @@ export default function EventWizard() {
           </div>
         </div>
       }
-      contentClassName="py-4 pb-24"
+      contentClassName="py-4"
     >
       <div className="mb-6">
         <div className="flex items-center justify-around mb-4">

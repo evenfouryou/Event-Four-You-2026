@@ -452,7 +452,7 @@ export default function Home() {
             <QuickActionButton
               icon={Plus}
               label="Nuovo Evento"
-              href="/event-wizard"
+              href="/events/new"
               gradient="from-indigo-500 to-purple-600"
               delay={0.35}
             />

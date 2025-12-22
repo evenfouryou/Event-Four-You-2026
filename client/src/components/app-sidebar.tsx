@@ -339,10 +339,16 @@ export function AppSidebar() {
         group: "Gestione",
       },
       {
-        title: "Scanner",
+        title: "Gestione Scanner",
         icon: ScanLine,
         url: "/scanner-management",
         group: "Gestione",
+      },
+      {
+        title: "Scanner QR",
+        icon: QrCode,
+        url: "/scanner",
+        group: "Operazioni",
       },
       {
         title: "Badge Scuola",
