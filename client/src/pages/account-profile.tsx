@@ -137,13 +137,7 @@ export default function AccountProfile() {
 
   if (isLoading) {
     return (
-      <div 
-        className="fixed inset-0 flex items-center justify-center bg-background"
-        style={{ 
-          paddingTop: 'env(safe-area-inset-top)',
-          paddingBottom: 'env(safe-area-inset-bottom)',
-        }}
-      >
+      <div className="flex items-center justify-center py-20">
         <motion.div
           initial={{ opacity: 0, scale: 0.8 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -156,10 +150,7 @@ export default function AccountProfile() {
   }
 
   return (
-    <div 
-      className="min-h-screen bg-background pb-48"
-      style={{ paddingTop: 'env(safe-area-inset-top)' }}
-    >
+    <div className="pb-40">
       <motion.div
         className="px-4 py-6"
         variants={staggerChildren}
@@ -316,8 +307,8 @@ export default function AccountProfile() {
       </motion.div>
 
       <motion.div 
-        className="fixed bottom-0 left-0 right-0 p-4 bg-background/95 backdrop-blur-xl border-t border-border z-40"
-        style={{ paddingBottom: 'calc(6rem + env(safe-area-inset-bottom))' }}
+        className="fixed left-0 right-0 p-4 bg-background/95 backdrop-blur-xl border-t border-border z-30"
+        style={{ bottom: 'calc(5rem + env(safe-area-inset-bottom))' }}
         initial={{ y: 100, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ ...springTransition, delay: 0.3 }}
