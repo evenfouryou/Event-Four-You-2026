@@ -3,7 +3,7 @@ import { Router, Request, Response, NextFunction } from "express";
 import { siaeStorage } from "./siae-storage";
 import { storage } from "./storage";
 import { db } from "./db";
-import { events, siaeCashiers, siaeTickets, siaeTransactions, siaeSubscriptions, siaeCashierAllocations, siaeOtpAttempts, siaeNameChanges, siaeResales, publicCartItems, publicCheckoutSessions, publicCustomerSessions, tableBookings, guestListEntries } from "@shared/schema";
+import { events, siaeCashiers, siaeTickets, siaeTransactions, siaeSubscriptions, siaeCashierAllocations, siaeOtpAttempts, siaeNameChanges, siaeResales, publicCartItems, publicCheckoutSessions, publicCustomerSessions, tableBookings, guestListEntries, siaeTransmissions, companies, siaeEmissionChannels } from "@shared/schema";
 import { eq, and, sql } from "drizzle-orm";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
@@ -1687,7 +1687,70 @@ router.get("/api/siae/ticketed-events/:eventId/resales", async (req: Request, re
 router.post("/api/siae/resales", requireAuth, async (req: Request, res: Response) => {
   try {
     const data = insertSiaeResaleSchema.parse(req.body);
-    const resale = await siaeStorage.createSiaeResale(data);
+    
+    // === VALIDAZIONE ALLEGATO B - NORMATIVA 2025 ===
+    // NOTA OPERATIVA: L'acquirente non è noto al momento della messa in vendita.
+    // L'identità acquirente viene verificata al momento del completamento (PATCH con status=completed).
+    // Questo flusso rispetta l'Allegato B che prevede:
+    // - Venditore: identificato alla messa in vendita
+    // - Acquirente: identificato al momento dell'acquisto
+    
+    // 1. Causale rivendita obbligatoria e valida
+    const causaliValide = ['IMP', 'VOL', 'ALT'] as const; // IMP=Impossibilità, VOL=Volontaria, ALT=Altro
+    if (!data.causaleRivendita || !causaliValide.includes(data.causaleRivendita as any)) {
+      return res.status(400).json({ 
+        message: "Causale rivendita obbligatoria (IMP=Impossibilità, VOL=Volontaria, ALT=Altro)",
+        code: "ALLEGATO_B_CAUSALE_MANCANTE"
+      });
+    }
+    
+    // 2. Se causale=ALT, dettaglio obbligatorio
+    if (data.causaleRivendita === 'ALT' && !data.causaleDettaglio) {
+      return res.status(400).json({ 
+        message: "Per causale ALT è obbligatorio specificare il dettaglio",
+        code: "ALLEGATO_B_DETTAGLIO_MANCANTE"
+      });
+    }
+    
+    // 3. Controllo prezzo massimo (Art. 1 comma 545 L. 232/2016): non può superare prezzo originale
+    if (data.newPrice && data.originalPrice) {
+      const prezzoOriginale = Number(data.originalPrice);
+      const prezzoNuovo = Number(data.newPrice);
+      if (prezzoNuovo > prezzoOriginale) {
+        return res.status(400).json({ 
+          message: `Prezzo rivendita (€${prezzoNuovo.toFixed(2)}) non può superare il prezzo originale (€${prezzoOriginale.toFixed(2)}) - Art. 1 comma 545 L. 232/2016`,
+          code: "ALLEGATO_B_PREZZO_MASSIMO_SUPERATO"
+        });
+      }
+    }
+    
+    // 4. ALLEGATO B: Verifica identità venditore obbligatoria
+    // Se identitaVenditoreVerificata è false o assente, blocca (normativa anti-bagarinaggio)
+    if (!data.identitaVenditoreVerificata) {
+      return res.status(400).json({ 
+        message: "Verifica identità venditore obbligatoria per Allegato B. Inserire documento di identità.",
+        code: "ALLEGATO_B_IDENTITA_VENDITORE_MANCANTE"
+      });
+    }
+    
+    // 5. Documento venditore obbligatorio se identità verificata
+    if (!data.venditoreDocumentoTipo || !data.venditoreDocumentoNumero) {
+      return res.status(400).json({ 
+        message: "Tipo e numero documento venditore obbligatori per Allegato B.",
+        code: "ALLEGATO_B_DOCUMENTO_VENDITORE_MANCANTE"
+      });
+    }
+    
+    // Imposta flags di controllo
+    const dataWithControls = {
+      ...data,
+      controlloPrezzoMassimoEseguito: true,
+      controlloPrezzoMassimoSuperato: false,
+      controlloPrezzoMassimoData: new Date(),
+      identitaVenditoreVerificataData: new Date(),
+    };
+    
+    const resale = await siaeStorage.createSiaeResale(dataWithControls);
     res.status(201).json(resale);
   } catch (error: any) {
     res.status(400).json({ message: error.message });
@@ -1697,10 +1760,106 @@ router.post("/api/siae/resales", requireAuth, async (req: Request, res: Response
 router.patch("/api/siae/resales/:id", requireAuth, async (req: Request, res: Response) => {
   try {
     const data = patchResaleSchema.parse(req.body);
-    const resale = await siaeStorage.updateSiaeResale(req.params.id, data);
-    if (!resale) {
+    
+    // Recupera la resale esistente per validazione
+    const existingResale = await siaeStorage.getSiaeResale(req.params.id);
+    if (!existingResale) {
       return res.status(404).json({ message: "Rimessa in vendita non trovata" });
     }
+    
+    // === VALIDAZIONE ALLEGATO B - NORMATIVA 2025 (COMPLETA) ===
+    
+    // 1. Controllo prezzo massimo se viene aggiornato il prezzo
+    if (data.newPrice !== undefined) {
+      const prezzoOriginale = Number(existingResale.originalPrice || data.originalPrice || 0);
+      const prezzoNuovo = Number(data.newPrice);
+      if (prezzoNuovo > prezzoOriginale && prezzoOriginale > 0) {
+        return res.status(400).json({ 
+          message: `Prezzo rivendita (€${prezzoNuovo.toFixed(2)}) non può superare il prezzo originale (€${prezzoOriginale.toFixed(2)}) - Art. 1 comma 545 L. 232/2016`,
+          code: "ALLEGATO_B_PREZZO_MASSIMO_SUPERATO"
+        });
+      }
+    }
+    
+    // 2. Se causale viene cambiata a ALT, verifica dettaglio
+    const causaleFinale = data.causaleRivendita || existingResale.causaleRivendita;
+    const dettaglioFinale = data.causaleDettaglio || existingResale.causaleDettaglio;
+    if (causaleFinale === 'ALT' && !dettaglioFinale) {
+      return res.status(400).json({ 
+        message: "Per causale ALT è obbligatorio specificare il dettaglio",
+        code: "ALLEGATO_B_DETTAGLIO_MANCANTE"
+      });
+    }
+    
+    // 3. Se stato cambia a 'completed' o 'approved', verifica identità acquirente
+    if (data.status === 'completed' || data.status === 'approved') {
+      const identitaAcquirente = data.identitaAcquirenteVerificata ?? existingResale.identitaAcquirenteVerificata;
+      const docTipo = data.acquirenteDocumentoTipo || existingResale.acquirenteDocumentoTipo;
+      const docNumero = data.acquirenteDocumentoNumero || existingResale.acquirenteDocumentoNumero;
+      
+      if (!identitaAcquirente) {
+        return res.status(400).json({ 
+          message: "Per completare la rivendita è obbligatoria la verifica identità acquirente (Allegato B).",
+          code: "ALLEGATO_B_IDENTITA_ACQUIRENTE_MANCANTE"
+        });
+      }
+      
+      if (!docTipo || !docNumero) {
+        return res.status(400).json({ 
+          message: "Tipo e numero documento acquirente obbligatori per completare la rivendita (Allegato B).",
+          code: "ALLEGATO_B_DOCUMENTO_ACQUIRENTE_MANCANTE"
+        });
+      }
+    }
+    
+    // 4. Verifica che identità venditore sia sempre presente (non può essere rimossa)
+    const identitaVenditoreFinale = data.identitaVenditoreVerificata ?? existingResale.identitaVenditoreVerificata;
+    if (!identitaVenditoreFinale) {
+      return res.status(400).json({ 
+        message: "La verifica identità venditore è obbligatoria e non può essere rimossa (Allegato B).",
+        code: "ALLEGATO_B_IDENTITA_VENDITORE_MANCANTE"
+      });
+    }
+    
+    // 5. Impedire la rimozione di dati di verifica già impostati (immutabilità Allegato B)
+    if (existingResale.identitaVenditoreVerificata === true && data.identitaVenditoreVerificata === false) {
+      return res.status(400).json({ 
+        message: "La verifica identità venditore non può essere annullata una volta confermata (Allegato B).",
+        code: "ALLEGATO_B_MODIFICA_NON_CONSENTITA"
+      });
+    }
+    if (existingResale.identitaAcquirenteVerificata === true && data.identitaAcquirenteVerificata === false) {
+      return res.status(400).json({ 
+        message: "La verifica identità acquirente non può essere annullata una volta confermata (Allegato B).",
+        code: "ALLEGATO_B_MODIFICA_NON_CONSENTITA"
+      });
+    }
+    
+    // 6. Non permettere rimozione documenti venditore già registrati
+    if (existingResale.venditoreDocumentoNumero && data.venditoreDocumentoNumero === null) {
+      return res.status(400).json({ 
+        message: "Il documento venditore non può essere rimosso una volta registrato (Allegato B).",
+        code: "ALLEGATO_B_MODIFICA_NON_CONSENTITA"
+      });
+    }
+    
+    // 7. Controllo prezzo massimo su ogni modifica prezzo (non solo nuovo)
+    const prezzoNuovoFinale = data.newPrice !== undefined ? Number(data.newPrice) : null;
+    const prezzoOriginaleFinale = Number(existingResale.originalPrice || 0);
+    if (prezzoNuovoFinale !== null && prezzoOriginaleFinale > 0 && prezzoNuovoFinale > prezzoOriginaleFinale) {
+      return res.status(400).json({ 
+        message: `Prezzo rivendita (€${prezzoNuovoFinale.toFixed(2)}) non può superare il prezzo originale (€${prezzoOriginaleFinale.toFixed(2)}) - Art. 1 comma 545 L. 232/2016`,
+        code: "ALLEGATO_B_PREZZO_MASSIMO_SUPERATO"
+      });
+    }
+    
+    // Imposta timestamp controlli se identità acquirente verificata ora
+    const dataWithTimestamps = { ...data };
+    if (data.identitaAcquirenteVerificata && !existingResale.identitaAcquirenteVerificata) {
+      (dataWithTimestamps as any).identitaAcquirenteVerificataData = new Date();
+    }
+    
+    const resale = await siaeStorage.updateSiaeResale(req.params.id, dataWithTimestamps);
     res.json(resale);
   } catch (error: any) {
     res.status(400).json({ message: error.message });
@@ -2808,10 +2967,42 @@ router.get('/api/siae/ticketed-events/:id/reports/c1', requireAuth, async (req: 
 
     // === NUOVI CAMPI 2025: Recupera dati organizzatore ===
     // Recupera la company associata all'evento per CF e ragione sociale
-    const company = event.companyId ? await db.select().from(companies).where(eq(companies.id, event.companyId)).then(rows => rows[0]) : null;
+    let company = event.companyId ? await db.select().from(companies).where(eq(companies.id, event.companyId)).then(rows => rows[0]) : null;
+    
+    // Se l'evento non ha companyId, recupera la company principale del sistema
+    if (!company) {
+      company = await db.select().from(companies).limit(1).then(rows => rows[0]);
+    }
     
     // Recupera il canale di emissione per matricola misuratore
-    const emissionChannel = event.emissionChannelId ? await db.select().from(siaeEmissionChannels).where(eq(siaeEmissionChannels.id, event.emissionChannelId)).then(rows => rows[0]) : null;
+    let emissionChannel = event.emissionChannelId ? await db.select().from(siaeEmissionChannels).where(eq(siaeEmissionChannels.id, event.emissionChannelId)).then(rows => rows[0]) : null;
+    
+    // Se l'evento non ha emissionChannelId, prova a recuperare il canale attivo
+    if (!emissionChannel) {
+      emissionChannel = await db.select().from(siaeEmissionChannels).where(eq(siaeEmissionChannels.status, 'active')).limit(1).then(rows => rows[0]);
+    }
+    
+    // Calcola progressivo fiscale dal numero di trasmissioni già effettuate oggi
+    // Filtrato per: company + matricola misuratore fiscale (dispositivo) secondo normativa
+    const companyIdForQuery = event.companyId || company?.id;
+    const matricolaDispositivo = emissionChannel?.fiscalDeviceId;
+    let progressivoFiscale = 1;
+    if (companyIdForQuery) {
+      // Costruisci query dinamicamente in base a campi disponibili
+      const conditions = [
+        eq(siaeTransmissions.companyId, companyIdForQuery),
+        sql`DATE(${siaeTransmissions.periodDate}) = CURRENT_DATE`,
+        eq(siaeTransmissions.transmissionType, 'daily')
+      ];
+      // Se abbiamo matricola dispositivo, filtra anche per quella (più preciso)
+      if (matricolaDispositivo) {
+        conditions.push(eq(siaeTransmissions.matricolaMisuratoreFiscale, matricolaDispositivo));
+      }
+      const todayTransmissions = await db.select().from(siaeTransmissions)
+        .where(and(...conditions))
+        .then(rows => rows.length);
+      progressivoFiscale = todayTransmissions + 1;
+    }
     
     // Calcola annullamenti per causale
     const annullamentiPerCausale: Array<{causale: string; causaleDescrizione: string; count: number; importoTotale: number}> = [];
@@ -2874,19 +3065,27 @@ router.get('/api/siae/ticketed-events/:id/reports/c1', requireAuth, async (req: 
       // === NUOVI CAMPI NORMATIVI 2025 ===
       cfOrganizzatore: company?.taxCode || company?.vatNumber || null,
       cfTitolare: company?.taxCode || company?.vatNumber || null,
-      ragioneSocialeOrganizzatore: company?.name || 'Event4U S.r.l.',
-      ragioneSocialeTitolare: company?.name || 'Event4U S.r.l.',
+      ragioneSocialeOrganizzatore: company?.name || null,
+      ragioneSocialeTitolare: company?.name || null,
       matricolaMisuratoreFiscale: emissionChannel?.fiscalDeviceId || null,
-      progressivoFiscale: 1, // Progressivo del giorno (da calcolare da trasmissioni)
+      progressivoFiscale, // Progressivo del giorno calcolato da trasmissioni
       provincia: event.venueProvince || null,
-      comune: event.venueCity || event.venueName || null,
-      impostaIntrattenimento: 0, // Calcolare se applicabile
+      comune: event.venueCity || null,
+      // Imposta intrattenimento: 10% solo per eventi di intrattenimento (non musica/teatro)
+      impostaIntrattenimento: event.eventCategory === 'intrattenimento' ? (totalRevenue * 0.10) : 0,
       corrispettiviEsenti,
       corrispettiviSoggetti,
       annullamentiPerCausale: annullamentiPerCausale.length > 0 ? annullamentiPerCausale : undefined,
       rivenditeCount: rivenditeCount > 0 ? rivenditeCount : undefined,
       rivenditeImporto: rivenditeImporto > 0 ? rivenditeImporto : undefined,
       cambiNominativoCount: cambiNominativoCount > 0 ? cambiNominativoCount : undefined,
+      // Dati incompleti: segnala se mancano dati normativi obbligatori
+      datiIncompleti: (!company?.taxCode && !company?.vatNumber) || !emissionChannel?.fiscalDeviceId ? true : undefined,
+      datiMancanti: [
+        !company?.taxCode && !company?.vatNumber ? 'CF/P.IVA Organizzatore' : null,
+        !emissionChannel?.fiscalDeviceId ? 'Matricola Misuratore Fiscale' : null,
+        !event.venueProvince ? 'Provincia' : null,
+      ].filter(Boolean),
       // Fine campi 2025
       sectors: sectors.map(s => {
         const sectorActiveTickets = activeTickets.filter(t => t.sectorId === s.id);
