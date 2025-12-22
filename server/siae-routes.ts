@@ -1912,6 +1912,273 @@ router.patch("/api/siae/transmissions/:id", requireAuth, requireGestore, async (
   }
 });
 
+// Send XML transmission via email
+router.post("/api/siae/transmissions/:id/send-email", requireAuth, requireGestore, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { toEmail } = req.body;
+    
+    // Get the transmission
+    const transmissions = await siaeStorage.getSiaeTransmissionsByCompany(req.body.companyId || '');
+    const transmission = transmissions.find(t => t.id === id);
+    
+    if (!transmission) {
+      return res.status(404).json({ message: "Trasmissione non trovata" });
+    }
+    
+    if (!transmission.fileContent) {
+      return res.status(400).json({ message: "Trasmissione senza contenuto XML" });
+    }
+    
+    // Get company name
+    const company = await storage.getCompany(transmission.companyId);
+    const companyName = company?.name || 'N/A';
+    
+    // Import email service
+    const { sendSiaeTransmissionEmail } = await import('./email-service');
+    
+    // Send the email
+    await sendSiaeTransmissionEmail({
+      to: toEmail || 'servertest2@batest.siae.it',
+      companyName,
+      transmissionType: transmission.transmissionType as 'daily' | 'monthly' | 'corrective',
+      periodDate: new Date(transmission.periodDate),
+      ticketsCount: transmission.ticketsCount || 0,
+      totalAmount: transmission.totalAmount || '0',
+      xmlContent: transmission.fileContent,
+      transmissionId: transmission.id,
+    });
+    
+    // Update transmission status to sent
+    await siaeStorage.updateSiaeTransmission(id, {
+      status: 'sent',
+      sentDate: new Date(),
+    });
+    
+    res.json({ success: true, message: "Email inviata con successo" });
+  } catch (error: any) {
+    console.error('[SIAE-ROUTES] Failed to send transmission email:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Generate and send automatic daily transmission
+router.post("/api/siae/companies/:companyId/transmissions/send-daily", requireAuth, requireGestore, async (req: Request, res: Response) => {
+  try {
+    const { companyId } = req.params;
+    const { date, toEmail } = req.body;
+    
+    const reportDate = date ? new Date(date) : new Date();
+    reportDate.setHours(0, 0, 0, 0);
+    
+    // Get activation card for company
+    const activationCards = await siaeStorage.getSiaeActivationCardsByCompany(companyId);
+    const activeCard = activationCards.find(c => c.status === 'active');
+    
+    if (!activeCard) {
+      return res.status(400).json({ message: "Nessuna carta di attivazione attiva trovata" });
+    }
+    
+    // Get system config for fiscal code
+    const systemConfig = await siaeStorage.getSiaeSystemConfig(companyId);
+    
+    // Get all tickets for the date range
+    const startOfDay = new Date(reportDate);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(reportDate);
+    endOfDay.setHours(23, 59, 59, 999);
+    
+    // Get tickets issued on this date
+    const allTickets = await siaeStorage.getSiaeTicketsByCompany(companyId);
+    const dayTickets = allTickets.filter(t => {
+      const ticketDate = new Date(t.emissionDate);
+      return ticketDate >= startOfDay && ticketDate <= endOfDay;
+    });
+    
+    // Build XML report
+    let xml = `<?xml version="1.0" encoding="UTF-8"?>
+<ComunicazioneDatiTitoli xmlns="urn:siae:biglietteria:2025">
+  <Intestazione>
+    <CodiceFiscaleEmittente>${escapeXml(systemConfig?.taxId || '')}</CodiceFiscaleEmittente>
+    <NumeroCarta>${escapeXml(activeCard.cardCode)}</NumeroCarta>
+    <DataRiferimento>${formatSiaeDate(reportDate)}</DataRiferimento>
+    <DataOraGenerazione>${formatSiaeDateTime(new Date())}</DataOraGenerazione>
+    <TipoTrasmissione>ORDINARIA</TipoTrasmissione>
+  </Intestazione>
+  <ElencoTitoli>`;
+    
+    for (const ticket of dayTickets) {
+      let ticketedEvent = null;
+      if (ticket.sectorId) {
+        const sector = await siaeStorage.getSiaeEventSector(ticket.sectorId);
+        if (sector?.ticketedEventId) {
+          ticketedEvent = await siaeStorage.getSiaeTicketedEvent(sector.ticketedEventId);
+        }
+      } else if (ticket.ticketedEventId) {
+        ticketedEvent = await siaeStorage.getSiaeTicketedEvent(ticket.ticketedEventId);
+      }
+      
+      xml += `
+    <Titolo>
+      <NumeroProgressivo>${ticket.progressiveNumber || 0}</NumeroProgressivo>
+      <SigilloFiscale>${escapeXml(ticket.fiscalSealCode)}</SigilloFiscale>
+      <TipologiaTitolo>${escapeXml(ticket.ticketTypeCode)}</TipologiaTitolo>
+      <DataOraEmissione>${formatSiaeDateTime(ticket.emissionDate)}</DataOraEmissione>
+      <CodiceCanale>${escapeXml(ticket.emissionChannelCode)}</CodiceCanale>
+      <ImportoLordo>${parseFloat(ticket.grossAmount || '0').toFixed(2)}</ImportoLordo>
+      <ImportoNetto>${parseFloat(ticket.netAmount || '0').toFixed(2)}</ImportoNetto>
+      <Diritti>0.00</Diritti>
+      <IVA>${parseFloat(ticket.vatAmount || '0').toFixed(2)}</IVA>
+      <CodiceGenere>${escapeXml(ticketedEvent?.genreCode || '')}</CodiceGenere>
+      <CodicePrestazione>${escapeXml(ticket.ticketTypeCode || '')}</CodicePrestazione>
+      <DataEvento>${formatSiaeDate(ticketedEvent?.saleStartDate || null)}</DataEvento>
+      <NominativoAcquirente>
+        <Nome>${escapeXml(ticket.participantFirstName || '')}</Nome>
+        <Cognome>${escapeXml(ticket.participantLastName || '')}</Cognome>
+      </NominativoAcquirente>
+      <Stato>${escapeXml(ticket.status)}</Stato>
+    </Titolo>`;
+    }
+    
+    xml += `
+  </ElencoTitoli>
+  <Riepilogo>
+    <TotaleTitoli>${dayTickets.length}</TotaleTitoli>
+    <TotaleImportoLordo>${dayTickets.reduce((sum, t) => sum + parseFloat(t.grossAmount || '0'), 0).toFixed(2)}</TotaleImportoLordo>
+    <TotaleDiritti>0.00</TotaleDiritti>
+    <TotaleIVA>${dayTickets.reduce((sum, t) => sum + parseFloat(t.vatAmount || '0'), 0).toFixed(2)}</TotaleIVA>
+  </Riepilogo>
+</ComunicazioneDatiTitoli>`;
+    
+    const totalAmount = dayTickets.reduce((sum, t) => sum + parseFloat(t.grossAmount || '0'), 0).toString();
+    
+    // Create transmission record
+    const transmission = await siaeStorage.createSiaeTransmission({
+      companyId,
+      transmissionType: 'daily',
+      periodDate: reportDate,
+      fileContent: xml,
+      status: 'pending',
+      ticketsCount: dayTickets.length,
+      totalAmount,
+    });
+    
+    // Get company name
+    const company = await storage.getCompany(companyId);
+    const companyName = company?.name || 'N/A';
+    
+    // Import and send the email
+    const { sendSiaeTransmissionEmail } = await import('./email-service');
+    
+    await sendSiaeTransmissionEmail({
+      to: toEmail || 'servertest2@batest.siae.it',
+      companyName,
+      transmissionType: 'daily',
+      periodDate: reportDate,
+      ticketsCount: dayTickets.length,
+      totalAmount,
+      xmlContent: xml,
+      transmissionId: transmission.id,
+    });
+    
+    // Update transmission status
+    await siaeStorage.updateSiaeTransmission(transmission.id, {
+      status: 'sent',
+      sentDate: new Date(),
+    });
+    
+    res.json({
+      success: true,
+      message: "Trasmissione giornaliera generata e inviata con successo",
+      transmission: {
+        id: transmission.id,
+        ticketsCount: dayTickets.length,
+        totalAmount,
+        sentTo: toEmail || 'servertest2@batest.siae.it',
+      }
+    });
+  } catch (error: any) {
+    console.error('[SIAE-ROUTES] Failed to send daily transmission:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Test email endpoint for transmission
+router.post("/api/siae/transmissions/test-email", requireAuth, requireGestore, async (req: Request, res: Response) => {
+  try {
+    const { toEmail, companyId } = req.body;
+    
+    if (!toEmail) {
+      return res.status(400).json({ message: "Indirizzo email richiesto" });
+    }
+    
+    // Get company name
+    const company = companyId ? await storage.getCompany(companyId) : null;
+    const companyName = company?.name || 'Test Company';
+    
+    // Create test XML
+    const testXml = `<?xml version="1.0" encoding="UTF-8"?>
+<ComunicazioneDatiTitoli xmlns="urn:siae:biglietteria:2025">
+  <Intestazione>
+    <CodiceFiscaleEmittente>TEST00000000000</CodiceFiscaleEmittente>
+    <NumeroCarta>TEST-CARD-001</NumeroCarta>
+    <DataRiferimento>${formatSiaeDate(new Date())}</DataRiferimento>
+    <DataOraGenerazione>${formatSiaeDateTime(new Date())}</DataOraGenerazione>
+    <TipoTrasmissione>TEST</TipoTrasmissione>
+  </Intestazione>
+  <ElencoTitoli>
+    <Titolo>
+      <NumeroProgressivo>1</NumeroProgressivo>
+      <SigilloFiscale>TEST-SEAL-001</SigilloFiscale>
+      <TipologiaTitolo>01</TipologiaTitolo>
+      <DataOraEmissione>${formatSiaeDateTime(new Date())}</DataOraEmissione>
+      <CodiceCanale>WEB</CodiceCanale>
+      <ImportoLordo>10.00</ImportoLordo>
+      <ImportoNetto>8.20</ImportoNetto>
+      <Diritti>0.00</Diritti>
+      <IVA>1.80</IVA>
+      <CodiceGenere>01</CodiceGenere>
+      <CodicePrestazione>01</CodicePrestazione>
+      <DataEvento>${formatSiaeDate(new Date())}</DataEvento>
+      <NominativoAcquirente>
+        <Nome>Test</Nome>
+        <Cognome>Utente</Cognome>
+      </NominativoAcquirente>
+      <Stato>emesso</Stato>
+    </Titolo>
+  </ElencoTitoli>
+  <Riepilogo>
+    <TotaleTitoli>1</TotaleTitoli>
+    <TotaleImportoLordo>10.00</TotaleImportoLordo>
+    <TotaleDiritti>0.00</TotaleDiritti>
+    <TotaleIVA>1.80</TotaleIVA>
+  </Riepilogo>
+</ComunicazioneDatiTitoli>`;
+    
+    // Import and send the test email
+    const { sendSiaeTransmissionEmail } = await import('./email-service');
+    
+    await sendSiaeTransmissionEmail({
+      to: toEmail,
+      companyName,
+      transmissionType: 'daily',
+      periodDate: new Date(),
+      ticketsCount: 1,
+      totalAmount: '10.00',
+      xmlContent: testXml,
+      transmissionId: 'TEST-' + Date.now(),
+    });
+    
+    res.json({
+      success: true,
+      message: `Email di test inviata con successo a ${toEmail}`,
+    });
+  } catch (error: any) {
+    console.error('[SIAE-ROUTES] Failed to send test email:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
 // ==================== Box Office Sessions ====================
 
 router.get("/api/siae/emission-channels/:channelId/sessions", requireAuth, async (req: Request, res: Response) => {

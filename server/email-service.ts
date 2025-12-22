@@ -308,3 +308,110 @@ export async function sendPasswordResetEmail(options: PasswordResetEmailOptions)
     throw error;
   }
 }
+
+// SIAE XML Transmission Email
+interface SiaeTransmissionEmailOptions {
+  to: string;
+  companyName: string;
+  transmissionType: 'daily' | 'monthly' | 'corrective';
+  periodDate: Date;
+  ticketsCount: number;
+  totalAmount: string;
+  xmlContent: string;
+  transmissionId: string;
+}
+
+export async function sendSiaeTransmissionEmail(options: SiaeTransmissionEmailOptions): Promise<void> {
+  const { to, companyName, transmissionType, periodDate, ticketsCount, totalAmount, xmlContent, transmissionId } = options;
+
+  const typeLabels: Record<string, string> = {
+    'daily': 'Giornaliera',
+    'monthly': 'Mensile',
+    'corrective': 'Correttiva'
+  };
+
+  const formatDate = (date: Date) => {
+    return date.toLocaleDateString('it-IT', { day: '2-digit', month: 'long', year: 'numeric' });
+  };
+
+  const formatDateFilename = (date: Date) => {
+    return date.toISOString().split('T')[0].replace(/-/g, '');
+  };
+
+  const htmlBody = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f5f5f5; color: #333333; margin: 0; padding: 0;">
+  <div style="max-width: 600px; margin: 0 auto; padding: 40px 20px;">
+    <div style="text-align: center; margin-bottom: 40px;">
+      <div style="font-size: 28px; font-weight: bold; color: #1a237e; margin-bottom: 10px;">Event4U - Trasmissione SIAE</div>
+      <div style="font-size: 18px; color: #666;">Comunicazione Dati Titoli</div>
+    </div>
+
+    <div style="background-color: #ffffff; border-radius: 8px; padding: 30px; margin-bottom: 30px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+      <h2 style="color: #1a237e; margin-top: 0; margin-bottom: 20px;">Riepilogo Trasmissione</h2>
+      
+      <table style="width: 100%; border-collapse: collapse;">
+        <tr>
+          <td style="padding: 12px 0; border-bottom: 1px solid #eee; color: #666;">Azienda</td>
+          <td style="padding: 12px 0; border-bottom: 1px solid #eee; font-weight: 500; text-align: right;">${companyName}</td>
+        </tr>
+        <tr>
+          <td style="padding: 12px 0; border-bottom: 1px solid #eee; color: #666;">Tipo Trasmissione</td>
+          <td style="padding: 12px 0; border-bottom: 1px solid #eee; font-weight: 500; text-align: right;">${typeLabels[transmissionType] || transmissionType}</td>
+        </tr>
+        <tr>
+          <td style="padding: 12px 0; border-bottom: 1px solid #eee; color: #666;">Data Riferimento</td>
+          <td style="padding: 12px 0; border-bottom: 1px solid #eee; font-weight: 500; text-align: right;">${formatDate(periodDate)}</td>
+        </tr>
+        <tr>
+          <td style="padding: 12px 0; border-bottom: 1px solid #eee; color: #666;">Numero Biglietti</td>
+          <td style="padding: 12px 0; border-bottom: 1px solid #eee; font-weight: 500; text-align: right;">${ticketsCount}</td>
+        </tr>
+        <tr>
+          <td style="padding: 12px 0; color: #666;">Importo Totale</td>
+          <td style="padding: 12px 0; font-weight: bold; text-align: right; font-size: 18px; color: #1a237e;">€ ${parseFloat(totalAmount).toFixed(2)}</td>
+        </tr>
+      </table>
+    </div>
+
+    <div style="background-color: #e3f2fd; border-radius: 8px; padding: 20px; margin-bottom: 30px; border-left: 4px solid #1a237e;">
+      <p style="margin: 0; color: #1a237e; font-size: 14px;">
+        <strong>Nota:</strong> Il file XML allegato contiene i dati della comunicazione in formato conforme al Provvedimento n. 356768/2025 dell'Agenzia delle Entrate.
+      </p>
+    </div>
+
+    <div style="text-align: center; padding-top: 20px; border-top: 1px solid #eee;">
+      <p style="color: #999; font-size: 12px;">Trasmissione ID: ${transmissionId}</p>
+      <p style="color: #999; font-size: 12px;">Data/Ora Generazione: ${new Date().toLocaleString('it-IT')}</p>
+      <p style="color: #999; font-size: 12px;">&copy; ${new Date().getFullYear()} Event4U - Sistema di Biglietteria SIAE</p>
+    </div>
+  </div>
+</body>
+</html>
+  `;
+
+  const mailOptions = {
+    from: process.env.SMTP_FROM || `"Event4U SIAE" <${process.env.SMTP_USER || 'noreply@event4u.it'}>`,
+    to,
+    subject: `Trasmissione SIAE ${typeLabels[transmissionType]} - ${formatDate(periodDate)} - ${companyName}`,
+    html: htmlBody,
+    attachments: [{
+      filename: `SIAE_${formatDateFilename(periodDate)}_${transmissionId}.xml`,
+      content: xmlContent,
+      contentType: 'application/xml',
+    }],
+  };
+
+  try {
+    await emailTransporter.sendMail(mailOptions);
+    console.log(`[EMAIL-SERVICE] SIAE transmission email sent successfully to ${to}`);
+  } catch (error) {
+    console.error('[EMAIL-SERVICE] Failed to send SIAE transmission email:', error);
+    throw error;
+  }
+}
