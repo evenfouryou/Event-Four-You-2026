@@ -1502,7 +1502,7 @@ export default function EventHub() {
               label="Scansiona QR"
               onClick={() => {
                 setQuickActionsOpen(false);
-                navigate('/pr/scanner');
+                navigate('/scanner');
               }}
               testId="quick-action-scan"
             />
@@ -1758,7 +1758,7 @@ export default function EventHub() {
                       <QuickActionButton
                         icon={QrCode}
                         label="Scansiona"
-                        onClick={() => navigate('/pr/scanner')}
+                        onClick={() => navigate('/scanner')}
                         testId="overview-scan"
                       />
                       <QuickActionButton

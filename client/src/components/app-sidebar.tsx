@@ -485,12 +485,6 @@ export function AppSidebar() {
       },
       {
         title: "Scanner QR",
-        icon: ScanLine,
-        url: "/pr/scanner",
-        group: "Operazioni",
-      },
-      {
-        title: "Scanner E4U",
         icon: QrCode,
         url: "/scanner",
         group: "Operazioni",
