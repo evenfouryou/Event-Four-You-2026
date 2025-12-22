@@ -3,7 +3,7 @@ import { motion, AnimatePresence, PanInfo } from "framer-motion";
 import { Button, ButtonProps } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { X, Menu, ArrowLeft } from "lucide-react";
-import { useSidebar, SidebarContext } from "@/components/ui/sidebar";
+import { SidebarContext } from "@/components/ui/sidebar";
 
 function useSidebarSafe() {
   const context = useContext(SidebarContext);
