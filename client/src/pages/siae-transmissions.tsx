@@ -43,6 +43,9 @@ import {
   ArrowLeft,
   Filter,
   X,
+  Mail,
+  Zap,
+  TestTube,
 } from "lucide-react";
 
 const springTransition = {
@@ -58,10 +61,15 @@ export default function SiaeTransmissionsPage() {
   const [isDetailSheetOpen, setIsDetailSheetOpen] = useState(false);
   const [isCreateSheetOpen, setIsCreateSheetOpen] = useState(false);
   const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
+  const [isTestEmailSheetOpen, setIsTestEmailSheetOpen] = useState(false);
+  const [isSendDailySheetOpen, setIsSendDailySheetOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [transmissionType, setTransmissionType] = useState<string>("daily");
   const [periodDate, setPeriodDate] = useState<string>("");
+  const [testEmail, setTestEmail] = useState<string>("servertest2@batest.siae.it");
+  const [dailyDate, setDailyDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [dailyEmail, setDailyEmail] = useState<string>("servertest2@batest.siae.it");
 
   const companyId = user?.companyId;
 
@@ -113,6 +121,86 @@ export default function SiaeTransmissionsPage() {
       toast({
         title: "Riprova Invio",
         description: "La trasmissione è stata rimessa in coda.",
+      });
+    },
+    onError: (error: Error) => {
+      triggerHaptic('error');
+      toast({
+        title: "Errore",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const sendEmailMutation = useMutation({
+    mutationFn: async ({ id, toEmail }: { id: string; toEmail: string }) => {
+      const response = await apiRequest("POST", `/api/siae/transmissions/${id}/send-email`, {
+        toEmail,
+        companyId,
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ predicate: (q) => (q.queryKey[0] as string)?.includes('transmissions') || false });
+      setIsDetailSheetOpen(false);
+      triggerHaptic('success');
+      toast({
+        title: "Email Inviata",
+        description: "La trasmissione XML è stata inviata via email.",
+      });
+    },
+    onError: (error: Error) => {
+      triggerHaptic('error');
+      toast({
+        title: "Errore",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const testEmailMutation = useMutation({
+    mutationFn: async (toEmail: string) => {
+      const response = await apiRequest("POST", `/api/siae/transmissions/test-email`, {
+        toEmail,
+        companyId,
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      setIsTestEmailSheetOpen(false);
+      triggerHaptic('success');
+      toast({
+        title: "Test Inviato",
+        description: "L'email di test è stata inviata con successo.",
+      });
+    },
+    onError: (error: Error) => {
+      triggerHaptic('error');
+      toast({
+        title: "Errore",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const sendDailyMutation = useMutation({
+    mutationFn: async ({ date, toEmail }: { date: string; toEmail: string }) => {
+      const response = await apiRequest("POST", `/api/siae/companies/${companyId}/transmissions/send-daily`, {
+        date,
+        toEmail,
+      });
+      return response.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ predicate: (q) => (q.queryKey[0] as string)?.includes('transmissions') || false });
+      setIsSendDailySheetOpen(false);
+      triggerHaptic('success');
+      toast({
+        title: "Trasmissione Inviata",
+        description: `Trasmissione giornaliera inviata con ${data.transmission?.ticketsCount || 0} biglietti.`,
       });
     },
     onError: (error: Error) => {
@@ -262,16 +350,40 @@ export default function SiaeTransmissionsPage() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ ...springTransition, delay: 0.05 }}
+          className="space-y-3"
         >
           <HapticButton
             className="w-full h-14 text-base font-semibold bg-gradient-to-r from-[#FFD700] to-[#FFA500] text-black"
-            onClick={() => setIsCreateSheetOpen(true)}
+            onClick={() => setIsSendDailySheetOpen(true)}
             hapticType="medium"
-            data-testid="button-create"
+            data-testid="button-send-daily"
           >
-            <Upload className="w-5 h-5 mr-2" />
-            Genera Trasmissione XML
+            <Zap className="w-5 h-5 mr-2" />
+            Invia Trasmissione Giornaliera
           </HapticButton>
+          
+          <div className="grid grid-cols-2 gap-3">
+            <HapticButton
+              variant="outline"
+              className="h-12"
+              onClick={() => setIsCreateSheetOpen(true)}
+              hapticType="light"
+              data-testid="button-create"
+            >
+              <Upload className="w-4 h-4 mr-2" />
+              Genera XML
+            </HapticButton>
+            <HapticButton
+              variant="outline"
+              className="h-12"
+              onClick={() => setIsTestEmailSheetOpen(true)}
+              hapticType="light"
+              data-testid="button-test-email"
+            >
+              <TestTube className="w-4 h-4 mr-2" />
+              Test Email
+            </HapticButton>
+          </div>
         </motion.div>
 
         {isLoading ? (
@@ -617,48 +729,182 @@ export default function SiaeTransmissionsPage() {
               )}
             </div>
 
-            <div className="flex gap-3 pt-4">
-              {selectedTransmission.fileContent && (
+            <div className="flex flex-col gap-3 pt-4">
+              {selectedTransmission.fileContent && selectedTransmission.status === "pending" && (
                 <HapticButton
-                  variant="outline"
-                  className="flex-1 h-12"
-                  hapticType="light"
-                  data-testid={`button-download-${selectedTransmission.id}`}
-                >
-                  <Download className="w-5 h-5 mr-2" />
-                  Scarica XML
-                </HapticButton>
-              )}
-              {selectedTransmission.status === "error" && (
-                <HapticButton
-                  className="flex-1 h-12"
+                  className="w-full h-12 bg-[#FFD700] text-black hover:bg-[#FFD700]/90"
                   onClick={() => {
-                    retryTransmissionMutation.mutate(selectedTransmission.id);
+                    sendEmailMutation.mutate({
+                      id: selectedTransmission.id,
+                      toEmail: "servertest2@batest.siae.it",
+                    });
                   }}
-                  disabled={retryTransmissionMutation.isPending}
+                  disabled={sendEmailMutation.isPending}
                   hapticType="medium"
-                  data-testid={`button-retry-${selectedTransmission.id}`}
+                  data-testid={`button-send-email-${selectedTransmission.id}`}
                 >
-                  {retryTransmissionMutation.isPending ? (
+                  {sendEmailMutation.isPending ? (
                     <Loader2 className="w-5 h-5 mr-2 animate-spin" />
                   ) : (
-                    <RefreshCw className="w-5 h-5 mr-2" />
+                    <Mail className="w-5 h-5 mr-2" />
                   )}
-                  Riprova Invio
+                  Invia via Email
                 </HapticButton>
               )}
-              {!selectedTransmission.fileContent && selectedTransmission.status !== "error" && (
-                <HapticButton
-                  className="flex-1 h-12"
-                  onClick={() => setIsDetailSheetOpen(false)}
-                  hapticType="light"
-                >
-                  Chiudi
-                </HapticButton>
-              )}
+              <div className="flex gap-3">
+                {selectedTransmission.fileContent && (
+                  <HapticButton
+                    variant="outline"
+                    className="flex-1 h-12"
+                    hapticType="light"
+                    data-testid={`button-download-${selectedTransmission.id}`}
+                  >
+                    <Download className="w-5 h-5 mr-2" />
+                    Scarica XML
+                  </HapticButton>
+                )}
+                {selectedTransmission.status === "error" && (
+                  <HapticButton
+                    className="flex-1 h-12"
+                    onClick={() => {
+                      retryTransmissionMutation.mutate(selectedTransmission.id);
+                    }}
+                    disabled={retryTransmissionMutation.isPending}
+                    hapticType="medium"
+                    data-testid={`button-retry-${selectedTransmission.id}`}
+                  >
+                    {retryTransmissionMutation.isPending ? (
+                      <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                    ) : (
+                      <RefreshCw className="w-5 h-5 mr-2" />
+                    )}
+                    Riprova Invio
+                  </HapticButton>
+                )}
+                {!selectedTransmission.fileContent && selectedTransmission.status !== "error" && (
+                  <HapticButton
+                    className="flex-1 h-12"
+                    onClick={() => setIsDetailSheetOpen(false)}
+                    hapticType="light"
+                  >
+                    Chiudi
+                  </HapticButton>
+                )}
+              </div>
             </div>
           </div>
         )}
+      </BottomSheet>
+
+      <BottomSheet
+        open={isTestEmailSheetOpen}
+        onClose={() => setIsTestEmailSheetOpen(false)}
+        title="Test Invio Email"
+      >
+        <div className="p-4 space-y-6">
+          <div className="text-center py-4">
+            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-cyan-500/20 flex items-center justify-center">
+              <TestTube className="w-8 h-8 text-cyan-400" />
+            </div>
+            <p className="text-muted-foreground text-sm">
+              Invia un'email di test per verificare la configurazione
+            </p>
+          </div>
+
+          <div>
+            <Label className="text-sm font-medium mb-2 block">Email Destinatario</Label>
+            <Input
+              type="email"
+              value={testEmail}
+              onChange={(e) => setTestEmail(e.target.value)}
+              className="h-12"
+              placeholder="servertest2@batest.siae.it"
+              data-testid="input-test-email"
+            />
+          </div>
+
+          <div className="flex gap-3 pt-4">
+            <HapticButton
+              variant="outline"
+              className="flex-1 h-12"
+              onClick={() => setIsTestEmailSheetOpen(false)}
+            >
+              Annulla
+            </HapticButton>
+            <HapticButton
+              className="flex-1 h-12 bg-cyan-500 text-white hover:bg-cyan-500/90"
+              onClick={() => testEmailMutation.mutate(testEmail)}
+              disabled={!testEmail || testEmailMutation.isPending}
+              hapticType="medium"
+              data-testid="button-send-test"
+            >
+              {testEmailMutation.isPending && <Loader2 className="w-5 h-5 mr-2 animate-spin" />}
+              Invia Test
+            </HapticButton>
+          </div>
+        </div>
+      </BottomSheet>
+
+      <BottomSheet
+        open={isSendDailySheetOpen}
+        onClose={() => setIsSendDailySheetOpen(false)}
+        title="Trasmissione Giornaliera Automatica"
+      >
+        <div className="p-4 space-y-6">
+          <div className="text-center py-4">
+            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-[#FFD700]/20 flex items-center justify-center">
+              <Zap className="w-8 h-8 text-[#FFD700]" />
+            </div>
+            <p className="text-muted-foreground text-sm">
+              Genera e invia automaticamente la trasmissione XML del giorno selezionato
+            </p>
+          </div>
+
+          <div className="space-y-4">
+            <div>
+              <Label className="text-sm font-medium mb-2 block">Data</Label>
+              <Input
+                type="date"
+                value={dailyDate}
+                onChange={(e) => setDailyDate(e.target.value)}
+                className="h-12"
+                data-testid="input-daily-date"
+              />
+            </div>
+            
+            <div>
+              <Label className="text-sm font-medium mb-2 block">Email Destinatario SIAE</Label>
+              <Input
+                type="email"
+                value={dailyEmail}
+                onChange={(e) => setDailyEmail(e.target.value)}
+                className="h-12"
+                placeholder="servertest2@batest.siae.it"
+                data-testid="input-daily-email"
+              />
+            </div>
+          </div>
+
+          <div className="flex gap-3 pt-4">
+            <HapticButton
+              variant="outline"
+              className="flex-1 h-12"
+              onClick={() => setIsSendDailySheetOpen(false)}
+            >
+              Annulla
+            </HapticButton>
+            <HapticButton
+              className="flex-1 h-12 bg-[#FFD700] text-black hover:bg-[#FFD700]/90"
+              onClick={() => sendDailyMutation.mutate({ date: dailyDate, toEmail: dailyEmail })}
+              disabled={!dailyDate || !dailyEmail || sendDailyMutation.isPending}
+              hapticType="medium"
+              data-testid="button-send-daily-confirm"
+            >
+              {sendDailyMutation.isPending && <Loader2 className="w-5 h-5 mr-2 animate-spin" />}
+              Genera e Invia
+            </HapticButton>
+          </div>
+        </div>
       </BottomSheet>
     </MobileAppLayout>
   );
