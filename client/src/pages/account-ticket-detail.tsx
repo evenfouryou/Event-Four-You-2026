@@ -551,33 +551,36 @@ export default function AccountTicketDetail() {
               className="space-y-3 pt-2"
               variants={fadeInUp}
             >
-              <h3 className="text-lg font-semibold text-foreground px-1">Aggiungi al Wallet</h3>
+              <h3 className="text-lg font-semibold text-foreground px-1">Salva Biglietto</h3>
+              <p className="text-xs text-muted-foreground px-1 -mt-2">
+                Scarica l'immagine del biglietto, poi salvala nelle Foto per aggiungerla al Wallet
+              </p>
               
               <div className="grid grid-cols-2 gap-3">
                 <HapticButton
                   variant="outline"
                   className="min-h-[52px] bg-black text-white border-black rounded-xl text-base font-medium"
                   onClick={() => {
-                    window.open(`/api/public/account/tickets/${id}/wallet/apple`, '_blank');
+                    window.location.href = `/api/public/account/tickets/${id}/wallet/apple`;
                   }}
                   data-testid="button-add-apple-wallet"
                   hapticType="medium"
                 >
                   <SiApple className="w-5 h-5 mr-2" />
-                  Apple
+                  Immagine
                 </HapticButton>
                 
                 <HapticButton
                   variant="outline"
                   className="min-h-[52px] bg-gradient-to-r from-blue-500 to-green-500 text-white border-0 rounded-xl text-base font-medium"
                   onClick={() => {
-                    window.open(`/api/public/account/tickets/${id}/wallet/google`, '_blank');
+                    window.location.href = `/api/public/account/tickets/${id}/wallet/google`;
                   }}
                   data-testid="button-add-google-wallet"
                   hapticType="medium"
                 >
                   <SiGoogle className="w-5 h-5 mr-2" />
-                  Google
+                  Immagine
                 </HapticButton>
               </div>
 
