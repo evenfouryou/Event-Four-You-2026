@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useSearch } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,6 +17,7 @@ import {
   ChevronRight,
   QrCode,
   Copy,
+  Loader2,
 } from "lucide-react";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
@@ -154,6 +156,8 @@ export default function PublicCheckoutSuccessPage() {
   const searchString = useSearch();
   const params = new URLSearchParams(searchString);
   const transactionCode = params.get("transaction");
+  const { toast } = useToast();
+  const [isDownloading, setIsDownloading] = useState(false);
 
   const { data: tickets, isLoading } = useQuery<TicketData[]>({
     queryKey: ["/api/public/tickets", transactionCode],
@@ -167,6 +171,44 @@ export default function PublicCheckoutSuccessPage() {
     },
     enabled: !!transactionCode,
   });
+
+  const handleDownloadAllPdfs = async () => {
+    if (!tickets || tickets.length === 0) {
+      toast({ title: "Nessun biglietto da scaricare", variant: "destructive" });
+      return;
+    }
+    
+    setIsDownloading(true);
+    try {
+      for (const ticket of tickets) {
+        const res = await fetch(`/api/public/account/tickets/${ticket.id}/pdf`, {
+          credentials: "include",
+        });
+        
+        if (!res.ok) {
+          const error = await res.json().catch(() => ({ message: "Errore download" }));
+          throw new Error(error.message || "Errore nel download del PDF");
+        }
+        
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `biglietto-${ticket.fiscalSealCode.slice(0, 8)}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+      }
+      
+      toast({ title: "Download completato!", description: `${tickets.length} biglietti scaricati` });
+    } catch (error: any) {
+      console.error("Download PDF error:", error);
+      toast({ title: "Errore download", description: error.message, variant: "destructive" });
+    } finally {
+      setIsDownloading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -216,13 +258,25 @@ export default function PublicCheckoutSuccessPage() {
               <p className="text-xs sm:text-sm text-muted-foreground truncate">I biglietti sono stati inviati alla tua email</p>
             </div>
           </Card>
-          <Card className="bg-card border-border p-3 sm:p-4 flex items-center gap-3 sm:gap-4">
+          <Card 
+            className="bg-card border-border p-3 sm:p-4 flex items-center gap-3 sm:gap-4 cursor-pointer hover:bg-muted/50 transition-colors"
+            onClick={handleDownloadAllPdfs}
+            data-testid="button-download-pdf"
+          >
             <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
-              <Download className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
+              {isDownloading ? (
+                <Loader2 className="w-5 h-5 sm:w-6 sm:h-6 text-primary animate-spin" />
+              ) : (
+                <Download className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
+              )}
             </div>
             <div className="min-w-0">
-              <h3 className="font-semibold text-foreground text-sm sm:text-base">Scarica PDF</h3>
-              <p className="text-xs sm:text-sm text-muted-foreground truncate">Puoi scaricare i biglietti in formato PDF</p>
+              <h3 className="font-semibold text-foreground text-sm sm:text-base">
+                {isDownloading ? "Scaricamento..." : "Scarica PDF"}
+              </h3>
+              <p className="text-xs sm:text-sm text-muted-foreground truncate">
+                {isDownloading ? "Attendere prego..." : "Puoi scaricare i biglietti in formato PDF"}
+              </p>
             </div>
           </Card>
         </div>
