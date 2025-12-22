@@ -345,17 +345,7 @@ export default function StaffPage() {
     <MobileHeader
       title="Staff"
       subtitle={`${staffList.length} membri · ${activeCount} attivi`}
-      leftAction={
-        <HapticButton
-          variant="ghost"
-          size="icon"
-          className="h-11 w-11 rounded-xl"
-          onClick={() => setLocation("/")}
-          data-testid="button-back"
-        >
-          <ChevronLeft className="h-5 w-5" />
-        </HapticButton>
-      }
+      showBackButton
       rightAction={
         <HapticButton
           variant="ghost"

@@ -507,13 +507,7 @@ export default function Beverage() {
           <MobileHeader
             title="Beverage"
             subtitle={`Ciao, ${user?.firstName || 'Magazziniere'}`}
-            leftAction={
-              <Link href="/">
-                <HapticButton variant="ghost" size="icon">
-                  <ArrowLeft className="h-5 w-5" />
-                </HapticButton>
-              </Link>
-            }
+            showBackButton
           />
         }
         contentClassName="pb-24"
@@ -552,13 +546,7 @@ export default function Beverage() {
       header={
         <MobileHeader
           title="Beverage"
-          leftAction={
-            <Link href="/">
-              <HapticButton variant="ghost" size="icon">
-                <ArrowLeft className="h-5 w-5" />
-              </HapticButton>
-            </Link>
-          }
+          showBackButton
           rightAction={
             user && (user.role === 'admin' || user.role === 'super_admin') && (
               <HapticButton

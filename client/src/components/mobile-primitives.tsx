@@ -2,7 +2,7 @@ import { forwardRef, useCallback } from "react";
 import { motion, AnimatePresence, PanInfo } from "framer-motion";
 import { Button, ButtonProps } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { X, Menu } from "lucide-react";
+import { X, Menu, ArrowLeft } from "lucide-react";
 import { useSidebar } from "@/components/ui/sidebar";
 
 export function triggerHaptic(type: 'light' | 'medium' | 'heavy' | 'success' | 'error' = 'light') {
@@ -266,6 +266,8 @@ interface MobileHeaderProps {
   transparent?: boolean;
   className?: string;
   showMenuButton?: boolean;
+  showBackButton?: boolean;
+  onBack?: () => void;
 }
 
 export function MobileHeader({
@@ -276,8 +278,32 @@ export function MobileHeader({
   transparent = false,
   className,
   showMenuButton = false,
+  showBackButton = false,
+  onBack,
 }: MobileHeaderProps) {
   const sidebar = useSidebar();
+  
+  const handleBack = () => {
+    triggerHaptic('light');
+    if (onBack) {
+      onBack();
+    } else {
+      window.history.back();
+    }
+  };
+  
+  const backButton = showBackButton ? (
+    <HapticButton
+      variant="ghost"
+      size="icon"
+      onClick={handleBack}
+      className="h-11 w-11"
+      hapticType="light"
+      data-testid="button-back"
+    >
+      <ArrowLeft className="h-6 w-6" />
+    </HapticButton>
+  ) : null;
   
   const menuButton = showMenuButton ? (
     <HapticButton
@@ -305,7 +331,7 @@ export function MobileHeader({
       )}
     >
       <div className="w-12 flex justify-start">
-        {leftAction || menuButton}
+        {leftAction || backButton || menuButton}
       </div>
       
       <div className="flex-1 text-center">

@@ -463,13 +463,7 @@ export default function PurchaseOrders() {
   const header = (
     <MobileHeader
       title="Ordini d'Acquisto"
-      leftAction={
-        <HapticButton variant="ghost" size="icon" asChild className="h-11 w-11">
-          <Link href="/beverage">
-            <ArrowLeft className="h-5 w-5" />
-          </Link>
-        </HapticButton>
-      }
+      showBackButton
       rightAction={
         <HapticButton
           variant="ghost"

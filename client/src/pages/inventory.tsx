@@ -317,13 +317,7 @@ export default function Inventory() {
   const headerContent = (
     <MobileHeader
       title="Inventario"
-      leftAction={
-        <Link href="/beverage">
-          <HapticButton variant="ghost" size="icon" className="rounded-full" data-testid="button-back">
-            <ArrowLeft className="h-5 w-5" />
-          </HapticButton>
-        </Link>
-      }
+      showBackButton
     />
   );
 

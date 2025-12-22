@@ -146,6 +146,7 @@ export default function Locations() {
     <MobileHeader
       title="Locali"
       subtitle="Le sedi dei tuoi eventi"
+      showBackButton
     />
   );
 

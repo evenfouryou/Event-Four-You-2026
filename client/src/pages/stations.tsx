@@ -392,20 +392,7 @@ export default function StationsPage() {
   const headerContent = (
     <MobileHeader
       title="Postazioni"
-      leftAction={
-        <HapticButton 
-          variant="ghost" 
-          size="icon" 
-          asChild
-          className="h-11 w-11 rounded-xl"
-          hapticType="light"
-          data-testid="button-back-beverage"
-        >
-          <Link href="/beverage">
-            <ArrowLeft className="h-6 w-6" />
-          </Link>
-        </HapticButton>
-      }
+      showBackButton
       rightAction={
         <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
           <Boxes className="h-6 w-6 text-white" />

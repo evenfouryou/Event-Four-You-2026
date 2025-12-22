@@ -241,17 +241,7 @@ export default function Personnel() {
     <MobileHeader
       title="Personale"
       subtitle="Gestione staff"
-      leftAction={
-        <HapticButton
-          variant="ghost"
-          size="icon"
-          onClick={() => setLocation("/")}
-          className="min-h-[44px] min-w-[44px] rounded-xl"
-          data-testid="button-back"
-        >
-          <ArrowLeft className="h-5 w-5" />
-        </HapticButton>
-      }
+      showBackButton
     />
   );
 

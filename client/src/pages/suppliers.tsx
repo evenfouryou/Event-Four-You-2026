@@ -358,19 +358,7 @@ export default function Suppliers() {
     <MobileHeader
       title="Fornitori"
       subtitle={`${suppliers?.length ?? 0} fornitori`}
-      leftAction={
-        <Link href="/beverage">
-          <HapticButton 
-            variant="ghost" 
-            size="icon" 
-            className="h-11 w-11 rounded-xl"
-            data-testid="button-back-beverage"
-            hapticType="light"
-          >
-            <ArrowLeft className="h-6 w-6" />
-          </HapticButton>
-        </Link>
-      }
+      showBackButton
       rightAction={
         <motion.div 
           initial={{ scale: 0 }}

@@ -217,18 +217,7 @@ export default function Companies() {
     <MobileHeader
       title="Aziende"
       subtitle={companies ? `${companies.length} aziende` : undefined}
-      leftAction={
-        <Link href="/">
-          <HapticButton 
-            variant="ghost" 
-            size="icon" 
-            className="h-11 w-11 rounded-xl"
-            data-testid="button-back-home"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </HapticButton>
-        </Link>
-      }
+      showBackButton
       rightAction={
         <motion.div
           initial={{ scale: 0 }}

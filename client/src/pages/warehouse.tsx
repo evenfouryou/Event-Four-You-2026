@@ -653,13 +653,7 @@ export default function Warehouse() {
     <MobileHeader
       title="Magazzino"
       subtitle="Gestione inventario"
-      leftAction={
-        <HapticButton variant="ghost" size="icon" asChild>
-          <Link href="/beverage" data-testid="button-back">
-            <ArrowLeft className="h-5 w-5" />
-          </Link>
-        </HapticButton>
-      }
+      showBackButton
     />
   );
 

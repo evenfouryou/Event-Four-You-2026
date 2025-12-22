@@ -453,13 +453,7 @@ export default function Reports() {
         header={
           <MobileHeader
             title="Report"
-            leftAction={
-              <HapticButton variant="ghost" size="icon" asChild>
-                <Link href="/beverage">
-                  <ArrowLeft className="h-5 w-5" />
-                </Link>
-              </HapticButton>
-            }
+            showBackButton
           />
         }
       >
@@ -488,13 +482,7 @@ export default function Reports() {
         <MobileHeader
           title="Report"
           subtitle={selectedEvent ? selectedEvent.name : "Seleziona evento"}
-          leftAction={
-            <HapticButton variant="ghost" size="icon" asChild>
-              <Link href="/beverage">
-                <ArrowLeft className="h-5 w-5" />
-              </Link>
-            </HapticButton>
-          }
+          showBackButton
           rightAction={
             <HapticButton
               variant="ghost"
