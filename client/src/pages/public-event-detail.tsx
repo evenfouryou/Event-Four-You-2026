@@ -356,7 +356,6 @@ function TicketTypeCard({
             </div>
             <div>
               <h3 className="font-semibold text-foreground">{sector.name}</h3>
-              <p className="text-xs text-muted-foreground">{sector.availableSeats} disponibili</p>
             </div>
           </div>
           <Badge variant="destructive" className="text-sm">Esaurito</Badge>
@@ -381,7 +380,6 @@ function TicketTypeCard({
             <h3 className="font-semibold text-foreground" data-testid={`text-sector-name-${sector.id}`}>
               {sector.name}
             </h3>
-            <p className="text-xs text-muted-foreground">{sector.availableSeats} disponibili</p>
           </div>
         </div>
         <div className="text-right">

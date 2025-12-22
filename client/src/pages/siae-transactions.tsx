@@ -328,7 +328,7 @@ export default function SiaeTransactionsPage() {
       </Card>
 
       {eventId && (
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
           <Card className="glass-card">
             <CardContent className="p-4">
               <div className="text-xs text-muted-foreground mb-1">Totale</div>
@@ -351,6 +351,12 @@ export default function SiaeTransactionsPage() {
             <CardContent className="p-4">
               <div className="text-xs text-muted-foreground mb-1">Fallite</div>
               <div className="text-2xl font-bold text-destructive" data-testid="stat-failed">{stats.failed}</div>
+            </CardContent>
+          </Card>
+          <Card className="glass-card">
+            <CardContent className="p-4">
+              <div className="text-xs text-muted-foreground mb-1">Rimborsate</div>
+              <div className="text-2xl font-bold text-blue-400" data-testid="stat-refunded">{stats.refunded}</div>
             </CardContent>
           </Card>
           <Card className="glass-card">
