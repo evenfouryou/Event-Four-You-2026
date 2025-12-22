@@ -497,7 +497,7 @@ export class DatabaseStorage implements IStorage {
     await db.delete(e4uStaffAssignments).where(eq(e4uStaffAssignments.userId, id));
     await db.delete(eventPrAssignments).where(eq(eventPrAssignments.userId, id));
     await db.delete(eventScanners).where(eq(eventScanners.userId, id));
-    await db.delete(cashierSessions).where(eq(cashierSessions.cashierId, id));
+    await db.delete(cashierSessions).where(eq(cashierSessions.userId, id));
     await db.delete(printerAgents).where(eq(printerAgents.userId, id));
     
     // Tables with optional userId - set to NULL
