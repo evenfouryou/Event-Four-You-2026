@@ -2090,6 +2090,24 @@ router.get("/api/public/tickets", async (req, res) => {
       return res.status(401).json({ message: "Non autenticato" });
     }
 
+    const { transaction } = req.query;
+    
+    // Build where conditions
+    const conditions = [eq(siaeTickets.customerId, customer.id)];
+    
+    // If transaction code is provided, filter by it
+    if (transaction && typeof transaction === 'string') {
+      // Find the transaction by code
+      const transactionRecord = await db.select({ id: siaeTransactions.id })
+        .from(siaeTransactions)
+        .where(eq(siaeTransactions.transactionCode, transaction))
+        .limit(1);
+      
+      if (transactionRecord.length > 0) {
+        conditions.push(eq(siaeTickets.transactionId, transactionRecord[0].id));
+      }
+    }
+
     const tickets = await db
       .select({
         id: siaeTickets.id,
@@ -2112,7 +2130,7 @@ router.get("/api/public/tickets", async (req, res) => {
       .innerJoin(events, eq(siaeTicketedEvents.eventId, events.id))
       .innerJoin(locations, eq(events.locationId, locations.id))
       .innerJoin(siaeEventSectors, eq(siaeTickets.sectorId, siaeEventSectors.id))
-      .where(eq(siaeTickets.customerId, customer.id))
+      .where(and(...conditions))
       .orderBy(desc(siaeTickets.createdAt));
 
     res.json(tickets);

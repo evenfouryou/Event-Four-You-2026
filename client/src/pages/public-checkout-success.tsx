@@ -156,7 +156,16 @@ export default function PublicCheckoutSuccessPage() {
   const transactionCode = params.get("transaction");
 
   const { data: tickets, isLoading } = useQuery<TicketData[]>({
-    queryKey: ["/api/public/tickets"],
+    queryKey: ["/api/public/tickets", transactionCode],
+    queryFn: async () => {
+      const url = transactionCode 
+        ? `/api/public/tickets?transaction=${encodeURIComponent(transactionCode)}`
+        : "/api/public/tickets";
+      const res = await fetch(url, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch tickets");
+      return res.json();
+    },
+    enabled: !!transactionCode,
   });
 
   return (
