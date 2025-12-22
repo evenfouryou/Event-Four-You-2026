@@ -1,9 +1,17 @@
-import { forwardRef, useCallback } from "react";
+import { forwardRef, useCallback, useContext } from "react";
 import { motion, AnimatePresence, PanInfo } from "framer-motion";
 import { Button, ButtonProps } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { X, Menu, ArrowLeft } from "lucide-react";
-import { useSidebar } from "@/components/ui/sidebar";
+import { useSidebar, SidebarContext } from "@/components/ui/sidebar";
+
+function useSidebarSafe() {
+  const context = useContext(SidebarContext);
+  if (!context) {
+    return null;
+  }
+  return context;
+}
 
 export function triggerHaptic(type: 'light' | 'medium' | 'heavy' | 'success' | 'error' = 'light') {
   if ('vibrate' in navigator) {
@@ -281,7 +289,7 @@ export function MobileHeader({
   showBackButton = false,
   onBack,
 }: MobileHeaderProps) {
-  const sidebar = useSidebar();
+  const sidebar = useSidebarSafe();
   
   const handleBack = () => {
     triggerHaptic('light');
@@ -305,7 +313,7 @@ export function MobileHeader({
     </HapticButton>
   ) : null;
   
-  const menuButton = showMenuButton ? (
+  const menuButton = showMenuButton && sidebar ? (
     <HapticButton
       variant="ghost"
       size="icon"
