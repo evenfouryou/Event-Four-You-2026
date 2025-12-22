@@ -137,7 +137,13 @@ export default function AccountProfile() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
+      <div 
+        className="fixed inset-0 flex items-center justify-center bg-background"
+        style={{ 
+          paddingTop: 'env(safe-area-inset-top)',
+          paddingBottom: 'env(safe-area-inset-bottom)',
+        }}
+      >
         <motion.div
           initial={{ opacity: 0, scale: 0.8 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -150,9 +156,12 @@ export default function AccountProfile() {
   }
 
   return (
-    <div className="flex flex-col min-h-full">
+    <div 
+      className="min-h-screen bg-background pb-48"
+      style={{ paddingTop: 'env(safe-area-inset-top)' }}
+    >
       <motion.div
-        className="flex-1 px-4 pt-6 pb-40"
+        className="px-4 py-6"
         variants={staggerChildren}
         initial="hidden"
         animate="visible"
@@ -308,7 +317,7 @@ export default function AccountProfile() {
 
       <motion.div 
         className="fixed bottom-0 left-0 right-0 p-4 bg-background/95 backdrop-blur-xl border-t border-border z-40"
-        style={{ paddingBottom: 'calc(5rem + env(safe-area-inset-bottom))' }}
+        style={{ paddingBottom: 'calc(6rem + env(safe-area-inset-bottom))' }}
         initial={{ y: 100, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ ...springTransition, delay: 0.3 }}
@@ -317,7 +326,7 @@ export default function AccountProfile() {
           type="submit"
           disabled={updateMutation.isPending}
           onClick={form.handleSubmit(onSubmit)}
-          className="w-full min-h-[56px] text-lg font-semibold rounded-xl"
+          className="w-full min-h-[56px] text-lg font-semibold rounded-2xl"
           hapticType="medium"
           data-testid="button-save"
         >
