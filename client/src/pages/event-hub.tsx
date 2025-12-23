@@ -107,6 +107,8 @@ import {
   Copy,
   ExternalLink,
   Banknote,
+  Send,
+  Upload,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -666,6 +668,11 @@ export default function EventHub() {
   const [cancelReason, setCancelReason] = useState("01");
   const [cancelNote, setCancelNote] = useState("");
 
+  // Transazioni state
+  const [transactionPaymentMethodFilter, setTransactionPaymentMethodFilter] = useState<string>("all");
+  const [transactionStatusFilter, setTransactionStatusFilter] = useState<string>("all");
+  const [transactionsDisplayLimit, setTransactionsDisplayLimit] = useState(20);
+
   const { data: event, isLoading: eventLoading } = useQuery<Event>({
     queryKey: ['/api/events', id],
   });
@@ -865,6 +872,73 @@ export default function EventHub() {
       });
     },
   });
+
+  // Online Visibility Mutations
+  const togglePublicMutation = useMutation({
+    mutationFn: async (isPublic: boolean) => {
+      await apiRequest('PATCH', `/api/events/${id}`, { isPublic });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/events', id] });
+      queryClient.invalidateQueries({ queryKey: ['/api/events'] });
+      toast({
+        title: event?.isPublic ? "Evento nascosto" : "Evento pubblicato",
+        description: event?.isPublic 
+          ? "L'evento non è più visibile al pubblico."
+          : "L'evento è ora visibile al pubblico.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Errore",
+        description: error?.message || "Impossibile aggiornare la visibilità dell'evento.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const toggleTicketingStatusMutation = useMutation({
+    mutationFn: async (ticketingStatus: string) => {
+      await apiRequest('PATCH', `/api/siae/ticketed-events/${ticketedEvent?.id}`, { ticketingStatus });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/siae/events', id, 'ticketing'] });
+      toast({
+        title: ticketedEvent?.ticketingStatus === 'active' ? "Vendita sospesa" : "Vendita attivata",
+        description: ticketedEvent?.ticketingStatus === 'active'
+          ? "La vendita online è stata sospesa."
+          : "La vendita online è ora attiva.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Errore",
+        description: error?.message || "Impossibile aggiornare lo stato della vendita.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Public event URL helper
+  const getPublicEventUrl = useCallback(() => {
+    if (!event) return '';
+    const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
+    return `${baseUrl}/events/${event.id}`;
+  }, [event]);
+
+  const copyUrlToClipboard = useCallback(() => {
+    const url = getPublicEventUrl();
+    navigator.clipboard.writeText(url);
+    toast({
+      title: "Link copiato",
+      description: "Il link dell'evento è stato copiato negli appunti.",
+    });
+  }, [getPublicEventUrl, toast]);
+
+  const openPreview = useCallback(() => {
+    const url = getPublicEventUrl();
+    window.open(url, '_blank');
+  }, [getPublicEventUrl]);
 
   // E4U Mutations
   const createListMutation = useMutation({
@@ -1114,6 +1188,50 @@ export default function EventHub() {
   }, [siaeTickets, ticketSectorFilter, ticketStatusFilter]);
 
   const displayedTickets = filteredTickets.slice(0, ticketsDisplayLimit);
+
+  // Helper to get filtered transactions
+  const filteredTransactions = useMemo(() => {
+    let filtered = siaeTransactions;
+    if (transactionPaymentMethodFilter !== "all") {
+      filtered = filtered.filter(t => t.paymentMethod === transactionPaymentMethodFilter);
+    }
+    if (transactionStatusFilter !== "all") {
+      filtered = filtered.filter(t => t.status === transactionStatusFilter);
+    }
+    return filtered;
+  }, [siaeTransactions, transactionPaymentMethodFilter, transactionStatusFilter]);
+
+  const displayedTransactions = filteredTransactions.slice(0, transactionsDisplayLimit);
+
+  const getTransactionStatusBadge = (status: string) => {
+    switch (status) {
+      case 'completed':
+        return <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30">Completata</Badge>;
+      case 'pending':
+        return <Badge className="bg-amber-500/20 text-amber-400 border-amber-500/30">In attesa</Badge>;
+      case 'failed':
+        return <Badge className="bg-red-500/20 text-red-400 border-red-500/30">Fallita</Badge>;
+      case 'refunded':
+        return <Badge className="bg-purple-500/20 text-purple-400 border-purple-500/30">Rimborsata</Badge>;
+      default:
+        return <Badge variant="secondary">{status}</Badge>;
+    }
+  };
+
+  const getPaymentMethodLabel = (method: string | null) => {
+    switch (method) {
+      case 'card':
+        return 'Carta';
+      case 'cash':
+        return 'Contanti';
+      case 'bank_transfer':
+        return 'Bonifico';
+      case 'paypal':
+        return 'PayPal';
+      default:
+        return method || '-';
+    }
+  };
 
   const getSectorName = useCallback((sectorId: string) => {
     const sector = ticketedEvent?.sectors?.find(s => s.id === sectorId);
@@ -1911,49 +2029,349 @@ export default function EventHub() {
                 </Card>
               </TabsContent>
 
-              <TabsContent value="transazioni">
+              <TabsContent value="transazioni" data-testid="subtab-transazioni-content">
                 <Card>
-                  <CardHeader>
-                    <CardTitle>Transazioni</CardTitle>
-                    <CardDescription>Elenco di tutte le transazioni dell'evento</CardDescription>
+                  <CardHeader className="flex flex-row items-center justify-between gap-4">
+                    <div>
+                      <CardTitle>Transazioni</CardTitle>
+                      <CardDescription>Elenco di tutte le transazioni dell'evento</CardDescription>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Select value={transactionPaymentMethodFilter} onValueChange={setTransactionPaymentMethodFilter}>
+                        <SelectTrigger className="w-36" data-testid="subtab-transazioni-filter-payment">
+                          <SelectValue placeholder="Metodo pagamento" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Tutti</SelectItem>
+                          <SelectItem value="card">Carta</SelectItem>
+                          <SelectItem value="cash">Contanti</SelectItem>
+                          <SelectItem value="bank_transfer">Bonifico</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Select value={transactionStatusFilter} onValueChange={setTransactionStatusFilter}>
+                        <SelectTrigger className="w-36" data-testid="subtab-transazioni-filter-status">
+                          <SelectValue placeholder="Stato" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Tutti</SelectItem>
+                          <SelectItem value="pending">In attesa</SelectItem>
+                          <SelectItem value="completed">Completata</SelectItem>
+                          <SelectItem value="failed">Fallita</SelectItem>
+                          <SelectItem value="refunded">Rimborsata</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-center py-12 text-muted-foreground">
-                      <Banknote className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                      <p>Transazioni in arrivo</p>
-                    </div>
+                    {filteredTransactions.length === 0 ? (
+                      <div className="text-center py-12 text-muted-foreground">
+                        <Banknote className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                        <p>Nessuna transazione registrata</p>
+                      </div>
+                    ) : (
+                      <Table data-testid="table-transactions">
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Codice</TableHead>
+                            <TableHead>Data/Ora</TableHead>
+                            <TableHead>Importo</TableHead>
+                            <TableHead>Metodo</TableHead>
+                            <TableHead>Stato</TableHead>
+                            <TableHead>Biglietti</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {displayedTransactions.map(transaction => (
+                            <TableRow key={transaction.id} data-testid={`row-transaction-${transaction.id}`}>
+                              <TableCell className="font-mono">{transaction.transactionCode}</TableCell>
+                              <TableCell className="text-muted-foreground">
+                                {transaction.paymentCompletedAt ? format(new Date(transaction.paymentCompletedAt), 'dd/MM/yyyy HH:mm', { locale: it }) : '-'}
+                              </TableCell>
+                              <TableCell className="font-medium">€{Number(transaction.totalAmount).toFixed(2)}</TableCell>
+                              <TableCell>{getPaymentMethodLabel(transaction.paymentMethod)}</TableCell>
+                              <TableCell>{getTransactionStatusBadge(transaction.status)}</TableCell>
+                              <TableCell>{transaction.ticketsCount}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    )}
+                    {filteredTransactions.length > transactionsDisplayLimit && (
+                      <div className="text-center mt-4">
+                        <Button variant="outline" onClick={() => setTransactionsDisplayLimit(prev => prev + 20)} data-testid="subtab-transazioni-load-more">
+                          Carica altri
+                        </Button>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               </TabsContent>
 
               <TabsContent value="report">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Report Vendite</CardTitle>
-                    <CardDescription>Analisi e reportistica dell'evento</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-center py-12 text-muted-foreground">
-                      <BarChart3 className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                      <p>Report in arrivo</p>
-                    </div>
-                  </CardContent>
-                </Card>
+                <div className="grid grid-cols-2 gap-4">
+                  <Card data-testid="report-c1-card">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <FileText className="h-5 w-5 text-blue-400" />
+                        Registro C1 - Riepilogo
+                      </CardTitle>
+                      <CardDescription>Riepilogo corrispettivi giornalieri per tipo biglietto e canale</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <Button 
+                        className="w-full" 
+                        onClick={() => navigate(`/siae/report-c1?eventId=${id}`)}
+                        data-testid="button-view-c1"
+                      >
+                        <FileText className="h-4 w-4 mr-2" />
+                        Visualizza Report C1
+                      </Button>
+                      <div className="flex gap-2">
+                        <Button variant="outline" size="sm" className="flex-1" data-testid="button-download-pdf-c1">
+                          <Download className="h-4 w-4 mr-1" />
+                          Scarica PDF
+                        </Button>
+                        <Button variant="outline" size="sm" className="flex-1" data-testid="button-download-csv-c1">
+                          <Download className="h-4 w-4 mr-1" />
+                          Scarica CSV
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card data-testid="report-c2-card">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <FileText className="h-5 w-5 text-purple-400" />
+                        Registro C2 - Dettaglio Biglietti
+                      </CardTitle>
+                      <CardDescription>Dettaglio di tutti i biglietti emessi con numerazione progressiva</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <Button 
+                        className="w-full" 
+                        onClick={() => navigate(`/siae/report-c2?eventId=${id}`)}
+                        data-testid="button-view-c2"
+                      >
+                        <FileText className="h-4 w-4 mr-2" />
+                        Visualizza Report C2
+                      </Button>
+                      <div className="flex gap-2">
+                        <Button variant="outline" size="sm" className="flex-1" data-testid="button-download-pdf-c2">
+                          <Download className="h-4 w-4 mr-1" />
+                          Scarica PDF
+                        </Button>
+                        <Button variant="outline" size="sm" className="flex-1" data-testid="button-download-csv-c2">
+                          <Download className="h-4 w-4 mr-1" />
+                          Scarica CSV
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card data-testid="report-trasmissioni-card">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Send className="h-5 w-5 text-amber-400" />
+                        Trasmissioni AE
+                      </CardTitle>
+                      <CardDescription>Stato delle trasmissioni all'Agenzia delle Entrate</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      {ticketedEvent?.transmissionStatus && (
+                        <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50">
+                          <Badge variant={ticketedEvent.transmissionStatus === 'completed' ? 'default' : 'secondary'}>
+                            {ticketedEvent.transmissionStatus === 'completed' ? 'Trasmesso' : 
+                             ticketedEvent.transmissionStatus === 'pending' ? 'In Attesa' : 
+                             ticketedEvent.transmissionStatus === 'failed' ? 'Errore' : 'Non Trasmesso'}
+                          </Badge>
+                        </div>
+                      )}
+                      <Button 
+                        className="w-full" 
+                        variant="outline"
+                        onClick={() => navigate(`/siae/transmissions?eventId=${id}`)}
+                        data-testid="button-manage-transmissions"
+                      >
+                        <Upload className="h-4 w-4 mr-2" />
+                        Gestisci Trasmissioni
+                      </Button>
+                    </CardContent>
+                  </Card>
+
+                  <Card data-testid="report-annullamenti-card">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <RefreshCw className="h-5 w-5 text-rose-400" />
+                        Registro Annullamenti e Rimborsi
+                      </CardTitle>
+                      <CardDescription>Biglietti annullati e rimborsi effettuati</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="p-3 rounded-lg bg-muted/50 text-center">
+                          <div className="text-2xl font-bold text-rose-400">{ticketedEvent?.ticketsCancelled || 0}</div>
+                          <div className="text-xs text-muted-foreground">Annullati</div>
+                        </div>
+                        <div className="p-3 rounded-lg bg-muted/50 text-center">
+                          <div className="text-2xl font-bold text-amber-400">{ticketedEvent?.ticketsRefunded || 0}</div>
+                          <div className="text-xs text-muted-foreground">Rimborsati</div>
+                        </div>
+                      </div>
+                      <Button 
+                        variant="outline" 
+                        className="w-full"
+                        onClick={() => navigate(`/siae/tickets?eventId=${id}&status=cancelled`)}
+                        data-testid="button-view-cancellations"
+                      >
+                        <Eye className="h-4 w-4 mr-2" />
+                        Visualizza Registro
+                      </Button>
+                    </CardContent>
+                  </Card>
+                </div>
               </TabsContent>
 
               <TabsContent value="online">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Visibilità Online</CardTitle>
-                    <CardDescription>Gestione pubblicazione evento</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-center py-12 text-muted-foreground">
-                      <Eye className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                      <p>Impostazioni online in arrivo</p>
-                    </div>
-                  </CardContent>
-                </Card>
+                <div className="grid gap-6" data-testid="online-visibility-card">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Eye className="h-5 w-5 text-cyan-400" />
+                        Visibilità Evento
+                      </CardTitle>
+                      <CardDescription>Gestisci la pubblicazione online dell'evento</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-6">
+                      <div className="flex items-center justify-between gap-4 p-4 rounded-lg bg-muted/50">
+                        <div className="flex-1">
+                          <div className="font-medium">Evento Pubblico</div>
+                          <div className="text-sm text-muted-foreground">
+                            {event?.isPublic 
+                              ? "L'evento è visibile al pubblico" 
+                              : "L'evento è visibile solo agli organizzatori"}
+                          </div>
+                        </div>
+                        <Switch
+                          checked={event?.isPublic || false}
+                          onCheckedChange={(checked) => togglePublicMutation.mutate(checked)}
+                          disabled={togglePublicMutation.isPending}
+                          data-testid="switch-public"
+                        />
+                      </div>
+
+                      {ticketedEvent && (
+                        <div className="flex items-center justify-between gap-4 p-4 rounded-lg bg-muted/50">
+                          <div className="flex-1">
+                            <div className="font-medium">Vendita Online Attiva</div>
+                            <div className="text-sm text-muted-foreground">
+                              {ticketedEvent.ticketingStatus === 'active'
+                                ? "I biglietti sono acquistabili online"
+                                : "La vendita online è disattivata"}
+                            </div>
+                          </div>
+                          <Switch
+                            checked={ticketedEvent.ticketingStatus === 'active'}
+                            onCheckedChange={(checked) => 
+                              toggleTicketingStatusMutation.mutate(checked ? 'active' : 'suspended')
+                            }
+                            disabled={toggleTicketingStatusMutation.isPending}
+                            data-testid="switch-ticketing-active"
+                          />
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Link2 className="h-5 w-5 text-blue-400" />
+                        Stato Pubblicazione
+                      </CardTitle>
+                      <CardDescription>URL e anteprima della pagina pubblica</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="flex items-center gap-3 p-4 rounded-lg bg-muted/50">
+                        <div className={`w-3 h-3 rounded-full flex-shrink-0 ${event?.isPublic ? 'bg-emerald-500' : 'bg-slate-400'}`} />
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium">
+                            {event?.isPublic ? 'Online' : 'Offline'}
+                          </div>
+                          <div className="text-sm text-muted-foreground truncate">
+                            {event?.isPublic ? getPublicEventUrl() : 'Pagina non pubblicata'}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex gap-3">
+                        <Button
+                          variant="outline"
+                          className="flex-1"
+                          onClick={copyUrlToClipboard}
+                          disabled={!event?.isPublic}
+                          data-testid="button-copy-url"
+                        >
+                          <Copy className="h-4 w-4 mr-2" />
+                          Copia Link
+                        </Button>
+                        <Button
+                          variant="outline"
+                          className="flex-1"
+                          onClick={openPreview}
+                          disabled={!event?.isPublic}
+                          data-testid="button-preview"
+                        >
+                          <ExternalLink className="h-4 w-4 mr-2" />
+                          Anteprima
+                        </Button>
+                      </div>
+
+                      {!event?.isPublic && (
+                        <Button
+                          className="w-full"
+                          onClick={() => togglePublicMutation.mutate(true)}
+                          disabled={togglePublicMutation.isPending}
+                          data-testid="button-publish"
+                        >
+                          {togglePublicMutation.isPending ? (
+                            <>
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              Pubblicazione...
+                            </>
+                          ) : (
+                            <>
+                              <Megaphone className="h-4 w-4 mr-2" />
+                              Pubblica Ora
+                            </>
+                          )}
+                        </Button>
+                      )}
+
+                      {ticketedEvent && ticketedEvent.ticketingStatus === 'active' && (
+                        <Button
+                          variant="outline"
+                          className="w-full text-amber-600 border-amber-500/50 hover:bg-amber-500/10"
+                          onClick={() => toggleTicketingStatusMutation.mutate('suspended')}
+                          disabled={toggleTicketingStatusMutation.isPending}
+                          data-testid="button-suspend-ticketing"
+                        >
+                          {toggleTicketingStatusMutation.isPending ? (
+                            <>
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              Sospensione...
+                            </>
+                          ) : (
+                            <>
+                              <Pause className="h-4 w-4 mr-2" />
+                              Sospendi Vendita
+                            </>
+                          )}
+                        </Button>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
               </TabsContent>
             </Tabs>
           </TabsContent>
@@ -3497,7 +3915,7 @@ export default function EventHub() {
                 </AlertDialog>
               </TabsContent>
 
-              <TabsContent value="transazioni">
+              <TabsContent value="transazioni" data-testid="subtab-transazioni-content-mobile">
                 <Card className="glass-card">
                   <CardHeader className="px-4">
                     <CardTitle className="flex items-center gap-2 text-lg">
@@ -3506,49 +3924,360 @@ export default function EventHub() {
                     </CardTitle>
                     <CardDescription>Elenco di tutte le transazioni dell'evento</CardDescription>
                   </CardHeader>
-                  <CardContent className="px-4">
-                    <div className="text-center py-12 text-muted-foreground">
-                      <Banknote className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                      <p>Transazioni in arrivo</p>
+                  <CardContent className="px-4 space-y-4">
+                    <div className="flex gap-2">
+                      <Select value={transactionPaymentMethodFilter} onValueChange={setTransactionPaymentMethodFilter}>
+                        <SelectTrigger className="flex-1 min-h-[44px]" data-testid="subtab-transazioni-filter-payment-mobile">
+                          <SelectValue placeholder="Metodo" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Tutti</SelectItem>
+                          <SelectItem value="card">Carta</SelectItem>
+                          <SelectItem value="cash">Contanti</SelectItem>
+                          <SelectItem value="bank_transfer">Bonifico</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Select value={transactionStatusFilter} onValueChange={setTransactionStatusFilter}>
+                        <SelectTrigger className="flex-1 min-h-[44px]" data-testid="subtab-transazioni-filter-status-mobile">
+                          <SelectValue placeholder="Stato" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Tutti</SelectItem>
+                          <SelectItem value="pending">In attesa</SelectItem>
+                          <SelectItem value="completed">Completata</SelectItem>
+                          <SelectItem value="failed">Fallita</SelectItem>
+                          <SelectItem value="refunded">Rimborsata</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
+
+                    {filteredTransactions.length === 0 ? (
+                      <div className="text-center py-12 text-muted-foreground">
+                        <Banknote className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                        <p>Nessuna transazione registrata</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {displayedTransactions.map(transaction => (
+                          <motion.div
+                            key={transaction.id}
+                            className="p-4 rounded-xl bg-background/50 border"
+                            data-testid={`row-transaction-${transaction.id}`}
+                            whileTap={{ scale: 0.98 }}
+                            transition={springConfig}
+                          >
+                            <div className="flex items-start justify-between gap-3 mb-2">
+                              <div className="min-w-0 flex-1">
+                                <div className="font-mono text-sm font-medium truncate">{transaction.transactionCode}</div>
+                                <div className="text-xs text-muted-foreground">
+                                  {transaction.paymentCompletedAt ? format(new Date(transaction.paymentCompletedAt), 'dd/MM/yyyy HH:mm', { locale: it }) : '-'}
+                                </div>
+                              </div>
+                              <div className="text-right">
+                                <div className="font-bold text-lg text-amber-400">€{Number(transaction.totalAmount).toFixed(2)}</div>
+                              </div>
+                            </div>
+                            <div className="flex items-center justify-between gap-2 flex-wrap">
+                              <div className="flex items-center gap-2">
+                                {getTransactionStatusBadge(transaction.status)}
+                                <Badge variant="outline" className="text-xs">
+                                  {getPaymentMethodLabel(transaction.paymentMethod)}
+                                </Badge>
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                {transaction.ticketsCount} {transaction.ticketsCount === 1 ? 'biglietto' : 'biglietti'}
+                              </div>
+                            </div>
+                          </motion.div>
+                        ))}
+                      </div>
+                    )}
+
+                    {filteredTransactions.length > transactionsDisplayLimit && (
+                      <div className="text-center pt-2">
+                        <HapticButton 
+                          variant="outline" 
+                          onClick={() => setTransactionsDisplayLimit(prev => prev + 20)} 
+                          data-testid="subtab-transazioni-load-more-mobile"
+                          className="min-h-[44px]"
+                        >
+                          Carica altri
+                        </HapticButton>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               </TabsContent>
 
               <TabsContent value="report">
-                <Card className="glass-card">
-                  <CardHeader className="px-4">
-                    <CardTitle className="flex items-center gap-2 text-lg">
-                      <BarChart3 className="h-5 w-5 text-purple-400" />
-                      Report Vendite
-                    </CardTitle>
-                    <CardDescription>Analisi e reportistica dell'evento</CardDescription>
-                  </CardHeader>
-                  <CardContent className="px-4">
-                    <div className="text-center py-12 text-muted-foreground">
-                      <BarChart3 className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                      <p>Report in arrivo</p>
-                    </div>
-                  </CardContent>
-                </Card>
+                <div className="space-y-4">
+                  <Card className="glass-card" data-testid="report-c1-card">
+                    <CardHeader className="px-4">
+                      <CardTitle className="flex items-center gap-2 text-lg">
+                        <FileText className="h-5 w-5 text-blue-400" />
+                        Registro C1 - Riepilogo
+                      </CardTitle>
+                      <CardDescription>Riepilogo corrispettivi giornalieri per tipo biglietto e canale</CardDescription>
+                    </CardHeader>
+                    <CardContent className="px-4 space-y-3">
+                      <HapticButton 
+                        className="w-full min-h-[44px]" 
+                        onClick={() => navigate(`/siae/report-c1?eventId=${id}`)}
+                        data-testid="button-view-c1"
+                      >
+                        <FileText className="h-4 w-4 mr-2" />
+                        Visualizza Report C1
+                      </HapticButton>
+                      <div className="flex gap-2">
+                        <HapticButton variant="outline" size="sm" className="flex-1 min-h-[40px]" data-testid="button-download-pdf-c1">
+                          <Download className="h-4 w-4 mr-1" />
+                          PDF
+                        </HapticButton>
+                        <HapticButton variant="outline" size="sm" className="flex-1 min-h-[40px]" data-testid="button-download-csv-c1">
+                          <Download className="h-4 w-4 mr-1" />
+                          CSV
+                        </HapticButton>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="glass-card" data-testid="report-c2-card">
+                    <CardHeader className="px-4">
+                      <CardTitle className="flex items-center gap-2 text-lg">
+                        <FileText className="h-5 w-5 text-purple-400" />
+                        Registro C2 - Dettaglio Biglietti
+                      </CardTitle>
+                      <CardDescription>Dettaglio di tutti i biglietti emessi con numerazione progressiva</CardDescription>
+                    </CardHeader>
+                    <CardContent className="px-4 space-y-3">
+                      <HapticButton 
+                        className="w-full min-h-[44px]" 
+                        onClick={() => navigate(`/siae/report-c2?eventId=${id}`)}
+                        data-testid="button-view-c2"
+                      >
+                        <FileText className="h-4 w-4 mr-2" />
+                        Visualizza Report C2
+                      </HapticButton>
+                      <div className="flex gap-2">
+                        <HapticButton variant="outline" size="sm" className="flex-1 min-h-[40px]" data-testid="button-download-pdf-c2">
+                          <Download className="h-4 w-4 mr-1" />
+                          PDF
+                        </HapticButton>
+                        <HapticButton variant="outline" size="sm" className="flex-1 min-h-[40px]" data-testid="button-download-csv-c2">
+                          <Download className="h-4 w-4 mr-1" />
+                          CSV
+                        </HapticButton>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="glass-card" data-testid="report-trasmissioni-card">
+                    <CardHeader className="px-4">
+                      <CardTitle className="flex items-center gap-2 text-lg">
+                        <Send className="h-5 w-5 text-amber-400" />
+                        Trasmissioni AE
+                      </CardTitle>
+                      <CardDescription>Stato delle trasmissioni all'Agenzia delle Entrate</CardDescription>
+                    </CardHeader>
+                    <CardContent className="px-4 space-y-3">
+                      {ticketedEvent?.transmissionStatus && (
+                        <div className="flex items-center gap-2 p-3 rounded-lg bg-white/5">
+                          <Badge variant={ticketedEvent.transmissionStatus === 'completed' ? 'default' : 'secondary'}>
+                            {ticketedEvent.transmissionStatus === 'completed' ? 'Trasmesso' : 
+                             ticketedEvent.transmissionStatus === 'pending' ? 'In Attesa' : 
+                             ticketedEvent.transmissionStatus === 'failed' ? 'Errore' : 'Non Trasmesso'}
+                          </Badge>
+                        </div>
+                      )}
+                      <HapticButton 
+                        className="w-full min-h-[44px]" 
+                        variant="outline"
+                        onClick={() => navigate(`/siae/transmissions?eventId=${id}`)}
+                        data-testid="button-manage-transmissions"
+                      >
+                        <Upload className="h-4 w-4 mr-2" />
+                        Gestisci Trasmissioni
+                      </HapticButton>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="glass-card" data-testid="report-annullamenti-card">
+                    <CardHeader className="px-4">
+                      <CardTitle className="flex items-center gap-2 text-lg">
+                        <RefreshCw className="h-5 w-5 text-rose-400" />
+                        Registro Annullamenti e Rimborsi
+                      </CardTitle>
+                      <CardDescription>Biglietti annullati e rimborsi effettuati</CardDescription>
+                    </CardHeader>
+                    <CardContent className="px-4 space-y-3">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="p-3 rounded-lg bg-white/5 text-center">
+                          <div className="text-2xl font-bold text-rose-400">{ticketedEvent?.ticketsCancelled || 0}</div>
+                          <div className="text-xs text-muted-foreground">Annullati</div>
+                        </div>
+                        <div className="p-3 rounded-lg bg-white/5 text-center">
+                          <div className="text-2xl font-bold text-amber-400">{ticketedEvent?.ticketsRefunded || 0}</div>
+                          <div className="text-xs text-muted-foreground">Rimborsati</div>
+                        </div>
+                      </div>
+                      <HapticButton 
+                        variant="outline" 
+                        className="w-full min-h-[44px]"
+                        onClick={() => navigate(`/siae/tickets?eventId=${id}&status=cancelled`)}
+                        data-testid="button-view-cancellations"
+                      >
+                        <Eye className="h-4 w-4 mr-2" />
+                        Visualizza Registro
+                      </HapticButton>
+                    </CardContent>
+                  </Card>
+                </div>
               </TabsContent>
 
               <TabsContent value="online">
-                <Card className="glass-card">
-                  <CardHeader className="px-4">
-                    <CardTitle className="flex items-center gap-2 text-lg">
-                      <Eye className="h-5 w-5 text-cyan-400" />
-                      Visibilità Online
-                    </CardTitle>
-                    <CardDescription>Gestione pubblicazione evento</CardDescription>
-                  </CardHeader>
-                  <CardContent className="px-4">
-                    <div className="text-center py-12 text-muted-foreground">
-                      <Eye className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                      <p>Impostazioni online in arrivo</p>
-                    </div>
-                  </CardContent>
-                </Card>
+                <div className="space-y-4" data-testid="online-visibility-card">
+                  <Card className="glass-card">
+                    <CardHeader className="px-4">
+                      <CardTitle className="flex items-center gap-2 text-lg">
+                        <Eye className="h-5 w-5 text-cyan-400" />
+                        Visibilità Evento
+                      </CardTitle>
+                      <CardDescription>Gestisci la pubblicazione online dell'evento</CardDescription>
+                    </CardHeader>
+                    <CardContent className="px-4 space-y-4">
+                      <div className="flex items-center justify-between gap-3 p-4 rounded-xl bg-background/50 border">
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium text-sm">Evento Pubblico</div>
+                          <div className="text-xs text-muted-foreground">
+                            {event?.isPublic 
+                              ? "L'evento è visibile al pubblico" 
+                              : "L'evento è visibile solo agli organizzatori"}
+                          </div>
+                        </div>
+                        <Switch
+                          checked={event?.isPublic || false}
+                          onCheckedChange={(checked) => {
+                            triggerHaptic('light');
+                            togglePublicMutation.mutate(checked);
+                          }}
+                          disabled={togglePublicMutation.isPending}
+                          data-testid="switch-public"
+                        />
+                      </div>
+
+                      {ticketedEvent && (
+                        <div className="flex items-center justify-between gap-3 p-4 rounded-xl bg-background/50 border">
+                          <div className="flex-1 min-w-0">
+                            <div className="font-medium text-sm">Vendita Online Attiva</div>
+                            <div className="text-xs text-muted-foreground">
+                              {ticketedEvent.ticketingStatus === 'active'
+                                ? "I biglietti sono acquistabili online"
+                                : "La vendita online è disattivata"}
+                            </div>
+                          </div>
+                          <Switch
+                            checked={ticketedEvent.ticketingStatus === 'active'}
+                            onCheckedChange={(checked) => {
+                              triggerHaptic('light');
+                              toggleTicketingStatusMutation.mutate(checked ? 'active' : 'suspended');
+                            }}
+                            disabled={toggleTicketingStatusMutation.isPending}
+                            data-testid="switch-ticketing-active"
+                          />
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  <Card className="glass-card">
+                    <CardHeader className="px-4">
+                      <CardTitle className="flex items-center gap-2 text-lg">
+                        <Link2 className="h-5 w-5 text-blue-400" />
+                        Stato Pubblicazione
+                      </CardTitle>
+                      <CardDescription>URL e anteprima della pagina pubblica</CardDescription>
+                    </CardHeader>
+                    <CardContent className="px-4 space-y-4">
+                      <div className="flex items-center gap-3 p-4 rounded-xl bg-background/50 border">
+                        <div className={`w-3 h-3 rounded-full flex-shrink-0 ${event?.isPublic ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`} />
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium text-sm">
+                            {event?.isPublic ? 'Online' : 'Offline'}
+                          </div>
+                          <div className="text-xs text-muted-foreground truncate">
+                            {event?.isPublic ? getPublicEventUrl() : 'Pagina non pubblicata'}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex gap-3">
+                        <HapticButton
+                          variant="outline"
+                          className="flex-1 min-h-[44px]"
+                          onClick={copyUrlToClipboard}
+                          disabled={!event?.isPublic}
+                          data-testid="button-copy-url"
+                        >
+                          <Copy className="h-4 w-4 mr-2" />
+                          Copia Link
+                        </HapticButton>
+                        <HapticButton
+                          variant="outline"
+                          className="flex-1 min-h-[44px]"
+                          onClick={openPreview}
+                          disabled={!event?.isPublic}
+                          data-testid="button-preview"
+                        >
+                          <ExternalLink className="h-4 w-4 mr-2" />
+                          Anteprima
+                        </HapticButton>
+                      </div>
+
+                      {!event?.isPublic && (
+                        <HapticButton
+                          className="w-full min-h-[48px]"
+                          onClick={() => togglePublicMutation.mutate(true)}
+                          disabled={togglePublicMutation.isPending}
+                          data-testid="button-publish"
+                        >
+                          {togglePublicMutation.isPending ? (
+                            <>
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              Pubblicazione...
+                            </>
+                          ) : (
+                            <>
+                              <Megaphone className="h-4 w-4 mr-2" />
+                              Pubblica Ora
+                            </>
+                          )}
+                        </HapticButton>
+                      )}
+
+                      {ticketedEvent && ticketedEvent.ticketingStatus === 'active' && (
+                        <HapticButton
+                          variant="outline"
+                          className="w-full min-h-[44px] text-amber-400 border-amber-500/50"
+                          onClick={() => toggleTicketingStatusMutation.mutate('suspended')}
+                          disabled={toggleTicketingStatusMutation.isPending}
+                          data-testid="button-suspend-ticketing"
+                        >
+                          {toggleTicketingStatusMutation.isPending ? (
+                            <>
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              Sospensione...
+                            </>
+                          ) : (
+                            <>
+                              <Pause className="h-4 w-4 mr-2" />
+                              Sospendi Vendita
+                            </>
+                          )}
+                        </HapticButton>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
               </TabsContent>
             </Tabs>
           </TabsContent>
