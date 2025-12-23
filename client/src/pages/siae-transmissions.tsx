@@ -7,7 +7,7 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { type SiaeTransmission } from "@shared/schema";
+import { type SiaeTransmission, type Company } from "@shared/schema";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -66,6 +66,7 @@ import {
   Zap,
   TestTube,
   Plus,
+  Building2,
 } from "lucide-react";
 
 const springTransition = {
@@ -99,8 +100,15 @@ export default function SiaeTransmissionsPage() {
   const [dailyEmail, setDailyEmail] = useState<string>("servertest2@batest.siae.it");
   const [receiptProtocol, setReceiptProtocol] = useState<string>("");
   const [receiptContent, setReceiptContent] = useState<string>("");
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(null);
 
-  const companyId = user?.companyId;
+  const isSuperAdmin = user?.role === 'super_admin';
+  const companyId = isSuperAdmin ? selectedCompanyId : user?.companyId;
+
+  const { data: companies } = useQuery<Company[]>({
+    queryKey: ['/api/companies'],
+    enabled: isSuperAdmin,
+  });
 
   const { data: transmissions, isLoading } = useQuery<SiaeTransmission[]>({
     queryKey: ['/api/siae/companies', companyId, 'transmissions'],
@@ -342,27 +350,64 @@ export default function SiaeTransmissionsPage() {
   if (!isMobile) {
     return (
       <div className="container mx-auto p-6 space-y-6" data-testid="page-siae-transmissions">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-4">
           <div>
             <h1 className="text-3xl font-bold">Trasmissioni SIAE</h1>
             <p className="text-muted-foreground">Gestione trasmissioni XML verso SIAE</p>
           </div>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => setIsTestEmailDialogOpen(true)} data-testid="button-test-email">
+          <div className="flex items-center gap-2">
+            {isSuperAdmin && (
+              <div className="flex items-center gap-2 mr-4">
+                <Label className="text-sm text-muted-foreground whitespace-nowrap">
+                  <Building2 className="h-4 w-4 inline-block mr-1" />
+                  Azienda:
+                </Label>
+                <Select
+                  value={selectedCompanyId || ""}
+                  onValueChange={(value) => setSelectedCompanyId(value)}
+                >
+                  <SelectTrigger className="w-[250px]" data-testid="select-company">
+                    <SelectValue placeholder="Seleziona azienda" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {companies?.map((company) => (
+                      <SelectItem key={company.id} value={company.id}>
+                        {company.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            <Button variant="outline" onClick={() => setIsTestEmailDialogOpen(true)} data-testid="button-test-email" disabled={!companyId}>
               <TestTube className="w-4 h-4 mr-2" />
               Test Email
             </Button>
-            <Button variant="outline" onClick={() => setIsCreateDialogOpen(true)} data-testid="button-create">
+            <Button variant="outline" onClick={() => setIsCreateDialogOpen(true)} data-testid="button-create" disabled={!companyId}>
               <Upload className="w-4 h-4 mr-2" />
               Genera XML
             </Button>
-            <Button onClick={() => setIsSendDailyDialogOpen(true)} data-testid="button-send-daily">
+            <Button onClick={() => setIsSendDailyDialogOpen(true)} data-testid="button-send-daily" disabled={!companyId}>
               <Zap className="w-4 h-4 mr-2" />
               Invia Trasmissione Giornaliera
             </Button>
           </div>
         </div>
 
+        {!companyId && isSuperAdmin && (
+          <Card className="border-dashed">
+            <CardContent className="pt-6 text-center py-12">
+              <Building2 className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
+              <h3 className="text-lg font-medium mb-2">Seleziona un'azienda</h3>
+              <p className="text-muted-foreground">
+                Scegli un'azienda dal menu sopra per visualizzare le trasmissioni SIAE
+              </p>
+            </CardContent>
+          </Card>
+        )}
+
+        {companyId && (
+        <>
         <div className="grid grid-cols-5 gap-4">
           <Card>
             <CardContent className="pt-6">
@@ -744,6 +789,8 @@ export default function SiaeTransmissionsPage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+        </>
+        )}
       </div>
     );
   }
@@ -781,6 +828,58 @@ export default function SiaeTransmissionsPage() {
       contentClassName="pb-24"
     >
       <div className="space-y-4 py-4" data-testid="page-siae-transmissions">
+        {isSuperAdmin && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={springTransition}
+          >
+            <Card className="glass-card overflow-visible">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <Building2 className="h-4 w-4 text-amber-400" />
+                  <Label className="text-sm text-muted-foreground">Seleziona Azienda</Label>
+                </div>
+                <Select
+                  value={selectedCompanyId || ""}
+                  onValueChange={(value) => setSelectedCompanyId(value)}
+                >
+                  <SelectTrigger className="w-full h-12 bg-background/50 rounded-xl" data-testid="select-company-mobile">
+                    <SelectValue placeholder="Seleziona un'azienda..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {companies?.map((company) => (
+                      <SelectItem key={company.id} value={company.id}>
+                        {company.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
+
+        {!companyId && isSuperAdmin && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={springTransition}
+          >
+            <Card className="glass-card border-dashed overflow-visible">
+              <CardContent className="py-12 text-center">
+                <Building2 className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
+                <h3 className="text-lg font-medium mb-2">Seleziona un'azienda</h3>
+                <p className="text-sm text-muted-foreground">
+                  Scegli un'azienda dal menu sopra per gestire le trasmissioni
+                </p>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
+
+        {companyId && (
+        <>
         <motion.div 
           className="grid grid-cols-3 gap-2"
           initial={{ opacity: 0, y: 20 }}
@@ -973,6 +1072,8 @@ export default function SiaeTransmissionsPage() {
               })}
             </AnimatePresence>
           </div>
+        )}
+        </>
         )}
       </div>
 

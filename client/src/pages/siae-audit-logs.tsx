@@ -5,11 +5,12 @@ import { it } from "date-fns/locale";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/hooks/useAuth";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { type SiaeAuditLog } from "@shared/schema";
+import { type SiaeAuditLog, type Company } from "@shared/schema";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -60,6 +61,7 @@ import {
   Filter,
   ChevronRight,
   ArrowLeft,
+  Building2,
 } from "lucide-react";
 const springTransition = {
   type: "spring" as const,
@@ -77,8 +79,15 @@ export default function SiaeAuditLogsPage() {
   const [actionFilter, setActionFilter] = useState<string>("all");
   const [entityFilter, setEntityFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(null);
 
-  const companyId = user?.companyId;
+  const isSuperAdmin = user?.role === 'super_admin';
+  const companyId = isSuperAdmin ? selectedCompanyId : user?.companyId;
+
+  const { data: companies } = useQuery<Company[]>({
+    queryKey: ['/api/companies'],
+    enabled: isSuperAdmin,
+  });
 
   const { data: auditLogs, isLoading } = useQuery<SiaeAuditLog[]>({
     queryKey: ['/api/siae/companies', companyId, 'audit-logs'],
@@ -280,142 +289,181 @@ export default function SiaeAuditLogsPage() {
   if (!isMobile) {
     return (
       <div className="container mx-auto p-6 space-y-6" data-testid="page-siae-audit-logs">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-4">
           <div>
             <h1 className="text-3xl font-bold">Log Audit SIAE</h1>
             <p className="text-muted-foreground">Registro operazioni fiscali</p>
           </div>
-        </div>
-
-        <div className="grid grid-cols-4 gap-4">
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-2xl font-bold">{stats.total}</div>
-              <p className="text-sm text-muted-foreground">Totale Log</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-2xl font-bold text-emerald-500">{stats.creates}</div>
-              <p className="text-sm text-muted-foreground">Creazioni</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-2xl font-bold text-blue-500">{stats.updates}</div>
-              <p className="text-sm text-muted-foreground">Modifiche</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-2xl font-bold text-cyan-500">{stats.transmits}</div>
-              <p className="text-sm text-muted-foreground">Trasmissioni</p>
-            </CardContent>
-          </Card>
-        </div>
-
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-4 mb-6">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Cerca log..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-9"
-                  data-testid="input-search-logs-desktop"
-                />
-              </div>
-              <Select value={actionFilter} onValueChange={setActionFilter}>
-                <SelectTrigger className="w-[180px]" data-testid="select-action-filter-desktop">
-                  <SelectValue placeholder="Azione" />
+          {isSuperAdmin && (
+            <div className="flex items-center gap-2">
+              <Label htmlFor="company-select" className="text-sm text-muted-foreground whitespace-nowrap">
+                <Building2 className="h-4 w-4 inline-block mr-1" />
+                Azienda:
+              </Label>
+              <Select
+                value={selectedCompanyId || ""}
+                onValueChange={(value) => setSelectedCompanyId(value)}
+              >
+                <SelectTrigger className="w-[250px]" data-testid="select-company">
+                  <SelectValue placeholder="Seleziona azienda" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Tutte le azioni</SelectItem>
-                  {uniqueActions.map((action) => (
-                    <SelectItem key={action} value={action}>
-                      {getActionLabel(action)}
+                  {companies?.map((company) => (
+                    <SelectItem key={company.id} value={company.id}>
+                      {company.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              <Select value={entityFilter} onValueChange={setEntityFilter}>
-                <SelectTrigger className="w-[180px]" data-testid="select-entity-filter-desktop">
-                  <SelectValue placeholder="Entità" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Tutte le entità</SelectItem>
-                  {uniqueEntities.map((entity) => (
-                    <SelectItem key={entity} value={entity}>
-                      {getEntityLabel(entity)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {activeFiltersCount > 0 && (
-                <Button variant="ghost" size="sm" onClick={handleClearFilters}>
-                  Resetta filtri
-                </Button>
-              )}
+            </div>
+          )}
+        </div>
+
+        {!companyId && isSuperAdmin && (
+          <Card className="border-dashed">
+            <CardContent className="pt-6 text-center py-12">
+              <Building2 className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
+              <h3 className="text-lg font-medium mb-2">Seleziona un'azienda</h3>
+              <p className="text-muted-foreground">
+                Scegli un'azienda dal menu sopra per visualizzare i log audit SIAE
+              </p>
+            </CardContent>
+          </Card>
+        )}
+
+        {companyId && (
+          <>
+            <div className="grid grid-cols-4 gap-4">
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="text-2xl font-bold">{stats.total}</div>
+                  <p className="text-sm text-muted-foreground">Totale Log</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="text-2xl font-bold text-emerald-500">{stats.creates}</div>
+                  <p className="text-sm text-muted-foreground">Creazioni</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="text-2xl font-bold text-blue-500">{stats.updates}</div>
+                  <p className="text-sm text-muted-foreground">Modifiche</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="text-2xl font-bold text-cyan-500">{stats.transmits}</div>
+                  <p className="text-sm text-muted-foreground">Trasmissioni</p>
+                </CardContent>
+              </Card>
             </div>
 
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Azione</TableHead>
-                  <TableHead>Entità</TableHead>
-                  <TableHead>Descrizione</TableHead>
-                  <TableHead>Sigillo Fiscale</TableHead>
-                  <TableHead>Data</TableHead>
-                  <TableHead className="w-[100px]">Azioni</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredLogs && filteredLogs.length > 0 ? (
-                  filteredLogs.map((log) => (
-                    <TableRow key={log.id} data-testid={`row-audit-log-${log.id}`}>
-                      <TableCell>{getActionBadge(log.action)}</TableCell>
-                      <TableCell>{getEntityBadge(log.entityType)}</TableCell>
-                      <TableCell className="max-w-[300px] truncate">
-                        {log.description || "Operazione registrata"}
-                      </TableCell>
-                      <TableCell>
-                        {log.fiscalSealCode ? (
-                          <code className="text-xs bg-muted px-2 py-1 rounded">{log.fiscalSealCode}</code>
-                        ) : (
-                          <span className="text-muted-foreground">-</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {log.createdAt ? format(new Date(log.createdAt), "dd/MM/yy HH:mm", { locale: it }) : "-"}
-                      </TableCell>
-                      <TableCell>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => {
-                            setSelectedLog(log);
-                            setIsDetailDialogOpen(true);
-                          }}
-                          data-testid={`button-view-log-${log.id}`}
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                      </TableCell>
+            <Card>
+              <CardContent className="pt-6">
+                <div className="flex items-center gap-4 mb-6">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Cerca log..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-9"
+                      data-testid="input-search-logs-desktop"
+                    />
+                  </div>
+                  <Select value={actionFilter} onValueChange={setActionFilter}>
+                    <SelectTrigger className="w-[180px]" data-testid="select-action-filter-desktop">
+                      <SelectValue placeholder="Azione" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Tutte le azioni</SelectItem>
+                      {uniqueActions.map((action) => (
+                        <SelectItem key={action} value={action}>
+                          {getActionLabel(action)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select value={entityFilter} onValueChange={setEntityFilter}>
+                    <SelectTrigger className="w-[180px]" data-testid="select-entity-filter-desktop">
+                      <SelectValue placeholder="Entità" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Tutte le entità</SelectItem>
+                      {uniqueEntities.map((entity) => (
+                        <SelectItem key={entity} value={entity}>
+                          {getEntityLabel(entity)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {activeFiltersCount > 0 && (
+                    <Button variant="ghost" size="sm" onClick={handleClearFilters}>
+                      Resetta filtri
+                    </Button>
+                  )}
+                </div>
+
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Azione</TableHead>
+                      <TableHead>Entità</TableHead>
+                      <TableHead>Descrizione</TableHead>
+                      <TableHead>Sigillo Fiscale</TableHead>
+                      <TableHead>Data</TableHead>
+                      <TableHead className="w-[100px]">Azioni</TableHead>
                     </TableRow>
-                  ))
-                ) : (
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                      Nessun log trovato
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredLogs && filteredLogs.length > 0 ? (
+                      filteredLogs.map((log) => (
+                        <TableRow key={log.id} data-testid={`row-audit-log-${log.id}`}>
+                          <TableCell>{getActionBadge(log.action)}</TableCell>
+                          <TableCell>{getEntityBadge(log.entityType)}</TableCell>
+                          <TableCell className="max-w-[300px] truncate">
+                            {log.description || "Operazione registrata"}
+                          </TableCell>
+                          <TableCell>
+                            {log.fiscalSealCode ? (
+                              <code className="text-xs bg-muted px-2 py-1 rounded">{log.fiscalSealCode}</code>
+                            ) : (
+                              <span className="text-muted-foreground">-</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {log.createdAt ? format(new Date(log.createdAt), "dd/MM/yy HH:mm", { locale: it }) : "-"}
+                          </TableCell>
+                          <TableCell>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => {
+                                setSelectedLog(log);
+                                setIsDetailDialogOpen(true);
+                              }}
+                              data-testid={`button-view-log-${log.id}`}
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    ) : (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                          Nessun log trovato
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </>
+        )}
 
         <Dialog open={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen}>
           <DialogContent className="max-w-2xl">
@@ -554,6 +602,58 @@ export default function SiaeAuditLogsPage() {
       }
     >
       <div className="space-y-4 py-4 pb-24">
+        {isSuperAdmin && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={springTransition}
+          >
+            <Card className="bg-[#151922] border-gray-800 rounded-2xl">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <Building2 className="h-4 w-4 text-amber-400" />
+                  <Label className="text-sm text-gray-400">Seleziona Azienda</Label>
+                </div>
+                <Select
+                  value={selectedCompanyId || ""}
+                  onValueChange={(value) => setSelectedCompanyId(value)}
+                >
+                  <SelectTrigger className="w-full h-12 bg-[#0c0f16] border-gray-700 rounded-xl" data-testid="select-company-mobile">
+                    <SelectValue placeholder="Seleziona un'azienda..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {companies?.map((company) => (
+                      <SelectItem key={company.id} value={company.id}>
+                        {company.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
+
+        {!companyId && isSuperAdmin && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={springTransition}
+          >
+            <Card className="bg-[#151922] border-dashed border-gray-700 rounded-2xl">
+              <CardContent className="py-12 text-center">
+                <Building2 className="h-12 w-12 mx-auto text-gray-600 mb-4" />
+                <h3 className="text-lg font-medium text-gray-400 mb-2">Seleziona un'azienda</h3>
+                <p className="text-sm text-gray-500">
+                  Scegli un'azienda dal menu sopra per visualizzare i log
+                </p>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
+
+        {companyId && (
+        <>
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -725,6 +825,8 @@ export default function SiaeAuditLogsPage() {
             )}
           </AnimatePresence>
         </div>
+        </>
+        )}
       </div>
 
       <BottomSheet

@@ -8,6 +8,25 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes (2025-12-23)
 
+### Super Admin Company Selector for SIAE Pages
+**Feature**: Added company selector dropdown for super_admin users in SIAE Audit Logs and SIAE Transmissions pages.
+
+**Problem Solved**: Super admin users have `companyId=null` by default, which prevented them from viewing company-specific SIAE data. Now they can select which company's data to view.
+
+**Implementation:**
+- Both desktop and mobile views updated
+- `selectedCompanyId` state with `isSuperAdmin` check
+- Conditional `companyId = isSuperAdmin ? selectedCompanyId : user?.companyId`
+- Companies dropdown with Building2 icon label
+- Placeholder card shown when no company selected
+- Action buttons disabled until company is selected
+
+**Files Modified:**
+- `client/src/pages/siae-audit-logs.tsx` - Desktop + Mobile company selector
+- `client/src/pages/siae-transmissions.tsx` - Desktop + Mobile company selector
+
+---
+
 ### CAPTCHA Integration for Ticket Purchase (Normativa SIAE)
 **Feature**: Added CAPTCHA protection to the public ticket checkout flow as required by Italian SIAE regulations.
 
