@@ -54,8 +54,8 @@ const router = Router();
 
 // ==================== CAPTCHA STORAGE ====================
 
-// In-memory CAPTCHA storage (token -> { text, expiresAt })
-const captchaStore = new Map<string, { text: string; expiresAt: Date }>();
+// In-memory CAPTCHA storage (token -> { text, expiresAt, validated })
+const captchaStore = new Map<string, { text: string; expiresAt: Date; validated?: boolean }>();
 
 // Clean up expired CAPTCHAs every 5 minutes
 setInterval(() => {
@@ -1298,12 +1298,14 @@ router.post("/api/public/captcha/validate", async (req, res) => {
     // Case-insensitive validation
     const isValid = captchaData.text.toLowerCase() === text.toLowerCase();
 
-    // Delete token after validation (one-time use)
-    captchaStore.delete(token);
-
     if (isValid) {
-      res.json({ valid: true });
+      // Mark as validated but DON'T delete - will be deleted after payment intent creation
+      captchaData.validated = true;
+      captchaStore.set(token, captchaData);
+      res.json({ valid: true, token: token });
     } else {
+      // Delete invalid CAPTCHA so user gets a fresh one
+      captchaStore.delete(token);
       res.json({ valid: false, message: "CAPTCHA non corretto" });
     }
   } catch (error: any) {
@@ -1368,7 +1370,7 @@ router.post("/api/public/checkout/create-payment-intent", async (req, res) => {
     const captchaEnabled = captchaConfig?.captchaEnabled ?? true;
 
     if (captchaEnabled) {
-      if (!captchaToken || !captchaText) {
+      if (!captchaToken) {
         return res.status(400).json({ 
           message: "CAPTCHA richiesto per procedere al pagamento",
           code: "CAPTCHA_REQUIRED"
@@ -1392,20 +1394,18 @@ router.post("/api/public/checkout/create-payment-intent", async (req, res) => {
         });
       }
 
-      // Case-insensitive validation
-      const isValid = captchaData.text.toLowerCase() === captchaText.toLowerCase();
-
-      // Delete token after validation (one-time use)
-      captchaStore.delete(captchaToken);
-
-      if (!isValid) {
+      // Check that the CAPTCHA was previously validated via /captcha/validate endpoint
+      if (!captchaData.validated) {
         return res.status(400).json({ 
-          message: "CAPTCHA non corretto. Riprova.",
-          code: "CAPTCHA_INVALID"
+          message: "CAPTCHA non validato. Clicca Verifica prima di procedere.",
+          code: "CAPTCHA_NOT_VALIDATED"
         });
       }
 
-      console.log("[PUBLIC] CAPTCHA validation passed");
+      // Delete token after successful check (one-time use after validation)
+      captchaStore.delete(captchaToken);
+
+      console.log("[PUBLIC] CAPTCHA validation passed (pre-validated)");
     }
 
     // CRITICAL: Verifica smart card SIAE PRIMA di creare il payment intent

@@ -37,7 +37,9 @@ import {
   User,
   Calendar,
   MapPin,
+  RotateCcw,
 } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
 import { motion } from "framer-motion";
@@ -258,6 +260,10 @@ function CheckoutContent() {
   const paymentIntentCreated = useRef(false);
   const stripeRef = useRef<any>(null);
   const elementsRef = useRef<any>(null);
+  const [captchaData, setCaptchaData] = useState<{ token: string; svg: string; width: number; height: number; enabled: boolean } | null>(null);
+  const [captchaInput, setCaptchaInput] = useState("");
+  const [captchaError, setCaptchaError] = useState<string | null>(null);
+  const [captchaValidated, setCaptchaValidated] = useState(false);
 
   const { data: cart, isLoading: cartLoading } = useQuery<CartData>({
     queryKey: ["/api/public/cart"],
@@ -268,14 +274,73 @@ function CheckoutContent() {
     retry: false,
   });
 
+  const { data: captchaResponse, refetch: refetchCaptcha, isLoading: captchaLoading } = useQuery({
+    queryKey: ['/api/public/captcha/generate'],
+    enabled: !!customer && !!cart && cart.items.length > 0,
+    staleTime: 0,
+    refetchOnWindowFocus: false,
+  });
+
+  const handleRefreshCaptcha = () => {
+    setCaptchaValidated(false);
+    paymentIntentCreated.current = false;
+    refetchCaptcha();
+    triggerHaptic('light');
+  };
+
+  useEffect(() => {
+    if (captchaResponse) {
+      setCaptchaData(captchaResponse as { token: string; svg: string; width: number; height: number; enabled: boolean });
+      setCaptchaInput("");
+      setCaptchaError(null);
+      setCaptchaValidated(false);
+    }
+  }, [captchaResponse]);
+
+  const validateCaptchaMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/public/captcha/validate", {
+        token: captchaData?.token,
+        text: captchaInput,
+      });
+      return res.json();
+    },
+    onSuccess: (data) => {
+      if (data.valid) {
+        setCaptchaValidated(true);
+        setCaptchaError(null);
+        triggerHaptic('success');
+      } else {
+        setCaptchaError(data.message || "Codice non corretto");
+        setCaptchaValidated(false);
+        handleRefreshCaptcha();
+      }
+    },
+    onError: (error: any) => {
+      setCaptchaError(error.message || "Errore validazione");
+      setCaptchaValidated(false);
+      handleRefreshCaptcha();
+    },
+  });
+
+  const canProceedWithPayment = !captchaData?.enabled || (captchaData?.enabled && captchaValidated);
+
   const createPaymentIntent = useMutation({
     mutationFn: async () => {
-      const res = await apiRequest("POST", "/api/public/checkout/create-payment-intent");
+      const res = await apiRequest("POST", "/api/public/checkout/create-payment-intent", {
+        captchaToken: captchaData?.token,
+      });
       const data = await res.json();
       return data as PaymentIntentResponse;
     },
     onError: (error: any) => {
       const errorCode = error.data?.code || error.code || "";
+      
+      if (errorCode === "CAPTCHA_INVALID" || errorCode === "CAPTCHA_EXPIRED" || errorCode === "CAPTCHA_NOT_VALIDATED") {
+        setCaptchaError(error.message);
+        handleRefreshCaptcha();
+        return;
+      }
       
       if (error.message?.includes("autenticato")) {
         navigate("/login?redirect=/checkout");
@@ -300,11 +365,11 @@ function CheckoutContent() {
   }, []);
 
   useEffect(() => {
-    if (cart && cart.items.length > 0 && customer && !paymentIntentCreated.current) {
+    if (cart && cart.items.length > 0 && customer && !paymentIntentCreated.current && canProceedWithPayment) {
       paymentIntentCreated.current = true;
       createPaymentIntent.mutate();
     }
-  }, [cart, customer]);
+  }, [cart, customer, canProceedWithPayment]);
 
   const handlePaymentSubmit = async () => {
     if (!stripeRef.current || !elementsRef.current || !isElementReady) {
@@ -578,6 +643,83 @@ function CheckoutContent() {
           </div>
         </motion.div>
 
+        {captchaData?.enabled && (
+          <motion.div variants={fadeInUp} className="bg-card rounded-2xl border border-border overflow-hidden">
+            <div className="px-4 py-3 border-b border-border bg-muted/30">
+              <h2 className="font-semibold text-foreground flex items-center gap-2">
+                <ShieldCheck className="w-5 h-5 text-primary" />
+                Verifica di Sicurezza
+                {captchaValidated && <Check className="w-4 h-4 text-teal-400 ml-auto" />}
+              </h2>
+            </div>
+            <div className="p-4 space-y-4">
+              <div className="flex items-center gap-4">
+                <div 
+                  className="bg-white rounded-lg p-2 border flex-shrink-0"
+                  dangerouslySetInnerHTML={{ __html: captchaData.svg }}
+                  data-testid="captcha-image"
+                />
+                <HapticButton 
+                  variant="outline" 
+                  size="icon"
+                  onClick={handleRefreshCaptcha}
+                  disabled={captchaLoading || validateCaptchaMutation.isPending}
+                  hapticType="light"
+                  data-testid="button-refresh-captcha"
+                >
+                  <RotateCcw className={cn("w-4 h-4", captchaLoading && "animate-spin")} />
+                </HapticButton>
+              </div>
+              {!captchaValidated ? (
+                <div className="space-y-3">
+                  <div className="space-y-2">
+                    <Label>Inserisci il codice mostrato nell'immagine</Label>
+                    <Input
+                      value={captchaInput}
+                      onChange={(e) => {
+                        setCaptchaInput(e.target.value.toUpperCase());
+                        setCaptchaError(null);
+                      }}
+                      placeholder="Codice CAPTCHA"
+                      className="uppercase tracking-widest font-mono"
+                      maxLength={8}
+                      disabled={validateCaptchaMutation.isPending}
+                      data-testid="input-captcha"
+                    />
+                    {captchaError && (
+                      <p className="text-sm text-destructive mt-1" data-testid="text-captcha-error">{captchaError}</p>
+                    )}
+                  </div>
+                  <HapticButton
+                    onClick={() => validateCaptchaMutation.mutate()}
+                    disabled={captchaInput.length < 4 || validateCaptchaMutation.isPending}
+                    className="w-full h-12"
+                    hapticType="medium"
+                    data-testid="button-verify-captcha"
+                  >
+                    {validateCaptchaMutation.isPending ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Verifica in corso...
+                      </>
+                    ) : (
+                      <>
+                        <ShieldCheck className="w-4 h-4 mr-2" />
+                        Verifica Codice
+                      </>
+                    )}
+                  </HapticButton>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 text-teal-400 py-2">
+                  <Check className="w-5 h-5" />
+                  <span className="font-medium">Verifica completata</span>
+                </div>
+              )}
+            </div>
+          </motion.div>
+        )}
+
         <motion.div variants={fadeInUp} className="bg-card rounded-2xl border border-border overflow-hidden">
           <div className="px-4 py-3 border-b border-border bg-muted/30">
             <h2 className="font-semibold text-foreground flex items-center gap-2">
@@ -668,7 +810,7 @@ function CheckoutContent() {
           
           <HapticButton
             onClick={handlePaymentSubmit}
-            disabled={!isElementReady || isProcessing || !stripeRef.current}
+            disabled={!isElementReady || isProcessing || !stripeRef.current || !canProceedWithPayment}
             className="w-full h-14 text-lg font-semibold"
             hapticType="heavy"
             data-testid="button-pay"
@@ -682,6 +824,11 @@ function CheckoutContent() {
               <>
                 <Loader2 className="w-5 h-5 mr-2 animate-spin" />
                 Elaborazione...
+              </>
+            ) : !canProceedWithPayment ? (
+              <>
+                <ShieldCheck className="w-5 h-5 mr-2" />
+                Completa verifica CAPTCHA
               </>
             ) : (
               <>
@@ -742,6 +889,10 @@ function DesktopCheckoutContent() {
   const paymentIntentCreated = useRef(false);
   const stripeRef = useRef<any>(null);
   const elementsRef = useRef<any>(null);
+  const [captchaData, setCaptchaData] = useState<{ token: string; svg: string; width: number; height: number; enabled: boolean } | null>(null);
+  const [captchaInput, setCaptchaInput] = useState("");
+  const [captchaError, setCaptchaError] = useState<string | null>(null);
+  const [captchaValidated, setCaptchaValidated] = useState(false);
 
   const { data: cart, isLoading: cartLoading } = useQuery<CartData>({
     queryKey: ["/api/public/cart"],
@@ -752,14 +903,71 @@ function DesktopCheckoutContent() {
     retry: false,
   });
 
+  const { data: captchaResponse, refetch: refetchCaptcha, isLoading: captchaLoading } = useQuery({
+    queryKey: ['/api/public/captcha/generate'],
+    enabled: !!customer && !!cart && cart.items.length > 0,
+    staleTime: 0,
+    refetchOnWindowFocus: false,
+  });
+
+  const handleRefreshCaptcha = () => {
+    setCaptchaValidated(false);
+    paymentIntentCreated.current = false;
+    refetchCaptcha();
+  };
+
+  useEffect(() => {
+    if (captchaResponse) {
+      setCaptchaData(captchaResponse as { token: string; svg: string; width: number; height: number; enabled: boolean });
+      setCaptchaInput("");
+      setCaptchaError(null);
+      setCaptchaValidated(false);
+    }
+  }, [captchaResponse]);
+
+  const validateCaptchaMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/public/captcha/validate", {
+        token: captchaData?.token,
+        text: captchaInput,
+      });
+      return res.json();
+    },
+    onSuccess: (data) => {
+      if (data.valid) {
+        setCaptchaValidated(true);
+        setCaptchaError(null);
+      } else {
+        setCaptchaError(data.message || "Codice non corretto");
+        setCaptchaValidated(false);
+        handleRefreshCaptcha();
+      }
+    },
+    onError: (error: any) => {
+      setCaptchaError(error.message || "Errore validazione");
+      setCaptchaValidated(false);
+      handleRefreshCaptcha();
+    },
+  });
+
+  const canProceedWithPayment = !captchaData?.enabled || (captchaData?.enabled && captchaValidated);
+
   const createPaymentIntent = useMutation({
     mutationFn: async () => {
-      const res = await apiRequest("POST", "/api/public/checkout/create-payment-intent");
+      const res = await apiRequest("POST", "/api/public/checkout/create-payment-intent", {
+        captchaToken: captchaData?.token,
+      });
       const data = await res.json();
       return data as PaymentIntentResponse;
     },
     onError: (error: any) => {
       const errorCode = error.data?.code || error.code || "";
+      
+      if (errorCode === "CAPTCHA_INVALID" || errorCode === "CAPTCHA_EXPIRED" || errorCode === "CAPTCHA_NOT_VALIDATED") {
+        setCaptchaError(error.message);
+        handleRefreshCaptcha();
+        return;
+      }
       
       if (error.message?.includes("autenticato")) {
         navigate("/login?redirect=/checkout");
@@ -784,11 +992,11 @@ function DesktopCheckoutContent() {
   }, []);
 
   useEffect(() => {
-    if (cart && cart.items.length > 0 && customer && !paymentIntentCreated.current) {
+    if (cart && cart.items.length > 0 && customer && !paymentIntentCreated.current && canProceedWithPayment) {
       paymentIntentCreated.current = true;
       createPaymentIntent.mutate();
     }
-  }, [cart, customer]);
+  }, [cart, customer, canProceedWithPayment]);
 
   const handlePaymentSubmit = async () => {
     if (!stripeRef.current || !elementsRef.current || !isElementReady) {
@@ -1024,6 +1232,81 @@ function DesktopCheckoutContent() {
           </CardContent>
         </Card>
 
+        {captchaData?.enabled && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <ShieldCheck className="w-5 h-5 text-primary" />
+                Verifica di Sicurezza
+                {captchaValidated && <Check className="w-4 h-4 text-teal-400 ml-auto" />}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center gap-4">
+                <div 
+                  className="bg-white rounded-lg p-2 border flex-shrink-0"
+                  dangerouslySetInnerHTML={{ __html: captchaData.svg }}
+                  data-testid="captcha-image-desktop"
+                />
+                <Button 
+                  variant="outline" 
+                  size="icon"
+                  onClick={handleRefreshCaptcha}
+                  disabled={captchaLoading || validateCaptchaMutation.isPending}
+                  data-testid="button-refresh-captcha-desktop"
+                >
+                  <RotateCcw className={cn("w-4 h-4", captchaLoading && "animate-spin")} />
+                </Button>
+              </div>
+              {!captchaValidated ? (
+                <div className="space-y-3">
+                  <div className="space-y-2">
+                    <Label>Inserisci il codice mostrato nell'immagine</Label>
+                    <Input
+                      value={captchaInput}
+                      onChange={(e) => {
+                        setCaptchaInput(e.target.value.toUpperCase());
+                        setCaptchaError(null);
+                      }}
+                      placeholder="Codice CAPTCHA"
+                      className="uppercase tracking-widest font-mono"
+                      maxLength={8}
+                      disabled={validateCaptchaMutation.isPending}
+                      data-testid="input-captcha-desktop"
+                    />
+                    {captchaError && (
+                      <p className="text-sm text-destructive mt-1" data-testid="text-captcha-error-desktop">{captchaError}</p>
+                    )}
+                  </div>
+                  <Button
+                    onClick={() => validateCaptchaMutation.mutate()}
+                    disabled={captchaInput.length < 4 || validateCaptchaMutation.isPending}
+                    className="w-full"
+                    data-testid="button-verify-captcha-desktop"
+                  >
+                    {validateCaptchaMutation.isPending ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Verifica in corso...
+                      </>
+                    ) : (
+                      <>
+                        <ShieldCheck className="w-4 h-4 mr-2" />
+                        Verifica Codice
+                      </>
+                    )}
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 text-teal-400 py-2">
+                  <Check className="w-5 h-5" />
+                  <span className="font-medium">Verifica completata</span>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -1101,7 +1384,7 @@ function DesktopCheckoutContent() {
 
             <Button
               onClick={handlePaymentSubmit}
-              disabled={!isElementReady || isProcessing || !stripeRef.current}
+              disabled={!isElementReady || isProcessing || !stripeRef.current || !canProceedWithPayment}
               className="w-full"
               size="lg"
               data-testid="button-pay-desktop"
@@ -1115,6 +1398,11 @@ function DesktopCheckoutContent() {
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                   Elaborazione...
+                </>
+              ) : !canProceedWithPayment ? (
+                <>
+                  <ShieldCheck className="w-4 h-4 mr-2" />
+                  Completa verifica CAPTCHA
                 </>
               ) : (
                 <>

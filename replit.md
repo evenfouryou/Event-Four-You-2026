@@ -6,7 +6,45 @@ Event4U is an event management and inventory tracking system for event organizer
 ## User Preferences
 Preferred communication style: Simple, everyday language.
 
-## Recent Changes (2025-12-21)
+## Recent Changes (2025-12-23)
+
+### CAPTCHA Integration for Ticket Purchase (Normativa SIAE)
+**Feature**: Added CAPTCHA protection to the public ticket checkout flow as required by Italian SIAE regulations.
+
+**Implementation:**
+1. Backend endpoints in `server/public-routes.ts`:
+   - `GET /api/public/captcha/generate` - Generates SVG CAPTCHA using admin-configured parameters
+   - `POST /api/public/captcha/validate` - Validates CAPTCHA text (marks as validated, doesn't delete)
+   - Modified `POST /api/public/checkout/create-payment-intent` - Requires validated CAPTCHA token
+
+2. Frontend integration in `client/src/pages/public-checkout.tsx`:
+   - CAPTCHA image display with refresh button
+   - Input field for code entry
+   - "Verifica Codice" button to validate before payment
+   - Success state shows checkmark when validated
+   - Works on both mobile and desktop layouts
+
+3. CAPTCHA parameters configurable via Admin (`/siae/config`):
+   - `captchaEnabled` - Enable/disable CAPTCHA
+   - `captchaMinChars` - Number of characters (4-8)
+   - `captchaImageWidth/Height` - Image dimensions
+   - `captchaDistortion` - Difficulty level (low/medium/high)
+   - `captchaAudioEnabled` - Accessibility option
+
+**Flow:**
+1. User adds tickets to cart → proceeds to checkout
+2. CAPTCHA is displayed (if enabled in admin config)
+3. User enters code and clicks "Verifica Codice"
+4. On successful validation, payment form appears
+5. User completes payment with Stripe
+
+**Files Modified:**
+- `server/public-routes.ts` - CAPTCHA endpoints and payment intent validation
+- `client/src/pages/public-checkout.tsx` - CAPTCHA UI and flow integration
+
+---
+
+## Changes (2025-12-21)
 
 ### Scanner Account Loading Loop - FIXED
 **Problem**: Scanner accounts were stuck in infinite loading loop when accessing account page.
