@@ -8,9 +8,18 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Upload, FileText, CheckCircle2, AlertCircle } from "lucide-react";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { Upload, FileText, CheckCircle2, AlertCircle, ArrowLeft } from "lucide-react";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import {
+  MobileAppLayout,
+  MobileHeader,
+  HapticButton,
+  BottomSheet,
+  triggerHaptic,
+} from "@/components/mobile-primitives";
 
 type ImportType = "products" | "priceListItems";
 
@@ -24,11 +33,13 @@ interface PreviewRow {
 
 export default function ImportPage() {
   const { toast } = useToast();
+  const isMobile = useIsMobile();
   const [importType, setImportType] = useState<ImportType>("products");
   const [selectedPriceList, setSelectedPriceList] = useState<string>("");
   const [file, setFile] = useState<File | null>(null);
   const [previewData, setPreviewData] = useState<PreviewRow[]>([]);
   const [showPreview, setShowPreview] = useState(false);
+  const [isPreviewDialogOpen, setIsPreviewDialogOpen] = useState(false);
 
   // Fetch price lists for price list items import
   const { data: priceLists } = useQuery<any[]>({
@@ -41,10 +52,10 @@ export default function ImportPage() {
     mutationFn: async (products: any[]) => {
       return await apiRequest('POST', '/api/import/products', { products });
     },
-    onSuccess: (data) => {
+    onSuccess: (data: any) => {
       toast({
         title: "Import completato",
-        description: data.message,
+        description: data?.message || "Prodotti importati con successo",
       });
       queryClient.invalidateQueries({ queryKey: ['/api/products'] });
       resetState();
@@ -63,10 +74,10 @@ export default function ImportPage() {
     mutationFn: async ({ priceListId, items }: { priceListId: string; items: any[] }) => {
       return await apiRequest('POST', '/api/import/price-list-items', { priceListId, items });
     },
-    onSuccess: (data) => {
+    onSuccess: (data: any) => {
       toast({
         title: "Import completato",
-        description: data.message,
+        description: data?.message || "Listino importato con successo",
       });
       queryClient.invalidateQueries({ queryKey: ['/api/price-lists'] });
       resetState();
@@ -269,14 +280,114 @@ export default function ImportPage() {
   const invalidCount = previewData.length - validCount;
   const warningCount = previewData.filter(row => row._warnings && row._warnings.length > 0).length;
 
-  return (
-    <div className="p-3 sm:p-4 md:p-8 pb-24 md:pb-8">
-      <div className="max-w-6xl mx-auto space-y-4 sm:space-y-6">
-        <div>
-          <h1 className="text-xl sm:text-2xl md:text-3xl font-semibold">Import CSV/Excel</h1>
-          <p className="text-xs sm:text-sm text-muted-foreground mt-1">
-            Importa prodotti o listini prezzi da file CSV
-          </p>
+  const renderPreviewTable = () => (
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead className="w-16">Riga</TableHead>
+          <TableHead className="w-12">Stato</TableHead>
+          {importType === "products" ? (
+            <>
+              <TableHead>Codice</TableHead>
+              <TableHead>Nome</TableHead>
+              <TableHead>Categoria</TableHead>
+              <TableHead>UM</TableHead>
+              <TableHead>Prezzo Costo</TableHead>
+              <TableHead>Soglia Min</TableHead>
+              <TableHead>Attivo</TableHead>
+            </>
+          ) : (
+            <>
+              <TableHead>Codice Prodotto</TableHead>
+              <TableHead>Prezzo Vendita</TableHead>
+            </>
+          )}
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {previewData.map((row, idx) => (
+          <>
+            <TableRow 
+              key={idx} 
+              className={!row._valid ? "bg-destructive/10" : (row._warnings && row._warnings.length > 0 ? "bg-yellow-50 dark:bg-yellow-950/10" : "")} 
+              data-testid={`row-preview-${idx}`}
+            >
+              <TableCell className="font-medium text-muted-foreground" data-testid={`rownum-${idx}`}>
+                {row._rowIndex}
+              </TableCell>
+              <TableCell data-testid={`status-row-${idx}`}>
+                {row._valid ? (
+                  row._warnings && row._warnings.length > 0 ? (
+                    <div title={row._warnings.join(", ")}>
+                      <AlertCircle 
+                        className="h-4 w-4 text-yellow-600" 
+                        data-testid={`icon-warning-${idx}`}
+                      />
+                    </div>
+                  ) : (
+                    <CheckCircle2 className="h-4 w-4 text-green-600" data-testid={`icon-valid-${idx}`} />
+                  )
+                ) : (
+                  <div title={row._errors?.join(", ")}>
+                    <AlertCircle 
+                      className="h-4 w-4 text-destructive" 
+                      data-testid={`icon-invalid-${idx}`}
+                    />
+                  </div>
+                )}
+              </TableCell>
+              {importType === "products" ? (
+                <>
+                  <TableCell className="font-mono text-xs">{row.code}</TableCell>
+                  <TableCell>{row.name}</TableCell>
+                  <TableCell>{row.category}</TableCell>
+                  <TableCell>{row.unitOfMeasure}</TableCell>
+                  <TableCell>€{row.costPrice}</TableCell>
+                  <TableCell>{row.minThreshold || "-"}</TableCell>
+                  <TableCell>{row.active === "false" ? "No" : "Sì"}</TableCell>
+                </>
+              ) : (
+                <>
+                  <TableCell className="font-mono text-xs">{row.productCode}</TableCell>
+                  <TableCell>€{row.salePrice}</TableCell>
+                </>
+              )}
+            </TableRow>
+            {(row._errors || row._warnings) && (
+              <TableRow key={`${idx}-details`} className={!row._valid ? "bg-destructive/5" : "bg-yellow-50/50 dark:bg-yellow-950/5"}>
+                <TableCell colSpan={importType === "products" ? 9 : 4} className="py-2">
+                  <div className="text-xs space-y-1">
+                    {row._errors && row._errors.map((err, errIdx) => (
+                      <div key={errIdx} className="text-destructive flex items-start gap-1" data-testid={`error-${idx}-${errIdx}`}>
+                        <AlertCircle className="h-3 w-3 mt-0.5 flex-shrink-0" />
+                        <span>{err}</span>
+                      </div>
+                    ))}
+                    {row._warnings && row._warnings.map((warn, warnIdx) => (
+                      <div key={warnIdx} className="text-yellow-700 dark:text-yellow-500 flex items-start gap-1" data-testid={`warning-${idx}-${warnIdx}`}>
+                        <AlertCircle className="h-3 w-3 mt-0.5 flex-shrink-0" />
+                        <span>{warn}</span>
+                      </div>
+                    ))}
+                  </div>
+                </TableCell>
+              </TableRow>
+            )}
+          </>
+        ))}
+      </TableBody>
+    </Table>
+  );
+
+  // Desktop version
+  if (!isMobile) {
+    return (
+      <div className="container mx-auto p-6 space-y-6" data-testid="page-import">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">Import CSV/Excel</h1>
+            <p className="text-muted-foreground">Importa prodotti o listini prezzi da file CSV</p>
+          </div>
         </div>
 
         <Card>
@@ -284,49 +395,51 @@ export default function ImportPage() {
             <CardTitle>Configurazione Import</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label>Tipo Import</Label>
-              <Select value={importType} onValueChange={(v) => {
-                setImportType(v as ImportType);
-                resetState();
-              }}>
-                <SelectTrigger data-testid="select-import-type">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="products">Prodotti</SelectItem>
-                  <SelectItem value="priceListItems">Voci Listino Prezzi</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {importType === "priceListItems" && (
+            <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Listino Prezzi</Label>
-                <Select value={selectedPriceList} onValueChange={setSelectedPriceList}>
-                  <SelectTrigger data-testid="select-price-list">
-                    <SelectValue placeholder="Seleziona listino" />
+                <Label>Tipo Import</Label>
+                <Select value={importType} onValueChange={(v) => {
+                  setImportType(v as ImportType);
+                  resetState();
+                }}>
+                  <SelectTrigger data-testid="select-import-type">
+                    <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {priceLists?.map(pl => (
-                      <SelectItem key={pl.id} value={pl.id}>
-                        {pl.name}
-                      </SelectItem>
-                    ))}
+                    <SelectItem value="products">Prodotti</SelectItem>
+                    <SelectItem value="priceListItems">Voci Listino Prezzi</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-            )}
+
+              {importType === "priceListItems" && (
+                <div className="space-y-2">
+                  <Label>Listino Prezzi</Label>
+                  <Select value={selectedPriceList} onValueChange={setSelectedPriceList}>
+                    <SelectTrigger data-testid="select-price-list">
+                      <SelectValue placeholder="Seleziona listino" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {priceLists?.map(pl => (
+                        <SelectItem key={pl.id} value={pl.id}>
+                          {pl.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+            </div>
 
             <div className="space-y-2">
               <Label>File CSV</Label>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-4">
                 <Input
                   type="file"
                   accept=".csv"
                   onChange={handleFileChange}
                   data-testid="input-csv-file"
-                  className="flex-1"
+                  className="max-w-md"
                 />
                 {file && (
                   <div className="flex items-center gap-2 text-sm text-muted-foreground" data-testid="text-filename">
@@ -375,102 +488,7 @@ export default function ImportPage() {
             </CardHeader>
             <CardContent>
               <div className="border rounded-md overflow-auto max-h-96" data-testid="table-preview">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-16">Riga</TableHead>
-                      <TableHead className="w-12">Stato</TableHead>
-                      {importType === "products" ? (
-                        <>
-                          <TableHead>Codice</TableHead>
-                          <TableHead>Nome</TableHead>
-                          <TableHead>Categoria</TableHead>
-                          <TableHead>UM</TableHead>
-                          <TableHead>Prezzo Costo</TableHead>
-                          <TableHead>Soglia Min</TableHead>
-                          <TableHead>Attivo</TableHead>
-                        </>
-                      ) : (
-                        <>
-                          <TableHead>Codice Prodotto</TableHead>
-                          <TableHead>Prezzo Vendita</TableHead>
-                        </>
-                      )}
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {previewData.map((row, idx) => (
-                      <>
-                        <TableRow 
-                          key={idx} 
-                          className={!row._valid ? "bg-destructive/10" : (row._warnings && row._warnings.length > 0 ? "bg-yellow-50 dark:bg-yellow-950/10" : "")} 
-                          data-testid={`row-preview-${idx}`}
-                        >
-                          <TableCell className="font-medium text-muted-foreground" data-testid={`rownum-${idx}`}>
-                            {row._rowIndex}
-                          </TableCell>
-                          <TableCell data-testid={`status-row-${idx}`}>
-                            {row._valid ? (
-                              row._warnings && row._warnings.length > 0 ? (
-                                <div title={row._warnings.join(", ")}>
-                                  <AlertCircle 
-                                    className="h-4 w-4 text-yellow-600" 
-                                    data-testid={`icon-warning-${idx}`}
-                                  />
-                                </div>
-                              ) : (
-                                <CheckCircle2 className="h-4 w-4 text-green-600" data-testid={`icon-valid-${idx}`} />
-                              )
-                            ) : (
-                              <div title={row._errors?.join(", ")}>
-                                <AlertCircle 
-                                  className="h-4 w-4 text-destructive" 
-                                  data-testid={`icon-invalid-${idx}`}
-                                />
-                              </div>
-                            )}
-                          </TableCell>
-                          {importType === "products" ? (
-                            <>
-                              <TableCell className="font-mono text-xs">{row.code}</TableCell>
-                              <TableCell>{row.name}</TableCell>
-                              <TableCell>{row.category}</TableCell>
-                              <TableCell>{row.unitOfMeasure}</TableCell>
-                              <TableCell>€{row.costPrice}</TableCell>
-                              <TableCell>{row.minThreshold || "-"}</TableCell>
-                              <TableCell>{row.active === "false" ? "No" : "Sì"}</TableCell>
-                            </>
-                          ) : (
-                            <>
-                              <TableCell className="font-mono text-xs">{row.productCode}</TableCell>
-                              <TableCell>€{row.salePrice}</TableCell>
-                            </>
-                          )}
-                        </TableRow>
-                        {(row._errors || row._warnings) && (
-                          <TableRow key={`${idx}-details`} className={!row._valid ? "bg-destructive/5" : "bg-yellow-50/50 dark:bg-yellow-950/5"}>
-                            <TableCell colSpan={importType === "products" ? 9 : 4} className="py-2">
-                              <div className="text-xs space-y-1">
-                                {row._errors && row._errors.map((err, errIdx) => (
-                                  <div key={errIdx} className="text-destructive flex items-start gap-1" data-testid={`error-${idx}-${errIdx}`}>
-                                    <AlertCircle className="h-3 w-3 mt-0.5 flex-shrink-0" />
-                                    <span>{err}</span>
-                                  </div>
-                                ))}
-                                {row._warnings && row._warnings.map((warn, warnIdx) => (
-                                  <div key={warnIdx} className="text-yellow-700 dark:text-yellow-500 flex items-start gap-1" data-testid={`warning-${idx}-${warnIdx}`}>
-                                    <AlertCircle className="h-3 w-3 mt-0.5 flex-shrink-0" />
-                                    <span>{warn}</span>
-                                  </div>
-                                ))}
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        )}
-                      </>
-                    ))}
-                  </TableBody>
-                </Table>
+                {renderPreviewTable()}
               </div>
 
               <div className="flex items-center justify-end gap-3 mt-4">
@@ -494,6 +512,190 @@ export default function ImportPage() {
           </Card>
         )}
       </div>
-    </div>
+    );
+  }
+
+  // Mobile version
+  return (
+    <MobileAppLayout>
+      <MobileHeader
+        title="Import CSV/Excel"
+        showBackButton
+        onBack={() => window.history.back()}
+      />
+      <div className="p-4 space-y-4 pb-24">
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg">Configurazione</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label>Tipo Import</Label>
+              <Select value={importType} onValueChange={(v) => {
+                setImportType(v as ImportType);
+                resetState();
+              }}>
+                <SelectTrigger data-testid="select-import-type-mobile">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="products">Prodotti</SelectItem>
+                  <SelectItem value="priceListItems">Voci Listino Prezzi</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {importType === "priceListItems" && (
+              <div className="space-y-2">
+                <Label>Listino Prezzi</Label>
+                <Select value={selectedPriceList} onValueChange={setSelectedPriceList}>
+                  <SelectTrigger data-testid="select-price-list-mobile">
+                    <SelectValue placeholder="Seleziona listino" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {priceLists?.map(pl => (
+                      <SelectItem key={pl.id} value={pl.id}>
+                        {pl.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label>File CSV</Label>
+              <Input
+                type="file"
+                accept=".csv"
+                onChange={handleFileChange}
+                data-testid="input-csv-file-mobile"
+              />
+              {file && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground" data-testid="text-filename-mobile">
+                  <FileText className="h-4 w-4" />
+                  <span>{file.name}</span>
+                </div>
+              )}
+            </div>
+
+            <Alert data-testid="alert-csv-format-mobile" className="text-xs">
+              <AlertDescription>
+                <strong>Prodotti:</strong> code, name, category, unitOfMeasure, costPrice, minThreshold, active<br /><br />
+                <strong>Listino Prezzi:</strong> productCode, salePrice
+              </AlertDescription>
+            </Alert>
+          </CardContent>
+        </Card>
+
+        {showPreview && previewData.length > 0 && (
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg flex flex-col gap-2">
+                <span data-testid="text-preview-count-mobile">Anteprima ({previewData.length} righe)</span>
+                <div className="flex items-center gap-3 text-sm font-normal flex-wrap">
+                  <span className="flex items-center gap-1 text-green-600" data-testid="text-valid-count-mobile">
+                    <CheckCircle2 className="h-4 w-4" />
+                    {validCount} valide
+                  </span>
+                  {warningCount > 0 && (
+                    <span className="flex items-center gap-1 text-yellow-600" data-testid="text-warning-count-mobile">
+                      <AlertCircle className="h-4 w-4" />
+                      {warningCount} avvisi
+                    </span>
+                  )}
+                  {invalidCount > 0 && (
+                    <span className="flex items-center gap-1 text-destructive" data-testid="text-invalid-count-mobile">
+                      <AlertCircle className="h-4 w-4" />
+                      {invalidCount} errori
+                    </span>
+                  )}
+                </div>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2 max-h-60 overflow-y-auto">
+                {previewData.map((row, idx) => (
+                  <div 
+                    key={idx}
+                    className={`p-3 rounded-lg border ${!row._valid ? "bg-destructive/10 border-destructive/30" : (row._warnings && row._warnings.length > 0 ? "bg-yellow-50 dark:bg-yellow-950/10 border-yellow-300 dark:border-yellow-800" : "bg-muted/30")}`}
+                    data-testid={`row-preview-mobile-${idx}`}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs text-muted-foreground">Riga {row._rowIndex}</span>
+                      {row._valid ? (
+                        row._warnings && row._warnings.length > 0 ? (
+                          <AlertCircle className="h-4 w-4 text-yellow-600" />
+                        ) : (
+                          <CheckCircle2 className="h-4 w-4 text-green-600" />
+                        )
+                      ) : (
+                        <AlertCircle className="h-4 w-4 text-destructive" />
+                      )}
+                    </div>
+                    {importType === "products" ? (
+                      <div className="space-y-1 text-sm">
+                        <div className="font-medium">{row.name || "Nome mancante"}</div>
+                        <div className="text-muted-foreground text-xs font-mono">{row.code || "Codice mancante"}</div>
+                        {row.category && <div className="text-xs">{row.category}</div>}
+                        <div className="text-xs">€{row.costPrice} - {row.unitOfMeasure}</div>
+                      </div>
+                    ) : (
+                      <div className="space-y-1 text-sm">
+                        <div className="font-mono">{row.productCode || "Codice mancante"}</div>
+                        <div>€{row.salePrice}</div>
+                      </div>
+                    )}
+                    {row._errors && row._errors.length > 0 && (
+                      <div className="mt-2 text-xs text-destructive space-y-1">
+                        {row._errors.map((err, errIdx) => (
+                          <div key={errIdx} className="flex items-start gap-1">
+                            <AlertCircle className="h-3 w-3 mt-0.5 flex-shrink-0" />
+                            <span>{err}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {row._warnings && row._warnings.length > 0 && (
+                      <div className="mt-2 text-xs text-yellow-700 dark:text-yellow-500 space-y-1">
+                        {row._warnings.map((warn, warnIdx) => (
+                          <div key={warnIdx} className="flex items-start gap-1">
+                            <AlertCircle className="h-3 w-3 mt-0.5 flex-shrink-0" />
+                            <span>{warn}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex flex-col gap-2 mt-4">
+                <HapticButton
+                  onClick={() => {
+                    triggerHaptic('medium');
+                    handleImport();
+                  }}
+                  disabled={validCount === 0 || importProductsMutation.isPending || importPriceListItemsMutation.isPending}
+                  className="w-full"
+                  data-testid="button-confirm-import-mobile"
+                >
+                  <Upload className="h-4 w-4 mr-2" />
+                  Importa {validCount} {validCount === 1 ? "Riga" : "Righe"}
+                </HapticButton>
+                <Button
+                  variant="outline"
+                  onClick={resetState}
+                  className="w-full"
+                  data-testid="button-cancel-import-mobile"
+                >
+                  Annulla
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+    </MobileAppLayout>
   );
 }

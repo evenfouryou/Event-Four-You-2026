@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Github, Loader2, CheckCircle, ExternalLink, AlertCircle, Copy, FileCode } from "lucide-react";
+import { Github, Loader2, CheckCircle, ExternalLink, AlertCircle, Copy } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { MobileAppLayout, MobileHeader } from "@/components/mobile-primitives";
 
 const WORKFLOW_CONTENT = `name: Build and Release Smart Card Reader
 
@@ -63,24 +65,23 @@ export default function DownloadSmartCardApp() {
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const { toast } = useToast();
+  const isMobile = useIsMobile();
 
   const createGitHubRepo = async () => {
     setIsCreating(true);
     setError(null);
     
     try {
-      const result = await apiRequest('/api/github/create-smart-card-repo', {
-        method: 'POST'
-      });
+      const result = await apiRequest('POST', '/api/github/create-smart-card-repo') as any;
       
-      if (result.success && result.repoUrl) {
+      if (result?.success && result?.repoUrl) {
         setRepoUrl(result.repoUrl);
         toast({
           title: "Repository creato!",
           description: "Ora aggiungi il workflow"
         });
       } else {
-        throw new Error(result.error || 'Errore sconosciuto');
+        throw new Error(result?.error || 'Errore sconosciuto');
       }
     } catch (err: any) {
       setError(err.message);
@@ -104,147 +105,175 @@ export default function DownloadSmartCardApp() {
     setTimeout(() => setCopied(false), 3000);
   };
 
+  const StepContent = () => (
+    <>
+      <Card className="border-primary">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-bold">1</span>
+            Crea Repository GitHub
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {!repoUrl ? (
+            <>
+              <Button 
+                onClick={createGitHubRepo}
+                disabled={isCreating}
+                size="lg"
+                className="w-full"
+                data-testid="button-create-repo"
+              >
+                {isCreating ? (
+                  <>
+                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                    Creazione in corso...
+                  </>
+                ) : (
+                  <>
+                    <Github className="mr-2 h-5 w-5" />
+                    Crea Repository su GitHub
+                  </>
+                )}
+              </Button>
+              
+              {error && (
+                <div className="flex items-center gap-2 text-destructive text-sm">
+                  <AlertCircle className="h-4 w-4" />
+                  {error}
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 text-green-500">
+                <CheckCircle className="h-5 w-5" />
+                <span className="font-medium">Repository creato!</span>
+              </div>
+              
+              <a 
+                href={repoUrl} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="block"
+              >
+                <Button variant="outline" className="w-full">
+                  <ExternalLink className="mr-2 h-4 w-4" />
+                  Apri Repository su GitHub
+                </Button>
+              </a>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-bold">2</span>
+            Aggiungi il Workflow
+          </CardTitle>
+          <CardDescription>
+            Crea il file per la compilazione automatica
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <Button 
+            onClick={copyWorkflow}
+            size="lg"
+            variant={copied ? "secondary" : "default"}
+            className="w-full"
+            data-testid="button-copy-workflow"
+          >
+            {copied ? (
+              <>
+                <CheckCircle className="mr-2 h-5 w-5" />
+                Copiato!
+              </>
+            ) : (
+              <>
+                <Copy className="mr-2 h-5 w-5" />
+                Copia Contenuto Workflow
+              </>
+            )}
+          </Button>
+          
+          <div className="bg-muted p-4 rounded-lg text-sm space-y-2">
+            <p className="font-medium">Come fare:</p>
+            <ol className="list-decimal list-inside space-y-1 text-muted-foreground">
+              <li>Apri il repository su GitHub</li>
+              <li>Clicca <strong>"Add file"</strong> → <strong>"Create new file"</strong></li>
+              <li>Scrivi come nome: <code className="bg-background px-1 rounded">.github/workflows/build.yml</code></li>
+              <li>Incolla il contenuto copiato</li>
+              <li>Clicca <strong>"Commit new file"</strong></li>
+            </ol>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-bold">3</span>
+            Avvia la Compilazione
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ol className="list-decimal list-inside space-y-2 text-sm text-muted-foreground">
+            <li>Vai alla tab <strong>Actions</strong> nel repository</li>
+            <li>Clicca su <strong>"Build and Release Smart Card Reader"</strong></li>
+            <li>Clicca <strong>"Run workflow"</strong> → <strong>"Run workflow"</strong></li>
+            <li>Attendi 2-3 minuti</li>
+            <li>Scarica il file ZIP dagli <strong>Artifacts</strong></li>
+          </ol>
+        </CardContent>
+      </Card>
+
+      <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4">
+        <p className="text-sm text-center">
+          <strong>Risultato finale:</strong> Un file ZIP che i tuoi utenti possono scaricare, estrarre e usare con un doppio click!
+        </p>
+      </div>
+    </>
+  );
+
+  if (!isMobile) {
+    return (
+      <div className="container mx-auto p-6" data-testid="page-download-smart-card-app">
+        <div className="max-w-2xl mx-auto space-y-6">
+          <div className="text-center space-y-2">
+            <h1 className="text-3xl font-bold" data-testid="text-page-title">Event4U Smart Card Reader</h1>
+            <p className="text-muted-foreground">
+              Pubblica su GitHub per ottenere l'installer automatico
+            </p>
+          </div>
+
+          <StepContent />
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background to-muted p-6">
-      <div className="max-w-2xl mx-auto space-y-6">
+    <MobileAppLayout
+      header={
+        <MobileHeader
+          title="Smart Card Reader"
+          showBackButton
+          onBack={() => window.history.back()}
+        />
+      }
+    >
+      <div className="p-4 space-y-4 pb-24">
         <div className="text-center space-y-2">
-          <h1 className="text-3xl font-bold" data-testid="text-page-title">Event4U Smart Card Reader</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-2xl font-bold" data-testid="text-page-title">Event4U Smart Card Reader</h1>
+          <p className="text-muted-foreground text-sm">
             Pubblica su GitHub per ottenere l'installer automatico
           </p>
         </div>
 
-        {/* Step 1: Create Repo */}
-        <Card className="border-primary">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-bold">1</span>
-              Crea Repository GitHub
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {!repoUrl ? (
-              <>
-                <Button 
-                  onClick={createGitHubRepo}
-                  disabled={isCreating}
-                  size="lg"
-                  className="w-full"
-                  data-testid="button-create-repo"
-                >
-                  {isCreating ? (
-                    <>
-                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                      Creazione in corso...
-                    </>
-                  ) : (
-                    <>
-                      <Github className="mr-2 h-5 w-5" />
-                      Crea Repository su GitHub
-                    </>
-                  )}
-                </Button>
-                
-                {error && (
-                  <div className="flex items-center gap-2 text-destructive text-sm">
-                    <AlertCircle className="h-4 w-4" />
-                    {error}
-                  </div>
-                )}
-              </>
-            ) : (
-              <div className="space-y-3">
-                <div className="flex items-center gap-2 text-green-500">
-                  <CheckCircle className="h-5 w-5" />
-                  <span className="font-medium">Repository creato!</span>
-                </div>
-                
-                <a 
-                  href={repoUrl} 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="block"
-                >
-                  <Button variant="outline" className="w-full">
-                    <ExternalLink className="mr-2 h-4 w-4" />
-                    Apri Repository su GitHub
-                  </Button>
-                </a>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Step 2: Add Workflow */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-bold">2</span>
-              Aggiungi il Workflow
-            </CardTitle>
-            <CardDescription>
-              Crea il file per la compilazione automatica
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Button 
-              onClick={copyWorkflow}
-              size="lg"
-              variant={copied ? "secondary" : "default"}
-              className="w-full"
-              data-testid="button-copy-workflow"
-            >
-              {copied ? (
-                <>
-                  <CheckCircle className="mr-2 h-5 w-5" />
-                  Copiato!
-                </>
-              ) : (
-                <>
-                  <Copy className="mr-2 h-5 w-5" />
-                  Copia Contenuto Workflow
-                </>
-              )}
-            </Button>
-            
-            <div className="bg-muted p-4 rounded-lg text-sm space-y-2">
-              <p className="font-medium">Come fare:</p>
-              <ol className="list-decimal list-inside space-y-1 text-muted-foreground">
-                <li>Apri il repository su GitHub</li>
-                <li>Clicca <strong>"Add file"</strong> → <strong>"Create new file"</strong></li>
-                <li>Scrivi come nome: <code className="bg-background px-1 rounded">.github/workflows/build.yml</code></li>
-                <li>Incolla il contenuto copiato</li>
-                <li>Clicca <strong>"Commit new file"</strong></li>
-              </ol>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Step 3: Run Workflow */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-bold">3</span>
-              Avvia la Compilazione
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ol className="list-decimal list-inside space-y-2 text-sm text-muted-foreground">
-              <li>Vai alla tab <strong>Actions</strong> nel repository</li>
-              <li>Clicca su <strong>"Build and Release Smart Card Reader"</strong></li>
-              <li>Clicca <strong>"Run workflow"</strong> → <strong>"Run workflow"</strong></li>
-              <li>Attendi 2-3 minuti</li>
-              <li>Scarica il file ZIP dagli <strong>Artifacts</strong></li>
-            </ol>
-          </CardContent>
-        </Card>
-
-        <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4">
-          <p className="text-sm text-center">
-            <strong>Risultato finale:</strong> Un file ZIP che i tuoi utenti possono scaricare, estrarre e usare con un doppio click!
-          </p>
-        </div>
+        <StepContent />
       </div>
-    </div>
+    </MobileAppLayout>
   );
 }

@@ -5,9 +5,12 @@ import { z } from "zod";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { 
   CheckCircle2, 
   Sparkles, 
@@ -73,6 +76,7 @@ const springTransition = { type: "spring", stiffness: 400, damping: 30 };
 
 export default function Register() {
   const [, navigate] = useLocation();
+  const isMobile = useIsMobile();
   const [accountType, setAccountType] = useState<AccountType>(null);
   const [gestoreSuccess, setGestoreSuccess] = useState(false);
   const [clienteOtpStep, setClienteOtpStep] = useState(false);
@@ -220,6 +224,29 @@ export default function Register() {
   }
 
   if (gestoreSuccess) {
+    if (!isMobile) {
+      return (
+        <div className="min-h-screen bg-background flex items-center justify-center p-6" data-testid="page-register-success">
+          <Card className="w-full max-w-md">
+            <CardContent className="pt-8 pb-8 text-center">
+              <div className="w-20 h-20 rounded-full bg-gradient-to-br from-teal-400 to-cyan-500 flex items-center justify-center mx-auto mb-6">
+                <CheckCircle2 className="w-10 h-10 text-black" />
+              </div>
+              <h2 className="text-2xl font-bold text-foreground mb-3">Registrazione Completata!</h2>
+              <p className="text-muted-foreground mb-6">
+                Controlla la tua email per verificare il tuo account.
+              </p>
+              <Link href="/login">
+                <Button className="w-full" size="lg" data-testid="button-go-login">
+                  Vai al Login
+                </Button>
+              </Link>
+            </CardContent>
+          </Card>
+        </div>
+      );
+    }
+
     return (
       <div 
         className="fixed inset-0 bg-background flex items-center justify-center px-6"
@@ -269,6 +296,74 @@ export default function Register() {
   }
 
   if (clienteOtpStep) {
+    if (!isMobile) {
+      return (
+        <div className="min-h-screen bg-background flex items-center justify-center p-6" data-testid="page-register-otp">
+          <Card className="w-full max-w-md">
+            <CardContent className="pt-8 pb-8">
+              <div className="mx-auto mb-6 h-16 w-16 rounded-full bg-gradient-to-br from-teal-400 to-cyan-500 flex items-center justify-center">
+                <Shield className="h-8 w-8 text-black" />
+              </div>
+              <div className="text-center mb-6">
+                <h1 className="text-2xl font-bold text-foreground mb-2">Verifica OTP</h1>
+                <p className="text-muted-foreground">
+                  Inserisci il codice a 6 cifre inviato al tuo telefono
+                </p>
+              </div>
+              <div className="flex justify-center mb-6">
+                <InputOTP
+                  maxLength={6}
+                  value={otpValue}
+                  onChange={(value) => setOtpValue(value)}
+                  data-testid="input-otp"
+                >
+                  <InputOTPGroup className="gap-2">
+                    {[...Array(6)].map((_, i) => (
+                      <InputOTPSlot
+                        key={i}
+                        index={i}
+                        className="h-12 w-10 text-lg border-border bg-muted/30 text-foreground rounded-md"
+                      />
+                    ))}
+                  </InputOTPGroup>
+                </InputOTP>
+              </div>
+              <div className="space-y-3">
+                <Button
+                  onClick={handleVerifyOTP}
+                  disabled={otpValue.length !== 6 || isLoading}
+                  className="w-full"
+                  size="lg"
+                  data-testid="button-verify"
+                >
+                  {isLoading ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <>
+                      Verifica
+                      <ArrowRight className="w-4 h-4 ml-2" />
+                    </>
+                  )}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setClienteOtpStep(false);
+                    setOtpValue("");
+                  }}
+                  className="w-full"
+                  data-testid="button-back-to-form"
+                >
+                  <ArrowLeft className="w-4 h-4 mr-2" />
+                  Torna indietro
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      );
+    }
+
     return (
       <div 
         className="fixed inset-0 bg-background flex flex-col"
@@ -385,6 +480,89 @@ export default function Register() {
   }
 
   if (accountType === null) {
+    if (!isMobile) {
+      return (
+        <div className="min-h-screen bg-background flex items-center justify-center p-6" data-testid="page-register-select">
+          <Card className="w-full max-w-lg">
+            <CardHeader className="text-center pb-2">
+              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-yellow-400 to-amber-500 flex items-center justify-center mx-auto mb-4">
+                <Sparkles className="h-8 w-8 text-black" />
+              </div>
+              <CardTitle className="text-2xl">Crea Account</CardTitle>
+              <CardDescription>Scegli il tipo di account</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <button
+                onClick={() => {
+                  if (clienteRegEnabled?.enabled === false) {
+                    toast({
+                      title: "Registrazioni clienti sospese",
+                      description: "Le registrazioni clienti sono temporaneamente disabilitate.",
+                      variant: "destructive"
+                    });
+                    return;
+                  }
+                  setAccountType("cliente");
+                }}
+                className="w-full p-4 rounded-lg border border-border hover-elevate flex items-center gap-4 text-left transition-colors"
+                data-testid="button-select-cliente"
+              >
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-teal-400 to-cyan-500 flex items-center justify-center shrink-0">
+                  <Ticket className="w-6 h-6 text-black" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-lg font-semibold text-foreground">Cliente</h3>
+                  <p className="text-muted-foreground text-sm">
+                    Acquista biglietti, gestisci prenotazioni e rivendite
+                  </p>
+                </div>
+                <ArrowRight className="w-5 h-5 text-muted-foreground shrink-0" />
+              </button>
+
+              <button
+                onClick={() => {
+                  if (gestoreRegEnabled?.enabled === false) {
+                    toast({
+                      title: "Registrazioni organizzatori sospese",
+                      description: "Le registrazioni per organizzatori sono temporaneamente disabilitate.",
+                      variant: "destructive"
+                    });
+                    return;
+                  }
+                  setAccountType("gestore");
+                }}
+                className={`w-full p-4 rounded-lg border border-border hover-elevate flex items-center gap-4 text-left transition-colors ${gestoreRegEnabled?.enabled === false ? 'opacity-50' : ''}`}
+                data-testid="button-select-gestore"
+              >
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center shrink-0">
+                  <Building2 className="w-6 h-6 text-black" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-lg font-semibold text-foreground">Organizzatore</h3>
+                  <p className="text-muted-foreground text-sm">
+                    Crea eventi, gestisci staff, vendita biglietti e inventario
+                  </p>
+                  {gestoreRegEnabled?.enabled === false && (
+                    <p className="text-red-400 text-xs mt-1">Registrazioni sospese</p>
+                  )}
+                </div>
+                <ArrowRight className="w-5 h-5 text-muted-foreground shrink-0" />
+              </button>
+
+              <div className="text-center pt-4">
+                <p className="text-muted-foreground">
+                  Hai già un account?{" "}
+                  <Link href="/login" className="text-primary font-semibold">
+                    Accedi
+                  </Link>
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      );
+    }
+
     return (
       <div 
         className="fixed inset-0 bg-background flex flex-col"
@@ -529,6 +707,212 @@ export default function Register() {
   }
 
   if (accountType === "gestore") {
+    if (!isMobile) {
+      return (
+        <div className="min-h-screen bg-background flex items-center justify-center p-6" data-testid="page-register-gestore">
+          <Card className="w-full max-w-lg">
+            <CardHeader className="text-center pb-2">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setAccountType(null)}
+                className="absolute left-4 top-4"
+                data-testid="button-back"
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+              <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center mx-auto mb-3">
+                <Building2 className="h-7 w-7 text-black" />
+              </div>
+              <CardTitle className="text-xl">Registrati come Organizzatore</CardTitle>
+              <CardDescription>Crea il tuo account gestore</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Form {...gestoreForm}>
+                <form onSubmit={gestoreForm.handleSubmit((data) => gestoreMutation.mutate(data))} className="space-y-4">
+                  <div className="grid grid-cols-2 gap-3">
+                    <FormField
+                      control={gestoreForm.control}
+                      name="firstName"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Nome</FormLabel>
+                          <FormControl>
+                            <div className="relative">
+                              <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                              <Input {...field} placeholder="Mario" className="pl-10" data-testid="input-firstname" />
+                            </div>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={gestoreForm.control}
+                      name="lastName"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Cognome</FormLabel>
+                          <FormControl>
+                            <Input {...field} placeholder="Rossi" data-testid="input-lastname" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  <FormField
+                    control={gestoreForm.control}
+                    name="email"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Email</FormLabel>
+                        <FormControl>
+                          <div className="relative">
+                            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                            <Input {...field} type="email" placeholder="mario@azienda.it" className="pl-10" data-testid="input-email" />
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={gestoreForm.control}
+                    name="password"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Password</FormLabel>
+                        <FormControl>
+                          <div className="relative">
+                            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                            <Input
+                              {...field}
+                              type={showPassword ? "text" : "password"}
+                              placeholder="••••••••"
+                              className="pl-10 pr-10"
+                              data-testid="input-password"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setShowPassword(!showPassword)}
+                              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+                            >
+                              {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                            </button>
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={gestoreForm.control}
+                    name="confirmPassword"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Conferma Password</FormLabel>
+                        <FormControl>
+                          <div className="relative">
+                            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                            <Input
+                              {...field}
+                              type={showConfirmPassword ? "text" : "password"}
+                              placeholder="••••••••"
+                              className="pl-10 pr-10"
+                              data-testid="input-confirm-password"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+                            >
+                              {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                            </button>
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <div className="space-y-3 pt-2">
+                    <FormField
+                      control={gestoreForm.control}
+                      name="acceptTerms"
+                      render={({ field }) => (
+                        <FormItem className="flex items-start gap-3">
+                          <FormControl>
+                            <Checkbox
+                              checked={field.value}
+                              onCheckedChange={field.onChange}
+                              className="mt-0.5"
+                              data-testid="checkbox-terms"
+                            />
+                          </FormControl>
+                          <div className="flex-1">
+                            <FormLabel className="text-sm font-normal">
+                              Accetto i{" "}
+                              <Link href="/terms" className="text-primary underline">Termini e Condizioni</Link>
+                            </FormLabel>
+                            <FormMessage />
+                          </div>
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={gestoreForm.control}
+                      name="acceptPrivacy"
+                      render={({ field }) => (
+                        <FormItem className="flex items-start gap-3">
+                          <FormControl>
+                            <Checkbox
+                              checked={field.value}
+                              onCheckedChange={field.onChange}
+                              className="mt-0.5"
+                              data-testid="checkbox-privacy"
+                            />
+                          </FormControl>
+                          <div className="flex-1">
+                            <FormLabel className="text-sm font-normal">
+                              Accetto la{" "}
+                              <Link href="/privacy" className="text-primary underline">Privacy Policy</Link>
+                            </FormLabel>
+                            <FormMessage />
+                          </div>
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  <Button
+                    type="submit"
+                    disabled={gestoreMutation.isPending}
+                    className="w-full"
+                    size="lg"
+                    data-testid="button-register"
+                  >
+                    {gestoreMutation.isPending ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <>
+                        Registrati
+                        <ArrowRight className="w-4 h-4 ml-2" />
+                      </>
+                    )}
+                  </Button>
+                  <div className="text-center pt-2">
+                    <p className="text-muted-foreground text-sm">
+                      Hai già un account?{" "}
+                      <Link href="/login" className="text-primary font-semibold">Accedi</Link>
+                    </p>
+                  </div>
+                </form>
+              </Form>
+            </CardContent>
+          </Card>
+        </div>
+      );
+    }
+
     return (
       <div 
         className="fixed inset-0 bg-background flex flex-col"
@@ -843,6 +1227,199 @@ export default function Register() {
             </motion.div>
           </div>
         </div>
+      </div>
+    );
+  }
+
+  if (!isMobile) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-6" data-testid="page-register-cliente">
+        <Card className="w-full max-w-lg">
+          <CardHeader className="text-center pb-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setAccountType(null)}
+              className="absolute left-4 top-4"
+              data-testid="button-back"
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+            <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-teal-400 to-cyan-500 flex items-center justify-center mx-auto mb-3">
+              <Ticket className="h-7 w-7 text-black" />
+            </div>
+            <CardTitle className="text-xl">Registrati come Cliente</CardTitle>
+            <CardDescription>Crea il tuo account</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Form {...clienteForm}>
+              <form onSubmit={clienteForm.handleSubmit(handleClienteRegister)} className="space-y-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <FormField
+                    control={clienteForm.control}
+                    name="firstName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Nome</FormLabel>
+                        <FormControl>
+                          <div className="relative">
+                            <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                            <Input {...field} placeholder="Mario" className="pl-10" data-testid="input-firstname" />
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={clienteForm.control}
+                    name="lastName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Cognome</FormLabel>
+                        <FormControl>
+                          <Input {...field} placeholder="Rossi" data-testid="input-lastname" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <FormField
+                  control={clienteForm.control}
+                  name="email"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Email</FormLabel>
+                      <FormControl>
+                        <div className="relative">
+                          <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                          <Input {...field} type="email" placeholder="mario@esempio.it" className="pl-10" data-testid="input-email" />
+                        </div>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={clienteForm.control}
+                  name="phone"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Telefono</FormLabel>
+                      <FormControl>
+                        <div className="relative">
+                          <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                          <Input {...field} type="tel" placeholder="+39 333 1234567" className="pl-10" data-testid="input-phone" />
+                        </div>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={clienteForm.control}
+                  name="password"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Password</FormLabel>
+                      <FormControl>
+                        <div className="relative">
+                          <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                          <Input
+                            {...field}
+                            type={showPassword ? "text" : "password"}
+                            placeholder="••••••••"
+                            className="pl-10 pr-10"
+                            data-testid="input-password"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowPassword(!showPassword)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+                          >
+                            {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          </button>
+                        </div>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <div className="space-y-3 pt-2">
+                  <FormField
+                    control={clienteForm.control}
+                    name="acceptTerms"
+                    render={({ field }) => (
+                      <FormItem className="flex items-start gap-3">
+                        <FormControl>
+                          <Checkbox
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                            className="mt-0.5"
+                            data-testid="checkbox-terms"
+                          />
+                        </FormControl>
+                        <div className="flex-1">
+                          <FormLabel className="text-sm font-normal">
+                            Accetto i{" "}
+                            <Link href="/terms" className="text-primary underline">Termini e Condizioni</Link>
+                          </FormLabel>
+                          <FormMessage />
+                        </div>
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={clienteForm.control}
+                    name="acceptPrivacy"
+                    render={({ field }) => (
+                      <FormItem className="flex items-start gap-3">
+                        <FormControl>
+                          <Checkbox
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                            className="mt-0.5"
+                            data-testid="checkbox-privacy"
+                          />
+                        </FormControl>
+                        <div className="flex-1">
+                          <FormLabel className="text-sm font-normal">
+                            Accetto la{" "}
+                            <Link href="/privacy" className="text-primary underline">Privacy Policy</Link>
+                          </FormLabel>
+                          <FormMessage />
+                        </div>
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <Button
+                  type="submit"
+                  disabled={isLoading}
+                  className="w-full"
+                  size="lg"
+                  data-testid="button-register"
+                >
+                  {isLoading ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <>
+                      Registrati
+                      <ArrowRight className="w-4 h-4 ml-2" />
+                    </>
+                  )}
+                </Button>
+                <div className="text-center pt-2">
+                  <p className="text-muted-foreground text-sm">
+                    Hai già un account?{" "}
+                    <Link href="/login" className="text-primary font-semibold">Accedi</Link>
+                  </p>
+                </div>
+              </form>
+            </Form>
+          </CardContent>
+        </Card>
       </div>
     );
   }

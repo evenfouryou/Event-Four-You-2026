@@ -1,15 +1,18 @@
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Card, CardContent } from "@/components/ui/card";
 import { Calendar, Ticket, Users, Sparkles, ArrowRight, MapPin, Music, User } from "lucide-react";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
 import { useCustomerAuth } from "@/hooks/useCustomerAuth";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { triggerHaptic } from "@/components/mobile-primitives";
 
 const springConfig = { type: "spring" as const, stiffness: 400, damping: 30 };
 
 export default function Landing() {
   const { isAuthenticated } = useCustomerAuth();
+  const isMobile = useIsMobile();
   
   const features = [
     {
@@ -62,6 +65,287 @@ export default function Landing() {
     triggerHaptic('light');
   };
 
+  // Desktop version
+  if (!isMobile) {
+    return (
+      <div className="min-h-screen bg-background" data-testid="page-landing-desktop">
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <motion.div 
+            className="absolute top-20 right-20 w-[500px] h-[500px] rounded-full opacity-40"
+            style={{ 
+              background: "radial-gradient(circle, rgba(255,215,0,0.25) 0%, transparent 70%)",
+              filter: "blur(100px)"
+            }}
+            animate={{ 
+              x: [0, 50, 0],
+              y: [0, -40, 0],
+              scale: [1, 1.2, 1]
+            }}
+            transition={{ duration: 12, repeat: Infinity, ease: "easeInOut" }}
+          />
+          <motion.div 
+            className="absolute bottom-20 left-20 w-[600px] h-[600px] rounded-full opacity-30"
+            style={{ 
+              background: "radial-gradient(circle, rgba(0,206,209,0.2) 0%, transparent 70%)",
+              filter: "blur(120px)"
+            }}
+            animate={{ 
+              x: [0, -40, 0],
+              y: [0, 50, 0],
+              scale: [1, 1.15, 1]
+            }}
+            transition={{ duration: 14, repeat: Infinity, ease: "easeInOut" }}
+          />
+        </div>
+
+        <header className="relative z-10 border-b border-white/10">
+          <div className="container mx-auto px-6 py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-yellow-400 to-amber-500 flex items-center justify-center shadow-lg shadow-amber-500/25">
+                  <Sparkles className="h-6 w-6 text-black" />
+                </div>
+                <span className="text-2xl font-bold">
+                  Event<span className="text-primary">4</span>U
+                </span>
+              </div>
+              
+              <nav className="flex items-center gap-6">
+                <Link href="/acquista" className="text-muted-foreground hover-elevate px-3 py-2 rounded-md" data-testid="link-nav-events">
+                  Eventi
+                </Link>
+                <Link href="/locali" className="text-muted-foreground hover-elevate px-3 py-2 rounded-md" data-testid="link-nav-venues">
+                  Locali
+                </Link>
+                {isAuthenticated ? (
+                  <Link href="/account">
+                    <Avatar className="h-10 w-10 cursor-pointer ring-2 ring-primary/40" data-testid="avatar-user-desktop">
+                      <AvatarFallback className="bg-primary/10 text-primary">
+                        <User className="h-5 w-5" />
+                      </AvatarFallback>
+                    </Avatar>
+                  </Link>
+                ) : (
+                  <div className="flex items-center gap-3">
+                    <Button variant="ghost" asChild data-testid="button-login-desktop">
+                      <Link href="/login">Accedi</Link>
+                    </Button>
+                    <Button asChild className="gradient-golden text-black" data-testid="button-register-desktop">
+                      <Link href="/register">Registrati</Link>
+                    </Button>
+                  </div>
+                )}
+              </nav>
+            </div>
+          </div>
+        </header>
+
+        <main className="relative z-10">
+          <section className="container mx-auto px-6 py-24">
+            <div className="grid lg:grid-cols-2 gap-16 items-center">
+              <motion.div
+                initial={{ opacity: 0, x: -40 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={springConfig}
+              >
+                <div className="inline-flex items-center gap-3 px-4 py-2 rounded-full glass border border-primary/30 mb-8">
+                  <span className="relative flex h-2.5 w-2.5">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-teal-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-teal-400"></span>
+                  </span>
+                  <span className="text-sm font-medium text-teal">Eventi live questa sera</span>
+                </div>
+                
+                <h1 className="text-6xl font-bold leading-tight mb-6">
+                  La tua notte
+                  <br />
+                  <span className="gradient-golden-text">inizia qui</span>
+                </h1>
+                
+                <p className="text-xl text-muted-foreground mb-10 max-w-lg leading-relaxed">
+                  Scopri i migliori eventi e club della città. Biglietti, liste VIP e tavoli in un click.
+                </p>
+                
+                <div className="flex gap-4">
+                  <Button
+                    size="lg"
+                    asChild
+                    className="h-12 px-8 text-lg font-semibold gradient-golden text-black glow-golden rounded-xl"
+                    data-testid="button-discover-events-desktop"
+                  >
+                    <Link href="/acquista">
+                      <Music className="mr-2 h-5 w-5" />
+                      Scopri Eventi
+                    </Link>
+                  </Button>
+                  
+                  <Button
+                    size="lg"
+                    variant="outline"
+                    asChild
+                    className="h-12 px-8 text-lg font-medium border-white/20 rounded-xl"
+                    data-testid="button-venues-desktop"
+                  >
+                    <Link href="/locali">
+                      <MapPin className="mr-2 h-5 w-5" />
+                      Esplora Locali
+                    </Link>
+                  </Button>
+                </div>
+              </motion.div>
+
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ ...springConfig, delay: 0.2 }}
+                className="hidden lg:block"
+              >
+                <Card className="glass-card p-8 relative overflow-hidden">
+                  <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-teal-500/10 pointer-events-none" />
+                  <CardContent className="p-0 relative z-10">
+                    <div className="grid grid-cols-2 gap-4">
+                      {features.map((feature, index) => (
+                        <motion.div
+                          key={index}
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ ...springConfig, delay: 0.3 + index * 0.1 }}
+                          className="p-4 rounded-xl bg-background/50 hover-elevate"
+                        >
+                          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary/25 to-amber-500/15 flex items-center justify-center mb-3">
+                            <feature.icon className="h-6 w-6 text-primary" />
+                          </div>
+                          <h3 className="font-semibold mb-1">{feature.title}</h3>
+                          <p className="text-sm text-muted-foreground">{feature.description}</p>
+                        </motion.div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            </div>
+          </section>
+
+          <section className="container mx-auto px-6 py-20">
+            <motion.div
+              initial={{ opacity: 0, y: 40 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={springConfig}
+              className="text-center mb-16"
+            >
+              <h2 className="text-4xl font-bold mb-4">Perché sceglierci</h2>
+              <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+                Tutto quello che ti serve per vivere la notte al meglio
+              </p>
+            </motion.div>
+
+            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {features.map((feature, index) => (
+                <motion.div
+                  key={index}
+                  initial={{ opacity: 0, y: 30 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ ...springConfig, delay: index * 0.1 }}
+                >
+                  <Card className="h-full hover-elevate">
+                    <CardContent className="p-6 text-center">
+                      <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/25 to-amber-500/15 flex items-center justify-center mx-auto mb-4">
+                        <feature.icon className="h-8 w-8 text-primary" />
+                      </div>
+                      <h3 className="text-lg font-semibold mb-2">{feature.title}</h3>
+                      <p className="text-muted-foreground">{feature.description}</p>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              ))}
+            </div>
+          </section>
+
+          <section className="container mx-auto px-6 py-20">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              whileInView={{ opacity: 1, scale: 1 }}
+              viewport={{ once: true }}
+              transition={springConfig}
+            >
+              <Card className="glass-card overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-r from-primary/15 via-transparent to-teal-500/15 pointer-events-none" />
+                <CardContent className="p-12 text-center relative z-10">
+                  <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-yellow-400 to-amber-500 flex items-center justify-center mx-auto mb-8 shadow-xl shadow-amber-500/30">
+                    <Sparkles className="h-10 w-10 text-black" />
+                  </div>
+                  
+                  <h2 className="text-4xl font-bold mb-4">Pronto per la serata?</h2>
+                  <p className="text-lg text-muted-foreground mb-10 max-w-xl mx-auto">
+                    Registrati gratis e scopri eventi esclusivi nella tua città
+                  </p>
+                  
+                  {!isAuthenticated ? (
+                    <Button
+                      size="lg"
+                      asChild
+                      className="h-14 px-10 text-xl font-semibold gradient-golden text-black glow-golden rounded-xl"
+                      data-testid="button-register-cta-desktop"
+                    >
+                      <Link href="/register">
+                        Inizia Ora
+                        <ArrowRight className="ml-3 h-6 w-6" />
+                      </Link>
+                    </Button>
+                  ) : (
+                    <Button
+                      size="lg"
+                      asChild
+                      className="h-14 px-10 text-xl font-semibold gradient-golden text-black glow-golden rounded-xl"
+                      data-testid="button-explore-cta-desktop"
+                    >
+                      <Link href="/acquista">
+                        Esplora Eventi
+                        <ArrowRight className="ml-3 h-6 w-6" />
+                      </Link>
+                    </Button>
+                  )}
+                </CardContent>
+              </Card>
+            </motion.div>
+          </section>
+        </main>
+
+        <footer className="relative z-10 border-t border-white/10 mt-12">
+          <div className="container mx-auto px-6 py-12">
+            <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-yellow-400 to-amber-500 flex items-center justify-center">
+                  <Sparkles className="h-5 w-5 text-black" />
+                </div>
+                <span className="text-lg font-semibold">Event<span className="text-primary">4</span>U</span>
+              </div>
+              
+              <div className="flex items-center gap-8">
+                <Link href="/acquista" className="text-muted-foreground hover:text-foreground transition-colors" data-testid="link-footer-events-desktop">
+                  Eventi
+                </Link>
+                <Link href="/locali" className="text-muted-foreground hover:text-foreground transition-colors" data-testid="link-footer-venues-desktop">
+                  Locali
+                </Link>
+                <Link href="/login" className="text-muted-foreground hover:text-foreground transition-colors" data-testid="link-footer-login-desktop">
+                  Accedi
+                </Link>
+              </div>
+              
+              <p className="text-sm text-muted-foreground">
+                © {new Date().getFullYear()} Event Four You. Tutti i diritti riservati.
+              </p>
+            </div>
+          </div>
+        </footer>
+      </div>
+    );
+  }
+
+  // Mobile version
   return (
     <div 
       className="min-h-screen bg-background flex flex-col overflow-x-hidden"

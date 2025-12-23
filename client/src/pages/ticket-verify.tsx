@@ -1,10 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
 import { useParams, Link } from "wouter";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
+import { useIsMobile } from "@/hooks/use-mobile";
 import {
   CheckCircle,
   XCircle,
@@ -16,6 +17,7 @@ import {
   Loader2,
   Home,
   Clock,
+  ArrowLeft,
 } from "lucide-react";
 
 interface TicketVerificationResponse {
@@ -46,6 +48,7 @@ interface TicketVerificationResponse {
 
 export default function TicketVerify() {
   const { code } = useParams<{ code: string }>();
+  const isMobile = useIsMobile();
 
   const { data, isLoading, isError } = useQuery<TicketVerificationResponse>({
     queryKey: ["/api/public/tickets/verify", code],
@@ -133,6 +136,117 @@ export default function TicketVerify() {
 
   const statusConfig = getStatusConfig();
   const StatusIcon = statusConfig.icon;
+
+  if (!isMobile) {
+    return (
+      <div className="min-h-screen bg-background" data-testid="page-ticket-verify">
+        <div className="container mx-auto p-6 space-y-6">
+          <div className="flex items-center gap-4">
+            <Link href="/acquista">
+              <Button variant="ghost" data-testid="button-back">
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Torna agli eventi
+              </Button>
+            </Link>
+          </div>
+
+          <div className="max-w-2xl mx-auto">
+            <Card className={`${statusConfig.bgColor} ${statusConfig.borderColor} border-2 overflow-hidden`}>
+              <CardHeader className="text-center pb-6">
+                <div className={`w-24 h-24 mx-auto rounded-full ${statusConfig.bgColor} flex items-center justify-center mb-4`}>
+                  <StatusIcon className={`w-12 h-12 ${statusConfig.iconColor}`} />
+                </div>
+                <CardTitle className="text-2xl" data-testid="text-status-title">
+                  {statusConfig.title}
+                </CardTitle>
+                <p className="text-muted-foreground mt-2" data-testid="text-status-subtitle">
+                  {statusConfig.subtitle}
+                </p>
+              </CardHeader>
+
+              {data?.ticket && data?.event && (
+                <CardContent className="bg-card border-t border-border space-y-6 p-6">
+                  <div className="text-center pb-4 border-b border-border">
+                    <h2 className="text-xl font-semibold text-foreground" data-testid="text-event-name">
+                      {data.event.name}
+                    </h2>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Codice: <span className="font-mono">{data.ticket.ticketCode}</span>
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="flex items-center gap-4 p-4 bg-muted/50 rounded-lg">
+                      <Calendar className="w-6 h-6 text-primary flex-shrink-0" />
+                      <div>
+                        <p className="text-xs text-muted-foreground">Data Evento</p>
+                        <p className="text-foreground font-medium" data-testid="text-event-date">
+                          {format(new Date(data.event.startDate), "d MMMM yyyy", { locale: it })}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          {format(new Date(data.event.startDate), "HH:mm", { locale: it })}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-4 p-4 bg-muted/50 rounded-lg">
+                      <MapPin className="w-6 h-6 text-primary flex-shrink-0" />
+                      <div>
+                        <p className="text-xs text-muted-foreground">Luogo</p>
+                        <p className="text-foreground font-medium" data-testid="text-location">
+                          {data.event.location.name}
+                        </p>
+                        {data.event.location.city && (
+                          <p className="text-sm text-muted-foreground">{data.event.location.city}</p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-4 p-4 bg-muted/50 rounded-lg">
+                      <Ticket className="w-6 h-6 text-primary flex-shrink-0" />
+                      <div>
+                        <p className="text-xs text-muted-foreground">Tipo Biglietto</p>
+                        <p className="text-foreground font-medium" data-testid="text-ticket-type">
+                          {data.ticket.ticketType}
+                        </p>
+                        <p className="text-sm text-muted-foreground">{data.ticket.sector}</p>
+                      </div>
+                    </div>
+
+                    {data.ticket.participantName && (
+                      <div className="flex items-center gap-4 p-4 bg-muted/50 rounded-lg">
+                        <User className="w-6 h-6 text-primary flex-shrink-0" />
+                        <div>
+                          <p className="text-xs text-muted-foreground">Intestatario</p>
+                          <p className="text-foreground font-medium" data-testid="text-participant">
+                            {data.ticket.participantName}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {data.ticket.price && (
+                    <div className="text-center pt-4 border-t border-border">
+                      <Badge variant="secondary" className="text-base px-4 py-1">
+                        Prezzo: €{parseFloat(data.ticket.price).toFixed(2)}
+                      </Badge>
+                    </div>
+                  )}
+                </CardContent>
+              )}
+            </Card>
+
+            <div className="mt-6 text-center">
+              <p className="text-sm text-muted-foreground">
+                Codice verificato: <span className="font-mono">{code}</span>
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background p-4 sm:p-6 md:p-8">

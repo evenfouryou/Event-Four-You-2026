@@ -365,8 +365,8 @@ export default function AccountNameChange() {
     <MobileAppLayout>
       <MobileHeader
         title="Cambio Nominativo"
-        showBack
-        backHref={`/account/tickets/${id}`}
+        showBackButton
+        onBack={() => window.history.back()}
       />
       <div className="px-4 py-4 space-y-4">
         <div className="bg-muted/50 rounded-lg p-4 space-y-3">

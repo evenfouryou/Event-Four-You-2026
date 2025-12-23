@@ -2,13 +2,17 @@ import { useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { AlertCircle, CheckCircle2, Eye, EyeOff, Loader2, ArrowLeft, Lock } from "lucide-react";
 import { Link, useLocation, useSearch } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 import { motion, AnimatePresence } from "framer-motion";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { triggerHaptic, HapticButton } from "@/components/mobile-primitives";
 
 export default function ResetPassword() {
+  const isMobile = useIsMobile();
   const [, setLocation] = useLocation();
   const search = useSearch();
   const token = new URLSearchParams(search).get("token") || "";
@@ -113,6 +117,193 @@ export default function ResetPassword() {
             </div>
             <p className="text-muted-foreground text-lg">Verifica del link in corso...</p>
           </motion.div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isMobile) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-4" data-testid="page-reset-password">
+        <div className="w-full max-w-md">
+          <div className="flex justify-center mb-8">
+            <Link href="/" data-testid="link-home">
+              <img 
+                src="/logo.png" 
+                alt="EventFourYou" 
+                className="h-16 w-auto"
+                data-testid="img-logo"
+              />
+            </Link>
+          </div>
+
+          <Card>
+            <CardHeader className="text-center">
+              <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
+                <Lock className="h-8 w-8 text-primary" />
+              </div>
+              <CardTitle className="text-2xl">Reimposta Password</CardTitle>
+              <CardDescription>
+                {isValidToken 
+                  ? `Inserisci una nuova password per ${userEmail}`
+                  : "Impossibile reimpostare la password"
+                }
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <AnimatePresence mode="wait">
+                {!isValidToken ? (
+                  <motion.div
+                    key="invalid"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    className="space-y-6"
+                  >
+                    <div className="p-4 rounded-lg bg-destructive/10 border border-destructive/20 flex items-start gap-3" data-testid="alert-error">
+                      <AlertCircle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
+                      <p className="text-destructive text-sm">{error}</p>
+                    </div>
+                    
+                    <Link href="/forgot-password" className="block">
+                      <Button 
+                        variant="outline" 
+                        className="w-full"
+                        data-testid="button-request-new"
+                      >
+                        Richiedi nuovo link
+                      </Button>
+                    </Link>
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    key="form"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                  >
+                    <AnimatePresence>
+                      {error && (
+                        <motion.div
+                          initial={{ opacity: 0, y: -10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -10 }}
+                          className="mb-4 p-4 rounded-lg bg-destructive/10 border border-destructive/20 flex items-start gap-3"
+                          data-testid="alert-error"
+                        >
+                          <AlertCircle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
+                          <p className="text-destructive text-sm">{error}</p>
+                        </motion.div>
+                      )}
+
+                      {success && (
+                        <motion.div
+                          initial={{ opacity: 0, y: -10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -10 }}
+                          className="mb-4 p-4 rounded-lg bg-green-500/10 border border-green-500/20 flex items-start gap-3"
+                          data-testid="alert-success"
+                        >
+                          <CheckCircle2 className="h-5 w-5 text-green-500 shrink-0 mt-0.5" />
+                          <div className="text-green-600 dark:text-green-400 text-sm">
+                            <p>{success}</p>
+                            <p className="text-xs mt-1">Reindirizzamento al login...</p>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+
+                    <form onSubmit={handleSubmit} className="space-y-6">
+                      <div className="space-y-2">
+                        <Label htmlFor="password-desktop">Nuova Password</Label>
+                        <div className="relative">
+                          <Input
+                            id="password-desktop"
+                            type={showPassword ? "text" : "password"}
+                            placeholder="Minimo 8 caratteri"
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            required
+                            disabled={isLoading || !!success}
+                            className="pr-10"
+                            data-testid="input-password"
+                          />
+                          <button
+                            type="button"
+                            className="absolute right-3 top-1/2 -translate-y-1/2"
+                            onClick={() => setShowPassword(!showPassword)}
+                            data-testid="button-toggle-password"
+                          >
+                            {showPassword ? (
+                              <EyeOff className="h-4 w-4 text-muted-foreground" />
+                            ) : (
+                              <Eye className="h-4 w-4 text-muted-foreground" />
+                            )}
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="confirmPassword-desktop">Conferma Password</Label>
+                        <div className="relative">
+                          <Input
+                            id="confirmPassword-desktop"
+                            type={showConfirmPassword ? "text" : "password"}
+                            placeholder="Ripeti la password"
+                            value={confirmPassword}
+                            onChange={(e) => setConfirmPassword(e.target.value)}
+                            required
+                            disabled={isLoading || !!success}
+                            className="pr-10"
+                            data-testid="input-confirm-password"
+                          />
+                          <button
+                            type="button"
+                            className="absolute right-3 top-1/2 -translate-y-1/2"
+                            onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                            data-testid="button-toggle-confirm-password"
+                          >
+                            {showConfirmPassword ? (
+                              <EyeOff className="h-4 w-4 text-muted-foreground" />
+                            ) : (
+                              <Eye className="h-4 w-4 text-muted-foreground" />
+                            )}
+                          </button>
+                        </div>
+                      </div>
+
+                      <Button
+                        type="submit"
+                        disabled={isLoading || !!success}
+                        className="w-full"
+                        data-testid="button-submit"
+                      >
+                        {isLoading ? (
+                          <span className="flex items-center justify-center gap-2">
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            <span>Salvataggio...</span>
+                          </span>
+                        ) : (
+                          <span>Reimposta Password</span>
+                        )}
+                      </Button>
+                    </form>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              <div className="mt-6 text-center">
+                <Link 
+                  href="/login" 
+                  className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                  data-testid="link-login"
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                  <span>Torna al login</span>
+                </Link>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
     );

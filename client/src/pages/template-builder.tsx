@@ -3,6 +3,7 @@ import { useParams, useLocation } from 'wouter';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
 import { useAuth } from '@/hooks/useAuth';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -18,8 +19,9 @@ import {
   AlignLeft, AlignCenter, AlignRight, 
   GripVertical, Settings2, Layers,
   ZoomIn, ZoomOut, RotateCw, RotateCcw, Shield, Printer,
-  Minus, Square, Scissors
+  Minus, Square, Scissors, Monitor
 } from 'lucide-react';
+import { MobileAppLayout, MobileHeader } from '@/components/mobile-primitives';
 import type { TicketTemplate, TicketTemplateElement } from '@shared/schema';
 
 // Element types available in the toolbox - SIAE compliant fields
@@ -109,6 +111,7 @@ export default function TemplateBuilder() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const { user } = useAuth();
+  const isMobile = useIsMobile();
   const queryClient = useQueryClient();
   const canvasRef = useRef<HTMLDivElement>(null);
   const isSuperAdmin = user?.role === 'super_admin';
@@ -437,10 +440,13 @@ export default function TemplateBuilder() {
     );
   }
 
-  return (
-    <div className="h-full flex flex-col">
-      {/* Header */}
-      <div className="border-b p-2 sm:p-3 md:p-4 flex flex-wrap items-center justify-between gap-2 sm:gap-4 bg-card">
+  // Desktop version
+  if (!isMobile) {
+    return (
+      <div className="container mx-auto p-6 h-full" data-testid="page-template-builder-desktop">
+        <div className="h-full flex flex-col">
+          {/* Header */}
+          <div className="border-b p-2 sm:p-3 md:p-4 flex flex-wrap items-center justify-between gap-2 sm:gap-4 bg-card rounded-t-lg">
         <div className="flex items-center gap-2 sm:gap-4">
           <Button variant="ghost" size="icon" onClick={() => navigate('/printer-settings')} data-testid="button-back">
             <ArrowLeft className="h-5 w-5" />
@@ -1034,66 +1040,98 @@ export default function TemplateBuilder() {
         </div>
       </div>
 
-      <Dialog open={showTestPrintDialog} onOpenChange={setShowTestPrintDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Prova di Stampa</DialogTitle>
-            <DialogDescription>
-              Seleziona un agente di stampa connesso per inviare una stampa di prova con dati di esempio.
-            </DialogDescription>
-          </DialogHeader>
-          
-          {agentsLoading ? (
-            <div className="flex justify-center py-4">
-              <div className="animate-spin w-6 h-6 border-2 border-primary border-t-transparent rounded-full" />
-            </div>
-          ) : connectedAgents.length === 0 ? (
-            <div className="text-center py-4 text-muted-foreground">
-              <Printer className="h-12 w-12 mx-auto mb-2 opacity-50" />
-              <p>Nessun agente di stampa connesso.</p>
-              <p className="text-sm">Avvia l'app desktop Event4U su un computer con stampante.</p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label>Seleziona Agente</Label>
-                <Select value={selectedAgentId} onValueChange={setSelectedAgentId}>
-                  <SelectTrigger data-testid="select-agent-test-print">
-                    <SelectValue placeholder="Seleziona agente..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {connectedAgents.map((agent) => (
-                      <SelectItem key={agent.agentId} value={agent.agentId}>
-                        {agent.deviceName}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+          <Dialog open={showTestPrintDialog} onOpenChange={setShowTestPrintDialog}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Prova di Stampa</DialogTitle>
+                <DialogDescription>
+                  Seleziona un agente di stampa connesso per inviare una stampa di prova con dati di esempio.
+                </DialogDescription>
+              </DialogHeader>
               
-              <p className="text-sm text-muted-foreground">
-                La stampa userà le dimensioni del template: {paperWidth}mm × {paperHeight}mm
-              </p>
-            </div>
-          )}
-          
-          <DialogFooter>
-            <Button variant="outline" onClick={() => {
-              setShowTestPrintDialog(false);
-              setSelectedAgentId('');
-            }} data-testid="button-cancel-test-print">
-              Annulla
-            </Button>
-            <Button 
-              onClick={() => selectedAgentId && testPrintMutation.mutate({ agentId: selectedAgentId })}
-              disabled={!selectedAgentId || testPrintMutation.isPending || connectedAgents.length === 0}
-              data-testid="button-confirm-test-print"
-            >
-              {testPrintMutation.isPending ? 'Invio...' : 'Stampa Prova'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
+              {agentsLoading ? (
+                <div className="flex justify-center py-4">
+                  <div className="animate-spin w-6 h-6 border-2 border-primary border-t-transparent rounded-full" />
+                </div>
+              ) : connectedAgents.length === 0 ? (
+                <div className="text-center py-4 text-muted-foreground">
+                  <Printer className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                  <p>Nessun agente di stampa connesso.</p>
+                  <p className="text-sm">Avvia l'app desktop Event4U su un computer con stampante.</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label>Seleziona Agente</Label>
+                    <Select value={selectedAgentId} onValueChange={setSelectedAgentId}>
+                      <SelectTrigger data-testid="select-agent-test-print">
+                        <SelectValue placeholder="Seleziona agente..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {connectedAgents.map((agent) => (
+                          <SelectItem key={agent.agentId} value={agent.agentId}>
+                            {agent.deviceName}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <p className="text-sm text-muted-foreground">
+                    La stampa userà le dimensioni del template: {paperWidth}mm × {paperHeight}mm
+                  </p>
+                </div>
+              )}
+              
+              <DialogFooter>
+                <Button variant="outline" onClick={() => {
+                  setShowTestPrintDialog(false);
+                  setSelectedAgentId('');
+                }} data-testid="button-cancel-test-print">
+                  Annulla
+                </Button>
+                <Button 
+                  onClick={() => selectedAgentId && testPrintMutation.mutate({ agentId: selectedAgentId })}
+                  disabled={!selectedAgentId || testPrintMutation.isPending || connectedAgents.length === 0}
+                  data-testid="button-confirm-test-print"
+                >
+                  {testPrintMutation.isPending ? 'Invio...' : 'Stampa Prova'}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
+      </div>
+    );
+  }
+
+  // Mobile version - editor not available on mobile
+  return (
+    <MobileAppLayout
+      header={
+        <MobileHeader
+          title="Template Builder"
+          showBackButton
+          onBack={() => navigate('/printer-settings')}
+        />
+      }
+    >
+      <div className="flex flex-col items-center justify-center h-full gap-6 p-6 text-center" data-testid="page-template-builder-mobile">
+        <div className="w-20 h-20 rounded-full bg-muted flex items-center justify-center">
+          <Monitor className="h-10 w-10 text-muted-foreground" />
+        </div>
+        <div className="space-y-2">
+          <h2 className="text-xl font-semibold">Editor disponibile solo su Desktop</h2>
+          <p className="text-muted-foreground max-w-sm">
+            L'editor di template richiede uno schermo più grande per l'editing drag-and-drop. 
+            Apri questa pagina da un computer per modificare i template.
+          </p>
+        </div>
+        <Button variant="outline" onClick={() => navigate('/printer-settings')} data-testid="button-back-mobile">
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Torna alle Impostazioni
+        </Button>
+      </div>
+    </MobileAppLayout>
   );
 }

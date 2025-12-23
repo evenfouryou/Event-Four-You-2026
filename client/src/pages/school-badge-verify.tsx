@@ -17,6 +17,8 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { motion } from "framer-motion";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { MobileAppLayout, MobileHeader } from "@/components/mobile-primitives";
 
 interface VerificationResult {
   success: boolean;
@@ -40,6 +42,7 @@ export default function SchoolBadgeVerify() {
   const [, setLocation] = useLocation();
   const [isLoading, setIsLoading] = useState(true);
   const [result, setResult] = useState<VerificationResult | null>(null);
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     const verifyToken = async () => {
@@ -67,141 +70,274 @@ export default function SchoolBadgeVerify() {
     verifyToken();
   }, []);
 
+  const badge = result?.badge;
+  const primaryColor = badge?.request?.landing?.primaryColor || "#3b82f6";
+
+  if (!isMobile) {
+    return (
+      <div className="container mx-auto p-6 flex items-center justify-center min-h-screen" data-testid="page-school-badge-verify-desktop">
+        {isLoading ? (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+          >
+            <Card className="w-full max-w-md text-center">
+              <CardHeader>
+                <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-4">
+                  <Loader2 className="h-8 w-8 text-primary animate-spin" />
+                </div>
+                <CardTitle className="text-2xl">Verifica in corso...</CardTitle>
+                <CardDescription>
+                  Stiamo verificando il tuo indirizzo email
+                </CardDescription>
+              </CardHeader>
+            </Card>
+          </motion.div>
+        ) : !result?.success ? (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+          >
+            <Card className="w-full max-w-md text-center" data-testid="card-verify-error">
+              <CardHeader>
+                <div className="w-16 h-16 rounded-2xl bg-destructive/10 flex items-center justify-center mx-auto mb-4">
+                  <XCircle className="h-8 w-8 text-destructive" />
+                </div>
+                <CardTitle className="text-2xl">Verifica fallita</CardTitle>
+                <CardDescription data-testid="text-error-message">
+                  {result?.message || "Il link di verifica non è valido o è scaduto."}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Button variant="outline" onClick={() => setLocation("/")}>
+                  Torna alla home
+                </Button>
+              </CardContent>
+            </Card>
+          </motion.div>
+        ) : (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="w-full max-w-md"
+          >
+            <Card className="text-center" data-testid="card-verify-success">
+              <CardHeader>
+                <div 
+                  className="w-20 h-20 rounded-2xl flex items-center justify-center mx-auto mb-4"
+                  style={{ backgroundColor: primaryColor }}
+                >
+                  <CheckCircle2 className="h-10 w-10 text-white" />
+                </div>
+                <CardTitle className="text-2xl">Email verificata</CardTitle>
+                <CardDescription>
+                  Il tuo badge è stato generato con successo!
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {badge?.badgeImageUrl && (
+                  <div className="flex justify-center">
+                    <img 
+                      src={badge.badgeImageUrl} 
+                      alt="Badge" 
+                      className="w-48 h-auto rounded-xl shadow-lg"
+                      data-testid="img-badge-preview"
+                    />
+                  </div>
+                )}
+                
+                <div className="p-4 rounded-xl bg-muted/50">
+                  <p className="text-sm text-muted-foreground mb-1">Titolare del badge</p>
+                  <p className="text-lg font-semibold" data-testid="text-badge-holder">
+                    {badge?.request?.firstName} {badge?.request?.lastName}
+                  </p>
+                  {badge?.request?.landing?.schoolName && (
+                    <>
+                      <p className="text-sm text-muted-foreground mt-3 mb-1">Scuola</p>
+                      <p className="font-medium" data-testid="text-school-name">
+                        {badge.request.landing.schoolName}
+                      </p>
+                    </>
+                  )}
+                </div>
+
+                {badge?.qrCodeUrl && (
+                  <div className="flex justify-center">
+                    <img 
+                      src={badge.qrCodeUrl} 
+                      alt="QR Code" 
+                      className="w-32 h-32 rounded-lg"
+                      data-testid="img-qr-code"
+                    />
+                  </div>
+                )}
+
+                <div className="flex flex-col gap-2">
+                  <Button 
+                    onClick={() => setLocation(`/badge/view/${badge?.uniqueCode}`)}
+                    style={{ backgroundColor: primaryColor }}
+                    data-testid="button-view-badge"
+                  >
+                    <Award className="h-4 w-4 mr-2" />
+                    Visualizza Badge
+                  </Button>
+                  {badge?.uniqueCode && (
+                    <Button 
+                      variant="outline"
+                      onClick={() => window.open(`/badge/view/${badge.uniqueCode}`, "_blank")}
+                      data-testid="button-open-badge"
+                    >
+                      <ExternalLink className="h-4 w-4 mr-2" />
+                      Apri in nuova finestra
+                    </Button>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
+      </div>
+    );
+  }
+
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-3 sm:p-4 md:p-6 bg-background">
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-        >
-          <Card className="w-full max-w-md text-center">
-            <CardHeader>
-              <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-3 sm:mb-4">
-                <Loader2 className="h-7 w-7 sm:h-8 sm:w-8 text-primary animate-spin" />
-              </div>
-              <CardTitle className="text-lg sm:text-xl md:text-2xl">Verifica in corso...</CardTitle>
-              <CardDescription className="text-sm sm:text-base">
-                Stiamo verificando il tuo indirizzo email
-              </CardDescription>
-            </CardHeader>
-          </Card>
-        </motion.div>
-      </div>
+      <MobileAppLayout>
+        <div className="min-h-screen flex items-center justify-center p-3 bg-background">
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+          >
+            <Card className="w-full max-w-md text-center">
+              <CardHeader>
+                <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-3">
+                  <Loader2 className="h-7 w-7 text-primary animate-spin" />
+                </div>
+                <CardTitle className="text-lg">Verifica in corso...</CardTitle>
+                <CardDescription className="text-sm">
+                  Stiamo verificando il tuo indirizzo email
+                </CardDescription>
+              </CardHeader>
+            </Card>
+          </motion.div>
+        </div>
+      </MobileAppLayout>
     );
   }
 
   if (!result?.success) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-3 sm:p-4 md:p-6 bg-background">
+      <MobileAppLayout>
+        <div className="min-h-screen flex items-center justify-center p-3 bg-background">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+          >
+            <Card className="w-full max-w-md text-center" data-testid="card-verify-error">
+              <CardHeader>
+                <div className="w-14 h-14 rounded-2xl bg-destructive/10 flex items-center justify-center mx-auto mb-3">
+                  <XCircle className="h-7 w-7 text-destructive" />
+                </div>
+                <CardTitle className="text-lg">Verifica fallita</CardTitle>
+                <CardDescription className="text-sm" data-testid="text-error-message">
+                  {result?.message || "Il link di verifica non è valido o è scaduto."}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Button variant="outline" className="w-full" onClick={() => setLocation("/")}>
+                  Torna alla home
+                </Button>
+              </CardContent>
+            </Card>
+          </motion.div>
+        </div>
+      </MobileAppLayout>
+    );
+  }
+
+  return (
+    <MobileAppLayout>
+      <div className="min-h-screen flex items-center justify-center p-4 bg-background">
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
+          className="w-full max-w-md"
         >
-          <Card className="w-full max-w-md text-center" data-testid="card-verify-error">
+          <Card className="glass-card text-center" data-testid="card-verify-success">
             <CardHeader>
-              <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-destructive/10 flex items-center justify-center mx-auto mb-3 sm:mb-4">
-                <XCircle className="h-7 w-7 sm:h-8 sm:w-8 text-destructive" />
+              <div 
+                className="w-20 h-20 rounded-2xl flex items-center justify-center mx-auto mb-4"
+                style={{ backgroundColor: primaryColor }}
+              >
+                <CheckCircle2 className="h-10 w-10 text-white" />
               </div>
-              <CardTitle className="text-lg sm:text-xl md:text-2xl">Verifica fallita</CardTitle>
-              <CardDescription className="text-sm sm:text-base" data-testid="text-error-message">
-                {result?.message || "Il link di verifica non è valido o è scaduto."}
+              <CardTitle className="text-2xl">Email verificata</CardTitle>
+              <CardDescription>
+                Il tuo badge è stato generato con successo!
               </CardDescription>
             </CardHeader>
-            <CardContent>
-              <Button variant="outline" className="w-full sm:w-auto" onClick={() => setLocation("/")}>
-                Torna alla home
-              </Button>
+            <CardContent className="space-y-6">
+              {badge?.badgeImageUrl && (
+                <div className="flex justify-center">
+                  <img 
+                    src={badge.badgeImageUrl} 
+                    alt="Badge" 
+                    className="w-48 h-auto rounded-xl shadow-lg"
+                    data-testid="img-badge-preview"
+                  />
+                </div>
+              )}
+              
+              <div className="p-4 rounded-xl bg-muted/50">
+                <p className="text-sm text-muted-foreground mb-1">Titolare del badge</p>
+                <p className="text-lg font-semibold" data-testid="text-badge-holder">
+                  {badge?.request?.firstName} {badge?.request?.lastName}
+                </p>
+                {badge?.request?.landing?.schoolName && (
+                  <>
+                    <p className="text-sm text-muted-foreground mt-3 mb-1">Scuola</p>
+                    <p className="font-medium" data-testid="text-school-name">
+                      {badge.request.landing.schoolName}
+                    </p>
+                  </>
+                )}
+              </div>
+
+              {badge?.qrCodeUrl && (
+                <div className="flex justify-center">
+                  <img 
+                    src={badge.qrCodeUrl} 
+                    alt="QR Code" 
+                    className="w-32 h-32 rounded-lg"
+                    data-testid="img-qr-code"
+                  />
+                </div>
+              )}
+
+              <div className="flex flex-col gap-2">
+                <Button 
+                  onClick={() => setLocation(`/badge/view/${badge?.uniqueCode}`)}
+                  style={{ backgroundColor: primaryColor }}
+                  data-testid="button-view-badge"
+                >
+                  <Award className="h-4 w-4 mr-2" />
+                  Visualizza Badge
+                </Button>
+                {badge?.uniqueCode && (
+                  <Button 
+                    variant="outline"
+                    onClick={() => window.open(`/badge/view/${badge.uniqueCode}`, "_blank")}
+                    data-testid="button-open-badge"
+                  >
+                    <ExternalLink className="h-4 w-4 mr-2" />
+                    Apri in nuova finestra
+                  </Button>
+                )}
+              </div>
             </CardContent>
           </Card>
         </motion.div>
       </div>
-    );
-  }
-
-  const badge = result.badge;
-  const primaryColor = badge?.request?.landing?.primaryColor || "#3b82f6";
-
-  return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-background">
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className="w-full max-w-md"
-      >
-        <Card className="glass-card text-center" data-testid="card-verify-success">
-          <CardHeader>
-            <div 
-              className="w-20 h-20 rounded-2xl flex items-center justify-center mx-auto mb-4"
-              style={{ backgroundColor: primaryColor }}
-            >
-              <CheckCircle2 className="h-10 w-10 text-white" />
-            </div>
-            <CardTitle className="text-2xl">Email verificata</CardTitle>
-            <CardDescription>
-              Il tuo badge è stato generato con successo!
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {badge?.badgeImageUrl && (
-              <div className="flex justify-center">
-                <img 
-                  src={badge.badgeImageUrl} 
-                  alt="Badge" 
-                  className="w-48 h-auto rounded-xl shadow-lg"
-                  data-testid="img-badge-preview"
-                />
-              </div>
-            )}
-            
-            <div className="p-4 rounded-xl bg-muted/50">
-              <p className="text-sm text-muted-foreground mb-1">Titolare del badge</p>
-              <p className="text-lg font-semibold" data-testid="text-badge-holder">
-                {badge?.request?.firstName} {badge?.request?.lastName}
-              </p>
-              {badge?.request?.landing?.schoolName && (
-                <>
-                  <p className="text-sm text-muted-foreground mt-3 mb-1">Scuola</p>
-                  <p className="font-medium" data-testid="text-school-name">
-                    {badge.request.landing.schoolName}
-                  </p>
-                </>
-              )}
-            </div>
-
-            {badge?.qrCodeUrl && (
-              <div className="flex justify-center">
-                <img 
-                  src={badge.qrCodeUrl} 
-                  alt="QR Code" 
-                  className="w-32 h-32 rounded-lg"
-                  data-testid="img-qr-code"
-                />
-              </div>
-            )}
-
-            <div className="flex flex-col gap-2">
-              <Button 
-                onClick={() => setLocation(`/badge/view/${badge?.uniqueCode}`)}
-                style={{ backgroundColor: primaryColor }}
-                data-testid="button-view-badge"
-              >
-                <Award className="h-4 w-4 mr-2" />
-                Visualizza Badge
-              </Button>
-              {badge?.uniqueCode && (
-                <Button 
-                  variant="outline"
-                  onClick={() => window.open(`/badge/view/${badge.uniqueCode}`, "_blank")}
-                  data-testid="button-open-badge"
-                >
-                  <ExternalLink className="h-4 w-4 mr-2" />
-                  Apri in nuova finestra
-                </Button>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      </motion.div>
-    </div>
+    </MobileAppLayout>
   );
 }
