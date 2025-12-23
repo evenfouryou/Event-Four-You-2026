@@ -558,6 +558,77 @@ async function handleWebSocketMessage(ws, msg) {
       sendResponse('status', { data: currentStatus });
       break;
 
+    case 'verifyPin':
+      try {
+        const pin = msg.data?.pin || '';
+        const result = await sendBridgeCommand(`VERIFY_PIN:${pin}`);
+        if (result.verified) {
+          pinVerified = true;
+          pinLocked = false;
+          lastVerifiedPin = pin;
+          updateStatus({ pinLocked: false, pinRequired: false });
+          sendResponse('pinVerifyResponse', { success: true, verified: true });
+        } else {
+          const errorCode = result.errorCode;
+          let retriesRemaining = null;
+          if (errorCode >= 0x63C0 && errorCode <= 0x63CF) {
+            retriesRemaining = errorCode & 0x0F;
+          }
+          sendResponse('pinVerifyResponse', { success: true, verified: false, error: result.error, errorCode, retriesRemaining });
+        }
+      } catch (err) {
+        sendResponse('pinVerifyResponse', { success: false, error: err.message });
+      }
+      break;
+
+    case 'changePin':
+      try {
+        const oldPin = msg.data?.oldPin || '';
+        const newPin = msg.data?.newPin || '';
+        const result = await sendBridgeCommand(`CHANGE_PIN:${oldPin},${newPin}`);
+        if (result.changed) {
+          if (lastVerifiedPin === oldPin) lastVerifiedPin = newPin;
+          sendResponse('pinChangeResponse', { success: true, changed: true, message: result.message });
+        } else {
+          sendResponse('pinChangeResponse', { success: true, changed: false, error: result.error, errorCode: result.errorCode });
+        }
+      } catch (err) {
+        sendResponse('pinChangeResponse', { success: false, error: err.message });
+      }
+      break;
+
+    case 'unlockWithPuk':
+      try {
+        const puk = msg.data?.puk || '';
+        const newPin = msg.data?.newPin || '';
+        const result = await sendBridgeCommand(`UNLOCK_PUK:${puk},${newPin}`);
+        if (result.unlocked) {
+          lastVerifiedPin = newPin;
+          pinVerified = true;
+          pinLocked = false;
+          updateStatus({ pinLocked: false, pinRequired: false });
+          sendResponse('pukUnlockResponse', { success: true, unlocked: true, message: result.message });
+        } else {
+          sendResponse('pukUnlockResponse', { success: true, unlocked: false, error: result.error, errorCode: result.errorCode });
+        }
+      } catch (err) {
+        sendResponse('pukUnlockResponse', { success: false, error: err.message });
+      }
+      break;
+
+    case 'getRetriesStatus':
+      try {
+        const result = await sendBridgeCommand('GET_RETRIES');
+        if (result.success) {
+          sendResponse('retriesStatusResponse', { success: true, pinRetries: result.pinRetries, pukRetries: result.pukRetries, message: result.message });
+        } else {
+          sendResponse('retriesStatusResponse', { success: false, error: result.error });
+        }
+      } catch (err) {
+        sendResponse('retriesStatusResponse', { success: false, error: err.message });
+      }
+      break;
+
     default:
       log.warn('Unknown WS message type:', msg.type);
   }
@@ -1199,6 +1270,115 @@ async function handleRelayCommand(msg) {
         }
       }
       break;
+    
+    case 'verifyPin':
+      // PIN verification from web client
+      try {
+        const pin = msg.data?.pin || '';
+        log.info('[PIN] Verify PIN request from web');
+        const result = await sendBridgeCommand(`VERIFY_PIN:${pin}`);
+        
+        if (result.verified) {
+          pinVerified = true;
+          pinLocked = false;
+          lastVerifiedPin = pin;
+          updateStatus({ pinLocked: false, pinRequired: false });
+          sendRelayResponse('pinVerifyResponse', { success: true, verified: true });
+        } else {
+          // Extract retries from error code if available (0x63CX format)
+          const errorCode = result.errorCode;
+          let retriesRemaining = null;
+          if (errorCode >= 0x63C0 && errorCode <= 0x63CF) {
+            retriesRemaining = errorCode & 0x0F;
+          }
+          sendRelayResponse('pinVerifyResponse', { 
+            success: true, 
+            verified: false, 
+            error: result.error,
+            errorCode: errorCode,
+            retriesRemaining: retriesRemaining
+          });
+        }
+      } catch (err) {
+        sendRelayResponse('pinVerifyResponse', { success: false, error: err.message });
+      }
+      break;
+    
+    case 'changePin':
+      // Change PIN from web client
+      try {
+        const oldPin = msg.data?.oldPin || '';
+        const newPin = msg.data?.newPin || '';
+        log.info('[PIN] Change PIN request from web');
+        const result = await sendBridgeCommand(`CHANGE_PIN:${oldPin},${newPin}`);
+        
+        if (result.changed) {
+          // Update stored PIN
+          if (lastVerifiedPin === oldPin) {
+            lastVerifiedPin = newPin;
+          }
+          sendRelayResponse('pinChangeResponse', { success: true, changed: true, message: result.message });
+        } else {
+          sendRelayResponse('pinChangeResponse', { 
+            success: true, 
+            changed: false, 
+            error: result.error,
+            errorCode: result.errorCode
+          });
+        }
+      } catch (err) {
+        sendRelayResponse('pinChangeResponse', { success: false, error: err.message });
+      }
+      break;
+    
+    case 'unlockWithPuk':
+      // Unlock with PUK from web client
+      try {
+        const puk = msg.data?.puk || '';
+        const newPin = msg.data?.newPin || '';
+        log.info('[PIN] Unlock with PUK request from web');
+        const result = await sendBridgeCommand(`UNLOCK_PUK:${puk},${newPin}`);
+        
+        if (result.unlocked) {
+          // Card is unlocked, PIN is now the new one
+          lastVerifiedPin = newPin;
+          pinVerified = true;
+          pinLocked = false;
+          updateStatus({ pinLocked: false, pinRequired: false });
+          sendRelayResponse('pukUnlockResponse', { success: true, unlocked: true, message: result.message });
+        } else {
+          sendRelayResponse('pukUnlockResponse', { 
+            success: true, 
+            unlocked: false, 
+            error: result.error,
+            errorCode: result.errorCode
+          });
+        }
+      } catch (err) {
+        sendRelayResponse('pukUnlockResponse', { success: false, error: err.message });
+      }
+      break;
+    
+    case 'getRetriesStatus':
+      // Get PIN/PUK retries from web client
+      try {
+        log.info('[PIN] Get retries status request from web');
+        const result = await sendBridgeCommand('GET_RETRIES');
+        
+        if (result.success) {
+          sendRelayResponse('retriesStatusResponse', { 
+            success: true, 
+            pinRetries: result.pinRetries,
+            pukRetries: result.pukRetries,
+            message: result.message
+          });
+        } else {
+          sendRelayResponse('retriesStatusResponse', { success: false, error: result.error });
+        }
+      } catch (err) {
+        sendRelayResponse('retriesStatusResponse', { success: false, error: err.message });
+      }
+      break;
       
     default:
       log.warn('Unknown relay command:', msg.type);
@@ -1481,6 +1661,64 @@ ipcMain.handle('pin:setPin', (event, newPin) => {
   // For now, we just log the change
   log.info('SIAE: PIN aggiornato');
   return { success: true, message: 'PIN aggiornato' };
+});
+
+ipcMain.handle('pin:changePin', async (event, { oldPin, newPin }) => {
+  log.info('IPC: pin:changePin');
+  try {
+    const result = await sendBridgeCommand(`CHANGE_PIN:${oldPin},${newPin}`);
+    log.info('PIN change result:', result);
+    
+    if (result.changed) {
+      if (lastVerifiedPin === oldPin) {
+        lastVerifiedPin = newPin;
+      }
+      return { success: true, changed: true, message: result.message };
+    } else {
+      return { success: false, changed: false, error: result.error, errorCode: result.errorCode };
+    }
+  } catch (err) {
+    log.error('PIN change error:', err.message);
+    return { success: false, error: 'Errore cambio PIN: ' + err.message };
+  }
+});
+
+ipcMain.handle('pin:unlockWithPuk', async (event, { puk, newPin }) => {
+  log.info('IPC: pin:unlockWithPuk');
+  try {
+    const result = await sendBridgeCommand(`UNLOCK_PUK:${puk},${newPin}`);
+    log.info('PUK unlock result:', result);
+    
+    if (result.unlocked) {
+      lastVerifiedPin = newPin;
+      pinVerified = true;
+      pinLocked = false;
+      updateStatus({ pinLocked: false, pinRequired: false });
+      return { success: true, unlocked: true, message: result.message };
+    } else {
+      return { success: false, unlocked: false, error: result.error, errorCode: result.errorCode };
+    }
+  } catch (err) {
+    log.error('PUK unlock error:', err.message);
+    return { success: false, error: 'Errore sblocco PUK: ' + err.message };
+  }
+});
+
+ipcMain.handle('pin:getRetries', async () => {
+  log.info('IPC: pin:getRetries');
+  try {
+    const result = await sendBridgeCommand('GET_RETRIES');
+    log.info('Get retries result:', result);
+    
+    if (result.success) {
+      return { success: true, pinRetries: result.pinRetries, pukRetries: result.pukRetries };
+    } else {
+      return { success: false, error: result.error };
+    }
+  } catch (err) {
+    log.error('Get retries error:', err.message);
+    return { success: false, error: 'Errore lettura tentativi: ' + err.message };
+  }
 });
 
 // App lifecycle

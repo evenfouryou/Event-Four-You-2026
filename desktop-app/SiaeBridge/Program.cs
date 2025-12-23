@@ -164,7 +164,10 @@ namespace SiaeBridge
                 if (cmd == "EXIT") { Environment.Exit(0); return OK("BYE"); }
                 if (cmd == "CHECK_READER") return CheckReader();
                 if (cmd == "READ_CARD") return ReadCard();
+                if (cmd == "GET_RETRIES") return GetRetries();
                 if (cmd.StartsWith("VERIFY_PIN:")) return VerifyPin(cmd.Substring(11));
+                if (cmd.StartsWith("CHANGE_PIN:")) return ChangePin(cmd.Substring(11));
+                if (cmd.StartsWith("UNLOCK_PUK:")) return UnlockPuk(cmd.Substring(11));
                 if (cmd.StartsWith("COMPUTE_SIGILLO:")) return ComputeSigillo(cmd.Substring(16));
                 return ERR($"Comando sconosciuto: {cmd}");
             }
@@ -531,6 +534,291 @@ namespace SiaeBridge
             catch (Exception ex)
             {
                 Log($"VerifyPin error: {ex.Message}");
+                return ERR(ex.Message);
+            }
+            finally
+            {
+                if (tx)
+                {
+                    try
+                    {
+                        EndTransactionML(_slot);
+                        Log("  EndTransactionML done");
+                    }
+                    catch { }
+                }
+            }
+        }
+
+        // ============================================================
+        // CHANGE PIN - Cambio PIN della carta SIAE
+        // ============================================================
+        static string ChangePin(string args)
+        {
+            if (_slot < 0) return ERR("Nessuna carta rilevata - prima fai CHECK_READER");
+
+            // Formato: oldPin,newPin
+            var parts = args.Split(',');
+            if (parts.Length != 2)
+            {
+                return ERR("Formato: CHANGE_PIN:oldPin,newPin");
+            }
+
+            string oldPin = new string(parts[0].Where(char.IsDigit).ToArray());
+            string newPin = new string(parts[1].Where(char.IsDigit).ToArray());
+
+            if (oldPin.Length < 4 || oldPin.Length > 8)
+            {
+                return ERR("PIN attuale non valido - deve essere 4-8 cifre");
+            }
+            if (newPin.Length < 4 || newPin.Length > 8)
+            {
+                return ERR("Nuovo PIN non valido - deve essere 4-8 cifre");
+            }
+
+            bool tx = false;
+            try
+            {
+                Log($"ChangePin: slot={_slot}, oldPin=****, newPin=****");
+
+                int state = isCardIn(_slot);
+                if (!IsCardPresent(state))
+                {
+                    _slot = -1;
+                    return ERR("Carta rimossa");
+                }
+
+                int finRes = FinalizeML(_slot);
+                Log($"  FinalizeML = {finRes}");
+                
+                int init = Initialize(_slot);
+                Log($"  Initialize = {init}");
+
+                int txResult = BeginTransactionML(_slot);
+                Log($"  BeginTransactionML = {txResult}");
+                tx = (txResult == 0);
+
+                // Seleziona root e DF Sigilli
+                int sel0000 = LibSiae.SelectML(0x0000, _slot);
+                Log($"  SelectML(0x0000) = {sel0000}");
+                
+                int sel1112 = LibSiae.SelectML(0x1112, _slot);
+                Log($"  SelectML(0x1112) = {sel1112}");
+
+                // Cambio PIN
+                int result = LibSiae.ChangePINML(1, oldPin, newPin, _slot);
+                Log($"  ChangePINML(nPIN=1) = {result} (0x{result:X4})");
+
+                if (result == 0)
+                {
+                    return JsonConvert.SerializeObject(new
+                    {
+                        success = true,
+                        changed = true,
+                        message = "PIN cambiato con successo"
+                    });
+                }
+                else if (result == 0x6982 || result == 0x6983)
+                {
+                    return JsonConvert.SerializeObject(new
+                    {
+                        success = true,
+                        changed = false,
+                        error = result == 0x6983 ? "PIN bloccato" : "PIN attuale errato",
+                        errorCode = result
+                    });
+                }
+                else
+                {
+                    return JsonConvert.SerializeObject(new
+                    {
+                        success = true,
+                        changed = false,
+                        error = $"Errore cambio PIN: 0x{result:X4}",
+                        errorCode = result
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                Log($"ChangePin error: {ex.Message}");
+                return ERR(ex.Message);
+            }
+            finally
+            {
+                if (tx)
+                {
+                    try
+                    {
+                        EndTransactionML(_slot);
+                        Log("  EndTransactionML done");
+                    }
+                    catch { }
+                }
+            }
+        }
+
+        // ============================================================
+        // UNLOCK PUK - Sblocco carta con PUK
+        // ============================================================
+        static string UnlockPuk(string args)
+        {
+            if (_slot < 0) return ERR("Nessuna carta rilevata - prima fai CHECK_READER");
+
+            // Formato: puk,newPin
+            var parts = args.Split(',');
+            if (parts.Length != 2)
+            {
+                return ERR("Formato: UNLOCK_PUK:puk,newPin");
+            }
+
+            string puk = new string(parts[0].Where(char.IsDigit).ToArray());
+            string newPin = new string(parts[1].Where(char.IsDigit).ToArray());
+
+            if (puk.Length != 8)
+            {
+                return ERR("PUK non valido - deve essere esattamente 8 cifre");
+            }
+            if (newPin.Length < 4 || newPin.Length > 8)
+            {
+                return ERR("Nuovo PIN non valido - deve essere 4-8 cifre");
+            }
+
+            bool tx = false;
+            try
+            {
+                Log($"UnlockPuk: slot={_slot}, puk=********, newPin=****");
+
+                int state = isCardIn(_slot);
+                if (!IsCardPresent(state))
+                {
+                    _slot = -1;
+                    return ERR("Carta rimossa");
+                }
+
+                int finRes = FinalizeML(_slot);
+                Log($"  FinalizeML = {finRes}");
+                
+                int init = Initialize(_slot);
+                Log($"  Initialize = {init}");
+
+                int txResult = BeginTransactionML(_slot);
+                Log($"  BeginTransactionML = {txResult}");
+                tx = (txResult == 0);
+
+                // Seleziona root e DF Sigilli
+                int sel0000 = LibSiae.SelectML(0x0000, _slot);
+                Log($"  SelectML(0x0000) = {sel0000}");
+                
+                int sel1112 = LibSiae.SelectML(0x1112, _slot);
+                Log($"  SelectML(0x1112) = {sel1112}");
+
+                // Sblocco con PUK
+                int result = LibSiae.UnblockPINML(1, puk, newPin, _slot);
+                Log($"  UnblockPINML(nPIN=1) = {result} (0x{result:X4})");
+
+                if (result == 0)
+                {
+                    return JsonConvert.SerializeObject(new
+                    {
+                        success = true,
+                        unlocked = true,
+                        message = "Carta sbloccata con successo"
+                    });
+                }
+                else if (result == 0x6983)
+                {
+                    return JsonConvert.SerializeObject(new
+                    {
+                        success = true,
+                        unlocked = false,
+                        error = "PUK bloccato - carta non recuperabile",
+                        errorCode = result
+                    });
+                }
+                else if (result == 0x6982)
+                {
+                    return JsonConvert.SerializeObject(new
+                    {
+                        success = true,
+                        unlocked = false,
+                        error = "PUK errato",
+                        errorCode = result
+                    });
+                }
+                else
+                {
+                    return JsonConvert.SerializeObject(new
+                    {
+                        success = true,
+                        unlocked = false,
+                        error = $"Errore sblocco PUK: 0x{result:X4}",
+                        errorCode = result
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                Log($"UnlockPuk error: {ex.Message}");
+                return ERR(ex.Message);
+            }
+            finally
+            {
+                if (tx)
+                {
+                    try
+                    {
+                        EndTransactionML(_slot);
+                        Log("  EndTransactionML done");
+                    }
+                    catch { }
+                }
+            }
+        }
+
+        // ============================================================
+        // GET RETRIES - Ottieni tentativi PIN/PUK rimasti
+        // ============================================================
+        static string GetRetries()
+        {
+            if (_slot < 0) return ERR("Nessuna carta rilevata - prima fai CHECK_READER");
+
+            bool tx = false;
+            try
+            {
+                Log($"GetRetries: slot={_slot}");
+
+                int state = isCardIn(_slot);
+                if (!IsCardPresent(state))
+                {
+                    _slot = -1;
+                    return ERR("Carta rimossa");
+                }
+
+                int init = Initialize(_slot);
+                Log($"  Initialize = {init}");
+
+                int txResult = BeginTransactionML(_slot);
+                Log($"  BeginTransactionML = {txResult}");
+                tx = (txResult == 0);
+
+                // Le carte SIAE non hanno un comando diretto per leggere i tentativi rimasti.
+                // Il numero di tentativi viene restituito come parte del codice errore 0x63CX
+                // dove X è il numero di tentativi rimasti.
+                // Per ora, restituiamo valori default (3 per PIN, 10 per PUK tipicamente)
+                // In futuro si potrebbe provare a verificare un PIN vuoto per ottenere il counter.
+
+                return JsonConvert.SerializeObject(new
+                {
+                    success = true,
+                    pinRetries = 3,  // Valore default, non leggibile direttamente
+                    pukRetries = 10, // Valore default, non leggibile direttamente
+                    message = "Tentativi stimati (valori standard carte SIAE)"
+                });
+            }
+            catch (Exception ex)
+            {
+                Log($"GetRetries error: {ex.Message}");
                 return ERR(ex.Message);
             }
             finally
