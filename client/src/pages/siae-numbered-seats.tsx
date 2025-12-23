@@ -8,6 +8,7 @@ import { it } from "date-fns/locale";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { type SiaeNumberedSeat, type SiaeEventSector } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -84,6 +85,7 @@ type SeatFormData = z.infer<typeof seatFormSchema>;
 export default function SiaeNumberedSeatsPage() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const isMobile = useIsMobile();
   const [selectedSeat, setSelectedSeat] = useState<SiaeNumberedSeat | null>(null);
   const [selectedSectorId, setSelectedSectorId] = useState<string>("");
   const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
@@ -291,285 +293,8 @@ export default function SiaeNumberedSeatsPage() {
     updateSeatMutation.mutate(data);
   };
 
-  return (
-    <MobileAppLayout
-      header={<MobileHeader title="Posti Numerati" showBackButton showMenuButton showUserMenu />}
-      contentClassName="pb-24"
-    >
-      <div className="px-3 sm:px-4 md:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
-          <div>
-            <p className="text-xs sm:text-sm text-gray-400">Gestione posti a sedere per eventi</p>
-          </div>
-
-          <Button
-          onClick={() => setIsCreateDialogOpen(true)}
-          className="bg-amber-500 hover:bg-amber-600 text-black"
-          disabled={!selectedSectorId}
-          data-testid="button-create-seat"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Nuovo Posto
-        </Button>
-      </div>
-
-      <Card className="bg-[#151922] border-gray-800">
-        <CardContent className="p-4">
-          <div className="flex items-center gap-4">
-            <div className="flex-1 max-w-md">
-              <label className="text-sm text-gray-400 mb-2 block">Seleziona Settore</label>
-              <Select value={selectedSectorId} onValueChange={setSelectedSectorId}>
-                <SelectTrigger className="bg-[#0a0e17] border-gray-700" data-testid="select-sector">
-                  <SelectValue placeholder="Seleziona un settore..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {sectors?.map((sector) => (
-                    <SelectItem key={sector.id} value={sector.id}>
-                      {sector.name} ({sector.sectorCode})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {selectedSectorId && (
-        <>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 sm:gap-4">
-            <Card className="bg-[#151922] border-gray-800">
-              <CardContent className="p-3 sm:p-4">
-                <div className="flex items-center gap-2 sm:gap-3">
-                  <Armchair className="h-6 w-6 sm:h-8 sm:w-8 text-amber-400 flex-shrink-0" />
-                  <div>
-                    <p className="text-2xl font-bold text-white">{stats.total}</p>
-                    <p className="text-xs text-gray-400">Totale Posti</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-[#151922] border-gray-800">
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <CheckCircle2 className="h-8 w-8 text-emerald-400" />
-                  <div>
-                    <p className="text-2xl font-bold text-white">{stats.available}</p>
-                    <p className="text-xs text-gray-400">Disponibili</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-[#151922] border-gray-800">
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <ShoppingCart className="h-8 w-8 text-red-400" />
-                  <div>
-                    <p className="text-2xl font-bold text-white">{stats.sold}</p>
-                    <p className="text-xs text-gray-400">Venduti</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-[#151922] border-gray-800">
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <Lock className="h-8 w-8 text-amber-400" />
-                  <div>
-                    <p className="text-2xl font-bold text-white">{stats.reserved}</p>
-                    <p className="text-xs text-gray-400">Riservati</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-[#151922] border-gray-800">
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <AlertTriangle className="h-8 w-8 text-gray-400" />
-                  <div>
-                    <p className="text-2xl font-bold text-white">{stats.blocked}</p>
-                    <p className="text-xs text-gray-400">Bloccati</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          <Card className="bg-[#151922] border-gray-800">
-            <CardContent className="p-4">
-              <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
-                <div className="relative flex-1 max-w-md">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <Input
-                    placeholder="Cerca per fila o numero posto..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-10 bg-[#0a0e17] border-gray-700"
-                    data-testid="input-search-seats"
-                  />
-                </div>
-
-                <div className="flex gap-2 flex-wrap">
-                  <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger className="w-[150px] bg-[#0a0e17] border-gray-700" data-testid="select-status-filter">
-                      <SelectValue placeholder="Stato" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Tutti gli stati</SelectItem>
-                      <SelectItem value="available">Disponibile</SelectItem>
-                      <SelectItem value="sold">Venduto</SelectItem>
-                      <SelectItem value="reserved">Riservato</SelectItem>
-                      <SelectItem value="blocked">Bloccato</SelectItem>
-                    </SelectContent>
-                  </Select>
-
-                  <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                    <SelectTrigger className="w-[150px] bg-[#0a0e17] border-gray-700" data-testid="select-category-filter">
-                      <SelectValue placeholder="Categoria" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Tutte</SelectItem>
-                      <SelectItem value="standard">Standard</SelectItem>
-                      <SelectItem value="vip">VIP</SelectItem>
-                      <SelectItem value="premium">Premium</SelectItem>
-                      <SelectItem value="accessibility">Accessibilità</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-[#151922] border-gray-800">
-            <CardContent className="p-0">
-              <div className="overflow-x-auto">
-              {isLoading ? (
-                <div className="p-4 space-y-4">
-                  {[1, 2, 3, 4, 5].map((i) => (
-                    <Skeleton key={i} className="h-12" />
-                  ))}
-                </div>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow className="border-gray-800 hover:bg-transparent">
-                      <TableHead className="text-gray-400">Fila</TableHead>
-                      <TableHead className="text-gray-400">Posto</TableHead>
-                      <TableHead className="text-gray-400">Categoria</TableHead>
-                      <TableHead className="text-gray-400">Moltiplicatore</TableHead>
-                      <TableHead className="text-gray-400">Stato</TableHead>
-                      <TableHead className="text-gray-400">Posizione</TableHead>
-                      <TableHead className="text-gray-400 text-right">Azioni</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredSeats && filteredSeats.length > 0 ? (
-                      filteredSeats.map((seat) => (
-                        <TableRow
-                          key={seat.id}
-                          className="border-gray-800 hover:bg-gray-800/50"
-                          data-testid={`row-seat-${seat.id}`}
-                        >
-                          <TableCell className="text-white font-mono">
-                            <div className="flex items-center gap-2">
-                              <Hash className="h-4 w-4 text-gray-500" />
-                              {seat.rowNumber}
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-white font-mono font-bold">
-                            {seat.seatNumber}
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-2">
-                              {getCategoryIcon(seat.category)}
-                              {getCategoryBadge(seat.category)}
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-white">
-                            x{Number(seat.priceMultiplier || 1).toFixed(2)}
-                          </TableCell>
-                          <TableCell>
-                            {getStatusBadge(seat.status)}
-                          </TableCell>
-                          <TableCell className="text-gray-400 text-sm">
-                            {seat.xPosition && seat.yPosition ? (
-                              <div className="flex items-center gap-1">
-                                <MapPin className="h-3 w-3" />
-                                ({Number(seat.xPosition).toFixed(0)}, {Number(seat.yPosition).toFixed(0)})
-                              </div>
-                            ) : (
-                              "-"
-                            )}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex justify-end gap-1">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleViewDetails(seat)}
-                                data-testid={`button-view-seat-${seat.id}`}
-                              >
-                                <Eye className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleEdit(seat)}
-                                data-testid={`button-edit-seat-${seat.id}`}
-                              >
-                                <Pencil className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleDelete(seat)}
-                                className="text-red-400 hover:text-red-300"
-                                data-testid={`button-delete-seat-${seat.id}`}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    ) : (
-                      <TableRow>
-                        <TableCell colSpan={7} className="text-center py-12">
-                          <div className="flex flex-col items-center gap-2">
-                            <Armchair className="h-12 w-12 text-gray-600" />
-                            <p className="text-gray-400">Nessun posto trovato</p>
-                            <p className="text-sm text-gray-500">
-                              Crea nuovi posti per questo settore
-                            </p>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-              )}
-              </div>
-            </CardContent>
-          </Card>
-        </>
-      )}
-
-      {!selectedSectorId && (
-        <Card className="bg-[#151922] border-gray-800">
-          <CardContent className="p-12 text-center">
-            <Grid3X3 className="h-16 w-16 text-gray-600 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-white mb-2">Seleziona un Settore</h3>
-            <p className="text-gray-400">
-              Seleziona un settore per visualizzare e gestire i posti numerati
-            </p>
-          </CardContent>
-        </Card>
-      )}
-
+  const renderDialogs = () => (
+    <>
       <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
         <DialogContent className="max-w-md bg-[#151922] border-gray-800">
           <DialogHeader>
@@ -962,6 +687,563 @@ export default function SiaeNumberedSeatsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </>
+  );
+
+  // Desktop version
+  if (!isMobile) {
+    return (
+      <div className="container mx-auto p-6 space-y-6" data-testid="page-siae-numbered-seats">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">Posti Numerati</h1>
+            <p className="text-muted-foreground">Gestione posti a sedere per eventi</p>
+          </div>
+          <Button
+            onClick={() => setIsCreateDialogOpen(true)}
+            disabled={!selectedSectorId}
+            data-testid="button-create-seat"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Nuovo Posto
+          </Button>
+        </div>
+
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-4">
+              <div className="flex-1 max-w-md">
+                <label className="text-sm text-muted-foreground mb-2 block">Seleziona Settore</label>
+                <Select value={selectedSectorId} onValueChange={setSelectedSectorId}>
+                  <SelectTrigger data-testid="select-sector">
+                    <SelectValue placeholder="Seleziona un settore..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {sectors?.map((sector) => (
+                      <SelectItem key={sector.id} value={sector.id}>
+                        {sector.name} ({sector.sectorCode})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {selectedSectorId && (
+          <>
+            <div className="grid grid-cols-5 gap-4">
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex items-center gap-3">
+                    <Armchair className="h-8 w-8 text-amber-500" />
+                    <div>
+                      <div className="text-2xl font-bold">{stats.total}</div>
+                      <p className="text-sm text-muted-foreground">Totale Posti</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex items-center gap-3">
+                    <CheckCircle2 className="h-8 w-8 text-green-500" />
+                    <div>
+                      <div className="text-2xl font-bold text-green-500">{stats.available}</div>
+                      <p className="text-sm text-muted-foreground">Disponibili</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex items-center gap-3">
+                    <ShoppingCart className="h-8 w-8 text-red-500" />
+                    <div>
+                      <div className="text-2xl font-bold text-red-500">{stats.sold}</div>
+                      <p className="text-sm text-muted-foreground">Venduti</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex items-center gap-3">
+                    <Lock className="h-8 w-8 text-amber-500" />
+                    <div>
+                      <div className="text-2xl font-bold text-amber-500">{stats.reserved}</div>
+                      <p className="text-sm text-muted-foreground">Riservati</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex items-center gap-3">
+                    <AlertTriangle className="h-8 w-8 text-gray-500" />
+                    <div>
+                      <div className="text-2xl font-bold">{stats.blocked}</div>
+                      <p className="text-sm text-muted-foreground">Bloccati</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            <Card>
+              <CardContent className="pt-6">
+                <div className="flex gap-4 items-center justify-between">
+                  <div className="relative flex-1 max-w-md">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Cerca per fila o numero posto..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-10"
+                      data-testid="input-search-seats"
+                    />
+                  </div>
+
+                  <div className="flex gap-2">
+                    <Select value={statusFilter} onValueChange={setStatusFilter}>
+                      <SelectTrigger className="w-[150px]" data-testid="select-status-filter">
+                        <SelectValue placeholder="Stato" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Tutti gli stati</SelectItem>
+                        <SelectItem value="available">Disponibile</SelectItem>
+                        <SelectItem value="sold">Venduto</SelectItem>
+                        <SelectItem value="reserved">Riservato</SelectItem>
+                        <SelectItem value="blocked">Bloccato</SelectItem>
+                      </SelectContent>
+                    </Select>
+
+                    <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                      <SelectTrigger className="w-[150px]" data-testid="select-category-filter">
+                        <SelectValue placeholder="Categoria" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Tutte</SelectItem>
+                        <SelectItem value="standard">Standard</SelectItem>
+                        <SelectItem value="vip">VIP</SelectItem>
+                        <SelectItem value="premium">Premium</SelectItem>
+                        <SelectItem value="accessibility">Accessibilità</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="p-0">
+                {isLoading ? (
+                  <div className="p-4 space-y-4">
+                    {[1, 2, 3, 4, 5].map((i) => (
+                      <Skeleton key={i} className="h-12" />
+                    ))}
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Fila</TableHead>
+                        <TableHead>Posto</TableHead>
+                        <TableHead>Categoria</TableHead>
+                        <TableHead>Moltiplicatore</TableHead>
+                        <TableHead>Stato</TableHead>
+                        <TableHead>Posizione</TableHead>
+                        <TableHead className="text-right">Azioni</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredSeats && filteredSeats.length > 0 ? (
+                        filteredSeats.map((seat) => (
+                          <TableRow key={seat.id} data-testid={`row-seat-${seat.id}`}>
+                            <TableCell className="font-mono">
+                              <div className="flex items-center gap-2">
+                                <Hash className="h-4 w-4 text-muted-foreground" />
+                                {seat.rowNumber}
+                              </div>
+                            </TableCell>
+                            <TableCell className="font-mono font-bold">
+                              {seat.seatNumber}
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                {getCategoryIcon(seat.category)}
+                                {getCategoryBadge(seat.category)}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              x{Number(seat.priceMultiplier || 1).toFixed(2)}
+                            </TableCell>
+                            <TableCell>
+                              {getStatusBadge(seat.status)}
+                            </TableCell>
+                            <TableCell className="text-muted-foreground text-sm">
+                              {seat.xPosition && seat.yPosition ? (
+                                <div className="flex items-center gap-1">
+                                  <MapPin className="h-3 w-3" />
+                                  ({Number(seat.xPosition).toFixed(0)}, {Number(seat.yPosition).toFixed(0)})
+                                </div>
+                              ) : (
+                                "-"
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex justify-end gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => handleViewDetails(seat)}
+                                  data-testid={`button-view-seat-${seat.id}`}
+                                >
+                                  <Eye className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => handleEdit(seat)}
+                                  data-testid={`button-edit-seat-${seat.id}`}
+                                >
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => handleDelete(seat)}
+                                  data-testid={`button-delete-seat-${seat.id}`}
+                                >
+                                  <Trash2 className="h-4 w-4 text-red-500" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      ) : (
+                        <TableRow>
+                          <TableCell colSpan={7} className="text-center py-12">
+                            <div className="flex flex-col items-center gap-2">
+                              <Armchair className="h-12 w-12 text-muted-foreground" />
+                              <p className="text-muted-foreground">Nessun posto trovato</p>
+                              <p className="text-sm text-muted-foreground">
+                                Crea nuovi posti per questo settore
+                              </p>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
+          </>
+        )}
+
+        {!selectedSectorId && (
+          <Card>
+            <CardContent className="p-12 text-center">
+              <Grid3X3 className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+              <h3 className="text-xl font-semibold mb-2">Seleziona un Settore</h3>
+              <p className="text-muted-foreground">
+                Seleziona un settore per visualizzare e gestire i posti numerati
+              </p>
+            </CardContent>
+          </Card>
+        )}
+
+        {renderDialogs()}
+      </div>
+    );
+  }
+
+  return (
+    <MobileAppLayout
+      header={<MobileHeader title="Posti Numerati" showBackButton showMenuButton showUserMenu />}
+      contentClassName="pb-24"
+    >
+      <div className="px-3 sm:px-4 md:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
+          <div>
+            <p className="text-xs sm:text-sm text-gray-400">Gestione posti a sedere per eventi</p>
+          </div>
+
+          <Button
+          onClick={() => setIsCreateDialogOpen(true)}
+          className="bg-amber-500 hover:bg-amber-600 text-black"
+          disabled={!selectedSectorId}
+          data-testid="button-create-seat"
+        >
+          <Plus className="h-4 w-4 mr-2" />
+          Nuovo Posto
+        </Button>
+      </div>
+
+      <Card className="bg-[#151922] border-gray-800">
+        <CardContent className="p-4">
+          <div className="flex items-center gap-4">
+            <div className="flex-1 max-w-md">
+              <label className="text-sm text-gray-400 mb-2 block">Seleziona Settore</label>
+              <Select value={selectedSectorId} onValueChange={setSelectedSectorId}>
+                <SelectTrigger className="bg-[#0a0e17] border-gray-700" data-testid="select-sector">
+                  <SelectValue placeholder="Seleziona un settore..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {sectors?.map((sector) => (
+                    <SelectItem key={sector.id} value={sector.id}>
+                      {sector.name} ({sector.sectorCode})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {selectedSectorId && (
+        <>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 sm:gap-4">
+            <Card className="bg-[#151922] border-gray-800">
+              <CardContent className="p-3 sm:p-4">
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <Armchair className="h-6 w-6 sm:h-8 sm:w-8 text-amber-400 flex-shrink-0" />
+                  <div>
+                    <p className="text-2xl font-bold text-white">{stats.total}</p>
+                    <p className="text-xs text-gray-400">Totale Posti</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-[#151922] border-gray-800">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <CheckCircle2 className="h-8 w-8 text-emerald-400" />
+                  <div>
+                    <p className="text-2xl font-bold text-white">{stats.available}</p>
+                    <p className="text-xs text-gray-400">Disponibili</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-[#151922] border-gray-800">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <ShoppingCart className="h-8 w-8 text-red-400" />
+                  <div>
+                    <p className="text-2xl font-bold text-white">{stats.sold}</p>
+                    <p className="text-xs text-gray-400">Venduti</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-[#151922] border-gray-800">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <Lock className="h-8 w-8 text-amber-400" />
+                  <div>
+                    <p className="text-2xl font-bold text-white">{stats.reserved}</p>
+                    <p className="text-xs text-gray-400">Riservati</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-[#151922] border-gray-800">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <AlertTriangle className="h-8 w-8 text-gray-400" />
+                  <div>
+                    <p className="text-2xl font-bold text-white">{stats.blocked}</p>
+                    <p className="text-xs text-gray-400">Bloccati</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card className="bg-[#151922] border-gray-800">
+            <CardContent className="p-4">
+              <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
+                <div className="relative flex-1 max-w-md">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Input
+                    placeholder="Cerca per fila o numero posto..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-10 bg-[#0a0e17] border-gray-700"
+                    data-testid="input-search-seats"
+                  />
+                </div>
+
+                <div className="flex gap-2 flex-wrap">
+                  <Select value={statusFilter} onValueChange={setStatusFilter}>
+                    <SelectTrigger className="w-[150px] bg-[#0a0e17] border-gray-700" data-testid="select-status-filter">
+                      <SelectValue placeholder="Stato" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Tutti gli stati</SelectItem>
+                      <SelectItem value="available">Disponibile</SelectItem>
+                      <SelectItem value="sold">Venduto</SelectItem>
+                      <SelectItem value="reserved">Riservato</SelectItem>
+                      <SelectItem value="blocked">Bloccato</SelectItem>
+                    </SelectContent>
+                  </Select>
+
+                  <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                    <SelectTrigger className="w-[150px] bg-[#0a0e17] border-gray-700" data-testid="select-category-filter">
+                      <SelectValue placeholder="Categoria" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Tutte</SelectItem>
+                      <SelectItem value="standard">Standard</SelectItem>
+                      <SelectItem value="vip">VIP</SelectItem>
+                      <SelectItem value="premium">Premium</SelectItem>
+                      <SelectItem value="accessibility">Accessibilità</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-[#151922] border-gray-800">
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
+              {isLoading ? (
+                <div className="p-4 space-y-4">
+                  {[1, 2, 3, 4, 5].map((i) => (
+                    <Skeleton key={i} className="h-12" />
+                  ))}
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow className="border-gray-800 hover:bg-transparent">
+                      <TableHead className="text-gray-400">Fila</TableHead>
+                      <TableHead className="text-gray-400">Posto</TableHead>
+                      <TableHead className="text-gray-400">Categoria</TableHead>
+                      <TableHead className="text-gray-400">Moltiplicatore</TableHead>
+                      <TableHead className="text-gray-400">Stato</TableHead>
+                      <TableHead className="text-gray-400">Posizione</TableHead>
+                      <TableHead className="text-gray-400 text-right">Azioni</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredSeats && filteredSeats.length > 0 ? (
+                      filteredSeats.map((seat) => (
+                        <TableRow
+                          key={seat.id}
+                          className="border-gray-800 hover:bg-gray-800/50"
+                          data-testid={`row-seat-${seat.id}`}
+                        >
+                          <TableCell className="text-white font-mono">
+                            <div className="flex items-center gap-2">
+                              <Hash className="h-4 w-4 text-gray-500" />
+                              {seat.rowNumber}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-white font-mono font-bold">
+                            {seat.seatNumber}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              {getCategoryIcon(seat.category)}
+                              {getCategoryBadge(seat.category)}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-white">
+                            x{Number(seat.priceMultiplier || 1).toFixed(2)}
+                          </TableCell>
+                          <TableCell>
+                            {getStatusBadge(seat.status)}
+                          </TableCell>
+                          <TableCell className="text-gray-400 text-sm">
+                            {seat.xPosition && seat.yPosition ? (
+                              <div className="flex items-center gap-1">
+                                <MapPin className="h-3 w-3" />
+                                ({Number(seat.xPosition).toFixed(0)}, {Number(seat.yPosition).toFixed(0)})
+                              </div>
+                            ) : (
+                              "-"
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex justify-end gap-1">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleViewDetails(seat)}
+                                data-testid={`button-view-seat-${seat.id}`}
+                              >
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleEdit(seat)}
+                                data-testid={`button-edit-seat-${seat.id}`}
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleDelete(seat)}
+                                className="text-red-400 hover:text-red-300"
+                                data-testid={`button-delete-seat-${seat.id}`}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    ) : (
+                      <TableRow>
+                        <TableCell colSpan={7} className="text-center py-12">
+                          <div className="flex flex-col items-center gap-2">
+                            <Armchair className="h-12 w-12 text-gray-600" />
+                            <p className="text-gray-400">Nessun posto trovato</p>
+                            <p className="text-sm text-gray-500">
+                              Crea nuovi posti per questo settore
+                            </p>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              )}
+              </div>
+            </CardContent>
+          </Card>
+        </>
+      )}
+
+      {!selectedSectorId && (
+        <Card className="bg-[#151922] border-gray-800">
+          <CardContent className="p-12 text-center">
+            <Grid3X3 className="h-16 w-16 text-gray-600 mx-auto mb-4" />
+            <h3 className="text-xl font-semibold text-white mb-2">Seleziona un Settore</h3>
+            <p className="text-gray-400">
+              Seleziona un settore per visualizzare e gestire i posti numerati
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {renderDialogs()}
       </div>
     </MobileAppLayout>
   );

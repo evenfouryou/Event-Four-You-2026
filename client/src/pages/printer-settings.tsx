@@ -7,6 +7,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
+import { useIsMobile } from "@/hooks/use-mobile";
 import {
   MobileAppLayout,
   MobileHeader,
@@ -14,7 +15,23 @@ import {
   BottomSheet,
   triggerHaptic,
 } from "@/components/mobile-primitives";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import {
   Form,
   FormControl,
@@ -242,9 +259,14 @@ export default function PrinterSettings() {
   const { user } = useAuth();
   const { toggleSidebar } = useSidebar();
   const [, navigate] = useLocation();
+  const isMobile = useIsMobile();
   const isSuperAdmin = user?.role === "super_admin";
   
   const [activeSection, setActiveSection] = useState<string | null>(null);
+  const [registerDialogOpen, setRegisterDialogOpen] = useState(false);
+  const [modelDialogOpen, setModelDialogOpen] = useState(false);
+  const [profileDialogOpen, setProfileDialogOpen] = useState(false);
+  const [profileAssignDialogOpen, setProfileAssignDialogOpen] = useState(false);
   const [modelSheetOpen, setModelSheetOpen] = useState(false);
   const [profileSheetOpen, setProfileSheetOpen] = useState(false);
   const [editingModel, setEditingModel] = useState<PrinterModel | null>(null);
@@ -1009,6 +1031,708 @@ export default function PrinterSettings() {
     }
   };
 
+  const getStatusBadgeDesktop = (status: string | null) => {
+    switch (status) {
+      case "online":
+        return <Badge className="bg-green-600"><Wifi className="h-3 w-3 mr-1" />Online</Badge>;
+      case "printing":
+        return <Badge className="bg-blue-600"><Loader2 className="h-3 w-3 mr-1 animate-spin" />Stampa</Badge>;
+      case "error":
+        return <Badge variant="destructive"><XCircle className="h-3 w-3 mr-1" />Errore</Badge>;
+      default:
+        return <Badge variant="secondary"><WifiOff className="h-3 w-3 mr-1" />Offline</Badge>;
+    }
+  };
+
+  const formatDateDesktop = (date: string | Date | null) => {
+    if (!date) return "Mai";
+    return new Date(date).toLocaleString("it-IT", {
+      day: "2-digit",
+      month: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
+  // Desktop version
+  if (!isMobile) {
+    return (
+      <div className="container mx-auto p-6 space-y-6" data-testid="page-printer-settings">
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <div>
+            <h1 className="text-3xl font-bold">Impostazioni Stampante</h1>
+            <p className="text-muted-foreground">Gestisci stampanti, profili carta e template biglietti</p>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => { refetchAgents(); refetchProfiles(); if (isSuperAdmin) refetchModels(); }} data-testid="button-refresh-desktop">
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Aggiorna
+            </Button>
+            <Button onClick={() => setRegisterDialogOpen(true)} data-testid="button-register-agent-desktop">
+              <Key className="w-4 h-4 mr-2" />
+              Registra Agent
+            </Button>
+          </div>
+        </div>
+
+        {/* Stats */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <Monitor className="w-5 h-5 text-primary" />
+                </div>
+                <div>
+                  <div className="text-2xl font-bold">{agents.length}</div>
+                  <p className="text-sm text-muted-foreground">Agenti</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-green-500/10 flex items-center justify-center">
+                  <Wifi className="w-5 h-5 text-green-500" />
+                </div>
+                <div>
+                  <div className="text-2xl font-bold text-green-500">{agents.filter(a => a.status === "online").length}</div>
+                  <p className="text-sm text-muted-foreground">Online</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
+                  <Layout className="w-5 h-5 text-blue-500" />
+                </div>
+                <div>
+                  <div className="text-2xl font-bold">{templates.length}</div>
+                  <p className="text-sm text-muted-foreground">Template</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-purple-500/10 flex items-center justify-center">
+                  <Smartphone className="w-5 h-5 text-purple-500" />
+                </div>
+                <div>
+                  <div className="text-2xl font-bold">{digitalTemplates.length}</div>
+                  <p className="text-sm text-muted-foreground">Digitali</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Agents Table */}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between gap-4">
+            <div>
+              <CardTitle>Agenti Collegati</CardTitle>
+              <CardDescription>Dispositivi di stampa registrati nel sistema</CardDescription>
+            </div>
+            <Button variant="outline" onClick={() => navigate("/download-smart-card-app")} data-testid="button-download-agent-desktop">
+              <Download className="w-4 h-4 mr-2" />
+              Scarica Agent
+            </Button>
+          </CardHeader>
+          <CardContent>
+            {agentsLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+              </div>
+            ) : agents.length === 0 ? (
+              <div className="text-center py-12">
+                <Monitor className="w-12 h-12 mx-auto mb-4 text-muted-foreground opacity-50" />
+                <p className="text-muted-foreground font-medium">Nessun agente collegato</p>
+                <p className="text-muted-foreground text-sm mt-1">Installa Event4U Print Agent su un computer</p>
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Dispositivo</TableHead>
+                    <TableHead>Stampante</TableHead>
+                    <TableHead>Stato</TableHead>
+                    <TableHead>Ultimo Heartbeat</TableHead>
+                    <TableHead>Profili</TableHead>
+                    <TableHead className="text-right">Azioni</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {agents.map((agent) => (
+                    <TableRow key={agent.id} data-testid={`row-agent-${agent.id}`}>
+                      <TableCell className="font-medium">{agent.deviceName}</TableCell>
+                      <TableCell>{agent.printerName || "Non configurata"}</TableCell>
+                      <TableCell>{getStatusBadgeDesktop(agent.status)}</TableCell>
+                      <TableCell>{formatDateDesktop(agent.lastHeartbeat)}</TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap gap-1">
+                          {getProfilesForAgent(agent.id).map(profile => (
+                            <Badge key={profile.id} variant="secondary" className="text-xs">
+                              {profile.name}
+                            </Badge>
+                          ))}
+                          {getProfilesForAgent(agent.id).length === 0 && (
+                            <span className="text-muted-foreground text-sm">-</span>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => {
+                              setSelectedAgentForProfiles(agent);
+                              setProfileAssignDialogOpen(true);
+                            }}
+                            data-testid={`button-manage-profiles-desktop-${agent.id}`}
+                          >
+                            <FileText className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => deleteAgentMutation.mutate(agent.id)}
+                            data-testid={`button-delete-agent-desktop-${agent.id}`}
+                          >
+                            <Trash2 className="w-4 h-4 text-destructive" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Templates Table */}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between gap-4">
+            <div>
+              <CardTitle>Template Biglietti</CardTitle>
+              <CardDescription>Template per la stampa dei biglietti</CardDescription>
+            </div>
+            {isSuperAdmin && (
+              <Link href="/template-builder">
+                <Button data-testid="button-new-template-desktop">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Nuovo Template
+                </Button>
+              </Link>
+            )}
+          </CardHeader>
+          <CardContent>
+            {templatesLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+              </div>
+            ) : templates.length === 0 ? (
+              <div className="text-center py-12">
+                <Layout className="w-12 h-12 mx-auto mb-4 text-muted-foreground opacity-50" />
+                <p className="text-muted-foreground font-medium">Nessun template</p>
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Nome</TableHead>
+                    <TableHead>Tipo</TableHead>
+                    <TableHead>Dimensioni</TableHead>
+                    <TableHead>Default</TableHead>
+                    <TableHead className="text-right">Azioni</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {templates.map((template) => (
+                    <TableRow key={template.id} data-testid={`row-template-${template.id}`}>
+                      <TableCell className="font-medium">{template.name}</TableCell>
+                      <TableCell>
+                        {!template.companyId ? (
+                          <Badge className="bg-purple-600">Sistema</Badge>
+                        ) : (
+                          <Badge variant="outline">Azienda</Badge>
+                        )}
+                      </TableCell>
+                      <TableCell>{template.paperWidthMm}mm × {template.paperHeightMm}mm</TableCell>
+                      <TableCell>
+                        {template.isDefault && <Badge variant="secondary">Default</Badge>}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {isSuperAdmin && (
+                          <div className="flex justify-end gap-1">
+                            <Link href={`/template-builder/${template.id}`}>
+                              <Button variant="ghost" size="icon" data-testid={`button-edit-template-desktop-${template.id}`}>
+                                <Edit className="w-4 h-4" />
+                              </Button>
+                            </Link>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => deleteTemplateMutation.mutate(template.id)}
+                              data-testid={`button-delete-template-desktop-${template.id}`}
+                            >
+                              <Trash2 className="w-4 h-4 text-destructive" />
+                            </Button>
+                          </div>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Digital Templates Table */}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between gap-4">
+            <div>
+              <CardTitle>Template Digitali</CardTitle>
+              <CardDescription>Template per biglietti digitali</CardDescription>
+            </div>
+            <Link href="/digital-template-builder">
+              <Button data-testid="button-new-digital-template-desktop">
+                <Plus className="w-4 h-4 mr-2" />
+                Nuovo Template Digitale
+              </Button>
+            </Link>
+          </CardHeader>
+          <CardContent>
+            {digitalTemplatesLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+              </div>
+            ) : digitalTemplates.length === 0 ? (
+              <div className="text-center py-12">
+                <Smartphone className="w-12 h-12 mx-auto mb-4 text-muted-foreground opacity-50" />
+                <p className="text-muted-foreground font-medium">Nessun template digitale</p>
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Nome</TableHead>
+                    <TableHead>Tipo</TableHead>
+                    <TableHead>Stile</TableHead>
+                    <TableHead>Default</TableHead>
+                    <TableHead className="text-right">Azioni</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {digitalTemplates.map((template) => (
+                    <TableRow key={template.id} data-testid={`row-digital-template-${template.id}`}>
+                      <TableCell className="font-medium">{template.name}</TableCell>
+                      <TableCell>
+                        {!template.companyId ? (
+                          <Badge className="bg-purple-600">Sistema</Badge>
+                        ) : (
+                          <Badge variant="outline">Azienda</Badge>
+                        )}
+                      </TableCell>
+                      <TableCell className="capitalize">{template.backgroundStyle || "gradient"}</TableCell>
+                      <TableCell>
+                        {template.isDefault && <Badge variant="secondary">Predefinito</Badge>}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-1">
+                          <Link href={`/digital-template-builder/${template.id}`}>
+                            <Button variant="ghost" size="icon" data-testid={`button-edit-digital-template-desktop-${template.id}`}>
+                              <Edit className="w-4 h-4" />
+                            </Button>
+                          </Link>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => deleteDigitalTemplateMutation.mutate(template.id)}
+                            data-testid={`button-delete-digital-template-desktop-${template.id}`}
+                          >
+                            <Trash2 className="w-4 h-4 text-destructive" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Printer Models Table (Super Admin Only) */}
+        {isSuperAdmin && (
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between gap-4">
+              <div>
+                <CardTitle>Modelli Stampante</CardTitle>
+                <CardDescription>Modelli di stampanti supportate (solo admin)</CardDescription>
+              </div>
+              <Button onClick={() => { setEditingModel(null); modelForm.reset(); setModelDialogOpen(true); }} data-testid="button-add-model-desktop">
+                <Plus className="w-4 h-4 mr-2" />
+                Nuovo Modello
+              </Button>
+            </CardHeader>
+            <CardContent>
+              {modelsLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+                </div>
+              ) : models.length === 0 ? (
+                <div className="text-center py-12">
+                  <Printer className="w-12 h-12 mx-auto mb-4 text-muted-foreground opacity-50" />
+                  <p className="text-muted-foreground font-medium">Nessun modello</p>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Produttore</TableHead>
+                      <TableHead>Modello</TableHead>
+                      <TableHead>DPI</TableHead>
+                      <TableHead>Larghezza Max</TableHead>
+                      <TableHead>Connessione</TableHead>
+                      <TableHead>Stato</TableHead>
+                      <TableHead className="text-right">Azioni</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {models.map((model) => (
+                      <TableRow key={model.id} data-testid={`row-model-${model.id}`}>
+                        <TableCell className="font-medium">{model.vendor}</TableCell>
+                        <TableCell>{model.model}</TableCell>
+                        <TableCell>{model.dpi}</TableCell>
+                        <TableCell>{model.maxWidthMm}mm</TableCell>
+                        <TableCell className="uppercase">{model.connectionType}</TableCell>
+                        <TableCell>
+                          {model.isActive ? (
+                            <Badge className="bg-green-600">Attivo</Badge>
+                          ) : (
+                            <Badge variant="secondary">Inattivo</Badge>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => { handleEditModel(model); setModelDialogOpen(true); }}
+                              data-testid={`button-edit-model-desktop-${model.id}`}
+                            >
+                              <Edit className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => deleteModelMutation.mutate(model.id)}
+                              data-testid={`button-delete-model-desktop-${model.id}`}
+                            >
+                              <Trash2 className="w-4 h-4 text-destructive" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Register Agent Dialog */}
+        <Dialog open={registerDialogOpen} onOpenChange={(open) => { if (!open) { setGeneratedToken(null); setDeviceName(""); setSelectedCompanyId(""); } setRegisterDialogOpen(open); }}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Registra Agent</DialogTitle>
+              <DialogDescription>Genera un token di autenticazione per un nuovo agent</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              {!generatedToken ? (
+                <>
+                  {isSuperAdmin && (
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Azienda</label>
+                      <Select value={selectedCompanyId} onValueChange={setSelectedCompanyId}>
+                        <SelectTrigger data-testid="select-company-agent-desktop">
+                          <SelectValue placeholder="Seleziona azienda..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {companies.map((company) => (
+                            <SelectItem key={company.id} value={company.id}>
+                              {company.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Nome Dispositivo</label>
+                    <Input
+                      placeholder="es. Box Office 1"
+                      value={deviceName}
+                      onChange={(e) => setDeviceName(e.target.value)}
+                      data-testid="input-device-name-desktop"
+                    />
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="p-4 bg-green-500/10 border border-green-500/20 rounded-lg">
+                    <div className="flex items-center gap-2 mb-2 text-green-600">
+                      <CheckCircle2 className="w-5 h-5" />
+                      <span className="font-medium">Token Generato!</span>
+                    </div>
+                    <p className="text-sm text-muted-foreground mb-3">Copia questo token nel Print Agent</p>
+                    <div className="flex gap-2">
+                      <Input value={generatedToken} readOnly className="font-mono text-xs" data-testid="input-generated-token-desktop" />
+                      <Button size="icon" variant="outline" onClick={handleCopyToken} data-testid="button-copy-token-desktop">
+                        {tokenCopied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
+                    <p className="text-xs text-yellow-600">
+                      <AlertTriangle className="w-4 h-4 inline mr-1" />
+                      Questo token viene mostrato una sola volta!
+                    </p>
+                  </div>
+                </>
+              )}
+            </div>
+            <DialogFooter>
+              {!generatedToken ? (
+                <Button
+                  onClick={handleRegisterAgent}
+                  disabled={registerAgentMutation.isPending || !deviceName.trim() || (isSuperAdmin && !selectedCompanyId)}
+                  data-testid="button-confirm-register-desktop"
+                >
+                  {registerAgentMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                  Genera Token
+                </Button>
+              ) : (
+                <Button variant="outline" onClick={() => { setRegisterDialogOpen(false); setGeneratedToken(null); setDeviceName(""); }}>
+                  Chiudi
+                </Button>
+              )}
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Profile Assign Dialog */}
+        <Dialog open={profileAssignDialogOpen} onOpenChange={(open) => { if (!open) setSelectedAgentForProfiles(null); setProfileAssignDialogOpen(open); }}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Gestione Profili - {selectedAgentForProfiles?.deviceName}</DialogTitle>
+              <DialogDescription>Assegna o rimuovi profili carta da questo agent</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              {selectedAgentForProfiles && (
+                <>
+                  <div>
+                    <h4 className="font-medium text-sm mb-3">Profili assegnati</h4>
+                    {getProfilesForAgent(selectedAgentForProfiles.id).length > 0 ? (
+                      <div className="space-y-2">
+                        {getProfilesForAgent(selectedAgentForProfiles.id).map(profile => (
+                          <div key={profile.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                            <div>
+                              <span className="font-medium">{profile.name}</span>
+                              <span className="text-xs text-muted-foreground ml-2">
+                                {profile.paperWidthMm}×{profile.paperHeightMm}mm
+                              </span>
+                            </div>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => assignProfileToAgentMutation.mutate({ profileId: profile.id, agentId: null })}
+                              disabled={assignProfileToAgentMutation.isPending}
+                              data-testid={`button-unassign-profile-desktop-${profile.id}`}
+                            >
+                              <XCircle className="w-5 h-5 text-destructive" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">Nessun profilo assegnato</p>
+                    )}
+                  </div>
+                  <div>
+                    <h4 className="font-medium text-sm mb-3">Profili disponibili</h4>
+                    {getUnassignedProfiles().length > 0 ? (
+                      <div className="space-y-2">
+                        {getUnassignedProfiles().map(profile => (
+                          <div key={profile.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                            <div>
+                              <span className="font-medium">{profile.name}</span>
+                              <span className="text-xs text-muted-foreground ml-2">
+                                {profile.paperWidthMm}×{profile.paperHeightMm}mm
+                              </span>
+                            </div>
+                            <Button
+                              size="icon"
+                              variant="outline"
+                              onClick={() => assignProfileToAgentMutation.mutate({ profileId: profile.id, agentId: selectedAgentForProfiles.id })}
+                              disabled={assignProfileToAgentMutation.isPending}
+                              data-testid={`button-assign-profile-desktop-${profile.id}`}
+                            >
+                              <Plus className="w-5 h-5" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">Tutti i profili sono assegnati</p>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setProfileAssignDialogOpen(false)}>Chiudi</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Model Form Dialog */}
+        <Dialog open={modelDialogOpen} onOpenChange={(open) => { if (!open) { setEditingModel(null); modelForm.reset(); } setModelDialogOpen(open); }}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>{editingModel ? "Modifica Modello" : "Nuovo Modello"}</DialogTitle>
+              <DialogDescription>Configura i dettagli del modello di stampante</DialogDescription>
+            </DialogHeader>
+            <Form {...modelForm}>
+              <form onSubmit={modelForm.handleSubmit(onSubmitModel)} className="space-y-4 py-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <FormField
+                    control={modelForm.control}
+                    name="vendor"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Produttore</FormLabel>
+                        <FormControl>
+                          <Input placeholder="X PRINTER" {...field} data-testid="input-model-vendor-desktop" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={modelForm.control}
+                    name="model"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Modello</FormLabel>
+                        <FormControl>
+                          <Input placeholder="XP-420B" {...field} data-testid="input-model-name-desktop" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <FormField
+                    control={modelForm.control}
+                    name="dpi"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>DPI</FormLabel>
+                        <FormControl>
+                          <Input type="number" {...field} data-testid="input-model-dpi-desktop" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={modelForm.control}
+                    name="maxWidthMm"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Largh. Max (mm)</FormLabel>
+                        <FormControl>
+                          <Input type="number" {...field} data-testid="input-model-width-desktop" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <FormField
+                  control={modelForm.control}
+                  name="connectionType"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Connessione</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value ?? "usb"}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-connection-type-desktop">
+                            <SelectValue />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="usb">USB</SelectItem>
+                          <SelectItem value="tcp">Rete (TCP/IP)</SelectItem>
+                          <SelectItem value="bluetooth">Bluetooth</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={modelForm.control}
+                  name="driverNotes"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Note Driver</FormLabel>
+                      <FormControl>
+                        <Textarea placeholder="Note installazione..." {...field} value={field.value ?? ""} data-testid="input-driver-notes-desktop" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={modelForm.control}
+                  name="isActive"
+                  render={({ field }) => (
+                    <FormItem className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                      <FormLabel className="!mt-0">Attivo</FormLabel>
+                      <FormControl>
+                        <Switch checked={field.value} onCheckedChange={field.onChange} />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+                <DialogFooter className="pt-4">
+                  <Button type="button" variant="outline" onClick={() => setModelDialogOpen(false)}>Annulla</Button>
+                  <Button type="submit" disabled={createModelMutation.isPending || updateModelMutation.isPending} data-testid="button-save-model-desktop">
+                    {(createModelMutation.isPending || updateModelMutation.isPending) && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                    {editingModel ? "Salva Modifiche" : "Crea Modello"}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </Form>
+          </DialogContent>
+        </Dialog>
+      </div>
+    );
+  }
+
+  // Mobile version
   return (
     <MobileAppLayout
       header={

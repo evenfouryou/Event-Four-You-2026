@@ -6,6 +6,7 @@ import { z } from "zod";
 import { motion, AnimatePresence } from "framer-motion";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useIsMobile } from "@/hooks/use-mobile";
 import {
   MobileAppLayout,
   MobileHeader,
@@ -28,6 +29,24 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import {
   Users,
@@ -170,6 +189,7 @@ function CustomerCard({
 
 export default function SiaeCustomersPage() {
   const { toast } = useToast();
+  const isMobile = useIsMobile();
   const [isAddSheetOpen, setIsAddSheetOpen] = useState(false);
   const [isOtpSheetOpen, setIsOtpSheetOpen] = useState(false);
   const [isActionSheetOpen, setIsActionSheetOpen] = useState(false);
@@ -180,6 +200,10 @@ export default function SiaeCustomersPage() {
   const [pendingCustomerId, setPendingCustomerId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [otpCooldown, setOtpCooldown] = useState(0);
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isOtpDialogOpen, setIsOtpDialogOpen] = useState(false);
+  const [isActionDialogOpen, setIsActionDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
   const { data: customers = [], isLoading, refetch } = useQuery<SiaeCustomer[]>({
     queryKey: ["/api/siae/customers"],
@@ -218,7 +242,9 @@ export default function SiaeCustomersPage() {
       });
       setPendingCustomerId(customer.id);
       setIsAddSheetOpen(false);
+      setIsAddDialogOpen(false);
       setIsOtpSheetOpen(true);
+      setIsOtpDialogOpen(true);
       form.reset();
       queryClient.invalidateQueries({ queryKey: ["/api/siae/customers"] });
     },
@@ -276,6 +302,7 @@ export default function SiaeCustomersPage() {
         description: "Il cliente è ora attivo",
       });
       setIsOtpSheetOpen(false);
+      setIsOtpDialogOpen(false);
       setPendingCustomerId(null);
       otpForm.reset();
       queryClient.invalidateQueries({ queryKey: ["/api/siae/customers"] });
@@ -299,6 +326,7 @@ export default function SiaeCustomersPage() {
       triggerHaptic("success");
       toast({ title: "Stato aggiornato" });
       setIsActionSheetOpen(false);
+      setIsActionDialogOpen(false);
       queryClient.invalidateQueries({ queryKey: ["/api/siae/customers"] });
     },
     onError: (error: Error) => {
@@ -323,6 +351,7 @@ export default function SiaeCustomersPage() {
         description: "Il cliente è stato verificato manualmente",
       });
       setIsActionSheetOpen(false);
+      setIsActionDialogOpen(false);
       queryClient.invalidateQueries({ queryKey: ["/api/siae/customers"] });
     },
     onError: (error: Error) => {
@@ -360,6 +389,7 @@ export default function SiaeCustomersPage() {
         description: "Il cliente è stato rimosso dal sistema",
       });
       setIsDeleteSheetOpen(false);
+      setIsDeleteDialogOpen(false);
       setSelectedCustomer(null);
       setDeleteErrorMessage(null);
       setCanForceDelete(false);
@@ -412,6 +442,582 @@ export default function SiaeCustomersPage() {
     const random = Math.random().toString(36).substring(2, 6).toUpperCase();
     return `${prefix}${timestamp}${random}`;
   };
+
+  const getStatusBadgeDesktop = (customer: SiaeCustomer) => {
+    if (customer.blockedUntil && new Date(customer.blockedUntil) > new Date()) {
+      return <Badge variant="destructive"><XCircle className="w-3 h-3 mr-1" />Bloccato</Badge>;
+    }
+    if (customer.isActive && customer.phoneVerified) {
+      return <Badge variant="default" className="bg-green-600"><CheckCircle2 className="w-3 h-3 mr-1" />Verificato</Badge>;
+    }
+    if (customer.isActive) {
+      return <Badge variant="secondary">Attivo</Badge>;
+    }
+    if (!customer.phoneVerified) {
+      return <Badge variant="outline"><Clock className="w-3 h-3 mr-1" />In attesa</Badge>;
+    }
+    return <Badge variant="outline">Inattivo</Badge>;
+  };
+
+  const stats = {
+    total: customers.length,
+    verified: customers.filter(c => c.phoneVerified).length,
+    active: customers.filter(c => c.isActive).length,
+    blocked: customers.filter(c => c.blockedUntil && new Date(c.blockedUntil) > new Date()).length,
+  };
+
+  if (!isMobile) {
+    return (
+      <div className="container mx-auto p-6 space-y-6" data-testid="page-siae-customers">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">Clienti SIAE</h1>
+            <p className="text-muted-foreground">Gestione clienti per biglietteria SIAE</p>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => refetch()} data-testid="button-refresh">
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Aggiorna
+            </Button>
+            <Button onClick={() => {
+              form.setValue("uniqueCode", generateCustomerCode());
+              setIsAddDialogOpen(true);
+            }} data-testid="button-add-customer">
+              <Plus className="w-4 h-4 mr-2" />
+              Nuovo Cliente
+            </Button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-4 gap-4">
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-2xl font-bold">{stats.total}</div>
+              <p className="text-sm text-muted-foreground">Totale Clienti</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-2xl font-bold text-green-500">{stats.verified}</div>
+              <p className="text-sm text-muted-foreground">Verificati</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-2xl font-bold text-blue-500">{stats.active}</div>
+              <p className="text-sm text-muted-foreground">Attivi</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-2xl font-bold text-red-500">{stats.blocked}</div>
+              <p className="text-sm text-muted-foreground">Bloccati</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between gap-4">
+              <CardTitle>Elenco Clienti</CardTitle>
+              <div className="relative w-64">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                <Input
+                  placeholder="Cerca clienti..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10"
+                  data-testid="input-search"
+                />
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <div className="space-y-4">
+                {[1, 2, 3, 4].map((i) => (
+                  <Skeleton key={i} className="h-16 w-full" />
+                ))}
+              </div>
+            ) : filteredCustomers.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-16 text-muted-foreground" data-testid="empty-state">
+                <Users className="w-16 h-16 mb-4 opacity-50" />
+                <p className="text-lg font-medium">Nessun cliente trovato</p>
+                <p className="text-sm mt-1">Aggiungi il primo cliente</p>
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Cliente</TableHead>
+                    <TableHead>Codice</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Telefono</TableHead>
+                    <TableHead>Stato</TableHead>
+                    <TableHead>Data Creazione</TableHead>
+                    <TableHead className="w-[100px]">Azioni</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredCustomers.map((customer) => {
+                    const initials = `${customer.firstName?.[0] || ""}${customer.lastName?.[0] || ""}`.toUpperCase();
+                    return (
+                      <TableRow key={customer.id} data-testid={`row-customer-${customer.id}`}>
+                        <TableCell>
+                          <div className="flex items-center gap-3">
+                            <Avatar className="h-10 w-10 bg-primary/20">
+                              <AvatarFallback className="text-sm font-semibold bg-transparent">
+                                {initials}
+                              </AvatarFallback>
+                            </Avatar>
+                            <span className="font-medium" data-testid={`text-name-${customer.id}`}>
+                              {customer.firstName} {customer.lastName}
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <span className="font-mono text-sm" data-testid={`text-code-${customer.id}`}>
+                            {customer.uniqueCode}
+                          </span>
+                        </TableCell>
+                        <TableCell data-testid={`text-email-${customer.id}`}>{customer.email}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <span data-testid={`text-phone-${customer.id}`}>{customer.phone}</span>
+                            {customer.phoneVerified && (
+                              <CheckCircle2 className="w-4 h-4 text-green-500" />
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell data-testid={`badge-status-${customer.id}`}>
+                          {getStatusBadgeDesktop(customer)}
+                        </TableCell>
+                        <TableCell data-testid={`text-date-${customer.id}`}>
+                          {customer.createdAt ? format(new Date(customer.createdAt), "dd MMM yyyy", { locale: it }) : "-"}
+                        </TableCell>
+                        <TableCell>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setSelectedCustomer(customer);
+                              setIsActionDialogOpen(true);
+                            }}
+                            data-testid={`button-actions-${customer.id}`}
+                          >
+                            <ChevronRight className="w-4 h-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+
+        <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Nuovo Cliente</DialogTitle>
+              <DialogDescription>Registra un nuovo cliente per la biglietteria SIAE</DialogDescription>
+            </DialogHeader>
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4" data-testid="form-customer">
+                <FormField
+                  control={form.control}
+                  name="uniqueCode"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Codice Cliente</FormLabel>
+                      <div className="flex gap-2">
+                        <FormControl>
+                          <Input {...field} placeholder="CLI..." data-testid="input-unique-code" />
+                        </FormControl>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          onClick={() => form.setValue("uniqueCode", generateCustomerCode())}
+                          data-testid="button-generate-code"
+                        >
+                          <RefreshCw className="w-4 h-4" />
+                        </Button>
+                      </div>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <Separator />
+                <div className="grid grid-cols-2 gap-3">
+                  <FormField
+                    control={form.control}
+                    name="firstName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Nome</FormLabel>
+                        <FormControl>
+                          <Input {...field} placeholder="Mario" data-testid="input-first-name" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="lastName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Cognome</FormLabel>
+                        <FormControl>
+                          <Input {...field} placeholder="Rossi" data-testid="input-last-name" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <FormField
+                  control={form.control}
+                  name="email"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Email</FormLabel>
+                      <FormControl>
+                        <Input type="email" {...field} placeholder="mario.rossi@email.com" data-testid="input-email" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="phone"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Telefono</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="+39 333 1234567" data-testid="input-phone" />
+                      </FormControl>
+                      <FormDescription>Per verifica OTP</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <div className="grid grid-cols-2 gap-3">
+                  <FormField
+                    control={form.control}
+                    name="birthDate"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Data Nascita</FormLabel>
+                        <FormControl>
+                          <Input type="date" {...field} data-testid="input-birth-date" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="birthPlace"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Luogo Nascita</FormLabel>
+                        <FormControl>
+                          <Input {...field} placeholder="Roma" data-testid="input-birth-place" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <DialogFooter className="pt-4">
+                  <Button type="button" variant="outline" onClick={() => setIsAddDialogOpen(false)} data-testid="button-cancel">
+                    Annulla
+                  </Button>
+                  <Button type="submit" disabled={createMutation.isPending} data-testid="button-submit">
+                    {createMutation.isPending ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Registrazione...
+                      </>
+                    ) : (
+                      <>
+                        <UserCheck className="w-4 h-4 mr-2" />
+                        Registra Cliente
+                      </>
+                    )}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </Form>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={isOtpDialogOpen} onOpenChange={setIsOtpDialogOpen}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader>
+              <DialogTitle>Verifica Telefono</DialogTitle>
+              <DialogDescription>Inserisci il codice OTP a 6 cifre inviato al telefono del cliente</DialogDescription>
+            </DialogHeader>
+            <div className="flex items-center justify-center py-4">
+              <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center">
+                <Shield className="w-8 h-8 text-primary" />
+              </div>
+            </div>
+            <Form {...otpForm}>
+              <form onSubmit={otpForm.handleSubmit(onVerifyOtp)} className="space-y-6" data-testid="form-otp">
+                <FormField
+                  control={otpForm.control}
+                  name="otp"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col items-center">
+                      <FormControl>
+                        <InputOTP maxLength={6} {...field} data-testid="input-otp">
+                          <InputOTPGroup className="gap-2">
+                            <InputOTPSlot index={0} className="w-10 h-12 text-xl" />
+                            <InputOTPSlot index={1} className="w-10 h-12 text-xl" />
+                            <InputOTPSlot index={2} className="w-10 h-12 text-xl" />
+                            <InputOTPSlot index={3} className="w-10 h-12 text-xl" />
+                            <InputOTPSlot index={4} className="w-10 h-12 text-xl" />
+                            <InputOTPSlot index={5} className="w-10 h-12 text-xl" />
+                          </InputOTPGroup>
+                        </InputOTP>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <div className="flex justify-center">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    disabled={otpCooldown > 0 || sendOtpMutation.isPending}
+                    onClick={() => pendingCustomerId && sendOtpMutation.mutate(pendingCustomerId)}
+                    data-testid="button-resend-otp"
+                  >
+                    {otpCooldown > 0 ? (
+                      <>
+                        <Clock className="w-4 h-4 mr-2" />
+                        Reinvia tra {otpCooldown}s
+                      </>
+                    ) : (
+                      <>
+                        <Send className="w-4 h-4 mr-2" />
+                        Reinvia OTP
+                      </>
+                    )}
+                  </Button>
+                </div>
+                <DialogFooter>
+                  <Button type="button" variant="outline" onClick={() => setIsOtpDialogOpen(false)} data-testid="button-cancel-otp">
+                    Annulla
+                  </Button>
+                  <Button type="submit" disabled={verifyOtpMutation.isPending} data-testid="button-verify-otp">
+                    {verifyOtpMutation.isPending ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Verifica...
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle2 className="w-4 h-4 mr-2" />
+                        Verifica OTP
+                      </>
+                    )}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </Form>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={isActionDialogOpen} onOpenChange={setIsActionDialogOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>{selectedCustomer ? `${selectedCustomer.firstName} ${selectedCustomer.lastName}` : "Dettagli Cliente"}</DialogTitle>
+              <DialogDescription>Gestisci le azioni per questo cliente</DialogDescription>
+            </DialogHeader>
+            {selectedCustomer && (
+              <div className="space-y-4">
+                <div className="flex items-center gap-4 p-4 bg-muted/50 rounded-xl">
+                  <Avatar className="h-16 w-16 bg-primary/20">
+                    <AvatarFallback className="text-xl font-semibold text-primary bg-transparent">
+                      {`${selectedCustomer.firstName?.[0] || ""}${selectedCustomer.lastName?.[0] || ""}`.toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <p className="font-mono text-sm text-muted-foreground">{selectedCustomer.uniqueCode}</p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <Phone className="w-4 h-4 text-muted-foreground" />
+                      <span className="text-sm">{selectedCustomer.phone}</span>
+                      {selectedCustomer.phoneVerified && (
+                        <CheckCircle2 className="w-4 h-4 text-green-500" />
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 mt-1">
+                      <Mail className="w-4 h-4 text-muted-foreground" />
+                      <span className="text-sm">{selectedCustomer.email}</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  {!selectedCustomer.phoneVerified && (
+                    <>
+                      <Button
+                        variant="outline"
+                        className="w-full justify-start"
+                        onClick={() => {
+                          setPendingCustomerId(selectedCustomer.id);
+                          setIsActionDialogOpen(false);
+                          setIsOtpDialogOpen(true);
+                        }}
+                        data-testid="action-verify"
+                      >
+                        <Shield className="w-4 h-4 mr-3" />
+                        Verifica Telefono (OTP)
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="w-full justify-start"
+                        onClick={() => manualVerifyMutation.mutate(selectedCustomer.id)}
+                        disabled={manualVerifyMutation.isPending}
+                        data-testid="action-verify-manual"
+                      >
+                        <ShieldCheck className="w-4 h-4 mr-3" />
+                        Verifica Manuale (Admin)
+                      </Button>
+                    </>
+                  )}
+                  {!selectedCustomer.isActive && (
+                    <Button
+                      variant="outline"
+                      className="w-full justify-start"
+                      onClick={() => updateStatusMutation.mutate({ id: selectedCustomer.id, status: "active" })}
+                      disabled={updateStatusMutation.isPending}
+                      data-testid="action-activate"
+                    >
+                      <CheckCircle2 className="w-4 h-4 mr-3 text-green-500" />
+                      Attiva Cliente
+                    </Button>
+                  )}
+                  {selectedCustomer.isActive && (
+                    <Button
+                      variant="outline"
+                      className="w-full justify-start text-amber-500 hover:text-amber-500"
+                      onClick={() => updateStatusMutation.mutate({ id: selectedCustomer.id, status: "blocked" })}
+                      disabled={updateStatusMutation.isPending}
+                      data-testid="action-block"
+                    >
+                      <XCircle className="w-4 h-4 mr-3" />
+                      Blocca Cliente
+                    </Button>
+                  )}
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start text-destructive hover:text-destructive"
+                    onClick={() => {
+                      setIsActionDialogOpen(false);
+                      setIsDeleteDialogOpen(true);
+                    }}
+                    data-testid="action-delete"
+                  >
+                    <Trash2 className="w-4 h-4 mr-3" />
+                    Elimina Cliente
+                  </Button>
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={isDeleteDialogOpen} onOpenChange={(open) => {
+          setIsDeleteDialogOpen(open);
+          if (!open) {
+            setDeleteErrorMessage(null);
+            setCanForceDelete(false);
+          }
+        }}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader>
+              <DialogTitle>Conferma Eliminazione</DialogTitle>
+            </DialogHeader>
+            <div className="flex flex-col items-center py-4">
+              <div className="w-16 h-16 rounded-full bg-destructive/20 flex items-center justify-center mb-4">
+                <Trash2 className="w-8 h-8 text-destructive" />
+              </div>
+              <p className="text-center text-muted-foreground">
+                {deleteErrorMessage ? (
+                  <span className="text-amber-500">{deleteErrorMessage}</span>
+                ) : (
+                  <>
+                    Sei sicuro di voler eliminare{" "}
+                    <strong className="text-foreground">{selectedCustomer?.firstName} {selectedCustomer?.lastName}</strong>?
+                    <br />
+                    Questa azione è irreversibile.
+                  </>
+                )}
+              </p>
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setIsDeleteDialogOpen(false);
+                  setDeleteErrorMessage(null);
+                  setCanForceDelete(false);
+                }}
+                data-testid="button-cancel-delete"
+              >
+                Annulla
+              </Button>
+              {canForceDelete ? (
+                <Button
+                  variant="destructive"
+                  onClick={() => selectedCustomer && deleteMutation.mutate({ id: selectedCustomer.id, force: true })}
+                  disabled={deleteMutation.isPending}
+                  data-testid="button-force-delete"
+                >
+                  {deleteMutation.isPending ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Eliminazione...
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      Elimina comunque
+                    </>
+                  )}
+                </Button>
+              ) : (
+                <Button
+                  variant="destructive"
+                  onClick={() => selectedCustomer && deleteMutation.mutate({ id: selectedCustomer.id })}
+                  disabled={deleteMutation.isPending}
+                  data-testid="button-confirm-delete"
+                >
+                  {deleteMutation.isPending ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Eliminazione...
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      Elimina
+                    </>
+                  )}
+                </Button>
+              )}
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+    );
+  }
 
   const headerContent = (
     <MobileHeader

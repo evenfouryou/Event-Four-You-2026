@@ -2,6 +2,9 @@ import { useLocation } from "wouter";
 import { motion } from "framer-motion";
 import { XCircle, AlertTriangle, Clock, Home, RefreshCw } from "lucide-react";
 import { MobileAppLayout, HapticButton, triggerHaptic } from "@/components/mobile-primitives";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 
 const springConfig = { stiffness: 400, damping: 30 };
 
@@ -34,6 +37,7 @@ const ERROR_MESSAGES: Record<string, { title: string; description: string; icon:
 
 export default function SchoolBadgeError() {
   const [, setLocation] = useLocation();
+  const isMobile = useIsMobile();
   
   const params = new URLSearchParams(window.location.search);
   const reason = params.get("reason") || "server-error";
@@ -50,6 +54,46 @@ export default function SchoolBadgeError() {
     triggerHaptic('light');
     window.location.reload();
   };
+
+  if (!isMobile) {
+    return (
+      <div className="container mx-auto p-6 flex items-center justify-center min-h-screen" data-testid="page-school-badge-error">
+        <Card className="max-w-md w-full">
+          <CardContent className="pt-8 pb-8 flex flex-col items-center text-center">
+            <div className="w-16 h-16 rounded-2xl bg-destructive/10 flex items-center justify-center mb-6">
+              <IconComponent className={`h-8 w-8 ${errorInfo.color}`} />
+            </div>
+
+            <h1 className="text-2xl font-bold text-foreground mb-3" data-testid="text-error-title">
+              {errorInfo.title}
+            </h1>
+
+            <p className="text-base text-muted-foreground leading-relaxed mb-8" data-testid="text-error-description">
+              {errorInfo.description}
+            </p>
+
+            <div className="w-full flex flex-col gap-3">
+              <Button onClick={handleGoHome} className="w-full" data-testid="button-go-home">
+                <Home className="h-4 w-4 mr-2" />
+                Torna alla home
+              </Button>
+
+              {reason === "server-error" && (
+                <Button variant="outline" onClick={handleRetry} className="w-full" data-testid="button-retry">
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Riprova
+                </Button>
+              )}
+            </div>
+
+            <p className="mt-6 text-xs text-muted-foreground/60">
+              Codice errore: {reason}
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <MobileAppLayout

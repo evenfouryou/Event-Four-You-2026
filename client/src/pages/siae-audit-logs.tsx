@@ -4,9 +4,11 @@ import { format } from "date-fns";
 import { it } from "date-fns/locale";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/hooks/useAuth";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { type SiaeAuditLog } from "@shared/schema";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -17,6 +19,21 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   MobileAppLayout,
   MobileHeader,
@@ -52,9 +69,11 @@ const springTransition = {
 
 export default function SiaeAuditLogsPage() {
   const { user } = useAuth();
+  const isMobile = useIsMobile();
   const [selectedLog, setSelectedLog] = useState<SiaeAuditLog | null>(null);
   const [isDetailSheetOpen, setIsDetailSheetOpen] = useState(false);
   const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
+  const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
   const [actionFilter, setActionFilter] = useState<string>("all");
   const [entityFilter, setEntityFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
@@ -205,6 +224,33 @@ export default function SiaeAuditLogsPage() {
   };
 
   if (isLoading) {
+    if (!isMobile) {
+      return (
+        <div className="container mx-auto p-6 space-y-6" data-testid="page-siae-audit-logs-loading">
+          <div className="flex items-center justify-between">
+            <div>
+              <Skeleton className="h-8 w-48" />
+              <Skeleton className="h-4 w-64 mt-2" />
+            </div>
+          </div>
+          <div className="grid grid-cols-4 gap-4">
+            {[1, 2, 3, 4].map((i) => (
+              <Card key={i}>
+                <CardContent className="pt-6">
+                  <Skeleton className="h-8 w-16" />
+                  <Skeleton className="h-4 w-24 mt-2" />
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+          <Card>
+            <CardContent className="pt-6">
+              <Skeleton className="h-64 w-full" />
+            </CardContent>
+          </Card>
+        </div>
+      );
+    }
     return (
       <MobileAppLayout
         header={
@@ -228,6 +274,255 @@ export default function SiaeAuditLogsPage() {
           </div>
         </div>
       </MobileAppLayout>
+    );
+  }
+
+  if (!isMobile) {
+    return (
+      <div className="container mx-auto p-6 space-y-6" data-testid="page-siae-audit-logs">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">Log Audit SIAE</h1>
+            <p className="text-muted-foreground">Registro operazioni fiscali</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-4 gap-4">
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-2xl font-bold">{stats.total}</div>
+              <p className="text-sm text-muted-foreground">Totale Log</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-2xl font-bold text-emerald-500">{stats.creates}</div>
+              <p className="text-sm text-muted-foreground">Creazioni</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-2xl font-bold text-blue-500">{stats.updates}</div>
+              <p className="text-sm text-muted-foreground">Modifiche</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-2xl font-bold text-cyan-500">{stats.transmits}</div>
+              <p className="text-sm text-muted-foreground">Trasmissioni</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-4 mb-6">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Cerca log..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-9"
+                  data-testid="input-search-logs-desktop"
+                />
+              </div>
+              <Select value={actionFilter} onValueChange={setActionFilter}>
+                <SelectTrigger className="w-[180px]" data-testid="select-action-filter-desktop">
+                  <SelectValue placeholder="Azione" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tutte le azioni</SelectItem>
+                  {uniqueActions.map((action) => (
+                    <SelectItem key={action} value={action}>
+                      {getActionLabel(action)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={entityFilter} onValueChange={setEntityFilter}>
+                <SelectTrigger className="w-[180px]" data-testid="select-entity-filter-desktop">
+                  <SelectValue placeholder="Entità" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tutte le entità</SelectItem>
+                  {uniqueEntities.map((entity) => (
+                    <SelectItem key={entity} value={entity}>
+                      {getEntityLabel(entity)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {activeFiltersCount > 0 && (
+                <Button variant="ghost" size="sm" onClick={handleClearFilters}>
+                  Resetta filtri
+                </Button>
+              )}
+            </div>
+
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Azione</TableHead>
+                  <TableHead>Entità</TableHead>
+                  <TableHead>Descrizione</TableHead>
+                  <TableHead>Sigillo Fiscale</TableHead>
+                  <TableHead>Data</TableHead>
+                  <TableHead className="w-[100px]">Azioni</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredLogs && filteredLogs.length > 0 ? (
+                  filteredLogs.map((log) => (
+                    <TableRow key={log.id} data-testid={`row-audit-log-${log.id}`}>
+                      <TableCell>{getActionBadge(log.action)}</TableCell>
+                      <TableCell>{getEntityBadge(log.entityType)}</TableCell>
+                      <TableCell className="max-w-[300px] truncate">
+                        {log.description || "Operazione registrata"}
+                      </TableCell>
+                      <TableCell>
+                        {log.fiscalSealCode ? (
+                          <code className="text-xs bg-muted px-2 py-1 rounded">{log.fiscalSealCode}</code>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {log.createdAt ? format(new Date(log.createdAt), "dd/MM/yy HH:mm", { locale: it }) : "-"}
+                      </TableCell>
+                      <TableCell>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => {
+                            setSelectedLog(log);
+                            setIsDetailDialogOpen(true);
+                          }}
+                          data-testid={`button-view-log-${log.id}`}
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                      Nessun log trovato
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+
+        <Dialog open={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                {selectedLog && getActionIcon(selectedLog.action, "h-5 w-5")}
+                Dettaglio Log
+              </DialogTitle>
+              <DialogDescription>
+                {selectedLog?.createdAt ? format(new Date(selectedLog.createdAt), "dd MMMM yyyy, HH:mm:ss", { locale: it }) : "-"}
+              </DialogDescription>
+            </DialogHeader>
+            {selectedLog && (
+              <div className="space-y-6">
+                <div className="flex items-center gap-4">
+                  {getActionBadge(selectedLog.action)}
+                  {getEntityBadge(selectedLog.entityType)}
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground uppercase tracking-wide">ID Entità</p>
+                    <code className="text-sm bg-muted px-2 py-1 rounded block truncate">
+                      {selectedLog.entityId || "-"}
+                    </code>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground uppercase tracking-wide">Sigillo Fiscale</p>
+                    {selectedLog.fiscalSealCode ? (
+                      <div className="flex items-center gap-2">
+                        <Shield className="h-4 w-4 text-amber-500" />
+                        <span className="font-mono text-sm">{selectedLog.fiscalSealCode}</span>
+                      </div>
+                    ) : (
+                      <span className="text-muted-foreground text-sm">-</span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Descrizione</p>
+                  <div className="bg-muted p-4 rounded-lg">
+                    <p className="text-sm">
+                      {selectedLog.description || "Nessuna descrizione"}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <p className="text-xs text-muted-foreground uppercase tracking-wide">Codice Carta</p>
+                    {selectedLog.cardCode ? (
+                      <span className="text-blue-500 font-mono text-sm">{selectedLog.cardCode}</span>
+                    ) : (
+                      <span className="text-muted-foreground text-sm">-</span>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <p className="text-xs text-muted-foreground uppercase tracking-wide">Indirizzo IP</p>
+                    <div className="flex items-center gap-2 text-sm">
+                      <Globe className="h-4 w-4 text-muted-foreground" />
+                      {selectedLog.ipAddress || "-"}
+                    </div>
+                  </div>
+                </div>
+
+                {selectedLog.userAgent && (
+                  <div className="space-y-2">
+                    <p className="text-xs text-muted-foreground uppercase tracking-wide">User Agent</p>
+                    <p className="text-xs text-muted-foreground break-all">
+                      {selectedLog.userAgent}
+                    </p>
+                  </div>
+                )}
+
+                {(selectedLog.oldData || selectedLog.newData) && (
+                  <div className="space-y-3">
+                    <p className="text-xs text-muted-foreground uppercase tracking-wide">Modifiche Dati</p>
+                    <div className="grid grid-cols-2 gap-4">
+                      {selectedLog.oldData && (
+                        <div className="space-y-2">
+                          <p className="text-xs text-red-500 font-medium">Dati Precedenti</p>
+                          <ScrollArea className="h-32 rounded border p-2">
+                            <pre className="text-xs">
+                              {JSON.stringify(parseJsonSafely(selectedLog.oldData), null, 2)}
+                            </pre>
+                          </ScrollArea>
+                        </div>
+                      )}
+                      {selectedLog.newData && (
+                        <div className="space-y-2">
+                          <p className="text-xs text-green-500 font-medium">Dati Nuovi</p>
+                          <ScrollArea className="h-32 rounded border p-2">
+                            <pre className="text-xs">
+                              {JSON.stringify(parseJsonSafely(selectedLog.newData), null, 2)}
+                            </pre>
+                          </ScrollArea>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+      </div>
     );
   }
 

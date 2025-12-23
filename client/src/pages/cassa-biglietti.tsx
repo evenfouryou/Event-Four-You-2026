@@ -5,6 +5,7 @@ import { it } from "date-fns/locale";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { type SiaeTicketedEvent, type SiaeEventSector, type SiaeTicket, type SiaeCashierAllocation, type SiaeSubscription, type SiaeCustomer, type SiaeCancellationReason } from "@shared/schema";
 import { Progress } from "@/components/ui/progress";
 import { useSmartCardStatus } from "@/lib/smart-card-service";
@@ -91,6 +92,7 @@ import { MobileAppLayout, MobileHeader } from "@/components/mobile-primitives";
 export default function CassaBigliettiPage() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const isMobile = useIsMobile();
   const smartCardStatus = useSmartCardStatus();
   const [selectedEventId, setSelectedEventId] = useState<string>("");
   const [selectedSectorId, setSelectedSectorId] = useState<string>("");
@@ -624,6 +626,1171 @@ export default function CassaBigliettiPage() {
     cancelled: todayTickets?.filter(t => t.status === "cancelled").length || 0,
   };
 
+  // Shared dialogs component for both mobile and desktop
+  const renderDialogs = () => (
+    <>
+      <AlertDialog open={isCancelDialogOpen} onOpenChange={(open) => {
+        setIsCancelDialogOpen(open);
+        if (!open) {
+          setCancelReasonCode("");
+          setCancelNote("");
+          setRefundOnCancel(false);
+        }
+      }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Annulla Biglietto</AlertDialogTitle>
+            <AlertDialogDescription>
+              Stai per annullare il biglietto <strong>{ticketToCancel?.ticketCode}</strong>.
+              Questa azione non può essere annullata.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="py-4 space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="cancel-reason-code">Motivo SIAE *</Label>
+              <Select value={cancelReasonCode} onValueChange={setCancelReasonCode}>
+                <SelectTrigger data-testid="select-cancel-reason">
+                  <SelectValue placeholder="Seleziona motivo annullamento..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {cancellationReasons && cancellationReasons.length > 0 ? (
+                    cancellationReasons.map((reason) => (
+                      <SelectItem key={reason.id} value={reason.code}>
+                        {reason.code} - {reason.name}
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <>
+                      <SelectItem value="01">01 - Annullamento evento</SelectItem>
+                      <SelectItem value="02">02 - Rinvio evento</SelectItem>
+                      <SelectItem value="03">03 - Modifica evento</SelectItem>
+                      <SelectItem value="04">04 - Richiesta cliente - rimborso</SelectItem>
+                      <SelectItem value="05">05 - Richiesta cliente - cambio data</SelectItem>
+                      <SelectItem value="06">06 - Errore emissione</SelectItem>
+                      <SelectItem value="07">07 - Duplicato</SelectItem>
+                      <SelectItem value="08">08 - Frode accertata</SelectItem>
+                      <SelectItem value="09">09 - Mancato pagamento</SelectItem>
+                      <SelectItem value="10">10 - Cambio nominativo</SelectItem>
+                      <SelectItem value="11">11 - Rimessa in vendita</SelectItem>
+                      <SelectItem value="12">12 - Revoca per forza maggiore</SelectItem>
+                      <SelectItem value="99">99 - Altra causale</SelectItem>
+                    </>
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="cancel-note">Note aggiuntive (opzionale)</Label>
+              <Textarea
+                id="cancel-note"
+                placeholder="Inserisci eventuali note aggiuntive..."
+                value={cancelNote}
+                onChange={(e) => setCancelNote(e.target.value)}
+                data-testid="input-cancel-note"
+              />
+            </div>
+            
+            {ticketToCancel?.transactionId && (
+              <div className="flex items-center space-x-2 p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg">
+                <Checkbox 
+                  id="refund-checkbox-cassa" 
+                  checked={refundOnCancel} 
+                  onCheckedChange={(checked) => setRefundOnCancel(checked === true)}
+                  data-testid="checkbox-refund"
+                />
+                <div className="flex flex-col">
+                  <Label htmlFor="refund-checkbox-cassa" className="text-sm font-medium cursor-pointer">
+                    Rimborsa via Stripe
+                  </Label>
+                  <span className="text-xs text-muted-foreground">
+                    Il cliente riceverà il rimborso automaticamente
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-dialog-cancel">Annulla</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-500 hover:bg-red-600"
+              disabled={!cancelReasonCode || cancelTicketMutation.isPending}
+              onClick={() => {
+                if (ticketToCancel && cancelReasonCode) {
+                  cancelTicketMutation.mutate({
+                    ticketId: ticketToCancel.id,
+                    reasonCode: cancelReasonCode,
+                    note: cancelNote?.trim() || undefined,
+                    refund: refundOnCancel,
+                  });
+                }
+              }}
+              data-testid="button-confirm-cancel"
+            >
+              {cancelTicketMutation.isPending ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Annullamento...
+                </>
+              ) : (
+                "Conferma Annullamento"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <Dialog open={isPrinterSelectOpen} onOpenChange={(open) => {
+        if (!open) {
+          setIsPrinterSelectOpen(false);
+          setPendingPrintTicketIds([]);
+          setSelectedPrintAgentId("");
+        }
+      }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Printer className="w-5 h-5 text-[#FFD700]" />
+              Seleziona Stampante
+            </DialogTitle>
+            <DialogDescription>
+              Sono presenti {connectedAgents.length} stampanti connesse. Seleziona quale utilizzare per stampare {pendingPrintTicketIds.length} bigliett{pendingPrintTicketIds.length === 1 ? 'o' : 'i'}.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-3 py-4">
+            {connectedAgents.map((agent) => (
+              <div
+                key={agent.agentId}
+                className={`p-3 rounded-lg border cursor-pointer transition-all ${
+                  selectedPrintAgentId === agent.agentId
+                    ? 'border-[#FFD700] bg-[#FFD700]/10'
+                    : 'border-border hover-elevate'
+                }`}
+                onClick={() => setSelectedPrintAgentId(agent.agentId)}
+                data-testid={`printer-option-${agent.agentId}`}
+              >
+                <div className="flex items-center gap-3">
+                  <div className={`w-3 h-3 rounded-full ${selectedPrintAgentId === agent.agentId ? 'bg-[#FFD700]' : 'bg-green-500'}`} />
+                  <div className="flex-1">
+                    <p className="font-medium">{agent.deviceName || 'Stampante'}</p>
+                    <p className="text-xs text-muted-foreground font-mono">{agent.agentId.slice(0, 8)}...</p>
+                  </div>
+                  {selectedPrintAgentId === agent.agentId && (
+                    <CheckCircle2 className="w-5 h-5 text-[#FFD700]" />
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+          
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsPrinterSelectOpen(false);
+                setPendingPrintTicketIds([]);
+              }}
+              data-testid="button-cancel-printer-select"
+            >
+              Annulla
+            </Button>
+            <Button
+              className="bg-[#FFD700] hover:bg-[#FFD700]/90 text-black"
+              disabled={!selectedPrintAgentId}
+              onClick={handlePrinterSelected}
+              data-testid="button-confirm-printer-select"
+            >
+              Stampa
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isRangeCancelDialogOpen} onOpenChange={(open) => {
+        setIsRangeCancelDialogOpen(open);
+        if (!open) {
+          setRangeFromNumber("");
+          setRangeToNumber("");
+          setCancelReasonCode("");
+          setCancelNote("");
+        }
+      }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <XCircle className="w-5 h-5 text-red-500" />
+              Annulla Range Biglietti
+            </DialogTitle>
+            <DialogDescription>
+              Annulla tutti i biglietti compresi nell'intervallo specificato.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="range-from">Da Numero Progressivo</Label>
+                <Input
+                  id="range-from"
+                  type="number"
+                  placeholder="Es: 1"
+                  value={rangeFromNumber}
+                  onChange={(e) => setRangeFromNumber(e.target.value)}
+                  data-testid="input-range-from"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="range-to">A Numero Progressivo</Label>
+                <Input
+                  id="range-to"
+                  type="number"
+                  placeholder="Es: 100"
+                  value={rangeToNumber}
+                  onChange={(e) => setRangeToNumber(e.target.value)}
+                  data-testid="input-range-to"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="range-cancel-reason">Motivo SIAE *</Label>
+              <Select value={cancelReasonCode} onValueChange={setCancelReasonCode}>
+                <SelectTrigger data-testid="select-range-cancel-reason">
+                  <SelectValue placeholder="Seleziona motivo annullamento..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {cancellationReasons && cancellationReasons.length > 0 ? (
+                    cancellationReasons.map((reason) => (
+                      <SelectItem key={reason.id} value={reason.code}>
+                        {reason.code} - {reason.name}
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <>
+                      <SelectItem value="01">01 - Annullamento evento</SelectItem>
+                      <SelectItem value="02">02 - Rinvio evento</SelectItem>
+                      <SelectItem value="03">03 - Modifica evento</SelectItem>
+                      <SelectItem value="04">04 - Richiesta cliente - rimborso</SelectItem>
+                      <SelectItem value="05">05 - Richiesta cliente - cambio data</SelectItem>
+                      <SelectItem value="06">06 - Errore emissione</SelectItem>
+                      <SelectItem value="07">07 - Duplicato</SelectItem>
+                      <SelectItem value="08">08 - Frode accertata</SelectItem>
+                      <SelectItem value="09">09 - Mancato pagamento</SelectItem>
+                      <SelectItem value="10">10 - Cambio nominativo</SelectItem>
+                      <SelectItem value="11">11 - Rimessa in vendita</SelectItem>
+                      <SelectItem value="12">12 - Revoca per forza maggiore</SelectItem>
+                      <SelectItem value="99">99 - Altra causale</SelectItem>
+                    </>
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="range-cancel-note">Note aggiuntive (opzionale)</Label>
+              <Textarea
+                id="range-cancel-note"
+                placeholder="Inserisci eventuali note aggiuntive..."
+                value={cancelNote}
+                onChange={(e) => setCancelNote(e.target.value)}
+                data-testid="input-range-cancel-note"
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsRangeCancelDialogOpen(false)} data-testid="button-range-cancel-close">
+              Annulla
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={!rangeFromNumber || !rangeToNumber || !cancelReasonCode || rangeCancelMutation.isPending}
+              onClick={() => {
+                const fromNum = parseInt(rangeFromNumber);
+                const toNum = parseInt(rangeToNumber);
+                if (selectedEventId && fromNum && toNum && cancelReasonCode) {
+                  rangeCancelMutation.mutate({
+                    ticketedEventId: selectedEventId,
+                    fromNumber: fromNum,
+                    toNumber: toNum,
+                    reasonCode: cancelReasonCode,
+                    note: cancelNote || undefined,
+                  });
+                }
+              }}
+              data-testid="button-range-cancel-confirm"
+            >
+              {rangeCancelMutation.isPending ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Annullamento...
+                </>
+              ) : (
+                <>
+                  <XCircle className="w-4 h-4 mr-2" />
+                  Annulla Range
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isC1DialogOpen} onOpenChange={setIsC1DialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileText className="w-5 h-5 text-[#FFD700]" />
+              Report C1 SIAE
+            </DialogTitle>
+            <DialogDescription>
+              Seleziona il tipo di report da generare
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="py-6 space-y-4">
+            <Button
+              variant="outline"
+              className="w-full h-20 flex flex-col items-center justify-center gap-2 hover-elevate"
+              onClick={() => {
+                setIsC1DialogOpen(false);
+                window.location.href = `/siae/reports/c1/${selectedEventId}?type=giornaliero`;
+              }}
+              data-testid="button-c1-giornaliero"
+            >
+              <Clock className="w-6 h-6 text-[#FFD700]" />
+              <div>
+                <div className="font-semibold">C1 Giornaliero</div>
+                <div className="text-xs text-muted-foreground">Riepilogo vendite del giorno</div>
+              </div>
+            </Button>
+
+            <Button
+              variant="outline"
+              className="w-full h-20 flex flex-col items-center justify-center gap-2 hover-elevate"
+              onClick={() => {
+                setIsC1DialogOpen(false);
+                window.location.href = `/siae/reports/c1/${selectedEventId}?type=mensile`;
+              }}
+              data-testid="button-c1-mensile"
+            >
+              <FileText className="w-6 h-6 text-[#FFD700]" />
+              <div>
+                <div className="font-semibold">C1 Mensile</div>
+                <div className="text-xs text-muted-foreground">Riepilogo vendite del mese</div>
+              </div>
+            </Button>
+          </div>
+
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setIsC1DialogOpen(false)} data-testid="button-close-c1-dialog">
+              Annulla
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+
+  // Desktop version
+  if (!isMobile) {
+    return (
+      <div className="container mx-auto p-6 space-y-6" data-testid="page-cassa-biglietti">
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <div>
+            <h1 className="text-3xl font-bold">Cassa Biglietti</h1>
+            <p className="text-muted-foreground">Emissione biglietti SIAE</p>
+          </div>
+          <div className="flex items-center gap-3 flex-wrap">
+            <div 
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-md border ${
+                canEmitTickets 
+                  ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400" 
+                  : bridgeConnected 
+                    ? "bg-yellow-500/10 border-yellow-500/30 text-yellow-500"
+                    : "bg-red-500/10 border-red-500/30 text-red-400"
+              }`}
+              data-testid="bridge-status-indicator"
+            >
+              {canEmitTickets ? (
+                <>
+                  <Wifi className="w-4 h-4" />
+                  <span className="text-sm font-medium">Bridge Connesso</span>
+                </>
+              ) : bridgeConnected ? (
+                <>
+                  <Radio className="w-4 h-4" />
+                  <span className="text-sm font-medium">Inserire Smart Card</span>
+                </>
+              ) : (
+                <>
+                  <WifiOff className="w-4 h-4" />
+                  <span className="text-sm font-medium">Bridge Non Connesso</span>
+                </>
+              )}
+            </div>
+
+            {isCassiere ? (
+              myAllocations && myAllocations.length === 1 ? (
+                <div className="flex items-center gap-2 px-3 py-2 bg-muted/30 rounded-md border">
+                  <Ticket className="w-4 h-4 text-[#FFD700]" />
+                  <span className="font-medium">{myAllocations[0].eventName}</span>
+                  {myAllocations[0].eventDate && (
+                    <Badge variant="outline" className="text-xs">
+                      {format(new Date(myAllocations[0].eventDate), "dd/MM/yyyy", { locale: it })}
+                    </Badge>
+                  )}
+                </div>
+              ) : (
+                <Select value={selectedEventId} onValueChange={(value) => {
+                  setSelectedEventId(value);
+                  const alloc = myAllocations?.find(a => a.eventId === value);
+                  if (alloc?.sectorId) {
+                    setSelectedSectorId(alloc.sectorId);
+                  } else {
+                    setSelectedSectorId("");
+                  }
+                }}>
+                  <SelectTrigger className="w-[280px]" data-testid="select-event">
+                    <SelectValue placeholder="Seleziona evento..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {myAllocations?.map((alloc) => (
+                      <SelectItem key={alloc.eventId} value={alloc.eventId}>
+                        {alloc.eventName} - {alloc.eventDate ? format(new Date(alloc.eventDate), "dd/MM/yyyy", { locale: it }) : 'N/A'}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )
+            ) : (
+              <Select value={selectedEventId} onValueChange={setSelectedEventId}>
+                <SelectTrigger className="w-[280px]" data-testid="select-event">
+                  <SelectValue placeholder="Seleziona evento..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {activeEvents.map((event) => (
+                    <SelectItem key={event.id} value={event.id}>
+                      {event.eventName} - {format(new Date(event.eventDate), "dd/MM/yyyy", { locale: it })}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+
+            {(isGestore || isCassiere) && selectedEventId && (
+              <>
+                <Button variant="outline" onClick={() => setIsC1DialogOpen(true)} data-testid="button-c1-report">
+                  <FileText className="w-4 h-4 mr-2" />
+                  Report C1
+                </Button>
+                <Button variant="outline" onClick={() => setIsRangeCancelDialogOpen(true)} data-testid="button-range-cancel">
+                  <XCircle className="w-4 h-4 mr-2" />
+                  Annulla Range
+                </Button>
+              </>
+            )}
+          </div>
+        </div>
+
+        {!selectedEventId ? (
+          <Card data-testid="card-select-event">
+            <CardContent className="p-12 text-center">
+              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-muted/30 flex items-center justify-center">
+                <Ticket className="w-8 h-8 text-muted-foreground" />
+              </div>
+              <h3 className="text-lg font-semibold mb-2">Seleziona un Evento</h3>
+              <p className="text-muted-foreground">
+                Scegli un evento attivo per iniziare a emettere biglietti
+              </p>
+            </CardContent>
+          </Card>
+        ) : (
+          <>
+            <div className="grid grid-cols-4 gap-4">
+              <Card>
+                <CardContent className="p-4">
+                  <div className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
+                    <User className="w-3 h-3" /> Cassiere
+                  </div>
+                  <div className="text-lg font-semibold truncate" data-testid="text-cashier-name">
+                    {user?.fullName || user?.email || "N/A"}
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className={`${quotaRemaining <= 5 ? "border-yellow-500/50" : ""} ${quotaRemaining <= 0 ? "border-red-500/50" : ""}`}>
+                <CardContent className="p-4">
+                  <div className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
+                    <Ticket className="w-3 h-3" /> Quota Residua
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className={`text-2xl font-bold ${quotaRemaining <= 0 ? "text-red-500" : quotaRemaining <= 5 ? "text-yellow-500" : "text-emerald-400"}`} data-testid="text-quota-remaining">
+                      {allocationLoading ? "-" : quotaRemaining}
+                    </div>
+                    {allocation && (
+                      <span className="text-sm text-muted-foreground">/ {allocation.quotaQuantity}</span>
+                    )}
+                  </div>
+                  {allocation && (
+                    <div className="mt-2 h-1.5 bg-muted/50 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all ${quotaPercentage > 90 ? "bg-red-500" : quotaPercentage > 75 ? "bg-yellow-500" : "bg-emerald-500"}`}
+                        style={{ width: `${Math.min(quotaPercentage, 100)}%` }}
+                      />
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardContent className="p-4">
+                  <div className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
+                    <Clock className="w-3 h-3" /> Emessi Oggi
+                  </div>
+                  <div className="text-2xl font-bold" data-testid="text-today-count">
+                    {todayStats.count}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {todayStats.cancelled > 0 && `(${todayStats.cancelled} annullati)`}
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardContent className="p-4">
+                  <div className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
+                    <Euro className="w-3 h-3" /> Incasso Oggi
+                  </div>
+                  <div className="text-2xl font-bold text-[#FFD700]" data-testid="text-today-revenue">
+                    €{todayStats.revenue.toFixed(2)}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+              <TabsList className="grid w-full max-w-md grid-cols-2" data-testid="tabs-list">
+                <TabsTrigger value="biglietti" data-testid="tab-biglietti">
+                  <Ticket className="w-4 h-4 mr-2" />
+                  Biglietti
+                </TabsTrigger>
+                <TabsTrigger value="abbonamenti" data-testid="tab-abbonamenti">
+                  <Users className="w-4 h-4 mr-2" />
+                  Abbonamenti
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="biglietti" className="mt-4">
+                <div className="grid grid-cols-3 gap-6">
+                  <Card data-testid="card-emit-ticket">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Plus className="w-5 h-5 text-[#FFD700]" />
+                        Emissione Biglietto
+                      </CardTitle>
+                    </CardHeader>
+                    <form onSubmit={handleFormSubmit}>
+                      <CardContent className="space-y-4">
+                        <div className="space-y-2">
+                          <Label>Settore</Label>
+                          {(isCassiere && currentAllocation?.sectorId && sectors?.length === 1) || (!isCassiere && sectors?.length === 1) ? (
+                            <div className="flex items-center gap-2 px-3 py-2 bg-muted/30 rounded-md border text-sm">
+                              <Store className="w-4 h-4 text-[#FFD700]" />
+                              <span className="font-medium">
+                                {sectors?.[0]?.name || currentAllocation?.sectorName}
+                              </span>
+                              {sectors?.[0] && (
+                                <Badge variant="outline" className="ml-auto">
+                                  €{Number(sectors[0].priceIntero).toFixed(2)}
+                                </Badge>
+                              )}
+                            </div>
+                          ) : (
+                            <Select value={selectedSectorId} onValueChange={setSelectedSectorId}>
+                              <SelectTrigger data-testid="select-sector">
+                                <SelectValue placeholder="Seleziona settore..." />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {sectors?.map((sector) => (
+                                  <SelectItem key={sector.id} value={sector.id}>
+                                    {sector.name} - €{Number(sector.priceIntero).toFixed(2)} ({sector.availableSeats} disp.)
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          )}
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label>Tipo Biglietto</Label>
+                          {availableTicketTypes.length === 0 ? (
+                            <div className="text-sm text-muted-foreground p-3 bg-muted/30 rounded-md text-center">
+                              Seleziona prima un settore
+                            </div>
+                          ) : (
+                            <div className="grid grid-cols-1 gap-2" data-testid="ticket-type-buttons">
+                              {availableTicketTypes.map((type) => {
+                                const isSelected = ticketType === type.value;
+                                const IconComponent = type.icon;
+                                return (
+                                  <button
+                                    key={type.value}
+                                    type="button"
+                                    onClick={() => setTicketType(type.value)}
+                                    className={`
+                                      flex items-center justify-between p-3 rounded-lg border-2 transition-all
+                                      ${isSelected 
+                                        ? 'bg-[#FFD700]/10 border-[#FFD700]' 
+                                        : 'bg-muted/30 border-border hover-elevate'}
+                                    `}
+                                    data-testid={`button-ticket-type-${type.value}`}
+                                  >
+                                    <div className="flex items-center gap-2">
+                                      <IconComponent className={`w-4 h-4 ${isSelected ? 'text-[#FFD700]' : 'text-muted-foreground'}`} />
+                                      <span className={`font-medium ${isSelected ? 'text-foreground' : 'text-muted-foreground'}`}>
+                                        {type.label}
+                                      </span>
+                                    </div>
+                                    <span className={`font-bold ${isSelected ? 'text-[#FFD700]' : 'text-muted-foreground'}`}>
+                                      {type.price === 0 ? 'Gratis' : `€${type.price.toFixed(2)}`}
+                                    </span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label>Metodo Pagamento</Label>
+                          <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                            <SelectTrigger data-testid="select-payment">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="cash">
+                                <div className="flex items-center gap-2">
+                                  <Banknote className="w-4 h-4" /> Contanti
+                                </div>
+                              </SelectItem>
+                              <SelectItem value="card">
+                                <div className="flex items-center gap-2">
+                                  <CreditCard className="w-4 h-4" /> Carta
+                                </div>
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        {ticketType === "ridotto" && (
+                          <div className="space-y-2">
+                            <Label>Prezzo Personalizzato (€)</Label>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              placeholder="Lascia vuoto per prezzo standard"
+                              value={customPrice}
+                              onChange={(e) => setCustomPrice(e.target.value)}
+                              data-testid="input-custom-price"
+                            />
+                          </div>
+                        )}
+
+                        <div className="space-y-2">
+                          <Label>Testo Libero</Label>
+                          <Input
+                            type="text"
+                            maxLength={255}
+                            placeholder="Testo personalizzato"
+                            value={customText}
+                            onChange={(e) => setCustomText(e.target.value)}
+                            data-testid="input-custom-text"
+                          />
+                        </div>
+
+                        <div className="border-t pt-4 mt-4 space-y-4">
+                          <div className="flex items-center justify-between">
+                            <div className="flex flex-col">
+                              <Label className="flex items-center gap-2">
+                                <Users className="w-4 h-4" />
+                                Biglietto Nominativo
+                              </Label>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                {isNominative ? "Con dati partecipante" : "Senza dati"}
+                              </p>
+                            </div>
+                            <Switch 
+                              checked={isNominative} 
+                              onCheckedChange={(checked) => {
+                                setIsNominative(checked);
+                                if (!checked) {
+                                  setParticipantFirstName("");
+                                  setParticipantLastName("");
+                                  setParticipantPhone("");
+                                  setParticipantEmail("");
+                                }
+                              }}
+                              data-testid="switch-nominative"
+                            />
+                          </div>
+
+                          {!isNominative && (
+                            <div className="space-y-2">
+                              <Label>Quantità Biglietti</Label>
+                              <div className="flex items-center gap-2">
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="icon"
+                                  onClick={() => setTicketQuantity(Math.max(1, ticketQuantity - 1))}
+                                  disabled={ticketQuantity <= 1}
+                                  data-testid="button-quantity-minus"
+                                >
+                                  -
+                                </Button>
+                                <Input
+                                  type="number"
+                                  min="1"
+                                  max={Math.min(quotaRemaining, 50)}
+                                  value={ticketQuantity}
+                                  onChange={(e) => setTicketQuantity(Math.max(1, Math.min(50, parseInt(e.target.value) || 1)))}
+                                  className="w-20 text-center"
+                                  data-testid="input-quantity"
+                                />
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="icon"
+                                  onClick={() => setTicketQuantity(Math.min(quotaRemaining, 50, ticketQuantity + 1))}
+                                  disabled={ticketQuantity >= Math.min(quotaRemaining, 50)}
+                                  data-testid="button-quantity-plus"
+                                >
+                                  +
+                                </Button>
+                              </div>
+                            </div>
+                          )}
+
+                          {isNominative && (
+                            <div className="space-y-2">
+                              <div className="grid grid-cols-2 gap-2">
+                                <Input
+                                  placeholder="Nome *"
+                                  value={participantFirstName}
+                                  onChange={(e) => setParticipantFirstName(e.target.value)}
+                                  data-testid="input-first-name"
+                                />
+                                <Input
+                                  placeholder="Cognome *"
+                                  value={participantLastName}
+                                  onChange={(e) => setParticipantLastName(e.target.value)}
+                                  data-testid="input-last-name"
+                                />
+                              </div>
+                              <Input
+                                placeholder="Telefono"
+                                value={participantPhone}
+                                onChange={(e) => setParticipantPhone(e.target.value)}
+                                data-testid="input-phone"
+                              />
+                              <Input
+                                placeholder="Email"
+                                type="email"
+                                value={participantEmail}
+                                onChange={(e) => setParticipantEmail(e.target.value)}
+                                data-testid="input-email"
+                              />
+                            </div>
+                          )}
+                        </div>
+
+                        {printProgress && (
+                          <div className="space-y-2 p-3 rounded-md bg-muted/30 border border-[#FFD700]/30" data-testid="print-progress-container">
+                            <div className="flex items-center justify-between text-sm">
+                              <span className="flex items-center gap-2">
+                                <Printer className="w-4 h-4 text-[#FFD700]" />
+                                <span>Stampa {printProgress.current}/{printProgress.total} biglietti...</span>
+                              </span>
+                              <span className="text-muted-foreground">{Math.round((printProgress.current / printProgress.total) * 100)}%</span>
+                            </div>
+                            <Progress value={(printProgress.current / printProgress.total) * 100} className="h-2" data-testid="progress-print" />
+                          </div>
+                        )}
+
+                        <Button
+                          type="submit"
+                          className="w-full"
+                          size="lg"
+                          disabled={emitTicketMutation.isPending || quotaRemaining <= 0 || !selectedSectorId || (!canEmitTickets && !isSuperAdmin)}
+                          data-testid="button-emit-ticket"
+                        >
+                          {emitTicketMutation.isPending ? (
+                            <>
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              Emissione in corso...
+                            </>
+                          ) : (
+                            <>
+                              <Ticket className="w-4 h-4 mr-2" />
+                              {isNominative 
+                                ? "Emetti Biglietto Nominativo" 
+                                : ticketQuantity > 1 
+                                  ? `Emetti ${ticketQuantity} Biglietti`
+                                  : "Emetti Biglietto"
+                              }
+                            </>
+                          )}
+                        </Button>
+
+                        {!canEmitTickets && !isSuperAdmin && (
+                          <div className="flex items-center gap-2 text-sm text-yellow-500 p-2 rounded-md bg-yellow-500/10 border border-yellow-500/30">
+                            <WifiOff className="w-4 h-4 flex-shrink-0" />
+                            <span>
+                              {!bridgeConnected 
+                                ? "Avviare l'app desktop Event4U per emettere biglietti fiscali."
+                                : "Inserire la Smart Card SIAE nel lettore."}
+                            </span>
+                          </div>
+                        )}
+                      </CardContent>
+                    </form>
+                  </Card>
+
+                  <Card className="col-span-2" data-testid="card-today-tickets">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Clock className="w-5 h-5 text-[#FFD700]" />
+                        Biglietti Emessi Oggi
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {ticketsLoading ? (
+                        <div className="space-y-2">
+                          {[1, 2, 3].map((i) => (
+                            <Skeleton key={i} className="h-12 w-full" />
+                          ))}
+                        </div>
+                      ) : todayTickets?.length === 0 ? (
+                        <div className="text-center py-8 text-muted-foreground">
+                          <Ticket className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                          <p>Nessun biglietto emesso oggi</p>
+                        </div>
+                      ) : (
+                        <div className="overflow-x-auto">
+                          <Table>
+                            <TableHeader>
+                              <TableRow className="bg-muted/50">
+                                <TableHead className="w-12">N°</TableHead>
+                                <TableHead>Codice</TableHead>
+                                <TableHead>Ora</TableHead>
+                                <TableHead>Tipo</TableHead>
+                                <TableHead>Prezzo</TableHead>
+                                <TableHead>Stato</TableHead>
+                                <TableHead className="text-right">Azioni</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {todayTickets?.map((ticket) => (
+                                <TableRow key={ticket.id} data-testid={`row-ticket-${ticket.id}`}>
+                                  <TableCell className="font-mono text-sm font-bold text-[#FFD700]" data-testid={`cell-progressive-${ticket.id}`}>
+                                    {ticket.progressiveNumber || '-'}
+                                  </TableCell>
+                                  <TableCell className="font-mono text-xs" data-testid={`cell-code-${ticket.id}`}>
+                                    {ticket.ticketCode}
+                                  </TableCell>
+                                  <TableCell>
+                                    {ticket.emissionDate && format(new Date(ticket.emissionDate), "HH:mm", { locale: it })}
+                                  </TableCell>
+                                  <TableCell>
+                                    <Badge variant="secondary" className="capitalize">
+                                      {ticket.ticketType}
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell className="font-semibold">
+                                    €{Number(ticket.ticketPrice || 0).toFixed(2)}
+                                  </TableCell>
+                                  <TableCell>
+                                    <div className="flex items-center gap-2">
+                                      {ticket.status === "cancelled" ? (
+                                        <Badge variant="destructive">Annullato</Badge>
+                                      ) : (
+                                        <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30">Valido</Badge>
+                                      )}
+                                      {printStatuses[ticket.id] === 'printing' && (
+                                        <Loader2 className="w-4 h-4 animate-spin text-[#FFD700]" />
+                                      )}
+                                      {printStatuses[ticket.id] === 'success' && (
+                                        <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                                      )}
+                                      {printStatuses[ticket.id] === 'error' && (
+                                        <XCircle className="w-4 h-4 text-red-400" />
+                                      )}
+                                    </div>
+                                  </TableCell>
+                                  <TableCell className="text-right">
+                                    {ticket.status !== "cancelled" && (
+                                      <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        className="text-red-500 hover:text-red-400 hover:bg-red-500/10"
+                                        onClick={() => {
+                                          setTicketToCancel(ticket);
+                                          setIsCancelDialogOpen(true);
+                                        }}
+                                        data-testid={`button-cancel-${ticket.id}`}
+                                      >
+                                        <XCircle className="w-4 h-4" />
+                                      </Button>
+                                    )}
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="abbonamenti" className="mt-4">
+                <div className="grid grid-cols-3 gap-6">
+                  <Card data-testid="card-create-subscription">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Plus className="w-5 h-5 text-[#FFD700]" />
+                        Nuovo Abbonamento
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="space-y-2">
+                        <Label>Settore</Label>
+                        <Select value={subSectorId} onValueChange={setSubSectorId}>
+                          <SelectTrigger data-testid="select-sub-sector">
+                            <SelectValue placeholder="Seleziona settore..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {sectors?.map((sector) => (
+                              <SelectItem key={sector.id} value={sector.id}>
+                                {sector.name} - €{Number(sector.priceIntero).toFixed(2)}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="flex items-center justify-between">
+                        <div className="flex flex-col">
+                          <Label>Nuovo Cliente</Label>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {createNewCustomer ? "Inserisci dati nuovo cliente" : "Seleziona cliente esistente"}
+                          </p>
+                        </div>
+                        <Switch 
+                          checked={createNewCustomer} 
+                          onCheckedChange={setCreateNewCustomer}
+                          data-testid="switch-new-customer"
+                        />
+                      </div>
+
+                      {createNewCustomer ? (
+                        <div className="space-y-2">
+                          <div className="grid grid-cols-2 gap-2">
+                            <Input
+                              placeholder="Nome *"
+                              value={subFirstName}
+                              onChange={(e) => setSubFirstName(e.target.value)}
+                              data-testid="input-sub-firstname"
+                            />
+                            <Input
+                              placeholder="Cognome *"
+                              value={subLastName}
+                              onChange={(e) => setSubLastName(e.target.value)}
+                              data-testid="input-sub-lastname"
+                            />
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          <Label>Seleziona Cliente</Label>
+                          <Select value={subCustomerId} onValueChange={setSubCustomerId}>
+                            <SelectTrigger data-testid="select-customer">
+                              <SelectValue placeholder="Seleziona cliente..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {customers?.map((customer) => (
+                                <SelectItem key={customer.id} value={customer.id}>
+                                  {customer.firstName} {customer.lastName}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
+
+                      <div className="space-y-2">
+                        <Label>Tipo Turno</Label>
+                        <Select value={subTurnType} onValueChange={(v) => setSubTurnType(v as 'F' | 'L')}>
+                          <SelectTrigger data-testid="select-sub-turn-type">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="F">Fisso (F)</SelectItem>
+                            <SelectItem value="L">Libero (L)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>Numero Eventi</Label>
+                        <Input
+                          type="number"
+                          min={1}
+                          max={100}
+                          value={subEventsCount}
+                          onChange={(e) => setSubEventsCount(parseInt(e.target.value) || 5)}
+                          data-testid="input-sub-events-count"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>Prezzo (€)</Label>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          placeholder={sectors?.find(s => s.id === subSectorId) ? `€${Number(sectors.find(s => s.id === subSectorId)?.priceIntero || 0).toFixed(2)} x ${subEventsCount}` : "Prezzo"}
+                          value={subPrice}
+                          onChange={(e) => setSubPrice(e.target.value)}
+                          data-testid="input-sub-price"
+                        />
+                      </div>
+
+                      <Button
+                        type="button"
+                        className="w-full bg-[#FFD700] text-black hover:bg-[#FFD700]/90"
+                        disabled={
+                          createSubscriptionMutation.isPending ||
+                          !subSectorId ||
+                          (createNewCustomer ? !subFirstName || !subLastName : !subCustomerId)
+                        }
+                        onClick={() => {
+                          const sector = sectors?.find(s => s.id === subSectorId);
+                          const calculatedPrice = subPrice || (sector ? String(Number(sector.priceIntero) * subEventsCount) : '0');
+                          
+                          createSubscriptionMutation.mutate({
+                            customerId: createNewCustomer ? undefined : subCustomerId,
+                            sectorId: subSectorId,
+                            turnType: subTurnType,
+                            eventsCount: subEventsCount,
+                            totalAmount: calculatedPrice,
+                            holderFirstName: createNewCustomer ? subFirstName : customers?.find(c => c.id === subCustomerId)?.firstName || '',
+                            holderLastName: createNewCustomer ? subLastName : customers?.find(c => c.id === subCustomerId)?.lastName || '',
+                            validFrom: new Date().toISOString(),
+                            validTo: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
+                            subscriptionCode: `ABB-${Date.now()}`,
+                            progressiveNumber: 1,
+                          });
+                        }}
+                        data-testid="button-create-subscription"
+                      >
+                        {createSubscriptionMutation.isPending ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            Creazione...
+                          </>
+                        ) : (
+                          <>
+                            <Plus className="w-4 h-4 mr-2" />
+                            Crea Abbonamento
+                          </>
+                        )}
+                      </Button>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="col-span-2" data-testid="card-subscriptions-list">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Users className="w-5 h-5 text-[#FFD700]" />
+                        Abbonamenti Evento
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {subscriptionsLoading ? (
+                        <div className="space-y-2">
+                          {[1, 2, 3].map((i) => (
+                            <Skeleton key={i} className="h-12 w-full" />
+                          ))}
+                        </div>
+                      ) : !eventSubscriptions || eventSubscriptions.length === 0 ? (
+                        <div className="text-center py-8 text-muted-foreground">
+                          <Users className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                          <p>Nessun abbonamento per questo evento</p>
+                        </div>
+                      ) : (
+                        <div className="overflow-x-auto">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>Codice</TableHead>
+                                <TableHead>Intestatario</TableHead>
+                                <TableHead>Turno</TableHead>
+                                <TableHead>Eventi</TableHead>
+                                <TableHead>Importo</TableHead>
+                                <TableHead>Stato</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {eventSubscriptions.map((sub) => (
+                                <TableRow key={sub.id} data-testid={`row-subscription-${sub.id}`}>
+                                  <TableCell className="font-mono text-xs">
+                                    {sub.subscriptionCode}
+                                  </TableCell>
+                                  <TableCell>
+                                    {sub.holderFirstName} {sub.holderLastName}
+                                  </TableCell>
+                                  <TableCell>
+                                    <Badge variant="secondary">
+                                      {sub.turnType === 'F' ? 'Fisso' : 'Libero'}
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell>
+                                    {sub.eventsUsed}/{sub.eventsCount}
+                                  </TableCell>
+                                  <TableCell className="font-semibold">
+                                    €{Number(sub.totalAmount || 0).toFixed(2)}
+                                  </TableCell>
+                                  <TableCell>
+                                    {sub.status === "active" ? (
+                                      <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30">Attivo</Badge>
+                                    ) : sub.status === "expired" ? (
+                                      <Badge variant="secondary">Scaduto</Badge>
+                                    ) : (
+                                      <Badge variant="destructive">Annullato</Badge>
+                                    )}
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
+              </TabsContent>
+            </Tabs>
+          </>
+        )}
+
+        {renderDialogs()}
+      </div>
+    );
+  }
+
+  // Mobile version
   return (
     <MobileAppLayout
       header={<MobileHeader title="Cassa Biglietti" showBackButton showMenuButton />}
@@ -1480,368 +2647,7 @@ export default function CassaBigliettiPage() {
         </>
       )}
 
-      <AlertDialog open={isCancelDialogOpen} onOpenChange={(open) => {
-        setIsCancelDialogOpen(open);
-        if (!open) {
-          setCancelReasonCode("");
-          setCancelNote("");
-          setRefundOnCancel(false);
-        }
-      }}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Annulla Biglietto</AlertDialogTitle>
-            <AlertDialogDescription>
-              Stai per annullare il biglietto <strong>{ticketToCancel?.ticketCode}</strong>.
-              Questa azione non può essere annullata.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <div className="py-4 space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="cancel-reason-code">Motivo SIAE *</Label>
-              <Select value={cancelReasonCode} onValueChange={setCancelReasonCode}>
-                <SelectTrigger data-testid="select-cancel-reason">
-                  <SelectValue placeholder="Seleziona motivo annullamento..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {cancellationReasons && cancellationReasons.length > 0 ? (
-                    cancellationReasons.map((reason) => (
-                      <SelectItem key={reason.id} value={reason.code}>
-                        {reason.code} - {reason.name}
-                      </SelectItem>
-                    ))
-                  ) : (
-                    <>
-                      <SelectItem value="01">01 - Annullamento evento</SelectItem>
-                      <SelectItem value="02">02 - Rinvio evento</SelectItem>
-                      <SelectItem value="03">03 - Modifica evento</SelectItem>
-                      <SelectItem value="04">04 - Richiesta cliente - rimborso</SelectItem>
-                      <SelectItem value="05">05 - Richiesta cliente - cambio data</SelectItem>
-                      <SelectItem value="06">06 - Errore emissione</SelectItem>
-                      <SelectItem value="07">07 - Duplicato</SelectItem>
-                      <SelectItem value="08">08 - Frode accertata</SelectItem>
-                      <SelectItem value="09">09 - Mancato pagamento</SelectItem>
-                      <SelectItem value="10">10 - Cambio nominativo</SelectItem>
-                      <SelectItem value="11">11 - Rimessa in vendita</SelectItem>
-                      <SelectItem value="12">12 - Revoca per forza maggiore</SelectItem>
-                      <SelectItem value="99">99 - Altra causale</SelectItem>
-                    </>
-                  )}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="cancel-note">Note aggiuntive (opzionale)</Label>
-              <Textarea
-                id="cancel-note"
-                placeholder="Inserisci eventuali note aggiuntive..."
-                value={cancelNote}
-                onChange={(e) => setCancelNote(e.target.value)}
-                data-testid="input-cancel-note"
-              />
-            </div>
-            
-            {ticketToCancel?.transactionId && (
-              <div className="flex items-center space-x-2 p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg">
-                <Checkbox 
-                  id="refund-checkbox-cassa" 
-                  checked={refundOnCancel} 
-                  onCheckedChange={(checked) => setRefundOnCancel(checked === true)}
-                  data-testid="checkbox-refund"
-                />
-                <div className="flex flex-col">
-                  <Label htmlFor="refund-checkbox-cassa" className="text-sm font-medium cursor-pointer">
-                    Rimborsa via Stripe
-                  </Label>
-                  <span className="text-xs text-muted-foreground">
-                    Il cliente riceverà il rimborso automaticamente
-                  </span>
-                </div>
-              </div>
-            )}
-          </div>
-          <AlertDialogFooter>
-            <AlertDialogCancel data-testid="button-cancel-dialog-cancel">Annulla</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-red-500 hover:bg-red-600"
-              disabled={!cancelReasonCode || cancelTicketMutation.isPending}
-              onClick={() => {
-                if (ticketToCancel && cancelReasonCode) {
-                  cancelTicketMutation.mutate({
-                    ticketId: ticketToCancel.id,
-                    reasonCode: cancelReasonCode,
-                    note: cancelNote?.trim() || undefined,
-                    refund: refundOnCancel,
-                  });
-                }
-              }}
-              data-testid="button-confirm-cancel"
-            >
-              {cancelTicketMutation.isPending ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Annullamento...
-                </>
-              ) : (
-                "Conferma Annullamento"
-              )}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* Printer Selection Dialog */}
-      <Dialog open={isPrinterSelectOpen} onOpenChange={(open) => {
-        if (!open) {
-          setIsPrinterSelectOpen(false);
-          setPendingPrintTicketIds([]);
-          setSelectedPrintAgentId("");
-        }
-      }}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Printer className="w-5 h-5 text-[#FFD700]" />
-              Seleziona Stampante
-            </DialogTitle>
-            <DialogDescription>
-              Sono presenti {connectedAgents.length} stampanti connesse. Seleziona quale utilizzare per stampare {pendingPrintTicketIds.length} bigliett{pendingPrintTicketIds.length === 1 ? 'o' : 'i'}.
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="space-y-3 py-4">
-            {connectedAgents.map((agent) => (
-              <div
-                key={agent.agentId}
-                className={`p-3 rounded-lg border cursor-pointer transition-all ${
-                  selectedPrintAgentId === agent.agentId
-                    ? 'border-[#FFD700] bg-[#FFD700]/10'
-                    : 'border-border hover-elevate'
-                }`}
-                onClick={() => setSelectedPrintAgentId(agent.agentId)}
-                data-testid={`printer-option-${agent.agentId}`}
-              >
-                <div className="flex items-center gap-3">
-                  <div className={`w-3 h-3 rounded-full ${selectedPrintAgentId === agent.agentId ? 'bg-[#FFD700]' : 'bg-green-500'}`} />
-                  <div className="flex-1">
-                    <p className="font-medium">{agent.deviceName || 'Stampante'}</p>
-                    <p className="text-xs text-muted-foreground font-mono">{agent.agentId.slice(0, 8)}...</p>
-                  </div>
-                  {selectedPrintAgentId === agent.agentId && (
-                    <CheckCircle2 className="w-5 h-5 text-[#FFD700]" />
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-          
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setIsPrinterSelectOpen(false);
-                setPendingPrintTicketIds([]);
-              }}
-              data-testid="button-cancel-printer-select"
-            >
-              Annulla
-            </Button>
-            <Button
-              className="bg-[#FFD700] hover:bg-[#FFD700]/90 text-black"
-              disabled={!selectedPrintAgentId}
-              onClick={handlePrinterSelected}
-              data-testid="button-confirm-printer-select"
-            >
-              Stampa
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Range Cancel Dialog */}
-      <Dialog open={isRangeCancelDialogOpen} onOpenChange={(open) => {
-        setIsRangeCancelDialogOpen(open);
-        if (!open) {
-          setRangeFromNumber("");
-          setRangeToNumber("");
-          setCancelReasonCode("");
-          setCancelNote("");
-        }
-      }}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <XCircle className="w-5 h-5 text-red-500" />
-              Annulla Range Biglietti
-            </DialogTitle>
-            <DialogDescription>
-              Annulla tutti i biglietti compresi nell'intervallo specificato.
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="space-y-4 py-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="range-from">Da Numero Progressivo</Label>
-                <Input
-                  id="range-from"
-                  type="number"
-                  placeholder="Es: 1"
-                  value={rangeFromNumber}
-                  onChange={(e) => setRangeFromNumber(e.target.value)}
-                  data-testid="input-range-from"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="range-to">A Numero Progressivo</Label>
-                <Input
-                  id="range-to"
-                  type="number"
-                  placeholder="Es: 100"
-                  value={rangeToNumber}
-                  onChange={(e) => setRangeToNumber(e.target.value)}
-                  data-testid="input-range-to"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="range-cancel-reason">Motivo SIAE *</Label>
-              <Select value={cancelReasonCode} onValueChange={setCancelReasonCode}>
-                <SelectTrigger data-testid="select-range-cancel-reason">
-                  <SelectValue placeholder="Seleziona motivo annullamento..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {cancellationReasons && cancellationReasons.length > 0 ? (
-                    cancellationReasons.map((reason) => (
-                      <SelectItem key={reason.id} value={reason.code}>
-                        {reason.code} - {reason.name}
-                      </SelectItem>
-                    ))
-                  ) : (
-                    <>
-                      <SelectItem value="01">01 - Annullamento evento</SelectItem>
-                      <SelectItem value="02">02 - Rinvio evento</SelectItem>
-                      <SelectItem value="03">03 - Modifica evento</SelectItem>
-                      <SelectItem value="04">04 - Richiesta cliente - rimborso</SelectItem>
-                      <SelectItem value="05">05 - Richiesta cliente - cambio data</SelectItem>
-                      <SelectItem value="06">06 - Errore emissione</SelectItem>
-                      <SelectItem value="07">07 - Duplicato</SelectItem>
-                      <SelectItem value="08">08 - Frode accertata</SelectItem>
-                      <SelectItem value="09">09 - Mancato pagamento</SelectItem>
-                      <SelectItem value="10">10 - Cambio nominativo</SelectItem>
-                      <SelectItem value="11">11 - Rimessa in vendita</SelectItem>
-                      <SelectItem value="12">12 - Revoca per forza maggiore</SelectItem>
-                      <SelectItem value="99">99 - Altra causale</SelectItem>
-                    </>
-                  )}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="range-cancel-note">Note aggiuntive (opzionale)</Label>
-              <Textarea
-                id="range-cancel-note"
-                placeholder="Inserisci eventuali note aggiuntive..."
-                value={cancelNote}
-                onChange={(e) => setCancelNote(e.target.value)}
-                data-testid="input-range-cancel-note"
-              />
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsRangeCancelDialogOpen(false)} data-testid="button-range-cancel-close">
-              Annulla
-            </Button>
-            <Button
-              variant="destructive"
-              disabled={!rangeFromNumber || !rangeToNumber || !cancelReasonCode || rangeCancelMutation.isPending}
-              onClick={() => {
-                const fromNum = parseInt(rangeFromNumber);
-                const toNum = parseInt(rangeToNumber);
-                if (selectedEventId && fromNum && toNum && cancelReasonCode) {
-                  rangeCancelMutation.mutate({
-                    ticketedEventId: selectedEventId,
-                    fromNumber: fromNum,
-                    toNumber: toNum,
-                    reasonCode: cancelReasonCode,
-                    note: cancelNote || undefined,
-                  });
-                }
-              }}
-              data-testid="button-range-cancel-confirm"
-            >
-              {rangeCancelMutation.isPending ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Annullamento...
-                </>
-              ) : (
-                <>
-                  <XCircle className="w-4 h-4 mr-2" />
-                  Annulla Range
-                </>
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={isC1DialogOpen} onOpenChange={setIsC1DialogOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <FileText className="w-5 h-5 text-[#FFD700]" />
-              Report C1 SIAE
-            </DialogTitle>
-            <DialogDescription>
-              Seleziona il tipo di report da generare
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="py-6 space-y-4">
-            <Button
-              variant="outline"
-              className="w-full h-20 flex flex-col items-center justify-center gap-2 hover-elevate"
-              onClick={() => {
-                setIsC1DialogOpen(false);
-                window.location.href = `/siae/reports/c1/${selectedEventId}?type=giornaliero`;
-              }}
-              data-testid="button-c1-giornaliero"
-            >
-              <Clock className="w-6 h-6 text-[#FFD700]" />
-              <div>
-                <div className="font-semibold">C1 Giornaliero</div>
-                <div className="text-xs text-muted-foreground">Riepilogo vendite del giorno</div>
-              </div>
-            </Button>
-
-            <Button
-              variant="outline"
-              className="w-full h-20 flex flex-col items-center justify-center gap-2 hover-elevate"
-              onClick={() => {
-                setIsC1DialogOpen(false);
-                window.location.href = `/siae/reports/c1/${selectedEventId}?type=mensile`;
-              }}
-              data-testid="button-c1-mensile"
-            >
-              <FileText className="w-6 h-6 text-[#FFD700]" />
-              <div>
-                <div className="font-semibold">C1 Mensile</div>
-                <div className="text-xs text-muted-foreground">Riepilogo vendite del mese</div>
-              </div>
-            </Button>
-          </div>
-
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setIsC1DialogOpen(false)} data-testid="button-close-c1-dialog">
-              Annulla
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {renderDialogs()}
       </div>
     </MobileAppLayout>
   );

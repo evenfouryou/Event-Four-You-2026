@@ -1,10 +1,30 @@
+import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import {
   MobileAppLayout,
   MobileHeader,
@@ -315,6 +335,8 @@ function LoadingSkeleton() {
 export default function PublicCartPage() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
+  const isMobile = useIsMobile();
+  const [clearCartDialogOpen, setClearCartDialogOpen] = useState(false);
 
   const { data: cart, isLoading, error } = useQuery<CartData>({
     queryKey: ["/api/public/cart"],
@@ -436,6 +458,270 @@ export default function PublicCartPage() {
       </HapticButton>
     </div>
   ) : null;
+
+  if (!isMobile) {
+    return (
+      <div className="container mx-auto p-6 space-y-6" data-testid="page-public-cart">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Link href="/acquista">
+              <Button variant="ghost" size="icon" data-testid="button-back">
+                <ChevronLeft className="w-5 h-5" />
+              </Button>
+            </Link>
+            <div>
+              <h1 className="text-3xl font-bold">Carrello</h1>
+              <p className="text-muted-foreground">
+                {hasItems ? `${cart?.itemsCount} ${cart?.itemsCount === 1 ? "biglietto" : "biglietti"}` : "Nessun articolo"}
+              </p>
+            </div>
+          </div>
+          {hasItems && (
+            <Dialog open={clearCartDialogOpen} onOpenChange={setClearCartDialogOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" className="text-red-400 border-red-400/30 hover:bg-red-400/10" data-testid="button-clear">
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Svuota Carrello
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Svuota Carrello</DialogTitle>
+                  <DialogDescription>
+                    Sei sicuro di voler rimuovere tutti gli articoli dal carrello? Questa azione non può essere annullata.
+                  </DialogDescription>
+                </DialogHeader>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setClearCartDialogOpen(false)}>
+                    Annulla
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    onClick={() => {
+                      if (cart?.items.length) {
+                        cart.items.forEach(item => removeMutation.mutate(item.id));
+                      }
+                      setClearCartDialogOpen(false);
+                    }}
+                    disabled={removeMutation.isPending}
+                    data-testid="button-confirm-clear"
+                  >
+                    Svuota
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          )}
+        </div>
+
+        {isLoading ? (
+          <Card>
+            <CardContent className="p-6 space-y-4">
+              {[...Array(3)].map((_, i) => (
+                <div key={i} className="flex gap-4">
+                  <Skeleton className="w-16 h-16 rounded-lg" />
+                  <div className="flex-1 space-y-2">
+                    <Skeleton className="h-5 w-3/4" />
+                    <Skeleton className="h-4 w-1/2" />
+                  </div>
+                  <Skeleton className="h-10 w-24" />
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        ) : error ? (
+          <Card>
+            <CardContent className="p-12 flex flex-col items-center justify-center">
+              <div className="w-20 h-20 rounded-full bg-red-500/10 flex items-center justify-center mb-4">
+                <AlertCircle className="w-10 h-10 text-red-400" />
+              </div>
+              <p className="text-red-400 text-center mb-4">Errore nel caricamento del carrello.</p>
+              <Button variant="outline" onClick={() => window.location.reload()}>
+                Riprova
+              </Button>
+            </CardContent>
+          </Card>
+        ) : hasItems ? (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Ticket className="w-5 h-5 text-primary" />
+                    I tuoi biglietti
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Evento</TableHead>
+                        <TableHead>Tipo</TableHead>
+                        <TableHead>Nominativo</TableHead>
+                        <TableHead className="text-center">Quantità</TableHead>
+                        <TableHead className="text-right">Prezzo</TableHead>
+                        <TableHead></TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {cart.items.map((item) => {
+                        const reservedUntil = new Date(item.reservedUntil);
+                        const isExpired = reservedUntil < new Date();
+                        const minutesLeft = Math.max(0, Math.floor((reservedUntil.getTime() - Date.now()) / 60000));
+                        
+                        return (
+                          <TableRow key={item.id} className={isExpired ? "opacity-50" : ""} data-testid={`row-item-${item.id}`}>
+                            <TableCell>
+                              <div>
+                                <p className="font-medium" data-testid={`text-event-${item.id}`}>{item.eventName}</p>
+                                <p className="text-sm text-muted-foreground">{item.sectorName}</p>
+                                <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
+                                  <span className="flex items-center gap-1">
+                                    <Calendar className="w-3 h-3" />
+                                    {format(new Date(item.eventStart), "d MMM HH:mm", { locale: it })}
+                                  </span>
+                                  <span className="flex items-center gap-1">
+                                    <MapPin className="w-3 h-3" />
+                                    {item.locationName}
+                                  </span>
+                                </div>
+                                {!isExpired && minutesLeft <= 5 && (
+                                  <p className="text-xs text-amber-400 mt-1 flex items-center gap-1">
+                                    <AlertCircle className="w-3 h-3" />
+                                    Scade tra {minutesLeft} min
+                                  </p>
+                                )}
+                                {isExpired && (
+                                  <p className="text-xs text-red-400 mt-1 flex items-center gap-1">
+                                    <AlertCircle className="w-3 h-3" />
+                                    Riserva scaduta
+                                  </p>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="outline">
+                                {item.ticketType === "intero" ? "Intero" : "Ridotto"}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              {item.participantFirstName ? (
+                                <span className="text-sm">{item.participantFirstName} {item.participantLastName}</span>
+                              ) : (
+                                <span className="text-muted-foreground text-sm">-</span>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center justify-center gap-2">
+                                <Button
+                                  variant="outline"
+                                  size="icon"
+                                  onClick={() => {
+                                    if (item.quantity > 1) {
+                                      updateQuantityMutation.mutate({ itemId: item.id, quantity: item.quantity - 1 });
+                                    }
+                                  }}
+                                  disabled={item.quantity <= 1 || updateQuantityMutation.isPending}
+                                  data-testid={`button-decrement-${item.id}`}
+                                >
+                                  <Minus className="w-4 h-4" />
+                                </Button>
+                                <span className="w-8 text-center font-semibold tabular-nums">{item.quantity}</span>
+                                <Button
+                                  variant="outline"
+                                  size="icon"
+                                  onClick={() => updateQuantityMutation.mutate({ itemId: item.id, quantity: item.quantity + 1 })}
+                                  disabled={updateQuantityMutation.isPending}
+                                  data-testid={`button-increment-${item.id}`}
+                                >
+                                  <Plus className="w-4 h-4" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <p className="font-semibold tabular-nums" data-testid={`text-price-${item.id}`}>
+                                €{(Number(item.unitPrice) * item.quantity).toFixed(2)}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                €{Number(item.unitPrice).toFixed(2)} cad.
+                              </p>
+                            </TableCell>
+                            <TableCell>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => removeMutation.mutate(item.id)}
+                                disabled={removeMutation.isPending}
+                                className="text-muted-foreground hover:text-red-400"
+                                data-testid={`button-remove-${item.id}`}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            </div>
+
+            <div className="lg:col-span-1">
+              <Card className="sticky top-6">
+                <CardHeader>
+                  <CardTitle>Riepilogo Ordine</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Subtotale</span>
+                    <span className="tabular-nums">€{cart.total.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Commissioni</span>
+                    <span className="text-green-500">Gratuite</span>
+                  </div>
+                  <div className="border-t pt-4">
+                    <div className="flex justify-between text-lg font-semibold">
+                      <span>Totale</span>
+                      <span className="text-primary tabular-nums" data-testid="text-total">€{cart.total.toFixed(2)}</span>
+                    </div>
+                  </div>
+                  <Button
+                    onClick={handleCheckout}
+                    className="w-full"
+                    size="lg"
+                    data-testid="button-checkout"
+                  >
+                    Vai al Checkout
+                    <ArrowRight className="w-4 h-4 ml-2" />
+                  </Button>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        ) : (
+          <Card>
+            <CardContent className="p-12 flex flex-col items-center justify-center">
+              <div className="w-24 h-24 rounded-full bg-muted/50 flex items-center justify-center mb-6">
+                <ShoppingCart className="w-12 h-12 text-muted-foreground" />
+              </div>
+              <h3 className="text-xl font-semibold mb-2">Carrello vuoto</h3>
+              <p className="text-muted-foreground text-center mb-8 max-w-sm">
+                Non hai ancora aggiunto biglietti al carrello. Scopri gli eventi disponibili!
+              </p>
+              <Link href="/acquista">
+                <Button data-testid="button-browse">
+                  <Ticket className="w-5 h-5 mr-2" />
+                  Sfoglia Eventi
+                </Button>
+              </Link>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+    );
+  }
 
   return (
     <MobileAppLayout

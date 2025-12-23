@@ -2,11 +2,14 @@ import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { AlertCircle, CheckCircle2, ArrowLeft, Mail, Send } from "lucide-react";
 import { Link } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 import { motion, AnimatePresence } from "framer-motion";
 import { triggerHaptic, HapticButton, MobileAppLayout } from "@/components/mobile-primitives";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 const springTransition = {
   type: "spring" as const,
@@ -15,6 +18,7 @@ const springTransition = {
 };
 
 export default function PublicForgotPassword() {
+  const isMobile = useIsMobile();
   const [email, setEmail] = useState("");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -39,6 +43,135 @@ export default function PublicForgotPassword() {
       setIsLoading(false);
     }
   };
+
+  if (!isMobile) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-6" data-testid="page-public-forgot-password-desktop">
+        <div className="w-full max-w-md">
+          <div className="flex justify-center mb-8">
+            <Link href="/">
+              <img 
+                src="/logo.png" 
+                alt="Event4U" 
+                className="h-12 w-auto cursor-pointer"
+              />
+            </Link>
+          </div>
+
+          <Card>
+            <CardHeader className="text-center">
+              <div className="mx-auto w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mb-4">
+                <Mail className="h-8 w-8 text-primary" />
+              </div>
+              <CardTitle className="text-2xl">Password Dimenticata</CardTitle>
+              <CardDescription>
+                Inserisci la tua email per ricevere un link di reset password
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleSubmit} className="space-y-6">
+                <AnimatePresence mode="wait">
+                  {error && (
+                    <motion.div
+                      key="error"
+                      initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                      transition={springTransition}
+                    >
+                      <Alert variant="destructive" data-testid="alert-error">
+                        <AlertCircle className="h-4 w-4" />
+                        <AlertDescription>{error}</AlertDescription>
+                      </Alert>
+                    </motion.div>
+                  )}
+
+                  {success && (
+                    <motion.div
+                      key="success"
+                      initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                      transition={springTransition}
+                    >
+                      <Alert data-testid="alert-success" className="border-green-500/50 bg-green-500/10">
+                        <CheckCircle2 className="h-4 w-4 text-green-500" />
+                        <AlertDescription className="text-green-400">
+                          {success}
+                        </AlertDescription>
+                      </Alert>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                <div className="space-y-2">
+                  <Label htmlFor="email-desktop">Email</Label>
+                  <div className="relative">
+                    <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                      <Mail className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                    <Input
+                      id="email-desktop"
+                      type="email"
+                      placeholder="tuaemail@esempio.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      required
+                      disabled={isLoading}
+                      data-testid="input-email"
+                      className="pl-10"
+                    />
+                  </div>
+                </div>
+
+                <Button 
+                  type="submit" 
+                  className="w-full gap-2" 
+                  disabled={isLoading}
+                  data-testid="button-submit"
+                >
+                  {isLoading ? (
+                    <motion.div
+                      animate={{ rotate: 360 }}
+                      transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                      className="h-4 w-4 border-2 border-primary-foreground border-t-transparent rounded-full"
+                    />
+                  ) : (
+                    <>
+                      <Send className="h-4 w-4" />
+                      Invia Link di Reset
+                    </>
+                  )}
+                </Button>
+
+                <div className="text-center">
+                  <p className="text-muted-foreground text-sm">
+                    Ricordi la password?{" "}
+                    <Link 
+                      href="/accedi" 
+                      className="text-primary font-medium hover:underline" 
+                      data-testid="link-login"
+                    >
+                      Accedi
+                    </Link>
+                  </p>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
+
+          <div className="text-center mt-6">
+            <Button variant="ghost" size="sm" asChild data-testid="button-back-home">
+              <Link href="/">
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Torna alla Home
+              </Link>
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const header = (
     <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-background/80 backdrop-blur-xl">

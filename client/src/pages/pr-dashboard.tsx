@@ -1,11 +1,29 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation, Link } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { motion, AnimatePresence } from "framer-motion";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { 
   Calendar, 
   Users, 
@@ -324,6 +342,9 @@ function DashboardHeader({ user, getRoleLabel }: { user: any; getRoleLabel: () =
 export default function PrDashboard() {
   const { user } = useAuth();
   const [, navigate] = useLocation();
+  const isMobile = useIsMobile();
+  const [selectedEvent, setSelectedEvent] = useState<EventWithAssignment | null>(null);
+  const [isEventDialogOpen, setIsEventDialogOpen] = useState(false);
 
   const { data: myEvents, isLoading: eventsLoading, refetch: refetchEvents } = useQuery<EventWithAssignment[]>({
     queryKey: ['/api/e4u/my-events'],
@@ -385,6 +406,338 @@ export default function PrDashboard() {
     const d = new Date(e.startDatetime);
     return !isToday(d) && isThisWeek(d);
   }) || [];
+
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Buongiorno';
+    if (hour < 18) return 'Buon pomeriggio';
+    return 'Buonasera';
+  };
+
+  const getInitials = () => {
+    const first = user?.firstName?.charAt(0) || '';
+    const last = user?.lastName?.charAt(0) || '';
+    return (first + last).toUpperCase() || user?.email?.charAt(0)?.toUpperCase() || 'U';
+  };
+
+  const getDateLabel = (date: Date) => {
+    if (isToday(date)) return "Oggi";
+    if (isTomorrow(date)) return "Domani";
+    return format(date, "EEEE d MMMM", { locale: it });
+  };
+
+  if (!isMobile) {
+    return (
+      <div className="container mx-auto p-6 space-y-6" data-testid="page-pr-dashboard">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Avatar className="h-14 w-14 border-2 border-primary/20">
+              <AvatarFallback className="bg-gradient-to-br from-primary to-primary/60 text-primary-foreground font-semibold text-lg">
+                {getInitials()}
+              </AvatarFallback>
+            </Avatar>
+            <div>
+              <p className="text-sm text-muted-foreground">{getGreeting()}</p>
+              <h1 className="text-2xl font-bold" data-testid="text-user-name">
+                {user?.firstName || user?.email?.split('@')[0] || 'Utente'}
+              </h1>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Badge 
+              className="text-base px-4 py-2 bg-primary/20 text-primary border-primary/30 font-semibold"
+              data-testid="badge-role"
+            >
+              {getRoleLabel()}
+            </Badge>
+            <Button variant="outline" onClick={() => { refetchEvents(); refetchStats(); }} data-testid="button-refresh">
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Aggiorna
+            </Button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-4 gap-4">
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="p-2 rounded-lg bg-blue-500/10">
+                  <Calendar className="h-5 w-5 text-blue-500" />
+                </div>
+                <span className="text-sm text-muted-foreground">Eventi Attivi</span>
+              </div>
+              {statsLoading ? (
+                <Skeleton className="h-8 w-16" />
+              ) : (
+                <div className="text-3xl font-bold" data-testid="stat-active-events">{myStats?.activeEvents || 0}</div>
+              )}
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="p-2 rounded-lg bg-teal-500/10">
+                  <Users className="h-5 w-5 text-teal-500" />
+                </div>
+                <span className="text-sm text-muted-foreground">Persone Aggiunte</span>
+              </div>
+              {statsLoading ? (
+                <Skeleton className="h-8 w-16" />
+              ) : (
+                <div className="text-3xl font-bold" data-testid="stat-entries">{myStats?.entriesCreated || 0}</div>
+              )}
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="p-2 rounded-lg bg-emerald-500/10">
+                  <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+                </div>
+                <span className="text-sm text-muted-foreground">Check-in</span>
+              </div>
+              {statsLoading ? (
+                <Skeleton className="h-8 w-16" />
+              ) : (
+                <div className="text-3xl font-bold" data-testid="stat-checkins">{myStats?.checkIns || 0}</div>
+              )}
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="p-2 rounded-lg bg-pink-500/10">
+                  <Armchair className="h-5 w-5 text-pink-500" />
+                </div>
+                <span className="text-sm text-muted-foreground">Tavoli Proposti</span>
+              </div>
+              {statsLoading ? (
+                <Skeleton className="h-8 w-16" />
+              ) : (
+                <div className="text-3xl font-bold" data-testid="stat-tables">{myStats?.tablesProposed || 0}</div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="grid grid-cols-3 gap-4">
+          {(isStaff || isPr) && (
+            <Button 
+              variant="outline" 
+              className="h-auto py-4 flex flex-col items-center gap-2"
+              onClick={() => myEvents?.[0] && navigate(`/events/${myEvents[0].id}/panel`)}
+              disabled={!myEvents?.length}
+              data-testid="button-quick-lists"
+            >
+              <ListChecks className="h-6 w-6" />
+              <span>Liste Ospiti</span>
+            </Button>
+          )}
+          {(isStaff || isPr) && (
+            <Button 
+              variant="outline" 
+              className="h-auto py-4 flex flex-col items-center gap-2"
+              onClick={() => myEvents?.[0] && navigate(`/events/${myEvents[0].id}/panel?tab=tables`)}
+              disabled={!myEvents?.length}
+              data-testid="button-quick-tables"
+            >
+              <Armchair className="h-6 w-6" />
+              <span>Tavoli</span>
+            </Button>
+          )}
+          {isStaff && (
+            <Button 
+              variant="outline" 
+              className="h-auto py-4 flex flex-col items-center gap-2"
+              onClick={() => myEvents?.[0] && navigate(`/events/${myEvents[0].id}/panel?tab=pr`)}
+              disabled={!myEvents?.length}
+              data-testid="button-quick-pr"
+            >
+              <UserPlus className="h-6 w-6" />
+              <span>Gestione PR</span>
+            </Button>
+          )}
+          <Button 
+            variant="outline" 
+            className="h-auto py-4 flex flex-col items-center gap-2"
+            onClick={() => navigate('/scanner')}
+            data-testid="button-quick-scanner"
+          >
+            <QrCode className="h-6 w-6" />
+            <span>Scanner QR</span>
+          </Button>
+        </div>
+
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>I Miei Eventi</CardTitle>
+                <CardDescription>Tutti gli eventi a cui sei assegnato</CardDescription>
+              </div>
+              <Badge className="bg-primary/20 text-primary border-primary/30">
+                {myEvents?.length || 0}
+              </Badge>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {eventsLoading ? (
+              <div className="space-y-4">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="flex items-center gap-4">
+                    <Skeleton className="h-12 w-12 rounded-lg" />
+                    <div className="flex-1">
+                      <Skeleton className="h-5 w-1/2 mb-2" />
+                      <Skeleton className="h-4 w-1/3" />
+                    </div>
+                    <Skeleton className="h-10 w-24" />
+                  </div>
+                ))}
+              </div>
+            ) : myEvents && myEvents.length > 0 ? (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Evento</TableHead>
+                    <TableHead>Data</TableHead>
+                    <TableHead>Ruolo</TableHead>
+                    <TableHead>Stato</TableHead>
+                    <TableHead className="text-right">Azioni</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {myEvents.map((event) => {
+                    const status = getEventStatus(event);
+                    const eventDate = new Date(event.startDatetime);
+                    return (
+                      <TableRow key={event.id} data-testid={`row-event-${event.id}`}>
+                        <TableCell className="font-medium">{event.name}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <Clock className="h-4 w-4 text-muted-foreground" />
+                            <span>{getDateLabel(eventDate)}</span>
+                            <span className="text-muted-foreground">
+                              {format(eventDate, "HH:mm", { locale: it })}
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell>{getRoleBadge(event.assignmentType)}</TableCell>
+                        <TableCell>
+                          <Badge className={status.color}>{status.label}</Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center gap-2 justify-end">
+                            <Button 
+                              variant="ghost" 
+                              size="sm"
+                              onClick={() => {
+                                setSelectedEvent(event);
+                                setIsEventDialogOpen(true);
+                              }}
+                              data-testid={`button-view-event-${event.id}`}
+                            >
+                              Dettagli
+                            </Button>
+                            <Button 
+                              size="sm"
+                              onClick={() => navigate(`/events/${event.id}/panel`)}
+                              data-testid={`button-enter-event-${event.id}`}
+                            >
+                              Entra
+                              <ArrowRight className="h-4 w-4 ml-1" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            ) : (
+              <div className="text-center py-12">
+                <div className="p-5 rounded-full bg-muted/20 inline-block mb-4">
+                  <Calendar className="h-12 w-12 text-muted-foreground" />
+                </div>
+                <h3 className="text-lg font-semibold mb-2">Nessun evento assegnato</h3>
+                <p className="text-muted-foreground">
+                  Contatta il tuo responsabile per essere aggiunto a un evento.
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Dialog open={isEventDialogOpen} onOpenChange={setIsEventDialogOpen}>
+          <DialogContent className="sm:max-w-[500px]">
+            <DialogHeader>
+              <DialogTitle>{selectedEvent?.name}</DialogTitle>
+              <DialogDescription>Dettagli dell'evento</DialogDescription>
+            </DialogHeader>
+            {selectedEvent && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Data</p>
+                    <p className="font-medium">
+                      {getDateLabel(new Date(selectedEvent.startDatetime))}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Orario</p>
+                    <p className="font-medium">
+                      {format(new Date(selectedEvent.startDatetime), "HH:mm", { locale: it })}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Ruolo</p>
+                    {getRoleBadge(selectedEvent.assignmentType)}
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Stato</p>
+                    <Badge className={getEventStatus(selectedEvent).color}>
+                      {getEventStatus(selectedEvent).label}
+                    </Badge>
+                  </div>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground mb-2">Permessi</p>
+                  <div className="flex flex-wrap gap-2">
+                    {selectedEvent.permissions?.canAddToLists && (
+                      <Badge variant="secondary">Aggiungi Liste</Badge>
+                    )}
+                    {selectedEvent.permissions?.canProposeTables && (
+                      <Badge variant="secondary">Proponi Tavoli</Badge>
+                    )}
+                    {selectedEvent.permissions?.canScanLists && (
+                      <Badge variant="secondary">Scansione Liste</Badge>
+                    )}
+                    {selectedEvent.permissions?.canManageLists && (
+                      <Badge variant="secondary">Gestisci Liste</Badge>
+                    )}
+                    {selectedEvent.permissions?.canManageTables && (
+                      <Badge variant="secondary">Gestisci Tavoli</Badge>
+                    )}
+                  </div>
+                </div>
+                <div className="flex justify-end gap-2">
+                  <Button variant="outline" onClick={() => setIsEventDialogOpen(false)}>
+                    Chiudi
+                  </Button>
+                  <Button onClick={() => {
+                    navigate(`/events/${selectedEvent.id}/panel`);
+                    setIsEventDialogOpen(false);
+                  }}>
+                    Vai all'Evento
+                    <ArrowRight className="h-4 w-4 ml-1" />
+                  </Button>
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+      </div>
+    );
+  }
 
   return (
     <MobileAppLayout

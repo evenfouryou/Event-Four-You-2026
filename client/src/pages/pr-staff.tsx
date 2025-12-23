@@ -73,6 +73,7 @@ import {
   Clock,
 } from "lucide-react";
 import { MobileAppLayout, MobileHeader } from "@/components/mobile-primitives";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
 import type { EventStaffAssignment, Event, User } from "@shared/schema";
@@ -101,6 +102,7 @@ const ROLE_OPTIONS = [
 export default function PrStaffPage() {
   const { toast } = useToast();
   const { user } = useAuth();
+  const isMobile = useIsMobile();
   const [selectedEventId, setSelectedEventId] = useState<string>("");
   const [isAddStaffOpen, setIsAddStaffOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -284,6 +286,362 @@ export default function PrStaffPage() {
     );
   }
 
+  // Desktop version
+  if (!isMobile) {
+    return (
+      <div className="container mx-auto p-6 space-y-6" data-testid="page-pr-staff">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">Team PR</h1>
+            <p className="text-muted-foreground">Assegna e gestisci lo staff per ogni evento</p>
+          </div>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => refetchStaff()}
+              data-testid="button-refresh"
+            >
+              <RefreshCw className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+
+        <Card>
+          <CardContent className="pt-6">
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Seleziona Evento</label>
+                <Select value={selectedEventId} onValueChange={setSelectedEventId}>
+                  <SelectTrigger data-testid="select-event">
+                    <SelectValue placeholder="Scegli un evento" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {events.map((event) => (
+                      <SelectItem key={event.id} value={event.id}>
+                        {event.name} - {format(new Date(event.startDatetime), "d MMM yyyy", { locale: it })}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Cerca Staff</label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Cerca per nome o ruolo..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-9"
+                    data-testid="input-search"
+                  />
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {selectedEventId && (
+          <>
+            <div className="grid grid-cols-4 gap-4">
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between gap-2">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Totale Staff</p>
+                      <p className="text-2xl font-bold">{staffAssignments.length}</p>
+                    </div>
+                    <Users className="h-8 w-8 text-primary" />
+                  </div>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between gap-2">
+                    <div>
+                      <p className="text-sm text-muted-foreground">PR</p>
+                      <p className="text-2xl font-bold text-green-500">
+                        {staffAssignments.filter(a => a.role === 'pr').length}
+                      </p>
+                    </div>
+                    <UserCog className="h-8 w-8 text-green-500" />
+                  </div>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between gap-2">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Capo Staff</p>
+                      <p className="text-2xl font-bold text-blue-500">
+                        {staffAssignments.filter(a => a.role === 'capo_staff').length}
+                      </p>
+                    </div>
+                    <Shield className="h-8 w-8 text-blue-500" />
+                  </div>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between gap-2">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Attivi</p>
+                      <p className="text-2xl font-bold text-purple-500">
+                        {staffAssignments.filter(a => a.isActive).length}
+                      </p>
+                    </div>
+                    <CheckCircle2 className="h-8 w-8 text-purple-500" />
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <CardTitle>Staff - {selectedEvent?.name}</CardTitle>
+                    <CardDescription>
+                      {selectedEvent && format(new Date(selectedEvent.startDatetime), "d MMMM yyyy", { locale: it })}
+                    </CardDescription>
+                  </div>
+                  <Dialog open={isAddStaffOpen} onOpenChange={setIsAddStaffOpen}>
+                    <DialogTrigger asChild>
+                      <Button data-testid="button-add-staff">
+                        <Plus className="w-4 h-4 mr-2" />
+                        Aggiungi Staff
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Assegna Staff all'Evento</DialogTitle>
+                        <DialogDescription>
+                          Seleziona un membro dello staff e assegna i permessi
+                        </DialogDescription>
+                      </DialogHeader>
+                      <Form {...form}>
+                        <form onSubmit={form.handleSubmit((data) => createAssignmentMutation.mutate(data))} className="space-y-4">
+                          <FormField
+                            control={form.control}
+                            name="userId"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Membro Staff</FormLabel>
+                                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                  <FormControl>
+                                    <SelectTrigger data-testid="select-user">
+                                      <SelectValue placeholder="Seleziona utente" />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    {availableUsers.map((u) => (
+                                      <SelectItem key={u.id} value={u.id}>
+                                        {u.firstName} {u.lastName} ({u.role})
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={form.control}
+                            name="role"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Ruolo per l'Evento</FormLabel>
+                                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                  <FormControl>
+                                    <SelectTrigger data-testid="select-role">
+                                      <SelectValue placeholder="Seleziona ruolo" />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    {ROLE_OPTIONS.map((role) => (
+                                      <SelectItem key={role.value} value={role.value}>
+                                        {role.label}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={form.control}
+                            name="permissions"
+                            render={() => (
+                              <FormItem>
+                                <FormLabel>Permessi</FormLabel>
+                                <div className="grid grid-cols-2 gap-2">
+                                  {PERMISSION_OPTIONS.map((permission) => (
+                                    <FormField
+                                      key={permission.value}
+                                      control={form.control}
+                                      name="permissions"
+                                      render={({ field }) => (
+                                        <FormItem className="flex items-center space-x-2 space-y-0">
+                                          <FormControl>
+                                            <Checkbox
+                                              checked={field.value?.includes(permission.value)}
+                                              onCheckedChange={(checked) => {
+                                                const newValue = checked
+                                                  ? [...(field.value || []), permission.value]
+                                                  : field.value?.filter((v) => v !== permission.value) || [];
+                                                field.onChange(newValue);
+                                              }}
+                                            />
+                                          </FormControl>
+                                          <FormLabel className="text-sm font-normal cursor-pointer">
+                                            {permission.label}
+                                          </FormLabel>
+                                        </FormItem>
+                                      )}
+                                    />
+                                  ))}
+                                </div>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <DialogFooter>
+                            <Button type="submit" disabled={createAssignmentMutation.isPending} data-testid="button-submit-staff">
+                              {createAssignmentMutation.isPending ? "Assegnando..." : "Assegna Staff"}
+                            </Button>
+                          </DialogFooter>
+                        </form>
+                      </Form>
+                    </DialogContent>
+                  </Dialog>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {loadingStaff ? (
+                  <div className="space-y-2">
+                    {[1, 2, 3].map((i) => (
+                      <Skeleton key={i} className="h-16" />
+                    ))}
+                  </div>
+                ) : filteredAssignments.length === 0 ? (
+                  <div className="text-center py-12">
+                    <Users className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                    <h3 className="text-lg font-semibold">Nessuno staff assegnato</h3>
+                    <p className="text-muted-foreground">
+                      Aggiungi membri dello staff per questo evento
+                    </p>
+                  </div>
+                ) : (
+                  <div className="rounded-md border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Nome</TableHead>
+                          <TableHead>Email</TableHead>
+                          <TableHead>Ruolo</TableHead>
+                          <TableHead>Permessi</TableHead>
+                          <TableHead className="text-center">Stato</TableHead>
+                          <TableHead className="text-right">Azioni</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredAssignments.map((assignment) => (
+                          <TableRow key={assignment.id} data-testid={`row-staff-${assignment.id}`}>
+                            <TableCell className="font-medium">
+                              {getUserName(assignment.userId)}
+                            </TableCell>
+                            <TableCell className="text-muted-foreground">
+                              {getUserEmail(assignment.userId)}
+                            </TableCell>
+                            <TableCell>
+                              {getRoleBadge(assignment.role)}
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex flex-wrap gap-1">
+                                {(assignment.permissions || []).map((perm) => (
+                                  <Badge key={perm} variant="outline" className="text-xs">
+                                    {PERMISSION_OPTIONS.find(p => p.value === perm)?.label || perm}
+                                  </Badge>
+                                ))}
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-center">
+                              {assignment.isActive ? (
+                                <Badge className="bg-green-500/10 text-green-500">Attivo</Badge>
+                              ) : (
+                                <Badge className="bg-red-500/10 text-red-500">Disattivato</Badge>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="icon" data-testid={`button-menu-${assignment.id}`}>
+                                    <MoreHorizontal className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem
+                                    onClick={() => updateAssignmentMutation.mutate({
+                                      id: assignment.id,
+                                      data: { isActive: !assignment.isActive }
+                                    })}
+                                  >
+                                    {assignment.isActive ? (
+                                      <>
+                                        <XCircle className="w-4 h-4 mr-2" />
+                                        Disattiva
+                                      </>
+                                    ) : (
+                                      <>
+                                        <CheckCircle2 className="w-4 h-4 mr-2" />
+                                        Attiva
+                                      </>
+                                    )}
+                                  </DropdownMenuItem>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem
+                                    onClick={() => deleteAssignmentMutation.mutate(assignment.id)}
+                                    className="text-destructive"
+                                  >
+                                    <Trash2 className="w-4 h-4 mr-2" />
+                                    Rimuovi
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </>
+        )}
+
+        {!selectedEventId && (
+          <Card>
+            <CardContent className="py-12 text-center">
+              <Calendar className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+              <h3 className="text-lg font-semibold">Seleziona un evento</h3>
+              <p className="text-muted-foreground">
+                Scegli un evento per gestire lo staff assegnato
+              </p>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+    );
+  }
+
+  // Mobile version
   return (
     <MobileAppLayout
       header={<MobileHeader title="Team PR" showBackButton showMenuButton />}

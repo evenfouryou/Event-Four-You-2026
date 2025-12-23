@@ -3,8 +3,26 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/hooks/useAuth";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { 
   HapticButton, 
   MobileAppLayout, 
@@ -71,8 +89,11 @@ type FilterType = "all" | "upcoming" | "today" | "past";
 
 export default function PrEventsPage() {
   const { user } = useAuth();
+  const isMobile = useIsMobile();
   const [activeFilter, setActiveFilter] = useState<FilterType>("upcoming");
   const [showFilterSheet, setShowFilterSheet] = useState(false);
+  const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
+  const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
 
   const { data: assignments = [], isLoading: loadingAssignments, refetch, isRefetching } = useQuery<EventStaffAssignment[]>({
     queryKey: ["/api/pr/my-assignments"],
@@ -467,11 +488,376 @@ export default function PrEventsPage() {
     />
   );
 
+  const handleViewEventDetail = (event: Event) => {
+    setSelectedEvent(event);
+    setIsDetailDialogOpen(true);
+  };
+
   if (isLoading) {
+    if (!isMobile) {
+      return (
+        <div className="container mx-auto p-6 space-y-6" data-testid="page-pr-events">
+          <div className="flex items-center justify-between">
+            <Skeleton className="h-10 w-48" />
+            <Skeleton className="h-10 w-24" />
+          </div>
+          <div className="grid grid-cols-4 gap-4">
+            {[1, 2, 3, 4].map((i) => (
+              <Skeleton key={i} className="h-24" />
+            ))}
+          </div>
+          <Skeleton className="h-96" />
+        </div>
+      );
+    }
     return (
       <MobileAppLayout header={header} noPadding>
         <LoadingSkeleton />
       </MobileAppLayout>
+    );
+  }
+
+  if (!isMobile) {
+    const selectedEventAssignment = selectedEvent ? getAssignmentForEvent(selectedEvent.id) : null;
+    const selectedEventRoleConfig = selectedEventAssignment ? getRoleConfig(selectedEventAssignment.role) : null;
+
+    return (
+      <div className="container mx-auto p-6 space-y-6" data-testid="page-pr-events">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">I Miei Eventi</h1>
+            <p className="text-muted-foreground">Eventi a cui sei stato assegnato come staff</p>
+          </div>
+          <Button
+            variant="outline"
+            onClick={() => refetch()}
+            disabled={isRefetching}
+            data-testid="button-refresh"
+          >
+            <RefreshCw className={`w-4 h-4 mr-2 ${isRefetching ? 'animate-spin' : ''}`} />
+            Aggiorna
+          </Button>
+        </div>
+
+        <div className="grid grid-cols-4 gap-4">
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <Calendar className="w-5 h-5 text-primary" />
+                </div>
+                <div>
+                  <div className="text-2xl font-bold">{myEvents.length}</div>
+                  <p className="text-sm text-muted-foreground">Totali</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+                  <Sparkles className="w-5 h-5 text-emerald-400" />
+                </div>
+                <div>
+                  <div className="text-2xl font-bold text-emerald-400">{todayEvents.length}</div>
+                  <p className="text-sm text-muted-foreground">Oggi</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
+                  <CalendarClock className="w-5 h-5 text-blue-400" />
+                </div>
+                <div>
+                  <div className="text-2xl font-bold text-blue-400">{upcomingEvents.length}</div>
+                  <p className="text-sm text-muted-foreground">In Arrivo</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-purple-500/10 flex items-center justify-center">
+                  <CheckCircle2 className="w-5 h-5 text-purple-400" />
+                </div>
+                <div>
+                  <div className="text-2xl font-bold text-purple-400">{pastEvents.length}</div>
+                  <p className="text-sm text-muted-foreground">Passati</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+              <CardTitle>Eventi Assegnati</CardTitle>
+              <div className="flex gap-2">
+                <Button
+                  variant={activeFilter === "upcoming" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setActiveFilter("upcoming")}
+                  data-testid="filter-upcoming"
+                >
+                  <CalendarClock className="w-4 h-4 mr-2" />
+                  Prossimi ({upcomingEvents.length})
+                </Button>
+                <Button
+                  variant={activeFilter === "today" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setActiveFilter("today")}
+                  data-testid="filter-today"
+                >
+                  <Sparkles className="w-4 h-4 mr-2" />
+                  Oggi ({todayEvents.length})
+                </Button>
+                <Button
+                  variant={activeFilter === "past" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setActiveFilter("past")}
+                  data-testid="filter-past"
+                >
+                  <CheckCircle2 className="w-4 h-4 mr-2" />
+                  Passati ({pastEvents.length})
+                </Button>
+                <Button
+                  variant={activeFilter === "all" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setActiveFilter("all")}
+                  data-testid="filter-all"
+                >
+                  <Calendar className="w-4 h-4 mr-2" />
+                  Tutti ({myEvents.length})
+                </Button>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {displayedEvents.length === 0 ? (
+              <div className="text-center py-12">
+                <div className="w-16 h-16 rounded-2xl bg-muted/20 flex items-center justify-center mx-auto mb-4">
+                  <Calendar className="w-8 h-8 text-muted-foreground" />
+                </div>
+                <h3 className="text-lg font-semibold mb-2">Nessun evento</h3>
+                <p className="text-muted-foreground">
+                  {activeFilter === "all" 
+                    ? "Non sei stato ancora assegnato a nessun evento."
+                    : `Non ci sono eventi ${activeFilter === "upcoming" ? "in arrivo" : activeFilter === "today" ? "oggi" : "passati"}.`}
+                </p>
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Evento</TableHead>
+                    <TableHead>Data</TableHead>
+                    <TableHead>Orario</TableHead>
+                    <TableHead>Ruolo</TableHead>
+                    <TableHead>Stato</TableHead>
+                    <TableHead>Permessi</TableHead>
+                    <TableHead className="text-right">Azioni</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {displayedEvents.map((event) => {
+                    const assignment = getAssignmentForEvent(event.id);
+                    const eventDate = new Date(event.startDatetime);
+                    const isEventToday = isToday(eventDate);
+                    const statusConfig = getStatusConfig(event.status);
+                    const roleConfig = assignment ? getRoleConfig(assignment.role) : null;
+                    const timeLabel = getTimeLabel(eventDate);
+
+                    return (
+                      <TableRow 
+                        key={event.id}
+                        className={isEventToday ? "bg-primary/5" : ""}
+                        data-testid={`row-event-${event.id}`}
+                      >
+                        <TableCell>
+                          <div className="flex items-center gap-3">
+                            <div className="font-semibold">{event.name}</div>
+                            {timeLabel && (
+                              <Badge 
+                                className={
+                                  isEventToday 
+                                    ? 'bg-primary/20 text-primary border-primary/30' 
+                                    : 'bg-amber-500/20 text-amber-400 border-amber-500/30'
+                                }
+                              >
+                                {isEventToday && <Sparkles className="w-3 h-3 mr-1" />}
+                                {timeLabel}
+                              </Badge>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <Calendar className="w-4 h-4 text-muted-foreground" />
+                            {format(eventDate, "EEE d MMM yyyy", { locale: it })}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <Clock className="w-4 h-4 text-muted-foreground" />
+                            {format(eventDate, "HH:mm", { locale: it })}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          {roleConfig && (
+                            <Badge className={`${roleConfig.bgClass} ${roleConfig.textClass} ${roleConfig.borderClass}`}>
+                              {roleConfig.label}
+                            </Badge>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <Badge className={`${statusConfig.bgClass} ${statusConfig.textClass} ${statusConfig.borderClass}`}>
+                            {statusConfig.label}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex gap-1 flex-wrap">
+                            {assignment?.permissions?.includes('gestione_liste') && (
+                              <Badge variant="secondary" className="text-xs">
+                                <ListChecks className="w-3 h-3 mr-1" />
+                                Liste
+                              </Badge>
+                            )}
+                            {assignment?.permissions?.includes('gestione_tavoli') && (
+                              <Badge variant="secondary" className="text-xs">
+                                <Armchair className="w-3 h-3 mr-1" />
+                                Tavoli
+                              </Badge>
+                            )}
+                            {assignment?.permissions?.includes('check_in') && (
+                              <Badge variant="secondary" className="text-xs">
+                                <QrCode className="w-3 h-3 mr-1" />
+                                Check-in
+                              </Badge>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleViewEventDetail(event)}
+                              data-testid={`button-view-${event.id}`}
+                            >
+                              <ChevronRight className="w-4 h-4" />
+                            </Button>
+                            <Link href={`/pr/staff?event=${event.id}`}>
+                              <Button size="sm" data-testid={`button-open-${event.id}`}>
+                                Apri
+                              </Button>
+                            </Link>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+
+        <Dialog open={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle>{selectedEvent?.name}</DialogTitle>
+              <DialogDescription>Dettagli dell'evento e del tuo ruolo</DialogDescription>
+            </DialogHeader>
+            {selectedEvent && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <p className="text-sm text-muted-foreground">Data</p>
+                    <p className="font-medium flex items-center gap-2">
+                      <Calendar className="w-4 h-4" />
+                      {format(new Date(selectedEvent.startDatetime), "EEEE d MMMM yyyy", { locale: it })}
+                    </p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-sm text-muted-foreground">Orario</p>
+                    <p className="font-medium flex items-center gap-2">
+                      <Clock className="w-4 h-4" />
+                      {format(new Date(selectedEvent.startDatetime), "HH:mm", { locale: it })}
+                    </p>
+                  </div>
+                </div>
+
+                {selectedEvent.locationId && (
+                  <div className="space-y-1">
+                    <p className="text-sm text-muted-foreground">Location</p>
+                    <p className="font-medium flex items-center gap-2">
+                      <MapPin className="w-4 h-4" />
+                      {selectedEvent.locationId}
+                    </p>
+                  </div>
+                )}
+
+                <div className="space-y-1">
+                  <p className="text-sm text-muted-foreground">Stato Evento</p>
+                  <Badge className={`${getStatusConfig(selectedEvent.status).bgClass} ${getStatusConfig(selectedEvent.status).textClass}`}>
+                    {getStatusConfig(selectedEvent.status).label}
+                  </Badge>
+                </div>
+
+                {selectedEventRoleConfig && (
+                  <div className="space-y-1">
+                    <p className="text-sm text-muted-foreground">Il Tuo Ruolo</p>
+                    <Badge className={`${selectedEventRoleConfig.bgClass} ${selectedEventRoleConfig.textClass} ${selectedEventRoleConfig.borderClass}`}>
+                      {selectedEventRoleConfig.label}
+                    </Badge>
+                  </div>
+                )}
+
+                {selectedEventAssignment?.permissions && selectedEventAssignment.permissions.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-sm text-muted-foreground">I Tuoi Permessi</p>
+                    <div className="flex gap-2 flex-wrap">
+                      {selectedEventAssignment.permissions.includes('gestione_liste') && (
+                        <Badge className="bg-emerald-500/10 text-emerald-400 border-emerald-500/30">
+                          <ListChecks className="w-3 h-3 mr-1" />
+                          Gestione Liste
+                        </Badge>
+                      )}
+                      {selectedEventAssignment.permissions.includes('gestione_tavoli') && (
+                        <Badge className="bg-blue-500/10 text-blue-400 border-blue-500/30">
+                          <Armchair className="w-3 h-3 mr-1" />
+                          Gestione Tavoli
+                        </Badge>
+                      )}
+                      {selectedEventAssignment.permissions.includes('check_in') && (
+                        <Badge className="bg-purple-500/10 text-purple-400 border-purple-500/30">
+                          <QrCode className="w-3 h-3 mr-1" />
+                          Check-in
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex justify-end pt-4">
+                  <Link href={`/pr/staff?event=${selectedEvent.id}`}>
+                    <Button data-testid="button-open-event">
+                      Vai all'Evento
+                      <ChevronRight className="w-4 h-4 ml-2" />
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+      </div>
     );
   }
 

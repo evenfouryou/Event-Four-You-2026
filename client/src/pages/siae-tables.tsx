@@ -26,6 +26,7 @@ import { Badge } from "@/components/ui/badge";
 import { Plus, Pencil, Music, MapPin, Ticket, Briefcase, XCircle, Loader2, Percent } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { useForm } from "react-hook-form";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { MobileAppLayout, MobileHeader } from "@/components/mobile-primitives";
@@ -521,6 +522,72 @@ function CancellationReasonsTab() {
 }
 
 export default function SiaeTablesPage() {
+  const isMobile = useIsMobile();
+
+  if (!isMobile) {
+    return (
+      <div className="container mx-auto p-6 space-y-6" data-testid="page-siae-tables">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">Tabelle SIAE</h1>
+            <p className="text-muted-foreground">
+              Gestione tabelle di sistema secondo Decreto 23/07/2001 e Provvedimento 356768/2025
+            </p>
+          </div>
+        </div>
+
+        <Card data-testid="card-tables">
+          <CardContent className="p-6">
+            <Tabs defaultValue="genres" className="w-full" data-testid="tabs-siae">
+              <TabsList className="grid w-full grid-cols-5 mb-6" data-testid="tabs-list">
+                <TabsTrigger value="genres" className="flex items-center gap-2" data-testid="tab-genres">
+                  <Music className="w-4 h-4" />
+                  <span>Generi</span>
+                </TabsTrigger>
+                <TabsTrigger value="sectors" className="flex items-center gap-2" data-testid="tab-sectors">
+                  <MapPin className="w-4 h-4" />
+                  <span>Settori</span>
+                </TabsTrigger>
+                <TabsTrigger value="ticket-types" className="flex items-center gap-2" data-testid="tab-ticket-types">
+                  <Ticket className="w-4 h-4" />
+                  <span>Tipi Titolo</span>
+                </TabsTrigger>
+                <TabsTrigger value="services" className="flex items-center gap-2" data-testid="tab-services">
+                  <Briefcase className="w-4 h-4" />
+                  <span>Prestazioni</span>
+                </TabsTrigger>
+                <TabsTrigger value="cancellations" className="flex items-center gap-2" data-testid="tab-cancellations">
+                  <XCircle className="w-4 h-4" />
+                  <span>Causali</span>
+                </TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="genres" data-testid="tabcontent-genres">
+                <EventGenresTab />
+              </TabsContent>
+              
+              <TabsContent value="sectors" data-testid="tabcontent-sectors">
+                <SectorCodesTab />
+              </TabsContent>
+              
+              <TabsContent value="ticket-types" data-testid="tabcontent-ticket-types">
+                <TicketTypesTab />
+              </TabsContent>
+              
+              <TabsContent value="services" data-testid="tabcontent-services">
+                <ServiceCodesTab />
+              </TabsContent>
+              
+              <TabsContent value="cancellations" data-testid="tabcontent-cancellations">
+                <CancellationReasonsTab />
+              </TabsContent>
+            </Tabs>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <MobileAppLayout
       header={<MobileHeader title="Tabelle SIAE" showBackButton showMenuButton showUserMenu />}

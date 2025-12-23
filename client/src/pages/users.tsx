@@ -3,8 +3,18 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import {
   Dialog,
   DialogContent,
@@ -326,6 +336,7 @@ export default function UsersPage() {
   const [selectedRole, setSelectedRole] = useState<string | null>(null);
   const { toast } = useToast();
   const { user: currentUser } = useAuth();
+  const isMobile = useIsMobile();
 
   const { data: users, isLoading: usersLoading } = useQuery<User[]>({
     queryKey: ['/api/users'],
@@ -712,6 +723,521 @@ export default function UsersPage() {
       }
     />
   );
+
+  if (!isMobile) {
+    return (
+      <div className="container mx-auto p-6 space-y-6" data-testid="page-users">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold">Gestione Utenti</h1>
+            <p className="text-muted-foreground">
+              {filteredUsers.length} {filteredUsers.length === 1 ? 'utente' : 'utenti'} trovati
+            </p>
+          </div>
+          <Button 
+            onClick={() => {
+              form.reset({
+                email: '',
+                password: '',
+                firstName: '',
+                lastName: '',
+                role: getDefaultRole(),
+                companyId: null,
+                phone: '',
+                isEditing: false,
+              });
+              setEditingUser(null);
+              setDialogOpen(true);
+            }}
+            data-testid="button-create-user"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Nuovo Utente
+          </Button>
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-2xl font-bold" data-testid="text-total-users">{totalUsers}</div>
+              <p className="text-sm text-muted-foreground">Totale Utenti</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-2xl font-bold text-emerald-500" data-testid="text-active-users">{activeUsers}</div>
+              <p className="text-sm text-muted-foreground">Utenti Attivi</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-2xl font-bold text-amber-500">{totalUsers - activeUsers}</div>
+              <p className="text-sm text-muted-foreground">Utenti Disattivati</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-2xl font-bold text-blue-500">{users?.filter(u => u.emailVerified).length || 0}</div>
+              <p className="text-sm text-muted-foreground">Email Verificate</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between gap-4 space-y-0 pb-4">
+            <CardTitle className="text-xl">Elenco Utenti</CardTitle>
+            <div className="flex items-center gap-3">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  type="text"
+                  placeholder="Cerca utenti..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-9 w-64"
+                  data-testid="input-search-users"
+                />
+              </div>
+              <Select value={selectedRole || "all"} onValueChange={(v) => setSelectedRole(v === "all" ? null : v)}>
+                <SelectTrigger className="w-40" data-testid="select-filter-role">
+                  <SelectValue placeholder="Filtra ruolo" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tutti i ruoli</SelectItem>
+                  {availableRoles.map((role) => (
+                    <SelectItem key={role} value={role}>{roleLabels[role]}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {usersLoading ? (
+              <div className="space-y-3">
+                {[1, 2, 3].map((i) => (
+                  <Skeleton key={i} className="h-16 w-full" />
+                ))}
+              </div>
+            ) : filteredUsers.length > 0 ? (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Utente</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Ruolo</TableHead>
+                    {isSuperAdmin && <TableHead>Azienda</TableHead>}
+                    <TableHead>Stato</TableHead>
+                    <TableHead className="text-right">Azioni</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredUsers.map((user) => {
+                    const initials = `${user.firstName?.[0] || ''}${user.lastName?.[0] || ''}`.toUpperCase();
+                    return (
+                      <TableRow key={user.id} data-testid={`row-user-${user.id}`}>
+                        <TableCell>
+                          <div className="flex items-center gap-3">
+                            <Avatar className="h-10 w-10">
+                              <AvatarFallback 
+                                className={`bg-gradient-to-br ${roleGradients[user.role] || 'from-gray-500 to-gray-600'} text-white text-sm font-semibold`}
+                              >
+                                {initials}
+                              </AvatarFallback>
+                            </Avatar>
+                            <span className="font-medium" data-testid={`text-user-name-${user.id}`}>
+                              {user.firstName} {user.lastName}
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">{user.email}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline" data-testid={`badge-role-${user.id}`}>
+                            {roleLabels[user.role]}
+                          </Badge>
+                        </TableCell>
+                        {isSuperAdmin && (
+                          <TableCell data-testid={`text-company-${user.id}`}>
+                            {user.companyId ? getCompanyName(user.companyId) : '-'}
+                          </TableCell>
+                        )}
+                        <TableCell>
+                          {user.isActive ? (
+                            <Badge variant="outline" className="text-emerald-500 border-emerald-500/30" data-testid={`badge-active-${user.id}`}>
+                              <CheckCircle className="h-3 w-3 mr-1" />
+                              Attivo
+                            </Badge>
+                          ) : (
+                            <Badge variant="destructive" data-testid={`badge-inactive-${user.id}`}>
+                              <UserX className="h-3 w-3 mr-1" />
+                              Disattivato
+                            </Badge>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            {isSuperAdmin && user.role === 'gestore' && (
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                onClick={() => handleOpenFeaturesDialog(user)}
+                                data-testid={`button-features-user-${user.id}`}
+                              >
+                                <Settings2 className="h-4 w-4" />
+                              </Button>
+                            )}
+                            {isAdmin && user.role === 'warehouse' && (
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                onClick={() => handleOpenFeaturesDialog(user)}
+                                data-testid={`button-permissions-user-${user.id}`}
+                              >
+                                <Settings2 className="h-4 w-4" />
+                              </Button>
+                            )}
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => handleEdit(user)}
+                              data-testid={`button-edit-user-${user.id}`}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            {user.id !== currentUser?.id && (
+                              <>
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  onClick={() => toggleActiveMutation.mutate({ id: user.id, isActive: !user.isActive })}
+                                  data-testid={`button-toggle-active-user-${user.id}`}
+                                >
+                                  {user.isActive ? <Ban className="h-4 w-4" /> : <CheckCircle className="h-4 w-4" />}
+                                </Button>
+                                {(isSuperAdmin || (isAdmin && user.role !== 'super_admin' && user.role !== 'gestore' && currentUser && user.companyId === currentUser.companyId)) && (
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    onClick={() => impersonateMutation.mutate(user.id)}
+                                    data-testid={`button-impersonate-user-${user.id}`}
+                                  >
+                                    <LogIn className="h-4 w-4" />
+                                  </Button>
+                                )}
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  onClick={() => handleDeleteClick(user.id)}
+                                  data-testid={`button-delete-user-${user.id}`}
+                                  className="text-destructive hover:text-destructive"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            ) : (
+              <div className="text-center py-12">
+                <UsersIcon className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <p className="text-muted-foreground" data-testid="text-no-users">
+                  {searchQuery || selectedRole ? 'Nessun utente trovato con i filtri applicati.' : 'Nessun utente presente.'}
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Dialog open={dialogOpen} onOpenChange={handleDialogOpenChange}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>
+                {editingUser ? 'Modifica Utente' : 'Nuovo Utente'}
+              </DialogTitle>
+              <DialogDescription>
+                {editingUser 
+                  ? 'Modifica i dettagli dell\'utente. Lascia la password vuota per non modificarla.' 
+                  : 'Inserisci i dettagli del nuovo utente.'}
+              </DialogDescription>
+            </DialogHeader>
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+                <FormField
+                  control={form.control}
+                  name="firstName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Nome</FormLabel>
+                      <FormControl>
+                        <Input {...field} data-testid="input-user-firstname" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="lastName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Cognome</FormLabel>
+                      <FormControl>
+                        <Input {...field} data-testid="input-user-lastname" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="email"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Email</FormLabel>
+                      <FormControl>
+                        <Input type="email" {...field} data-testid="input-user-email" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="password"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>
+                        Password {editingUser && '(lascia vuoto per non modificare)'}
+                      </FormLabel>
+                      <FormControl>
+                        <Input
+                          type="password"
+                          {...field}
+                          placeholder={editingUser ? '' : 'Minimo 8 caratteri'}
+                          data-testid="input-user-password"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="role"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Ruolo</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-user-role">
+                            <SelectValue placeholder="Seleziona ruolo" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {isSuperAdmin && (
+                            <>
+                              <SelectItem value="super_admin">Super Admin</SelectItem>
+                              <SelectItem value="gestore">Gestore</SelectItem>
+                              <SelectItem value="gestore_covisione">Gestore Covisione</SelectItem>
+                              <SelectItem value="capo_staff">Capo Staff</SelectItem>
+                              <SelectItem value="pr">PR</SelectItem>
+                              <SelectItem value="warehouse">Magazzino</SelectItem>
+                              <SelectItem value="bartender">Bartender</SelectItem>
+                              <SelectItem value="cassiere">Cassiere</SelectItem>
+                            </>
+                          )}
+                          {isAdmin && (
+                            <>
+                              <SelectItem value="gestore_covisione">Gestore Covisione</SelectItem>
+                              <SelectItem value="capo_staff">Capo Staff</SelectItem>
+                              <SelectItem value="pr">PR</SelectItem>
+                              <SelectItem value="warehouse">Magazzino</SelectItem>
+                              <SelectItem value="bartender">Bartender</SelectItem>
+                              <SelectItem value="cassiere">Cassiere</SelectItem>
+                            </>
+                          )}
+                          {isCapoStaff && (
+                            <SelectItem value="pr">PR</SelectItem>
+                          )}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                {watchRole === 'pr' && (
+                  <FormField
+                    control={form.control}
+                    name="phone"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Telefono</FormLabel>
+                        <FormControl>
+                          <Input placeholder="+39..." {...field} data-testid="input-user-phone" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
+                {isSuperAdmin && (
+                  <FormField
+                    control={form.control}
+                    name="companyId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Azienda</FormLabel>
+                        <Select
+                          onValueChange={field.onChange}
+                          value={field.value || undefined}
+                        >
+                          <FormControl>
+                            <SelectTrigger data-testid="select-user-company">
+                              <SelectValue placeholder="Seleziona azienda (opzionale)" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="null">Nessuna azienda</SelectItem>
+                            {companies?.map((company) => (
+                              <SelectItem key={company.id} value={company.id}>
+                                {company.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
+                <DialogFooter className="gap-2 pt-4">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => handleDialogOpenChange(false)}
+                    data-testid="button-cancel-user"
+                  >
+                    Annulla
+                  </Button>
+                  <Button
+                    type="submit"
+                    disabled={createMutation.isPending || updateMutation.isPending}
+                    data-testid="button-save-user"
+                  >
+                    {editingUser ? 'Aggiorna' : 'Crea'}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </Form>
+          </DialogContent>
+        </Dialog>
+
+        <AlertDialog open={!!deleteUserId} onOpenChange={() => setDeleteUserId(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Conferma eliminazione</AlertDialogTitle>
+              <AlertDialogDescription>
+                Sei sicuro di voler eliminare questo utente? Questa azione non può essere annullata.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel data-testid="button-cancel-delete">Annulla</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleDeleteConfirm}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                data-testid="button-confirm-delete"
+              >
+                Elimina
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        <Dialog open={featuresDialogOpen} onOpenChange={setFeaturesDialogOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Settings2 className="h-5 w-5" />
+                {selectedUserForFeatures?.role === 'warehouse' ? 'Gestione Permessi' : 'Gestione Moduli'}
+              </DialogTitle>
+              <DialogDescription>
+                {selectedUserForFeatures?.firstName} {selectedUserForFeatures?.lastName} - {selectedUserForFeatures?.role === 'warehouse' ? 'Abilita o disabilita i permessi' : 'Attiva o disattiva i moduli disponibili'}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3 py-4">
+              {selectedUserForFeatures?.role === 'warehouse' && warehouseFeaturesList.map((feature) => (
+                <div
+                  key={feature.key}
+                  className="flex items-center justify-between p-3 rounded-lg border hover-elevate cursor-pointer"
+                  onClick={() => handleToggleFeature(feature.key)}
+                  data-testid={`toggle-feature-${feature.key}`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-600 flex items-center justify-center text-white">
+                      {feature.icon}
+                    </div>
+                    <div>
+                      <Label className="cursor-pointer font-medium">{feature.label}</Label>
+                      <p className="text-sm text-muted-foreground">{feature.description}</p>
+                    </div>
+                  </div>
+                  <Switch
+                    checked={!!localFeatures[feature.key]}
+                    onCheckedChange={() => handleToggleFeature(feature.key)}
+                    data-testid={`switch-feature-${feature.key}`}
+                  />
+                </div>
+              ))}
+              {selectedUserForFeatures?.role === 'gestore' && featuresList.map((feature) => (
+                <div
+                  key={feature.key}
+                  className="flex items-center justify-between p-3 rounded-lg border hover-elevate cursor-pointer"
+                  onClick={() => handleToggleFeature(feature.key)}
+                  data-testid={`toggle-feature-${feature.key}`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white">
+                      {feature.icon}
+                    </div>
+                    <div>
+                      <Label className="cursor-pointer font-medium">{feature.label}</Label>
+                      <p className="text-sm text-muted-foreground">{feature.description}</p>
+                    </div>
+                  </div>
+                  <Switch
+                    checked={!!localFeatures[feature.key]}
+                    onCheckedChange={() => handleToggleFeature(feature.key)}
+                    data-testid={`switch-feature-${feature.key}`}
+                  />
+                </div>
+              ))}
+            </div>
+            <DialogFooter className="gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setFeaturesDialogOpen(false)}
+                data-testid="button-cancel-features"
+              >
+                Annulla
+              </Button>
+              <Button
+                onClick={handleSaveFeatures}
+                disabled={updateFeaturesMutation.isPending}
+                data-testid="button-save-features"
+              >
+                {updateFeaturesMutation.isPending ? 'Salvataggio...' : 'Salva'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+    );
+  }
 
   return (
     <MobileAppLayout header={header} noPadding>

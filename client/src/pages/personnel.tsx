@@ -3,11 +3,15 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { useLocation } from "wouter";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -219,6 +223,7 @@ function StaffCard({
 export default function Personnel() {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
+  const isMobile = useIsMobile();
   const [activeTab, setActiveTab] = useState("staff");
   const isAdmin = user?.role === "super_admin" || user?.role === "gestore";
 
@@ -237,6 +242,103 @@ export default function Personnel() {
   const activeStaffCount = staffList.filter(s => s.active).length;
   const totalPayments = payments.reduce((sum, p) => sum + parseFloat(p.amount || "0"), 0);
 
+  // Desktop version
+  if (!isMobile) {
+    return (
+      <div className="container mx-auto p-6 space-y-6" data-testid="page-personnel">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">Personale</h1>
+            <p className="text-muted-foreground">Gestione staff, assegnazioni e pagamenti</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-4 gap-4">
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
+                  <Users className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <div className="text-2xl font-bold" data-testid="stat-total-staff-desktop">{staffList.length}</div>
+                  <p className="text-sm text-muted-foreground">Totale Staff</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-teal-500 to-cyan-600 flex items-center justify-center">
+                  <UserCheck className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <div className="text-2xl font-bold text-teal-500" data-testid="stat-active-staff-desktop">{activeStaffCount}</div>
+                  <p className="text-sm text-muted-foreground">Attivi</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
+                  <Calendar className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <div className="text-2xl font-bold text-violet-500" data-testid="stat-assignments-desktop">{assignments.length}</div>
+                  <p className="text-sm text-muted-foreground">Assegnazioni</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center">
+                  <Euro className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <div className="text-2xl font-bold text-amber-500" data-testid="stat-payments-desktop">€{totalPayments.toFixed(0)}</div>
+                  <p className="text-sm text-muted-foreground">Pagamenti</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+          <TabsList>
+            <TabsTrigger value="staff" className="flex items-center gap-2" data-testid="tab-staff-desktop">
+              <Users className="h-4 w-4" />
+              Staff
+            </TabsTrigger>
+            <TabsTrigger value="assignments" className="flex items-center gap-2" data-testid="tab-assignments-desktop">
+              <Calendar className="h-4 w-4" />
+              Assegnazioni
+            </TabsTrigger>
+            <TabsTrigger value="payments" className="flex items-center gap-2" data-testid="tab-payments-desktop">
+              <Wallet className="h-4 w-4" />
+              Pagamenti
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="staff">
+            <DesktopStaffSection isAdmin={isAdmin} />
+          </TabsContent>
+          <TabsContent value="assignments">
+            <DesktopAssignmentsSection isAdmin={isAdmin} />
+          </TabsContent>
+          <TabsContent value="payments">
+            <DesktopPaymentsSection isAdmin={isAdmin} />
+          </TabsContent>
+        </Tabs>
+      </div>
+    );
+  }
+
+  // Mobile version
   const header = (
     <MobileHeader
       title="Personale"
@@ -1442,5 +1544,853 @@ function PaymentsSection({ isAdmin }: { isAdmin: boolean }) {
         </>
       )}
     </motion.div>
+  );
+}
+
+// Desktop Components
+function DesktopStaffSection({ isAdmin }: { isAdmin: boolean }) {
+  const { toast } = useToast();
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingStaff, setEditingStaff] = useState<Staff | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
+
+  const { data: staffList = [], isLoading } = useQuery<Staff[]>({
+    queryKey: ["/api/staff"],
+  });
+
+  const createMutation = useMutation({
+    mutationFn: (data: any) => apiRequest("POST", "/api/staff", data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/staff"] });
+      setIsDialogOpen(false);
+      toast({ title: "Personale creato con successo" });
+    },
+    onError: (err: any) => {
+      toast({ title: "Errore", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: any }) => 
+      apiRequest("PATCH", `/api/staff/${id}`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/staff"] });
+      setEditingStaff(null);
+      setIsDialogOpen(false);
+      toast({ title: "Personale aggiornato" });
+    },
+    onError: (err: any) => {
+      toast({ title: "Errore", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => apiRequest("DELETE", `/api/staff/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/staff"] });
+      toast({ title: "Personale eliminato" });
+    },
+    onError: (err: any) => {
+      toast({ title: "Errore", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    const data = {
+      firstName: formData.get("firstName") as string,
+      lastName: formData.get("lastName") as string,
+      fiscalCode: formData.get("fiscalCode") as string || null,
+      email: formData.get("email") as string || null,
+      phone: formData.get("phone") as string || null,
+      role: formData.get("role") as string,
+      hourlyRate: formData.get("hourlyRate") as string || null,
+      fixedRate: formData.get("fixedRate") as string || null,
+      bankIban: formData.get("bankIban") as string || null,
+      address: formData.get("address") as string || null,
+      notes: formData.get("notes") as string || null,
+      active: formData.get("active") === "on",
+    };
+
+    if (editingStaff) {
+      updateMutation.mutate({ id: editingStaff.id, data });
+    } else {
+      createMutation.mutate(data);
+    }
+  };
+
+  const roleLabels: Record<string, string> = {
+    pr: "PR",
+    barista: "Barista",
+    sicurezza: "Sicurezza",
+    fotografo: "Fotografo",
+    dj: "DJ",
+    tecnico: "Tecnico",
+    altro: "Altro",
+  };
+
+  const filteredStaff = staffList.filter(s =>
+    s.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    s.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    s.role.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardContent className="p-6">
+          <div className="space-y-4">
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-64 w-full" />
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between gap-4 space-y-0">
+        <CardTitle>Staff</CardTitle>
+        <div className="flex items-center gap-2">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Cerca..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-9 w-64"
+              data-testid="input-search-staff-desktop"
+            />
+          </div>
+          {isAdmin && (
+            <Button onClick={() => { setEditingStaff(null); setIsDialogOpen(true); }} data-testid="button-add-staff-desktop">
+              <Plus className="h-4 w-4 mr-2" />
+              Aggiungi
+            </Button>
+          )}
+        </div>
+      </CardHeader>
+      <CardContent>
+        {filteredStaff.length === 0 ? (
+          <div className="text-center py-12 text-muted-foreground">
+            <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
+            <p>{searchTerm ? "Nessun risultato" : "Nessun personale"}</p>
+          </div>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Nome</TableHead>
+                <TableHead>Ruolo</TableHead>
+                <TableHead>Contatti</TableHead>
+                <TableHead>Tariffe</TableHead>
+                <TableHead>Stato</TableHead>
+                {isAdmin && <TableHead className="w-[100px]">Azioni</TableHead>}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredStaff.map((staff) => (
+                <TableRow key={staff.id} data-testid={`row-staff-${staff.id}`}>
+                  <TableCell>
+                    <div className="flex items-center gap-3">
+                      <Avatar className="h-9 w-9">
+                        <AvatarFallback className="bg-gradient-to-br from-blue-500 to-indigo-600 text-white text-sm">
+                          {`${staff.firstName.charAt(0)}${staff.lastName.charAt(0)}`.toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <p className="font-medium">{staff.firstName} {staff.lastName}</p>
+                        {staff.fiscalCode && <p className="text-xs text-muted-foreground">{staff.fiscalCode}</p>}
+                      </div>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="outline">{roleLabels[staff.role] || staff.role}</Badge>
+                  </TableCell>
+                  <TableCell>
+                    <div className="space-y-1 text-sm">
+                      {staff.email && <div className="flex items-center gap-1"><Mail className="h-3 w-3" />{staff.email}</div>}
+                      {staff.phone && <div className="flex items-center gap-1"><Phone className="h-3 w-3" />{staff.phone}</div>}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="text-sm">
+                      {staff.hourlyRate && <span>€{parseFloat(staff.hourlyRate).toFixed(2)}/h</span>}
+                      {staff.hourlyRate && staff.fixedRate && " | "}
+                      {staff.fixedRate && <span>€{parseFloat(staff.fixedRate).toFixed(2)} fisso</span>}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <Badge className={staff.active ? "bg-teal-500/20 text-teal-400" : "bg-muted"}>
+                      {staff.active ? "Attivo" : "Inattivo"}
+                    </Badge>
+                  </TableCell>
+                  {isAdmin && (
+                    <TableCell>
+                      <div className="flex items-center gap-1">
+                        <Button variant="ghost" size="icon" onClick={() => { setEditingStaff(staff); setIsDialogOpen(true); }} data-testid={`button-edit-staff-desktop-${staff.id}`}>
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="ghost" size="icon" data-testid={`button-delete-staff-desktop-${staff.id}`}>
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Eliminare {staff.firstName}?</AlertDialogTitle>
+                              <AlertDialogDescription>Questa azione non può essere annullata.</AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Annulla</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => deleteMutation.mutate(staff.id)}>Elimina</AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
+                    </TableCell>
+                  )}
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </CardContent>
+
+      <Dialog open={isDialogOpen} onOpenChange={(open) => { setIsDialogOpen(open); if (!open) setEditingStaff(null); }}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{editingStaff ? "Modifica Personale" : "Nuovo Personale"}</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label htmlFor="firstName">Nome *</Label>
+                <Input id="firstName" name="firstName" defaultValue={editingStaff?.firstName || ""} required data-testid="input-staff-first-name-desktop" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="lastName">Cognome *</Label>
+                <Input id="lastName" name="lastName" defaultValue={editingStaff?.lastName || ""} required data-testid="input-staff-last-name-desktop" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label htmlFor="role">Ruolo *</Label>
+                <Select name="role" defaultValue={editingStaff?.role || "altro"}>
+                  <SelectTrigger data-testid="select-staff-role-desktop"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="pr">PR</SelectItem>
+                    <SelectItem value="barista">Barista</SelectItem>
+                    <SelectItem value="sicurezza">Sicurezza</SelectItem>
+                    <SelectItem value="fotografo">Fotografo</SelectItem>
+                    <SelectItem value="dj">DJ</SelectItem>
+                    <SelectItem value="tecnico">Tecnico</SelectItem>
+                    <SelectItem value="altro">Altro</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="fiscalCode">Cod. Fiscale</Label>
+                <Input id="fiscalCode" name="fiscalCode" defaultValue={editingStaff?.fiscalCode || ""} maxLength={16} data-testid="input-staff-fiscal-code-desktop" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
+                <Input id="email" name="email" type="email" defaultValue={editingStaff?.email || ""} data-testid="input-staff-email-desktop" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="phone">Telefono</Label>
+                <Input id="phone" name="phone" type="tel" defaultValue={editingStaff?.phone || ""} data-testid="input-staff-phone-desktop" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label htmlFor="hourlyRate">Tariffa/h (€)</Label>
+                <Input id="hourlyRate" name="hourlyRate" type="number" step="0.01" defaultValue={editingStaff?.hourlyRate || ""} placeholder="0.00" data-testid="input-staff-hourly-rate-desktop" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="fixedRate">Fisso (€)</Label>
+                <Input id="fixedRate" name="fixedRate" type="number" step="0.01" defaultValue={editingStaff?.fixedRate || ""} placeholder="0.00" data-testid="input-staff-fixed-rate-desktop" />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="bankIban">IBAN</Label>
+              <Input id="bankIban" name="bankIban" defaultValue={editingStaff?.bankIban || ""} maxLength={34} data-testid="input-staff-iban-desktop" />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="address">Indirizzo</Label>
+              <Input id="address" name="address" defaultValue={editingStaff?.address || ""} data-testid="input-staff-address-desktop" />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="notes">Note</Label>
+              <Textarea id="notes" name="notes" defaultValue={editingStaff?.notes || ""} data-testid="input-staff-notes-desktop" />
+            </div>
+            <div className="flex items-center gap-3">
+              <Switch id="active" name="active" defaultChecked={editingStaff?.active !== false} data-testid="switch-staff-active-desktop" />
+              <Label htmlFor="active">Personale attivo</Label>
+            </div>
+            <DialogFooter>
+              <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending} data-testid="button-save-staff-desktop">
+                {editingStaff ? "Salva Modifiche" : "Aggiungi Personale"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+    </Card>
+  );
+}
+
+function DesktopAssignmentsSection({ isAdmin }: { isAdmin: boolean }) {
+  const { toast } = useToast();
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingAssignment, setEditingAssignment] = useState<StaffAssignment | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
+
+  const { data: assignments = [], isLoading } = useQuery<StaffAssignment[]>({
+    queryKey: ["/api/staff-assignments"],
+  });
+
+  const { data: staffList = [] } = useQuery<Staff[]>({
+    queryKey: ["/api/staff"],
+  });
+
+  const { data: events = [] } = useQuery<Event[]>({
+    queryKey: ["/api/events"],
+  });
+
+  const createMutation = useMutation({
+    mutationFn: (data: any) => apiRequest("POST", "/api/staff-assignments", data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/staff-assignments"] });
+      setIsDialogOpen(false);
+      toast({ title: "Assegnazione creata" });
+    },
+    onError: (err: any) => {
+      toast({ title: "Errore", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: any }) => 
+      apiRequest("PATCH", `/api/staff-assignments/${id}`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/staff-assignments"] });
+      setEditingAssignment(null);
+      setIsDialogOpen(false);
+      toast({ title: "Assegnazione aggiornata" });
+    },
+    onError: (err: any) => {
+      toast({ title: "Errore", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => apiRequest("DELETE", `/api/staff-assignments/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/staff-assignments"] });
+      toast({ title: "Assegnazione eliminata" });
+    },
+    onError: (err: any) => {
+      toast({ title: "Errore", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    const data = {
+      staffId: formData.get("staffId") as string,
+      eventId: formData.get("eventId") as string,
+      role: formData.get("role") as string || null,
+      status: formData.get("status") as string,
+      compensationAmount: formData.get("compensationAmount") as string || null,
+      bonus: formData.get("bonus") as string || null,
+      notes: formData.get("notes") as string || null,
+    };
+
+    if (editingAssignment) {
+      updateMutation.mutate({ id: editingAssignment.id, data });
+    } else {
+      createMutation.mutate(data);
+    }
+  };
+
+  const getStaffName = (staffId: string) => {
+    const s = staffList.find(x => x.id === staffId);
+    return s ? `${s.firstName} ${s.lastName}` : "N/D";
+  };
+
+  const getEventName = (eventId: string) => {
+    const e = events.find(x => x.id === eventId);
+    return e?.name || "N/D";
+  };
+
+  const statusConfig: Record<string, { label: string; color: string }> = {
+    scheduled: { label: "Programmato", color: "bg-blue-500/20 text-blue-400" },
+    confirmed: { label: "Confermato", color: "bg-teal-500/20 text-teal-400" },
+    checked_in: { label: "Check-in", color: "bg-violet-500/20 text-violet-400" },
+    checked_out: { label: "Check-out", color: "bg-emerald-500/20 text-emerald-400" },
+    cancelled: { label: "Annullato", color: "bg-rose-500/20 text-rose-400" },
+  };
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardContent className="p-6">
+          <div className="space-y-4">
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-64 w-full" />
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between gap-4 space-y-0">
+        <CardTitle>Assegnazioni</CardTitle>
+        <div className="flex items-center gap-2">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Cerca..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-9 w-64"
+              data-testid="input-search-assignments-desktop"
+            />
+          </div>
+          {isAdmin && (
+            <Button onClick={() => { setEditingAssignment(null); setIsDialogOpen(true); }} data-testid="button-add-assignment-desktop">
+              <Plus className="h-4 w-4 mr-2" />
+              Aggiungi
+            </Button>
+          )}
+        </div>
+      </CardHeader>
+      <CardContent>
+        {assignments.length === 0 ? (
+          <div className="text-center py-12 text-muted-foreground">
+            <Calendar className="h-12 w-12 mx-auto mb-4 opacity-50" />
+            <p>Nessuna assegnazione</p>
+          </div>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Staff</TableHead>
+                <TableHead>Evento</TableHead>
+                <TableHead>Ruolo</TableHead>
+                <TableHead>Stato</TableHead>
+                <TableHead>Compenso</TableHead>
+                {isAdmin && <TableHead className="w-[100px]">Azioni</TableHead>}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {assignments.map((a) => {
+                const status = statusConfig[a.status] || statusConfig.scheduled;
+                return (
+                  <TableRow key={a.id} data-testid={`row-assignment-${a.id}`}>
+                    <TableCell className="font-medium">{getStaffName(a.staffId)}</TableCell>
+                    <TableCell>{getEventName(a.eventId)}</TableCell>
+                    <TableCell>{a.role || "-"}</TableCell>
+                    <TableCell>
+                      <Badge className={status.color}>{status.label}</Badge>
+                    </TableCell>
+                    <TableCell>
+                      {a.compensationAmount && <span>€{parseFloat(a.compensationAmount).toFixed(2)}</span>}
+                      {a.bonus && <span className="text-teal-400 ml-1">+€{parseFloat(a.bonus).toFixed(2)}</span>}
+                    </TableCell>
+                    {isAdmin && (
+                      <TableCell>
+                        <div className="flex items-center gap-1">
+                          <Button variant="ghost" size="icon" onClick={() => { setEditingAssignment(a); setIsDialogOpen(true); }} data-testid={`button-edit-assignment-desktop-${a.id}`}>
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button variant="ghost" size="icon" data-testid={`button-delete-assignment-desktop-${a.id}`}>
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Eliminare assegnazione?</AlertDialogTitle>
+                                <AlertDialogDescription>Questa azione non può essere annullata.</AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Annulla</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => deleteMutation.mutate(a.id)}>Elimina</AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
+                      </TableCell>
+                    )}
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        )}
+      </CardContent>
+
+      <Dialog open={isDialogOpen} onOpenChange={(open) => { setIsDialogOpen(open); if (!open) setEditingAssignment(null); }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{editingAssignment ? "Modifica Assegnazione" : "Nuova Assegnazione"}</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="staffId">Personale *</Label>
+              <Select name="staffId" defaultValue={editingAssignment?.staffId || ""}>
+                <SelectTrigger data-testid="select-assignment-staff-desktop"><SelectValue placeholder="Seleziona personale" /></SelectTrigger>
+                <SelectContent>
+                  {staffList.map((s) => (
+                    <SelectItem key={s.id} value={s.id}>{s.firstName} {s.lastName}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="eventId">Evento *</Label>
+              <Select name="eventId" defaultValue={editingAssignment?.eventId || ""}>
+                <SelectTrigger data-testid="select-assignment-event-desktop"><SelectValue placeholder="Seleziona evento" /></SelectTrigger>
+                <SelectContent>
+                  {events.map((e) => (
+                    <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label htmlFor="role">Ruolo</Label>
+                <Input id="role" name="role" defaultValue={editingAssignment?.role || ""} data-testid="input-assignment-role-desktop" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="status">Stato *</Label>
+                <Select name="status" defaultValue={editingAssignment?.status || "scheduled"}>
+                  <SelectTrigger data-testid="select-assignment-status-desktop"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="scheduled">Programmato</SelectItem>
+                    <SelectItem value="confirmed">Confermato</SelectItem>
+                    <SelectItem value="checked_in">Check-in</SelectItem>
+                    <SelectItem value="checked_out">Check-out</SelectItem>
+                    <SelectItem value="cancelled">Annullato</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label htmlFor="compensationAmount">Compenso (€)</Label>
+                <Input id="compensationAmount" name="compensationAmount" type="number" step="0.01" defaultValue={editingAssignment?.compensationAmount || ""} placeholder="0.00" data-testid="input-assignment-compensation-desktop" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="bonus">Bonus (€)</Label>
+                <Input id="bonus" name="bonus" type="number" step="0.01" defaultValue={editingAssignment?.bonus || ""} placeholder="0.00" data-testid="input-assignment-bonus-desktop" />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="notes">Note</Label>
+              <Textarea id="notes" name="notes" defaultValue={editingAssignment?.notes || ""} data-testid="input-assignment-notes-desktop" />
+            </div>
+            <DialogFooter>
+              <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending} data-testid="button-save-assignment-desktop">
+                {editingAssignment ? "Salva Modifiche" : "Aggiungi Assegnazione"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+    </Card>
+  );
+}
+
+function DesktopPaymentsSection({ isAdmin }: { isAdmin: boolean }) {
+  const { toast } = useToast();
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingPayment, setEditingPayment] = useState<StaffPayment | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
+
+  const { data: payments = [], isLoading } = useQuery<StaffPayment[]>({
+    queryKey: ["/api/staff-payments"],
+  });
+
+  const { data: staffList = [] } = useQuery<Staff[]>({
+    queryKey: ["/api/staff"],
+  });
+
+  const { data: events = [] } = useQuery<Event[]>({
+    queryKey: ["/api/events"],
+  });
+
+  const createMutation = useMutation({
+    mutationFn: (data: any) => apiRequest("POST", "/api/staff-payments", data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/staff-payments"] });
+      setIsDialogOpen(false);
+      toast({ title: "Pagamento creato" });
+    },
+    onError: (err: any) => {
+      toast({ title: "Errore", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: any }) => 
+      apiRequest("PATCH", `/api/staff-payments/${id}`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/staff-payments"] });
+      setEditingPayment(null);
+      setIsDialogOpen(false);
+      toast({ title: "Pagamento aggiornato" });
+    },
+    onError: (err: any) => {
+      toast({ title: "Errore", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => apiRequest("DELETE", `/api/staff-payments/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/staff-payments"] });
+      toast({ title: "Pagamento eliminato" });
+    },
+    onError: (err: any) => {
+      toast({ title: "Errore", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    const eventIdValue = formData.get("eventId") as string;
+    const data = {
+      staffId: formData.get("staffId") as string,
+      eventId: eventIdValue === "_none" ? null : eventIdValue || null,
+      amount: formData.get("amount") as string,
+      paymentDate: formData.get("paymentDate") as string || null,
+      paymentMethod: formData.get("paymentMethod") as string || null,
+      status: formData.get("status") as string,
+      notes: formData.get("notes") as string || null,
+    };
+
+    if (editingPayment) {
+      updateMutation.mutate({ id: editingPayment.id, data });
+    } else {
+      createMutation.mutate(data);
+    }
+  };
+
+  const getStaffName = (staffId: string) => {
+    const s = staffList.find(x => x.id === staffId);
+    return s ? `${s.firstName} ${s.lastName}` : "N/D";
+  };
+
+  const getEventName = (eventId: string | null) => {
+    if (!eventId) return "-";
+    const e = events.find(x => x.id === eventId);
+    return e?.name || "N/D";
+  };
+
+  const statusConfig: Record<string, { label: string; color: string }> = {
+    pending: { label: "In attesa", color: "bg-amber-500/20 text-amber-400" },
+    paid: { label: "Pagato", color: "bg-teal-500/20 text-teal-400" },
+    cancelled: { label: "Annullato", color: "bg-rose-500/20 text-rose-400" },
+  };
+
+  const methodLabels: Record<string, string> = {
+    cash: "Contanti",
+    bank_transfer: "Bonifico",
+    other: "Altro",
+  };
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardContent className="p-6">
+          <div className="space-y-4">
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-64 w-full" />
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between gap-4 space-y-0">
+        <CardTitle>Pagamenti</CardTitle>
+        <div className="flex items-center gap-2">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Cerca..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-9 w-64"
+              data-testid="input-search-payments-desktop"
+            />
+          </div>
+          {isAdmin && (
+            <Button onClick={() => { setEditingPayment(null); setIsDialogOpen(true); }} data-testid="button-add-payment-desktop">
+              <Plus className="h-4 w-4 mr-2" />
+              Aggiungi
+            </Button>
+          )}
+        </div>
+      </CardHeader>
+      <CardContent>
+        {payments.length === 0 ? (
+          <div className="text-center py-12 text-muted-foreground">
+            <Wallet className="h-12 w-12 mx-auto mb-4 opacity-50" />
+            <p>Nessun pagamento</p>
+          </div>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Staff</TableHead>
+                <TableHead>Importo</TableHead>
+                <TableHead>Evento</TableHead>
+                <TableHead>Metodo</TableHead>
+                <TableHead>Data</TableHead>
+                <TableHead>Stato</TableHead>
+                {isAdmin && <TableHead className="w-[100px]">Azioni</TableHead>}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {payments.map((p) => {
+                const status = statusConfig[p.status] || statusConfig.pending;
+                return (
+                  <TableRow key={p.id} data-testid={`row-payment-${p.id}`}>
+                    <TableCell className="font-medium">{getStaffName(p.staffId)}</TableCell>
+                    <TableCell className="font-bold text-primary">€{parseFloat(p.amount).toFixed(2)}</TableCell>
+                    <TableCell>{getEventName(p.eventId)}</TableCell>
+                    <TableCell>{p.paymentMethod ? methodLabels[p.paymentMethod] || p.paymentMethod : "-"}</TableCell>
+                    <TableCell>{p.paymentDate ? format(new Date(p.paymentDate), "dd/MM/yyyy", { locale: it }) : "-"}</TableCell>
+                    <TableCell>
+                      <Badge className={status.color}>{status.label}</Badge>
+                    </TableCell>
+                    {isAdmin && (
+                      <TableCell>
+                        <div className="flex items-center gap-1">
+                          <Button variant="ghost" size="icon" onClick={() => { setEditingPayment(p); setIsDialogOpen(true); }} data-testid={`button-edit-payment-desktop-${p.id}`}>
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button variant="ghost" size="icon" data-testid={`button-delete-payment-desktop-${p.id}`}>
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Eliminare pagamento?</AlertDialogTitle>
+                                <AlertDialogDescription>Questa azione non può essere annullata.</AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Annulla</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => deleteMutation.mutate(p.id)}>Elimina</AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
+                      </TableCell>
+                    )}
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        )}
+      </CardContent>
+
+      <Dialog open={isDialogOpen} onOpenChange={(open) => { setIsDialogOpen(open); if (!open) setEditingPayment(null); }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{editingPayment ? "Modifica Pagamento" : "Nuovo Pagamento"}</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="staffId">Personale *</Label>
+              <Select name="staffId" defaultValue={editingPayment?.staffId || ""}>
+                <SelectTrigger data-testid="select-payment-staff-desktop"><SelectValue placeholder="Seleziona personale" /></SelectTrigger>
+                <SelectContent>
+                  {staffList.map((s) => (
+                    <SelectItem key={s.id} value={s.id}>{s.firstName} {s.lastName}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="eventId">Evento</Label>
+              <Select name="eventId" defaultValue={editingPayment?.eventId || ""}>
+                <SelectTrigger data-testid="select-payment-event-desktop"><SelectValue placeholder="Seleziona evento (opzionale)" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="_none">Non associato</SelectItem>
+                  {events.map((e) => (
+                    <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label htmlFor="amount">Importo (€) *</Label>
+                <Input id="amount" name="amount" type="number" step="0.01" defaultValue={editingPayment?.amount || ""} placeholder="0.00" required data-testid="input-payment-amount-desktop" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="status">Stato *</Label>
+                <Select name="status" defaultValue={editingPayment?.status || "pending"}>
+                  <SelectTrigger data-testid="select-payment-status-desktop"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="pending">In attesa</SelectItem>
+                    <SelectItem value="paid">Pagato</SelectItem>
+                    <SelectItem value="cancelled">Annullato</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label htmlFor="paymentMethod">Metodo</Label>
+                <Select name="paymentMethod" defaultValue={editingPayment?.paymentMethod || ""}>
+                  <SelectTrigger data-testid="select-payment-method-desktop"><SelectValue placeholder="Metodo" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="_none">Non specificato</SelectItem>
+                    <SelectItem value="cash">Contanti</SelectItem>
+                    <SelectItem value="bank_transfer">Bonifico</SelectItem>
+                    <SelectItem value="other">Altro</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="paymentDate">Data</Label>
+                <Input id="paymentDate" name="paymentDate" type="date" defaultValue={editingPayment?.paymentDate ? format(new Date(editingPayment.paymentDate), "yyyy-MM-dd") : ""} data-testid="input-payment-date-desktop" />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="notes">Note</Label>
+              <Textarea id="notes" name="notes" defaultValue={editingPayment?.notes || ""} data-testid="input-payment-notes-desktop" />
+            </div>
+            <DialogFooter>
+              <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending} data-testid="button-save-payment-desktop">
+                {editingPayment ? "Salva Modifiche" : "Aggiungi Pagamento"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+    </Card>
   );
 }

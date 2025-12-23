@@ -3,13 +3,14 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { motion, AnimatePresence } from "framer-motion";
 import type { SiaeCashier } from "@shared/schema";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
   Form,
@@ -30,6 +31,32 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   MobileAppLayout,
   MobileHeader,
@@ -82,8 +109,11 @@ const springTransition = {
 export default function CashierManagementPage() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const isMobile = useIsMobile();
   const [isFormSheetOpen, setIsFormSheetOpen] = useState(false);
   const [isDeleteSheetOpen, setIsDeleteSheetOpen] = useState(false);
+  const [isFormDialogOpen, setIsFormDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [editingCashier, setEditingCashier] = useState<SiaeCashier | null>(null);
   const [cashierToDelete, setCashierToDelete] = useState<SiaeCashier | null>(null);
 
@@ -118,6 +148,7 @@ export default function CashierManagementPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/cashiers"] });
       setIsFormSheetOpen(false);
+      setIsFormDialogOpen(false);
       form.reset();
       triggerHaptic('success');
       toast({
@@ -143,6 +174,7 @@ export default function CashierManagementPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/cashiers"] });
       setIsFormSheetOpen(false);
+      setIsFormDialogOpen(false);
       setEditingCashier(null);
       form.reset();
       triggerHaptic('success');
@@ -169,6 +201,7 @@ export default function CashierManagementPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/cashiers"] });
       setIsDeleteSheetOpen(false);
+      setIsDeleteDialogOpen(false);
       setCashierToDelete(null);
       triggerHaptic('success');
       toast({
@@ -186,7 +219,7 @@ export default function CashierManagementPage() {
     },
   });
 
-  const handleOpenForm = (cashier?: SiaeCashier) => {
+  const handleOpenForm = (cashier?: SiaeCashier, forDesktop = false) => {
     triggerHaptic('light');
     if (cashier) {
       setEditingCashier(cashier);
@@ -207,7 +240,11 @@ export default function CashierManagementPage() {
         isActive: true,
       });
     }
-    setIsFormSheetOpen(true);
+    if (forDesktop) {
+      setIsFormDialogOpen(true);
+    } else {
+      setIsFormSheetOpen(true);
+    }
   };
 
   const handleSubmit = (values: CashierFormValues) => {
@@ -270,6 +307,363 @@ export default function CashierManagementPage() {
           </motion.div>
         </div>
       </MobileAppLayout>
+    );
+  }
+
+  const renderFormContent = () => (
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-5">
+        <FormField
+          control={form.control}
+          name="name"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Nome</FormLabel>
+              <FormControl>
+                <Input 
+                  placeholder="Mario Rossi" 
+                  {...field} 
+                  data-testid="input-name"
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="username"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Username</FormLabel>
+              <FormControl>
+                <Input 
+                  placeholder="cassiere1"
+                  {...field} 
+                  disabled={!!editingCashier}
+                  data-testid="input-username"
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="password"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>
+                Password {editingCashier && "(lascia vuoto per non modificare)"}
+              </FormLabel>
+              <FormControl>
+                <Input 
+                  type="password"
+                  placeholder={editingCashier ? "••••••••" : "Minimo 6 caratteri"} 
+                  {...field} 
+                  data-testid="input-password"
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="defaultPrinterAgentId"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Stampante Predefinita</FormLabel>
+              <Select 
+                onValueChange={field.onChange} 
+                value={field.value || ""}
+              >
+                <FormControl>
+                  <SelectTrigger data-testid="select-printer">
+                    <SelectValue placeholder="Seleziona stampante..." />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  <SelectItem value="none">Nessuna stampante</SelectItem>
+                  {printerAgents?.map((agent) => (
+                    <SelectItem key={agent.id} value={agent.id}>
+                      <div className="flex items-center gap-2">
+                        <Printer className="w-4 h-4" />
+                        {agent.name}
+                        {agent.status === "online" && (
+                          <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                        )}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="isActive"
+          render={({ field }) => (
+            <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+              <div className="space-y-0.5">
+                <FormLabel className="text-base">Attivo</FormLabel>
+                <p className="text-sm text-muted-foreground">
+                  Il cassiere può accedere al sistema
+                </p>
+              </div>
+              <FormControl>
+                <Switch
+                  checked={field.value}
+                  onCheckedChange={field.onChange}
+                  data-testid="switch-active"
+                />
+              </FormControl>
+            </FormItem>
+          )}
+        />
+
+        <DialogFooter className="pt-4">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => {
+              setIsFormDialogOpen(false);
+              setEditingCashier(null);
+              form.reset();
+            }}
+            data-testid="button-cancel"
+          >
+            Annulla
+          </Button>
+          <Button
+            type="submit"
+            disabled={createCashierMutation.isPending || updateCashierMutation.isPending}
+            data-testid="button-save"
+          >
+            {(createCashierMutation.isPending || updateCashierMutation.isPending) && (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            )}
+            {editingCashier ? "Salva Modifiche" : "Crea Cassiere"}
+          </Button>
+        </DialogFooter>
+      </form>
+    </Form>
+  );
+
+  if (!isMobile) {
+    return (
+      <div className="container mx-auto p-6 space-y-6" data-testid="page-cashier-management">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">Gestione Cassieri</h1>
+            <p className="text-muted-foreground">Gestisci gli operatori di cassa della tua azienda</p>
+          </div>
+          <Button onClick={() => handleOpenForm(undefined, true)} data-testid="button-add-cashier">
+            <UserPlus className="w-4 h-4 mr-2" />
+            Nuovo Cassiere
+          </Button>
+        </div>
+
+        <div className="grid grid-cols-3 gap-4">
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-2xl font-bold">{cashiers?.length || 0}</div>
+              <p className="text-sm text-muted-foreground">Cassieri Totali</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-2xl font-bold text-emerald-500">
+                {cashiers?.filter(c => c.isActive).length || 0}
+              </div>
+              <p className="text-sm text-muted-foreground">Attivi</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-2xl font-bold text-muted-foreground">
+                {cashiers?.filter(c => !c.isActive).length || 0}
+              </div>
+              <p className="text-sm text-muted-foreground">Disattivi</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Users className="w-5 h-5" />
+              Elenco Cassieri
+            </CardTitle>
+            <CardDescription>
+              Tutti i cassieri registrati per la tua azienda
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {cashiersLoading ? (
+              <div className="space-y-4">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="flex items-center gap-4">
+                    <Skeleton className="h-10 w-10 rounded-full" />
+                    <div className="space-y-2 flex-1">
+                      <Skeleton className="h-4 w-40" />
+                      <Skeleton className="h-3 w-24" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : !cashiers || cashiers.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12">
+                <div className="w-16 h-16 rounded-full bg-muted/50 flex items-center justify-center mb-4">
+                  <Users className="w-8 h-8 text-muted-foreground" />
+                </div>
+                <h3 className="font-semibold">Nessun Cassiere</h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Non hai ancora creato nessun cassiere
+                </p>
+                <Button 
+                  className="mt-4"
+                  onClick={() => handleOpenForm(undefined, true)}
+                  data-testid="button-add-cashier-empty"
+                >
+                  <UserPlus className="w-4 h-4 mr-2" />
+                  Aggiungi il primo cassiere
+                </Button>
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Cassiere</TableHead>
+                    <TableHead>Username</TableHead>
+                    <TableHead>Stampante</TableHead>
+                    <TableHead>Stato</TableHead>
+                    <TableHead className="text-right">Azioni</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {cashiers.map((cashier) => (
+                    <TableRow key={cashier.id} data-testid={`row-cashier-${cashier.id}`}>
+                      <TableCell>
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full bg-[#FFD700]/20 flex items-center justify-center">
+                            <User className="w-5 h-5 text-[#FFD700]" />
+                          </div>
+                          <span className="font-medium" data-testid={`text-name-${cashier.id}`}>
+                            {cashier.name}
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        @{cashier.username}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <Printer className="w-4 h-4" />
+                          {getPrinterName(cashier.defaultPrinterAgentId)}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        {cashier.isActive ? (
+                          <Badge className="bg-emerald-500/20 text-emerald-400">
+                            <CheckCircle2 className="w-3 h-3 mr-1" />
+                            Attivo
+                          </Badge>
+                        ) : (
+                          <Badge variant="secondary" className="bg-red-500/20 text-red-400">
+                            <XCircle className="w-3 h-3 mr-1" />
+                            Disattivo
+                          </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleOpenForm(cashier, true)}
+                            data-testid={`button-edit-cashier-${cashier.id}`}
+                          >
+                            <Edit className="w-4 h-4 mr-1" />
+                            Modifica
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            className="text-red-500 border-red-500/30 hover:bg-red-500/10"
+                            onClick={() => {
+                              setCashierToDelete(cashier);
+                              setIsDeleteDialogOpen(true);
+                            }}
+                            data-testid={`button-delete-cashier-${cashier.id}`}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+
+        <Dialog open={isFormDialogOpen} onOpenChange={(open) => {
+          setIsFormDialogOpen(open);
+          if (!open) {
+            setEditingCashier(null);
+            form.reset();
+          }
+        }}>
+          <DialogContent className="sm:max-w-[500px]">
+            <DialogHeader>
+              <DialogTitle>
+                {editingCashier ? "Modifica Cassiere" : "Nuovo Cassiere"}
+              </DialogTitle>
+              <DialogDescription>
+                {editingCashier 
+                  ? "Modifica le informazioni del cassiere" 
+                  : "Crea un nuovo operatore di cassa"}
+              </DialogDescription>
+            </DialogHeader>
+            {renderFormContent()}
+          </DialogContent>
+        </Dialog>
+
+        <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Disattivare Cassiere?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Stai per disattivare il cassiere <strong>{cashierToDelete?.name}</strong>.
+                Il cassiere non potrà più accedere al sistema.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => setCashierToDelete(null)}>
+                Annulla
+              </AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-red-500 hover:bg-red-600"
+                onClick={handleDeleteConfirm}
+                disabled={deleteCashierMutation.isPending}
+              >
+                {deleteCashierMutation.isPending && (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                )}
+                Disattiva
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </div>
     );
   }
 

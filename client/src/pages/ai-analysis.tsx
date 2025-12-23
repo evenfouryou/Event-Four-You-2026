@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
+import { Button } from '@/components/ui/button';
 import { Loader2, Sparkles, TrendingUp, AlertTriangle, CheckCircle2, Send, ArrowLeft, Brain, Lightbulb, MessageCircle } from 'lucide-react';
 import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { MobileAppLayout, MobileHeader, HapticButton, triggerHaptic } from '@/components/mobile-primitives';
 import { useLocation } from 'wouter';
 
@@ -45,6 +47,7 @@ const cardVariant = {
 export default function AIAnalysis() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
+  const isMobile = useIsMobile();
   const [query, setQuery] = useState('');
   const [conversationHistory, setConversationHistory] = useState<Array<{ role: 'user' | 'assistant'; content: string }>>([]);
 
@@ -155,6 +158,148 @@ export default function AIAnalysis() {
       }
     />
   );
+
+  if (!isMobile) {
+    return (
+      <div className="container mx-auto p-6 space-y-6" data-testid="page-ai-analysis">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold flex items-center gap-3">
+              <Brain className="h-8 w-8 text-primary" />
+              Analisi AI
+            </h1>
+            <p className="text-muted-foreground">Analisi intelligente e chat con l'AI sui tuoi dati</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Sparkles className="h-5 w-5 text-primary" />
+                Insights Automatici
+              </CardTitle>
+              <CardDescription>Analisi intelligente dei tuoi dati</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {insightsLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                </div>
+              ) : insights && insights.length > 0 ? (
+                insights.map((insight, index) => {
+                  const colors = getInsightColors(insight.type);
+                  return (
+                    <div
+                      key={index}
+                      className={`p-4 rounded-xl bg-gradient-to-br ${colors.gradient} border border-border/50`}
+                      data-testid={`card-insight-${index}`}
+                    >
+                      <div className="flex gap-4">
+                        <div className={`h-12 w-12 rounded-xl ${colors.iconBg} flex items-center justify-center shrink-0`}>
+                          <span className={colors.iconColor}>
+                            {getInsightIcon(insight.type)}
+                          </span>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-semibold text-foreground mb-1">
+                            {insight.title}
+                          </h3>
+                          <p className="text-sm text-muted-foreground">
+                            {insight.description}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  Nessun insight disponibile al momento
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <MessageCircle className="h-5 w-5 text-[#00CED1]" />
+                Chat con l'AI
+              </CardTitle>
+              <CardDescription>Fai domande sui tuoi dati</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {conversationHistory.length > 0 ? (
+                <div className="flex flex-col gap-3 max-h-[400px] overflow-y-auto" data-testid="div-conversation-history">
+                  {conversationHistory.map((message, index) => (
+                    <div
+                      key={index}
+                      className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                      data-testid={`div-message-${index}`}
+                    >
+                      <div
+                        className={`rounded-2xl px-4 py-3 max-w-[85%] ${
+                          message.role === 'user'
+                            ? 'bg-primary text-primary-foreground'
+                            : 'bg-muted'
+                        }`}
+                      >
+                        <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <p className="text-sm font-medium text-muted-foreground">Domande suggerite:</p>
+                  <div className="grid gap-2">
+                    {suggestedQuestions.map((item, index) => (
+                      <button
+                        key={index}
+                        onClick={() => setQuery(item.text)}
+                        className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 hover-elevate active-elevate-2 text-left"
+                        data-testid={`button-suggestion-${index}`}
+                      >
+                        <div className="h-8 w-8 rounded-lg bg-primary/20 flex items-center justify-center shrink-0">
+                          <item.icon className="h-4 w-4 text-primary" />
+                        </div>
+                        <span className="text-sm text-foreground">{item.text}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <form onSubmit={handleSubmit} className="flex gap-2 items-end pt-4 border-t">
+                <Textarea
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Fai una domanda sui tuoi dati..."
+                  className="min-h-[80px] flex-1 resize-none"
+                  disabled={analysisMutation.isPending}
+                  data-testid="textarea-query"
+                />
+                <Button
+                  type="submit"
+                  size="icon"
+                  disabled={!query.trim() || analysisMutation.isPending}
+                  className="h-[80px] w-[50px] shrink-0"
+                  data-testid="button-send"
+                >
+                  {analysisMutation.isPending ? (
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                  ) : (
+                    <Send className="h-5 w-5" />
+                  )}
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <MobileAppLayout header={header} contentClassName="pb-24">

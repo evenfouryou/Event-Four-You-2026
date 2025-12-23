@@ -6,9 +6,11 @@ import { motion, AnimatePresence } from "framer-motion";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { type SiaeBoxOfficeSession, type SiaeEmissionChannel, type Location } from "@shared/schema";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -20,6 +22,22 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import {
   MobileAppLayout,
   MobileHeader,
@@ -56,10 +74,14 @@ const springConfig = { stiffness: 400, damping: 30 };
 export default function SiaeBoxOfficePage() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const isMobile = useIsMobile();
   const [selectedSession, setSelectedSession] = useState<SiaeBoxOfficeSession | AdminSession | null>(null);
   const [isDetailSheetOpen, setIsDetailSheetOpen] = useState(false);
   const [isOpenSheetOpen, setIsOpenSheetOpen] = useState(false);
   const [isCloseSheetOpen, setIsCloseSheetOpen] = useState(false);
+  const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
+  const [isOpenDialogOpen, setIsOpenDialogOpen] = useState(false);
+  const [isCloseDialogOpen, setIsCloseDialogOpen] = useState(false);
   const [selectedChannelId, setSelectedChannelId] = useState("");
   const [selectedLocationId, setSelectedLocationId] = useState("");
   const [actualCash, setActualCash] = useState("");
@@ -300,6 +322,477 @@ export default function SiaeBoxOfficePage() {
       showUserMenu
     />
   );
+
+  const handleViewSessionDesktop = (session: SiaeBoxOfficeSession | AdminSession) => {
+    setSelectedSession(session);
+    setIsDetailDialogOpen(true);
+  };
+
+  const handleCloseSessionDesktop = (session: SiaeBoxOfficeSession | AdminSession) => {
+    setSelectedSession(session);
+    setIsCloseDialogOpen(true);
+  };
+
+  if (!isMobile) {
+    return (
+      <div className="container mx-auto p-6 space-y-6" data-testid="page-siae-box-office">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">Box Office SIAE</h1>
+            <p className="text-muted-foreground">
+              {isSuperAdmin ? "Amministrazione sessioni di cassa" : "Gestione sessioni di cassa"}
+            </p>
+          </div>
+          {!isSuperAdmin && !activeSession && (
+            <Button onClick={() => setIsOpenDialogOpen(true)} data-testid="button-open-session">
+              <Plus className="w-4 h-4 mr-2" />
+              Apri Nuova Sessione
+            </Button>
+          )}
+        </div>
+
+        {isSuperAdmin && (
+          <Badge className="bg-purple-500/20 text-purple-400 border-purple-500/30">
+            <Building2 className="w-3 h-3 mr-1" />
+            Modalità Amministratore
+          </Badge>
+        )}
+
+        {!isSuperAdmin && activeSession && (
+          <Card className="border-emerald-500/30 bg-emerald-500/5" data-testid="card-active-session">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="w-14 h-14 rounded-2xl bg-emerald-500/20 flex items-center justify-center">
+                    <Store className="w-7 h-7 text-emerald-400" />
+                  </div>
+                  <div>
+                    <div className="font-semibold text-lg">Sessione Attiva</div>
+                    <div className="text-muted-foreground">
+                      Aperta alle {activeSession.openedAt && format(new Date(activeSession.openedAt), "HH:mm", { locale: it })}
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-6">
+                  <div className="text-center">
+                    <div className="text-muted-foreground text-sm">Biglietti</div>
+                    <div className="text-2xl font-bold">{activeSession.ticketsSold}</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-muted-foreground text-sm">Incasso</div>
+                    <div className="text-2xl font-bold text-[#FFD700]">€{Number(activeSession.cashTotal || 0).toFixed(2)}</div>
+                  </div>
+                  <Button
+                    variant="outline"
+                    onClick={() => handleCloseSessionDesktop(activeSession)}
+                    data-testid="button-close-active-session"
+                  >
+                    <Square className="w-4 h-4 mr-2" />
+                    Chiudi Sessione
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        <div className="grid grid-cols-4 gap-4">
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-2 text-muted-foreground text-sm mb-2">
+                <Play className="w-4 h-4 text-emerald-400" />
+                Aperte
+              </div>
+              <div className="text-3xl font-bold text-emerald-400" data-testid="stat-open">{stats.open}</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-2 text-muted-foreground text-sm mb-2">
+                <Square className="w-4 h-4 text-blue-400" />
+                Chiuse
+              </div>
+              <div className="text-3xl font-bold text-blue-400" data-testid="stat-closed">{stats.closed}</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-2 text-muted-foreground text-sm mb-2">
+                <Ticket className="w-4 h-4" />
+                Biglietti
+              </div>
+              <div className="text-3xl font-bold" data-testid="stat-tickets">{stats.totalTickets}</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-2 text-muted-foreground text-sm mb-2">
+                <Banknote className="w-4 h-4 text-[#FFD700]" />
+                Incasso Totale
+              </div>
+              <div className="text-3xl font-bold text-[#FFD700]" data-testid="stat-cash">€{stats.totalCash.toFixed(0)}</div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <Card>
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Stato</TableHead>
+                  {isSuperAdmin && <TableHead>Azienda</TableHead>}
+                  <TableHead>Operatore</TableHead>
+                  <TableHead>Apertura</TableHead>
+                  <TableHead>Chiusura</TableHead>
+                  <TableHead className="text-right">Biglietti</TableHead>
+                  <TableHead className="text-right">Contanti</TableHead>
+                  <TableHead className="text-right">Carte</TableHead>
+                  <TableHead className="text-right">Azioni</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {currentLoading ? (
+                  Array.from({ length: 5 }).map((_, i) => (
+                    <TableRow key={i}>
+                      <TableCell colSpan={isSuperAdmin ? 9 : 8}>
+                        <Skeleton className="h-8 w-full" />
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : currentSessions?.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={isSuperAdmin ? 9 : 8} className="text-center py-12">
+                      <div className="flex flex-col items-center gap-4">
+                        <Store className="w-12 h-12 text-muted-foreground" />
+                        <div>
+                          <h3 className="font-semibold text-lg">Nessuna Sessione</h3>
+                          <p className="text-muted-foreground">
+                            {isSuperAdmin 
+                              ? "Non ci sono sessioni di cassa registrate"
+                              : "Apri la tua prima sessione di cassa"}
+                          </p>
+                        </div>
+                        {!isSuperAdmin && (
+                          <Button onClick={() => setIsOpenDialogOpen(true)}>
+                            <Play className="w-4 h-4 mr-2" />
+                            Apri Prima Sessione
+                          </Button>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  currentSessions?.map((session) => (
+                    <TableRow key={session.id} data-testid={`row-session-${session.id}`}>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          {getStatusBadge(session.status)}
+                          {session.status === "open" && (
+                            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                          )}
+                        </div>
+                      </TableCell>
+                      {isSuperAdmin && (
+                        <TableCell>
+                          {'companyName' in session && session.companyName ? (
+                            <div className="flex items-center gap-2">
+                              <Building2 className="w-4 h-4 text-primary" />
+                              <span className="font-medium">{String(session.companyName)}</span>
+                            </div>
+                          ) : '-'}
+                        </TableCell>
+                      )}
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <User className="w-4 h-4 text-muted-foreground" />
+                          <span>
+                            {isSuperAdmin && 'userName' in session && session.userName 
+                              ? String(session.userName) 
+                              : `Operatore ${session.userId?.slice(0, 6)}...`}
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        {session.openedAt && format(new Date(session.openedAt), "dd/MM/yyyy HH:mm", { locale: it })}
+                      </TableCell>
+                      <TableCell>
+                        {session.closedAt 
+                          ? format(new Date(session.closedAt), "dd/MM/yyyy HH:mm", { locale: it })
+                          : '-'}
+                      </TableCell>
+                      <TableCell className="text-right font-medium">{session.ticketsSold}</TableCell>
+                      <TableCell className="text-right font-bold text-[#FFD700]">
+                        €{Number(session.cashTotal || 0).toFixed(2)}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        €{Number(session.cardTotal || 0).toFixed(2)}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <Button 
+                            variant="ghost" 
+                            size="icon"
+                            onClick={() => handleViewSessionDesktop(session)}
+                            data-testid={`button-view-${session.id}`}
+                          >
+                            <Eye className="w-4 h-4" />
+                          </Button>
+                          {!isSuperAdmin && session.status === "open" && (
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => handleCloseSessionDesktop(session)}
+                              data-testid={`button-close-${session.id}`}
+                            >
+                              <Square className="w-4 h-4 mr-1" />
+                              Chiudi
+                            </Button>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+
+        <Dialog open={isOpenDialogOpen} onOpenChange={setIsOpenDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Apri Nuova Sessione</DialogTitle>
+              <DialogDescription>
+                Seleziona il canale di emissione per aprire una nuova sessione di cassa.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label>Canale Emissione *</Label>
+                <Select value={selectedChannelId} onValueChange={setSelectedChannelId}>
+                  <SelectTrigger data-testid="select-channel">
+                    <SelectValue placeholder="Seleziona canale" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {emissionChannels?.filter(c => c.channelType === "physical").map((channel) => (
+                      <SelectItem key={channel.id} value={channel.id}>
+                        {channel.channelCode} - {channel.description}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Location (opzionale)</Label>
+                <Select value={selectedLocationId} onValueChange={setSelectedLocationId}>
+                  <SelectTrigger data-testid="select-location">
+                    <SelectValue placeholder="Seleziona location" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {locations?.map((location) => (
+                      <SelectItem key={location.id} value={location.id}>
+                        {location.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsOpenDialogOpen(false)}>
+                Annulla
+              </Button>
+              <Button
+                onClick={() => {
+                  openSessionMutation.mutate({
+                    emissionChannelId: selectedChannelId,
+                    locationId: selectedLocationId || undefined,
+                  });
+                  setIsOpenDialogOpen(false);
+                }}
+                disabled={!selectedChannelId || openSessionMutation.isPending}
+                data-testid="button-confirm-open"
+              >
+                {openSessionMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                Apri Sessione
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={isCloseDialogOpen} onOpenChange={setIsCloseDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Chiudi Sessione</DialogTitle>
+              <DialogDescription>
+                Inserisci l'importo effettivo in cassa per quadrare la sessione.
+              </DialogDescription>
+            </DialogHeader>
+            {selectedSession && (
+              <div className="space-y-4 py-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-muted/30 rounded-lg p-4 text-center">
+                    <div className="text-muted-foreground text-sm mb-1">Contante Atteso</div>
+                    <div className="text-2xl font-bold text-[#FFD700]">€{Number(selectedSession.cashTotal || 0).toFixed(2)}</div>
+                  </div>
+                  <div className="bg-muted/30 rounded-lg p-4 text-center">
+                    <div className="text-muted-foreground text-sm mb-1">Biglietti Venduti</div>
+                    <div className="text-2xl font-bold">{selectedSession.ticketsSold}</div>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label>Contante Effettivo *</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    placeholder="0.00"
+                    value={actualCash}
+                    onChange={(e) => setActualCash(e.target.value)}
+                    className="text-lg font-bold"
+                    data-testid="input-actual-cash"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Note (opzionale)</Label>
+                  <Textarea
+                    placeholder="Note sulla chiusura..."
+                    value={closeNotes}
+                    onChange={(e) => setCloseNotes(e.target.value)}
+                    data-testid="input-close-notes"
+                  />
+                </div>
+              </div>
+            )}
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsCloseDialogOpen(false)}>
+                Annulla
+              </Button>
+              <Button
+                onClick={() => {
+                  if (selectedSession) {
+                    closeSessionMutation.mutate({
+                      id: selectedSession.id,
+                      actualCash,
+                      notes: closeNotes,
+                    });
+                    setIsCloseDialogOpen(false);
+                  }
+                }}
+                disabled={!actualCash || closeSessionMutation.isPending}
+                data-testid="button-confirm-close"
+              >
+                {closeSessionMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                Chiudi e Quadra
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Dettaglio Sessione</DialogTitle>
+              <DialogDescription>
+                Informazioni complete sulla sessione di cassa.
+              </DialogDescription>
+            </DialogHeader>
+            {selectedSession && (
+              <div className="space-y-4 py-4">
+                {'companyName' in selectedSession && selectedSession.companyName && (
+                  <div className="p-4 rounded-lg bg-primary/5 border border-primary/20">
+                    <div className="flex items-center gap-2 font-semibold">
+                      <Building2 className="w-5 h-5 text-primary" />
+                      {selectedSession.companyName}
+                    </div>
+                    {'userName' in selectedSession && selectedSession.userName && (
+                      <div className="flex items-center gap-2 mt-2 text-muted-foreground">
+                        <User className="w-4 h-4" />
+                        {selectedSession.userName}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-muted/30 rounded-lg p-4 text-center">
+                    <div className="text-muted-foreground text-sm mb-2">Stato</div>
+                    {getStatusBadge(selectedSession.status)}
+                  </div>
+                  <div className="bg-muted/30 rounded-lg p-4 text-center">
+                    <div className="text-muted-foreground text-sm mb-2">Biglietti</div>
+                    <div className="text-2xl font-bold">{selectedSession.ticketsSold}</div>
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <div className="flex justify-between py-2 border-b border-border">
+                    <span className="text-muted-foreground">Apertura</span>
+                    <span className="font-medium">
+                      {selectedSession.openedAt && format(new Date(selectedSession.openedAt), "dd/MM/yyyy HH:mm", { locale: it })}
+                    </span>
+                  </div>
+                  {selectedSession.closedAt && (
+                    <div className="flex justify-between py-2 border-b border-border">
+                      <span className="text-muted-foreground">Chiusura</span>
+                      <span className="font-medium">
+                        {format(new Date(selectedSession.closedAt), "dd/MM/yyyy HH:mm", { locale: it })}
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex justify-between py-2 border-b border-border">
+                    <span className="text-muted-foreground">Contanti</span>
+                    <span className="font-bold text-[#FFD700]">€{Number(selectedSession.cashTotal || 0).toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between py-2 border-b border-border">
+                    <span className="text-muted-foreground">Carte</span>
+                    <span className="font-medium">€{Number(selectedSession.cardTotal || 0).toFixed(2)}</span>
+                  </div>
+                  {selectedSession.actualCash && (
+                    <>
+                      <div className="flex justify-between py-2 border-b border-border">
+                        <span className="text-muted-foreground">Contante Effettivo</span>
+                        <span className="font-medium">€{Number(selectedSession.actualCash).toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between py-2 border-b border-border">
+                        <span className="text-muted-foreground">Differenza</span>
+                        <span className={Number(selectedSession.difference || 0) !== 0 ? "text-destructive font-bold" : "font-medium"}>
+                          €{Number(selectedSession.difference || 0).toFixed(2)}
+                        </span>
+                      </div>
+                    </>
+                  )}
+                  {selectedSession.notes && (
+                    <div className="py-2">
+                      <span className="text-muted-foreground block mb-2">Note</span>
+                      <p className="bg-muted/30 p-3 rounded-lg">{selectedSession.notes}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+            <DialogFooter>
+              {!isSuperAdmin && selectedSession?.status === "open" && (
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setIsDetailDialogOpen(false);
+                    setTimeout(() => handleCloseSessionDesktop(selectedSession!), 100);
+                  }}
+                >
+                  <Square className="w-4 h-4 mr-2" />
+                  Chiudi Sessione
+                </Button>
+              )}
+              <Button onClick={() => setIsDetailDialogOpen(false)}>
+                Chiudi
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+    );
+  }
 
   return (
     <MobileAppLayout

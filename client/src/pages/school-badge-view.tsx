@@ -2,6 +2,8 @@ import { useQuery } from "@tanstack/react-query";
 import { useParams } from "wouter";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import {
   Award,
   CheckCircle2,
@@ -17,6 +19,7 @@ import { it } from "date-fns/locale";
 import { motion } from "framer-motion";
 import { MobileAppLayout, MobileHeader, HapticButton, triggerHaptic } from "@/components/mobile-primitives";
 import { useLocation } from "wouter";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface BadgeData {
   id: string;
@@ -48,6 +51,7 @@ const springTransition = {
 export default function SchoolBadgeView() {
   const { code } = useParams<{ code: string }>();
   const [, setLocation] = useLocation();
+  const isMobile = useIsMobile();
 
   const { data: badge, isLoading, error } = useQuery<BadgeData>({
     queryKey: ["/api/school-badges/badge", code],
@@ -74,6 +78,222 @@ export default function SchoolBadgeView() {
     setLocation('/');
   };
 
+  const handleShareDesktop = async () => {
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: `Badge - ${badge?.request.firstName} ${badge?.request.lastName}`,
+          text: `Badge digitale verificato da ${badge?.request.landing.schoolName}`,
+          url: window.location.href,
+        });
+      } catch {
+        // User cancelled or error
+      }
+    } else {
+      navigator.clipboard.writeText(window.location.href);
+    }
+  };
+
+  // Desktop version
+  if (!isMobile) {
+    const primaryColor = badge?.request.landing.primaryColor || "#3b82f6";
+    const isRevoked = badge ? (!badge.isActive || !!badge.revokedAt) : false;
+
+    if (isLoading) {
+      return (
+        <div className="container mx-auto py-12 px-6 max-w-2xl" data-testid="page-school-badge-view-loading">
+          <Card className="overflow-hidden">
+            <CardContent className="p-8 space-y-6">
+              <div className="flex flex-col items-center">
+                <Skeleton className="h-24 w-24 rounded-2xl mb-4" />
+                <Skeleton className="h-8 w-56 mb-2" />
+                <Skeleton className="h-5 w-44" />
+              </div>
+              <Skeleton className="h-10 w-32 mx-auto rounded-full" />
+              <Skeleton className="h-56 w-56 mx-auto rounded-2xl" />
+              <div className="space-y-4 p-6 rounded-xl bg-muted/30">
+                <Skeleton className="h-6 w-full" />
+                <Skeleton className="h-6 w-3/4" />
+                <Skeleton className="h-6 w-1/2" />
+              </div>
+              <Skeleton className="h-36 w-36 mx-auto rounded-xl" />
+            </CardContent>
+          </Card>
+        </div>
+      );
+    }
+
+    if (error || !badge) {
+      return (
+        <div className="container mx-auto py-12 px-6 max-w-2xl" data-testid="page-school-badge-view-error">
+          <Button 
+            variant="ghost" 
+            onClick={() => setLocation('/')} 
+            className="mb-6"
+            data-testid="button-back-desktop"
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Torna indietro
+          </Button>
+          <Card className="text-center" data-testid="card-badge-not-found-desktop">
+            <CardContent className="p-12">
+              <div className="w-20 h-20 rounded-2xl bg-destructive/10 flex items-center justify-center mx-auto mb-6">
+                <AlertCircle className="h-10 w-10 text-destructive" />
+              </div>
+              <h1 className="text-2xl font-bold mb-3">Badge non trovato</h1>
+              <p className="text-muted-foreground">
+                Questo badge non esiste o non è più valido.
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      );
+    }
+
+    return (
+      <div className="container mx-auto py-12 px-6 max-w-2xl" data-testid="page-school-badge-view">
+        <div className="flex items-center justify-between mb-6">
+          <Button 
+            variant="ghost" 
+            onClick={() => setLocation('/')}
+            data-testid="button-back-desktop"
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Torna indietro
+          </Button>
+          <Button 
+            variant="outline" 
+            onClick={handleShareDesktop}
+            data-testid="button-share-desktop"
+          >
+            <Share2 className="h-4 w-4 mr-2" />
+            Condividi
+          </Button>
+        </div>
+
+        <Card className="overflow-hidden" data-testid="card-badge-view-desktop">
+          <div 
+            className="h-2" 
+            style={{ backgroundColor: isRevoked ? "rgb(239 68 68)" : primaryColor }}
+          />
+          
+          <CardContent className="p-8 space-y-8">
+            <div className="flex flex-col items-center">
+              {badge.request.landing.logoUrl ? (
+                <img 
+                  src={badge.request.landing.logoUrl} 
+                  alt={badge.request.landing.schoolName} 
+                  className="w-28 h-28 rounded-2xl object-cover mb-4 shadow-lg"
+                  data-testid="img-school-logo-desktop"
+                />
+              ) : (
+                <div 
+                  className="w-28 h-28 rounded-2xl flex items-center justify-center mb-4 shadow-lg"
+                  style={{ backgroundColor: primaryColor }}
+                >
+                  <GraduationCap className="h-14 w-14 text-white" />
+                </div>
+              )}
+              <h1 
+                className="text-3xl font-bold text-center"
+                data-testid="text-school-name-desktop"
+              >
+                {badge.request.landing.schoolName}
+              </h1>
+              <p className="text-muted-foreground text-lg mt-2">
+                Badge Digitale Verificato
+              </p>
+            </div>
+
+            <div className="flex justify-center">
+              {isRevoked ? (
+                <Badge 
+                  variant="destructive" 
+                  className="text-base px-5 py-2.5 gap-2"
+                >
+                  <XCircle className="h-5 w-5" />
+                  Badge Revocato
+                </Badge>
+              ) : (
+                <Badge 
+                  className="text-base px-5 py-2.5 gap-2 text-white"
+                  style={{ backgroundColor: primaryColor }}
+                  data-testid="badge-verified-desktop"
+                >
+                  <CheckCircle2 className="h-5 w-5" />
+                  Verificato
+                </Badge>
+              )}
+            </div>
+
+            {badge.badgeImageUrl && (
+              <div className="flex justify-center">
+                <img 
+                  src={badge.badgeImageUrl} 
+                  alt="Badge" 
+                  className="w-64 h-auto rounded-2xl shadow-2xl"
+                  data-testid="img-badge-desktop"
+                />
+              </div>
+            )}
+
+            <div className="p-6 rounded-xl bg-muted/30 space-y-5">
+              <div>
+                <p className="text-sm text-muted-foreground mb-1.5">Titolare</p>
+                <p 
+                  className="text-xl font-semibold flex items-center gap-3"
+                  data-testid="text-holder-name-desktop"
+                >
+                  <Award className="h-6 w-6 shrink-0" style={{ color: primaryColor }} />
+                  {badge.request.firstName} {badge.request.lastName}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground mb-1.5">Data di emissione</p>
+                <p 
+                  className="text-base font-medium flex items-center gap-3"
+                  data-testid="text-issue-date-desktop"
+                >
+                  <Calendar className="h-5 w-5 shrink-0" />
+                  {badge.createdAt && format(new Date(badge.createdAt), "dd MMMM yyyy", { locale: it })}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground mb-1.5">Codice Badge</p>
+                <p 
+                  className="font-mono text-sm bg-background/50 px-3 py-2 rounded-lg inline-block"
+                  data-testid="text-badge-code-desktop"
+                >
+                  {badge.uniqueCode}
+                </p>
+              </div>
+            </div>
+
+            {isRevoked && badge.revokedReason && (
+              <div className="p-5 rounded-xl bg-destructive/10 border border-destructive/20">
+                <p className="text-sm text-destructive font-medium mb-2">Motivo revoca</p>
+                <p className="text-base" data-testid="text-revoke-reason-desktop">{badge.revokedReason}</p>
+              </div>
+            )}
+
+            {badge.qrCodeUrl && (
+              <div className="flex flex-col items-center gap-3 pt-2">
+                <p className="text-sm text-muted-foreground">Scansiona per verificare</p>
+                <img 
+                  src={badge.qrCodeUrl} 
+                  alt="QR Code" 
+                  className="w-40 h-40 rounded-xl shadow-lg"
+                  data-testid="img-qr-code-desktop"
+                />
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Mobile version
   if (isLoading) {
     return (
       <MobileAppLayout

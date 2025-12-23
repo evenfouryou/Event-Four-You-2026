@@ -3,7 +3,9 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
@@ -26,6 +28,7 @@ import {
   Tag,
   RotateCcw,
   QrCode,
+  ArrowLeft,
 } from "lucide-react";
 import { SiApple, SiGoogle } from "react-icons/si";
 import { DigitalTicketCard } from "@/components/DigitalTicketCard";
@@ -108,6 +111,7 @@ export default function AccountTicketDetail() {
   const { id } = useParams<{ id: string }>();
   const [, navigate] = useLocation();
   const { toast } = useToast();
+  const isMobile = useIsMobile();
   const [qrCodeImage, setQrCodeImage] = useState<string | null>(null);
   const [qrLoading, setQrLoading] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
@@ -244,6 +248,21 @@ export default function AccountTicketDetail() {
   };
 
   if (isLoading) {
+    if (!isMobile) {
+      return (
+        <div className="container mx-auto p-6" data-testid="page-account-ticket-detail">
+          <div className="flex items-center gap-4 mb-6">
+            <Button variant="ghost" size="icon" onClick={() => navigate("/account/tickets")} data-testid="button-back">
+              <ArrowLeft className="w-5 h-5" />
+            </Button>
+            <h1 className="text-2xl font-bold">Caricamento...</h1>
+          </div>
+          <div className="flex items-center justify-center h-64">
+            <Loader2 className="w-10 h-10 text-primary animate-spin" />
+          </div>
+        </div>
+      );
+    }
     return (
       <MobileAppLayout
         header={
@@ -276,6 +295,27 @@ export default function AccountTicketDetail() {
   }
 
   if (isError || !ticket) {
+    if (!isMobile) {
+      return (
+        <div className="container mx-auto p-6" data-testid="page-account-ticket-detail">
+          <div className="flex items-center gap-4 mb-6">
+            <Button variant="ghost" size="icon" onClick={() => navigate("/account/tickets")} data-testid="button-back">
+              <ArrowLeft className="w-5 h-5" />
+            </Button>
+            <h1 className="text-2xl font-bold">Errore</h1>
+          </div>
+          <Card>
+            <CardContent className="flex flex-col items-center justify-center py-16 gap-4">
+              <Ticket className="w-16 h-16 text-muted-foreground/50" />
+              <p className="text-lg text-muted-foreground text-center">Biglietto non trovato</p>
+              <Button onClick={() => navigate("/account/tickets")} data-testid="button-go-back">
+                Torna ai biglietti
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      );
+    }
     return (
       <MobileAppLayout
         header={
@@ -342,6 +382,286 @@ export default function AccountTicketDetail() {
         return ticket.status;
     }
   };
+
+  if (!isMobile) {
+    return (
+      <div className="container mx-auto p-6 space-y-6" data-testid="page-account-ticket-detail">
+        <div className="flex items-center gap-4">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => navigate("/account/tickets")}
+            data-testid="button-back"
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </Button>
+          <div className="flex-1">
+            <h1 className="text-2xl font-bold">{ticket.eventName}</h1>
+            <p className="text-muted-foreground">
+              {format(eventDate, "EEEE d MMMM yyyy 'ore' HH:mm", { locale: it })}
+            </p>
+          </div>
+          <Badge variant={statusVariant()} className="text-sm px-4 py-1.5" data-testid="badge-status">
+            {statusLabel()}
+          </Badge>
+          {typeof navigator !== 'undefined' && 'share' in navigator && (
+            <Button variant="outline" size="icon" onClick={handleShare} data-testid="button-share">
+              <Share2 className="w-5 h-5" />
+            </Button>
+          )}
+        </div>
+
+        {ticket.hoursToEvent > 0 && (
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <Clock className="w-5 h-5" />
+            <span>
+              {ticket.hoursToEvent < 24
+                ? `Mancano ${ticket.hoursToEvent} ore`
+                : `Mancano ${Math.floor(ticket.hoursToEvent / 24)} giorni`}
+            </span>
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="space-y-6">
+            <Card>
+              <CardContent className="pt-6">
+                <DigitalTicketCard
+                  ticket={{
+                    ...ticket,
+                    allowNameChange: ticket.allowNameChange,
+                    allowResale: ticket.allowResale,
+                    organizerCompany: ticket.organizerCompany,
+                    ticketingManager: ticket.ticketingManager,
+                    emissionDateTime: ticket.emissionDateTime,
+                    progressiveNumber: ticket.progressiveNumber,
+                  }}
+                  template={digitalTemplate}
+                />
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Informazioni Biglietto</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 gap-6">
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+                      <Ticket className="w-5 h-5 text-primary" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Tipo</p>
+                      <p className="text-base font-medium" data-testid="text-ticket-type">
+                        {ticket.ticketType}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+                      <MapPin className="w-5 h-5 text-primary" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Settore</p>
+                      <p className="text-base font-medium" data-testid="text-sector">
+                        {ticket.sectorName}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+                      <Tag className="w-5 h-5 text-primary" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Prezzo</p>
+                      <p className="text-xl font-bold text-primary" data-testid="text-price">
+                        €{price.toFixed(2)}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+                      <User className="w-5 h-5 text-primary" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Intestatario</p>
+                      <p className="text-base font-medium" data-testid="text-holder">
+                        {holderName}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Informazioni Evento</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+                    <Calendar className="w-5 h-5 text-primary" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Data e Ora</p>
+                    <p className="text-base font-medium" data-testid="text-event-date">
+                      {format(eventDate, "EEEE d MMMM yyyy", { locale: it })}
+                    </p>
+                    <p className="text-muted-foreground">
+                      ore {format(eventDate, "HH:mm", { locale: it })}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+                    <MapPin className="w-5 h-5 text-primary" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Luogo</p>
+                    <p className="text-base font-medium" data-testid="text-location">
+                      {ticket.locationName}
+                    </p>
+                    {ticket.locationAddress && (
+                      <p className="text-sm text-muted-foreground">{ticket.locationAddress}</p>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {(ticket.status === "emitted" || ticket.status === "active" || ticket.status === "valid") && !ticket.isListed && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Salva Biglietto</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <p className="text-sm text-muted-foreground">
+                    Scarica l'immagine del biglietto, poi salvala nelle Foto per aggiungerla al Wallet
+                  </p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <Button
+                      variant="outline"
+                      className="bg-black text-white border-black hover:bg-black/90"
+                      onClick={() => {
+                        window.location.href = `/api/public/account/tickets/${id}/wallet/apple`;
+                      }}
+                      data-testid="button-add-apple-wallet"
+                    >
+                      <SiApple className="w-5 h-5 mr-2" />
+                      Immagine
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="bg-gradient-to-r from-blue-500 to-green-500 text-white border-0 hover:opacity-90"
+                      onClick={() => {
+                        window.location.href = `/api/public/account/tickets/${id}/wallet/google`;
+                      }}
+                      data-testid="button-add-google-wallet"
+                    >
+                      <SiGoogle className="w-5 h-5 mr-2" />
+                      Immagine
+                    </Button>
+                  </div>
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={handleDownloadPdf}
+                    disabled={isDownloading}
+                    data-testid="button-download-pdf"
+                  >
+                    {isDownloading ? (
+                      <Loader2 className="w-5 h-5 animate-spin mr-2" />
+                    ) : (
+                      <Download className="w-5 h-5 mr-2" />
+                    )}
+                    Scarica PDF
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+
+            {(ticket.status === "emitted" || ticket.status === "active" || ticket.status === "valid") && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Azioni</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {ticket.isListed && ticket.existingResale ? (
+                    <>
+                      <div className="p-4 bg-primary/10 border border-primary/20 rounded-lg">
+                        <p className="text-base font-medium text-primary text-center">
+                          In vendita a €{parseFloat(ticket.existingResale.resalePrice).toFixed(2)}
+                        </p>
+                      </div>
+                      <Button
+                        variant="outline"
+                        className="w-full text-destructive border-destructive/30"
+                        onClick={() => cancelResaleMutation.mutate()}
+                        disabled={cancelResaleMutation.isPending}
+                        data-testid="button-cancel-resale"
+                      >
+                        {cancelResaleMutation.isPending ? (
+                          <Loader2 className="w-5 h-5 animate-spin" />
+                        ) : (
+                          <>
+                            <XCircle className="w-5 h-5 mr-2" />
+                            Rimuovi dalla Vendita
+                          </>
+                        )}
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      {ticket.canNameChange && (
+                        <Button
+                          variant="outline"
+                          className="w-full"
+                          onClick={() => navigate(`/account/tickets/${id}/name-change`)}
+                          data-testid="button-name-change"
+                        >
+                          <User className="w-5 h-5 mr-2" />
+                          Cambia Nominativo
+                        </Button>
+                      )}
+                      {ticket.canResale && (
+                        <Button
+                          className="w-full"
+                          onClick={() => navigate(`/account/tickets/${id}/resale`)}
+                          data-testid="button-resale"
+                        >
+                          <RefreshCw className="w-5 h-5 mr-2" />
+                          Metti in Vendita
+                        </Button>
+                      )}
+                      {!ticket.canNameChange && !ticket.canResale && ticket.hoursToEvent > 0 && (
+                        <p className="text-center text-muted-foreground py-4">
+                          Cambio nominativo e rivendita non disponibili
+                        </p>
+                      )}
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
+            {ticket.fiscalSealCode && (
+              <Card>
+                <CardContent className="pt-6">
+                  <p className="text-xs text-muted-foreground text-center">
+                    Sigillo fiscale: {ticket.fiscalSealCode}
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <MobileAppLayout

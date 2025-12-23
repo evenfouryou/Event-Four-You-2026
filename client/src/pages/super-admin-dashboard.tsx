@@ -4,7 +4,17 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Building2, Calendar, TrendingUp, Package, Settings, UserPlus, Ticket, ChevronLeft, CreditCard, FileText, Send, ClipboardList, Shield } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { MobileAppLayout, MobileHeader, HapticButton, triggerHaptic } from "@/components/mobile-primitives";
 import { useLocation } from "wouter";
@@ -115,6 +125,7 @@ function StatCard({ title, value, subtitle, icon: Icon, testId, index }: StatCar
 export default function SuperAdminDashboard() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
+  const isMobile = useIsMobile();
   
   const { data: analytics, isLoading } = useQuery<AnalyticsData>({
     queryKey: ['/api/super-admin/analytics'],
@@ -231,6 +242,367 @@ export default function SuperAdminDashboard() {
 
   const totalCompanies = analytics.companyMetrics.length;
   const totalRevenue = analytics.companyMetrics.reduce((sum, c) => sum + c.totalRevenue, 0);
+
+  if (!isMobile) {
+    return (
+      <div className="container mx-auto p-6 space-y-6" data-testid="page-super-admin-dashboard">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold">Dashboard Super Admin</h1>
+            <p className="text-muted-foreground">Metriche cross-company</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-4 gap-4">
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <p className="text-2xl font-bold" data-testid="text-total-companies">{totalCompanies}</p>
+                  <p className="text-sm text-muted-foreground">Aziende</p>
+                </div>
+                <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <Building2 className="w-5 h-5 text-primary" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <p className="text-2xl font-bold" data-testid="text-total-events">{analytics.eventStatistics.total}</p>
+                  <p className="text-sm text-muted-foreground">Eventi ({analytics.eventStatistics.active} attivi)</p>
+                </div>
+                <div className="w-10 h-10 rounded-lg bg-accent/10 flex items-center justify-center">
+                  <Calendar className="w-5 h-5 text-accent" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <p className="text-2xl font-bold" data-testid="text-total-revenue">€{totalRevenue.toFixed(0)}</p>
+                  <p className="text-sm text-muted-foreground">Ricavi Totali</p>
+                </div>
+                <div className="w-10 h-10 rounded-lg bg-chart-1/10 flex items-center justify-center">
+                  <TrendingUp className="w-5 h-5 text-chart-1" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <p className="text-2xl font-bold" data-testid="text-top-products-count">{analytics.topProducts.length}</p>
+                  <p className="text-sm text-muted-foreground">Top Prodotti</p>
+                </div>
+                <div className="w-10 h-10 rounded-lg bg-chart-2/10 flex items-center justify-center">
+                  <Package className="w-5 h-5 text-chart-2" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="grid grid-cols-2 gap-6">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-muted/50 flex items-center justify-center">
+                  <Settings className="w-5 h-5 text-muted-foreground" />
+                </div>
+                <div>
+                  <CardTitle>Impostazioni Sistema</CardTitle>
+                  <CardDescription>Impostazioni globali piattaforma</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between gap-4 p-4 rounded-lg bg-muted/30">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <UserPlus className="w-5 h-5 text-primary" />
+                  </div>
+                  <div>
+                    <Label htmlFor="desktop-registration-toggle">Registrazione Organizzatori</Label>
+                    <p className="text-sm text-muted-foreground">
+                      {registrationEnabled ? "Attiva" : "Disabilitata"}
+                    </p>
+                  </div>
+                </div>
+                <Switch
+                  id="desktop-registration-toggle"
+                  checked={registrationEnabled}
+                  onCheckedChange={handleRegistrationToggle}
+                  disabled={updateSettingMutation.isPending}
+                  data-testid="switch-registration-enabled"
+                />
+              </div>
+              <div className="flex items-center justify-between gap-4 p-4 rounded-lg bg-muted/30">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-accent/10 flex items-center justify-center">
+                    <Ticket className="w-5 h-5 text-accent" />
+                  </div>
+                  <div>
+                    <Label htmlFor="desktop-customer-registration-toggle">Registrazione Clienti</Label>
+                    <p className="text-sm text-muted-foreground">
+                      {customerRegistrationEnabled ? "Attiva" : "Disabilitata"}
+                    </p>
+                  </div>
+                </div>
+                <Switch
+                  id="desktop-customer-registration-toggle"
+                  checked={customerRegistrationEnabled}
+                  onCheckedChange={handleCustomerRegistrationToggle}
+                  disabled={updateSettingMutation.isPending}
+                  data-testid="switch-customer-registration-enabled"
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-chart-2/10 flex items-center justify-center">
+                  <Shield className="w-5 h-5 text-chart-2" />
+                </div>
+                <div>
+                  <CardTitle>Gestione SIAE</CardTitle>
+                  <CardDescription>Biglietteria fiscale e trasmissioni</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-3 gap-3">
+                <Button
+                  variant="outline"
+                  className="flex flex-col items-center gap-2 h-auto py-4"
+                  onClick={() => setLocation('/siae-config')}
+                  data-testid="link-siae-config"
+                >
+                  <Settings className="w-5 h-5 text-primary" />
+                  <span className="text-xs">Configurazione</span>
+                </Button>
+                <Button
+                  variant="outline"
+                  className="flex flex-col items-center gap-2 h-auto py-4"
+                  onClick={() => setLocation('/siae-tables')}
+                  data-testid="link-siae-tables"
+                >
+                  <ClipboardList className="w-5 h-5 text-accent" />
+                  <span className="text-xs">Tabelle Codificate</span>
+                </Button>
+                <Button
+                  variant="outline"
+                  className="flex flex-col items-center gap-2 h-auto py-4"
+                  onClick={() => setLocation('/siae-activation-cards')}
+                  data-testid="link-siae-cards"
+                >
+                  <CreditCard className="w-5 h-5 text-chart-1" />
+                  <span className="text-xs">Carte Attivazione</span>
+                </Button>
+                <Button
+                  variant="outline"
+                  className="flex flex-col items-center gap-2 h-auto py-4"
+                  onClick={() => setLocation('/siae-transmissions')}
+                  data-testid="link-siae-transmissions"
+                >
+                  <Send className="w-5 h-5 text-chart-2" />
+                  <span className="text-xs">Trasmissioni</span>
+                </Button>
+                <Button
+                  variant="outline"
+                  className="flex flex-col items-center gap-2 h-auto py-4"
+                  onClick={() => setLocation('/siae-report-c1')}
+                  data-testid="link-siae-report-c1"
+                >
+                  <FileText className="w-5 h-5 text-chart-3" />
+                  <span className="text-xs">Report C1/C2</span>
+                </Button>
+                <Button
+                  variant="outline"
+                  className="flex flex-col items-center gap-2 h-auto py-4"
+                  onClick={() => setLocation('/siae-audit-logs')}
+                  data-testid="link-siae-audit"
+                >
+                  <Shield className="w-5 h-5 text-chart-4" />
+                  <span className="text-xs">Audit Logs</span>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="grid grid-cols-2 gap-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Ricavi per Azienda</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={analytics.companyMetrics}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis 
+                    dataKey="companyName" 
+                    tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
+                    tickLine={{ stroke: 'hsl(var(--border))' }}
+                  />
+                  <YAxis 
+                    tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
+                    tickLine={{ stroke: 'hsl(var(--border))' }}
+                  />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: 'hsl(var(--card))',
+                      border: '1px solid hsl(var(--border))',
+                      borderRadius: '8px',
+                    }}
+                  />
+                  <Bar dataKey="totalRevenue" fill="hsl(var(--primary))" name="Ricavi (€)" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Eventi per Azienda</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={analytics.companyMetrics}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis 
+                    dataKey="companyName" 
+                    tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
+                    tickLine={{ stroke: 'hsl(var(--border))' }}
+                  />
+                  <YAxis 
+                    tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
+                    tickLine={{ stroke: 'hsl(var(--border))' }}
+                  />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: 'hsl(var(--card))',
+                      border: '1px solid hsl(var(--border))',
+                      borderRadius: '8px',
+                    }}
+                  />
+                  <Bar dataKey="eventCount" fill="hsl(var(--accent))" name="N° Eventi" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="grid grid-cols-2 gap-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Top Prodotti per Consumo</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={analytics.topProducts} layout="vertical">
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis 
+                    type="number" 
+                    tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
+                    tickLine={{ stroke: 'hsl(var(--border))' }}
+                  />
+                  <YAxis 
+                    dataKey="productName" 
+                    type="category" 
+                    width={120} 
+                    tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
+                    tickLine={{ stroke: 'hsl(var(--border))' }}
+                  />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: 'hsl(var(--card))',
+                      border: '1px solid hsl(var(--border))',
+                      borderRadius: '8px',
+                    }}
+                  />
+                  <Bar dataKey="totalConsumed" fill="hsl(var(--chart-2))" name="Quantità" radius={[0, 4, 4, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Distribuzione Stati Eventi</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={300}>
+                <PieChart>
+                  <Pie
+                    data={[
+                      { name: 'Pianificato', value: analytics.eventStatistics.total - analytics.eventStatistics.active - analytics.eventStatistics.completed },
+                      { name: 'Attivo', value: analytics.eventStatistics.active },
+                      { name: 'Completato', value: analytics.eventStatistics.completed },
+                    ]}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    label={({ name, value }) => `${name}: ${value}`}
+                    outerRadius={100}
+                    innerRadius={50}
+                    fill="hsl(var(--primary))"
+                    dataKey="value"
+                    paddingAngle={2}
+                  >
+                    {[0, 1, 2].map((index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: 'hsl(var(--card))',
+                      border: '1px solid hsl(var(--border))',
+                      borderRadius: '8px',
+                    }}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Metriche Aziende</CardTitle>
+            <CardDescription>Dettaglio ricavi e eventi per azienda</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Azienda</TableHead>
+                  <TableHead className="text-right">Eventi</TableHead>
+                  <TableHead className="text-right">Ricavi</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {analytics.companyMetrics.map((company) => (
+                  <TableRow key={company.companyId} data-testid={`row-company-${company.companyId}`}>
+                    <TableCell className="font-medium">{company.companyName}</TableCell>
+                    <TableCell className="text-right">{company.eventCount}</TableCell>
+                    <TableCell className="text-right">€{company.totalRevenue.toFixed(2)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <MobileAppLayout

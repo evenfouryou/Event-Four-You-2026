@@ -4,6 +4,7 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { useAuth } from "@/hooks/useAuth";
+import { useIsMobile } from "@/hooks/use-mobile";
 import {
   Form,
   FormControl,
@@ -23,6 +24,23 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { Plus, Package, Edit, Search, ArrowLeft, CheckCircle2, Tag, Euro } from "lucide-react";
 import { Link } from "wouter";
 import { useForm } from "react-hook-form";
@@ -191,6 +209,7 @@ export default function Products() {
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const { toast } = useToast();
   const { user } = useAuth();
+  const isMobile = useIsMobile();
   
   const canCreateProducts = user?.role === 'super_admin' || user?.role === 'gestore';
   const isBartender = user?.role === 'bartender';
@@ -363,6 +382,342 @@ export default function Products() {
       }
     />
   );
+
+  const formContent = (
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+        <FormField
+          control={form.control}
+          name="code"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Codice</FormLabel>
+              <FormControl>
+                <Input {...field} data-testid="input-product-code" />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="name"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Nome</FormLabel>
+              <FormControl>
+                <Input {...field} data-testid="input-product-name" />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="category"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Categoria</FormLabel>
+              <Select onValueChange={field.onChange} value={field.value ?? ''}>
+                <FormControl>
+                  <SelectTrigger data-testid="select-product-category">
+                    <SelectValue placeholder="Seleziona categoria" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  {categories.map((cat) => (
+                    <SelectItem key={cat} value={cat}>
+                      {cat.charAt(0).toUpperCase() + cat.slice(1)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="unitOfMeasure"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Unità di Misura</FormLabel>
+              <Select onValueChange={field.onChange} value={field.value}>
+                <FormControl>
+                  <SelectTrigger data-testid="select-product-unit">
+                    <SelectValue />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  {units.map((unit) => (
+                    <SelectItem key={unit} value={unit}>
+                      {unit.charAt(0).toUpperCase() + unit.slice(1)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="costPrice"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Prezzo di Costo (€)</FormLabel>
+              <FormControl>
+                <Input {...field} type="number" step="0.01" data-testid="input-product-cost" />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="minThreshold"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Soglia Minima (opzionale)</FormLabel>
+              <FormControl>
+                <Input
+                  {...field}
+                  type="number"
+                  step="0.01"
+                  value={field.value || ''}
+                  data-testid="input-product-threshold"
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="active"
+          render={({ field }) => (
+            <FormItem>
+              <div className="flex items-center justify-between py-2">
+                <FormLabel>Prodotto Attivo</FormLabel>
+                <FormControl>
+                  <Switch
+                    checked={field.value}
+                    onCheckedChange={field.onChange}
+                    data-testid="switch-product-active"
+                  />
+                </FormControl>
+              </div>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <DialogFooter className="gap-2 pt-4">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handleDialogClose}
+            data-testid="button-cancel-product"
+          >
+            Annulla
+          </Button>
+          <Button
+            type="submit"
+            disabled={createMutation.isPending || updateMutation.isPending}
+            data-testid="button-submit-product"
+          >
+            {editingProduct ? 'Aggiorna' : 'Crea'}
+          </Button>
+        </DialogFooter>
+      </form>
+    </Form>
+  );
+
+  if (!isMobile) {
+    return (
+      <div className="container mx-auto p-6 space-y-6" data-testid="page-products">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">Catalogo Prodotti</h1>
+            <p className="text-muted-foreground">Gestione prodotti del magazzino</p>
+          </div>
+          {canCreateProducts && (
+            <Button onClick={handleFabClick} data-testid="button-create-product">
+              <Plus className="w-4 h-4 mr-2" />
+              Nuovo Prodotto
+            </Button>
+          )}
+        </div>
+
+        <div className="grid grid-cols-4 gap-4">
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-blue-500/20 flex items-center justify-center">
+                  <Package className="h-5 w-5 text-blue-500" />
+                </div>
+                <div>
+                  <div className="text-2xl font-bold" data-testid="stat-total-products">{products?.length || 0}</div>
+                  <p className="text-sm text-muted-foreground">Prodotti Totali</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-emerald-500/20 flex items-center justify-center">
+                  <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+                </div>
+                <div>
+                  <div className="text-2xl font-bold" data-testid="stat-active-products">{activeProducts}</div>
+                  <p className="text-sm text-muted-foreground">Prodotti Attivi</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-amber-500/20 flex items-center justify-center">
+                  <Tag className="h-5 w-5 text-amber-500" />
+                </div>
+                <div>
+                  <div className="text-2xl font-bold" data-testid="stat-categories">{totalCategories}</div>
+                  <p className="text-sm text-muted-foreground">Categorie</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-red-500/20 flex items-center justify-center">
+                  <Package className="h-5 w-5 text-red-500" />
+                </div>
+                <div>
+                  <div className="text-2xl font-bold">{(products?.length || 0) - activeProducts}</div>
+                  <p className="text-sm text-muted-foreground">Prodotti Inattivi</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between gap-4">
+              <CardTitle>Lista Prodotti</CardTitle>
+              <div className="flex items-center gap-4">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Cerca prodotti..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-10 w-64"
+                    data-testid="input-search-products"
+                  />
+                </div>
+                <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                  <SelectTrigger className="w-48" data-testid="select-category-filter">
+                    <SelectValue placeholder="Filtra per categoria" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Tutte le categorie</SelectItem>
+                    {categories.map((cat) => (
+                      <SelectItem key={cat} value={cat}>
+                        {cat.charAt(0).toUpperCase() + cat.slice(1)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <div className="space-y-3">
+                <Skeleton className="h-12 w-full" />
+                <Skeleton className="h-12 w-full" />
+                <Skeleton className="h-12 w-full" />
+              </div>
+            ) : filteredProducts.length > 0 ? (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Codice</TableHead>
+                    <TableHead>Nome</TableHead>
+                    <TableHead>Categoria</TableHead>
+                    <TableHead>Unità</TableHead>
+                    {!isBartender && <TableHead>Prezzo Costo</TableHead>}
+                    <TableHead>Soglia Min.</TableHead>
+                    <TableHead>Stato</TableHead>
+                    {canCreateProducts && <TableHead className="w-16">Azioni</TableHead>}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredProducts.map((product) => (
+                    <TableRow key={product.id} data-testid={`row-product-${product.id}`}>
+                      <TableCell className="font-mono text-sm">{product.code}</TableCell>
+                      <TableCell className="font-medium">{product.name}</TableCell>
+                      <TableCell>
+                        {product.category && (
+                          <Badge variant="outline">
+                            {product.category.charAt(0).toUpperCase() + product.category.slice(1)}
+                          </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell>{product.unitOfMeasure}</TableCell>
+                      {!isBartender && <TableCell>€ {product.costPrice}</TableCell>}
+                      <TableCell>{product.minThreshold || '-'}</TableCell>
+                      <TableCell>
+                        {product.active ? (
+                          <Badge className="bg-emerald-500/20 text-emerald-500 border-emerald-500/30">Attivo</Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-muted-foreground">Inattivo</Badge>
+                        )}
+                      </TableCell>
+                      {canCreateProducts && (
+                        <TableCell>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleEdit(product)}
+                            data-testid={`button-edit-product-${product.id}`}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      )}
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            ) : (
+              <div className="text-center py-12">
+                <Package className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                <h3 className="font-semibold text-lg mb-2">Nessun prodotto trovato</h3>
+                <p className="text-sm text-muted-foreground">
+                  {searchQuery || categoryFilter !== "all"
+                    ? "Prova a modificare i filtri di ricerca"
+                    : "Aggiungi il primo prodotto al catalogo"}
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>{editingProduct ? 'Modifica Prodotto' : 'Nuovo Prodotto'}</DialogTitle>
+            </DialogHeader>
+            {formContent}
+          </DialogContent>
+        </Dialog>
+      </div>
+    );
+  }
 
   return (
     <MobileAppLayout header={header} contentClassName="pb-24">

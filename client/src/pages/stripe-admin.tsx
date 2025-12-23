@@ -4,6 +4,7 @@ import { format } from "date-fns";
 import { it } from "date-fns/locale";
 import { useAuth } from "@/hooks/useAuth";
 import { useLocation } from "wouter";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -41,6 +42,7 @@ import { MobileAppLayout, MobileHeader } from "@/components/mobile-primitives";
 export default function StripeAdminPage() {
   const { user } = useAuth();
   const [, navigate] = useLocation();
+  const isMobile = useIsMobile();
   const companyId = user?.companyId;
   const [selectedEventId, setSelectedEventId] = useState<string>("all");
 
@@ -172,6 +174,266 @@ export default function StripeAdminPage() {
           ))}
         </div>
         <Skeleton className="h-96" />
+      </div>
+    );
+  }
+
+  if (!isMobile) {
+    return (
+      <div className="container mx-auto p-6 space-y-6" data-testid="page-stripe-admin">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold flex items-center gap-3">
+              <CreditCard className="w-8 h-8 text-[#FFD700]" />
+              Pagamenti Stripe
+            </h1>
+            <p className="text-muted-foreground">Gestisci le transazioni e monitora i pagamenti</p>
+          </div>
+          <Button
+            onClick={openStripeDashboard}
+            className="bg-[#635BFF] hover:bg-[#5851DB] text-white"
+            data-testid="button-stripe-dashboard"
+          >
+            <ExternalLink className="w-4 h-4 mr-2" />
+            Apri Dashboard Stripe
+          </Button>
+        </div>
+
+        <div className="flex items-center gap-4">
+          <Card className="flex-1">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center">
+                  <Calendar className="w-5 h-5 text-primary" />
+                </div>
+                <div className="flex-1">
+                  <label className="text-sm font-medium mb-1 block">Filtra per Evento</label>
+                  <Select value={selectedEventId} onValueChange={setSelectedEventId}>
+                    <SelectTrigger data-testid="select-event-filter">
+                      <SelectValue placeholder="Tutti gli eventi" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Tutti gli eventi</SelectItem>
+                      {ticketedEvents?.map((te) => {
+                        const event = events?.find(e => e.id === te.eventId);
+                        return (
+                          <SelectItem key={te.id} value={te.id}>
+                            {event?.name || "Evento sconosciuto"}
+                          </SelectItem>
+                        );
+                      })}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                  isProduction ? "bg-emerald-500/20" : "bg-amber-500/20"
+                }`}>
+                  <CreditCard className={`w-5 h-5 ${isProduction ? "text-emerald-400" : "text-amber-400"}`} />
+                </div>
+                <div>
+                  <h3 className="font-semibold">Connessione Stripe</h3>
+                  <Badge 
+                    className={`${
+                      isProduction 
+                        ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30" 
+                        : "bg-amber-500/20 text-amber-400 border-amber-500/30"
+                    }`}
+                    data-testid="badge-stripe-mode"
+                  >
+                    {isProduction ? (
+                      <>
+                        <CheckCircle2 className="w-3 h-3 mr-1" />
+                        Produzione
+                      </>
+                    ) : (
+                      <>
+                        <AlertCircle className="w-3 h-3 mr-1" />
+                        Modalità Sandbox
+                      </>
+                    )}
+                  </Badge>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+          <Card data-testid="card-total-revenue">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between mb-2">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center">
+                  <Euro className="h-5 w-5 text-white" />
+                </div>
+                <TrendingUp className="h-4 w-4 text-emerald-400" />
+              </div>
+              <div className="text-2xl font-bold text-[#FFD700]" data-testid="stat-total-revenue">
+                €{stats.totalRevenue.toFixed(2)}
+              </div>
+              <p className="text-sm text-muted-foreground">Incasso Totale</p>
+            </CardContent>
+          </Card>
+
+          <Card data-testid="card-today-revenue">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between mb-2">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
+                  <Activity className="h-5 w-5 text-white" />
+                </div>
+              </div>
+              <div className="text-2xl font-bold" data-testid="stat-today-revenue">
+                €{stats.todayRevenue.toFixed(2)}
+              </div>
+              <p className="text-sm text-muted-foreground">Incasso Oggi</p>
+            </CardContent>
+          </Card>
+
+          <Card data-testid="card-successful-transactions">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between mb-2">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center">
+                  <CheckCircle2 className="h-5 w-5 text-white" />
+                </div>
+              </div>
+              <div className="text-2xl font-bold text-emerald-400" data-testid="stat-successful">
+                {stats.successfulTransactions}
+              </div>
+              <p className="text-sm text-muted-foreground">Transazioni Riuscite</p>
+            </CardContent>
+          </Card>
+
+          <Card data-testid="card-failed-transactions">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between mb-2">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-red-500 to-rose-600 flex items-center justify-center">
+                  <XCircle className="h-5 w-5 text-white" />
+                </div>
+              </div>
+              <div className="text-2xl font-bold text-destructive" data-testid="stat-failed">
+                {stats.failedTransactions}
+              </div>
+              <p className="text-sm text-muted-foreground">Transazioni Fallite</p>
+            </CardContent>
+          </Card>
+
+          <Card data-testid="card-pending-info">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between mb-2">
+                <div className="w-10 h-10 rounded-xl bg-amber-500/20 flex items-center justify-center">
+                  <Clock className="w-5 h-5 text-amber-400" />
+                </div>
+              </div>
+              <div className="text-2xl font-bold text-amber-400" data-testid="stat-pending">
+                €{stats.pendingPayments.toFixed(2)}
+              </div>
+              <p className="text-sm text-muted-foreground">Pagamenti in Attesa</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        <Card data-testid="card-transactions-table">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <CreditCard className="w-5 h-5 text-[#FFD700]" />
+              Transazioni Recenti
+            </CardTitle>
+            <CardDescription>
+              Ultimi pagamenti dalla biglietteria SIAE
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="p-0">
+            {!recentTransactions || recentTransactions.length === 0 ? (
+              <div className="p-12 text-center">
+                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-muted/30 flex items-center justify-center">
+                  <CreditCard className="w-8 h-8 text-muted-foreground" />
+                </div>
+                <h3 className="text-lg font-semibold mb-2">Nessuna Transazione</h3>
+                <p className="text-muted-foreground">Non ci sono transazioni da visualizzare</p>
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-muted/50">
+                    <TableHead>Data</TableHead>
+                    <TableHead>Evento</TableHead>
+                    <TableHead>Importo</TableHead>
+                    <TableHead>Biglietti</TableHead>
+                    <TableHead>Stato</TableHead>
+                    <TableHead>Pagamento</TableHead>
+                    <TableHead>Cliente</TableHead>
+                    <TableHead className="text-right">Azioni</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {recentTransactions.map((transaction) => (
+                    <TableRow key={transaction.id} data-testid={`row-transaction-${transaction.id}`}>
+                      <TableCell data-testid={`cell-date-${transaction.id}`}>
+                        <div className="text-sm">
+                          {transaction.createdAt && format(new Date(transaction.createdAt), "dd/MM/yyyy", { locale: it })}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {transaction.createdAt && format(new Date(transaction.createdAt), "HH:mm", { locale: it })}
+                        </div>
+                      </TableCell>
+                      <TableCell data-testid={`cell-event-${transaction.id}`}>
+                        <div className="max-w-[200px] truncate text-sm" title={getEventName(transaction.ticketedEventId)}>
+                          {getEventName(transaction.ticketedEventId)}
+                        </div>
+                      </TableCell>
+                      <TableCell data-testid={`cell-amount-${transaction.id}`}>
+                        <span className="flex items-center gap-1 font-medium text-[#FFD700]">
+                          <Euro className="w-3 h-3" />
+                          {Number(transaction.totalAmount).toFixed(2)}
+                        </span>
+                      </TableCell>
+                      <TableCell data-testid={`cell-tickets-${transaction.id}`}>
+                        <Badge variant="outline" className="gap-1">
+                          <Ticket className="w-3 h-3" />
+                          {transaction.ticketsCount || 0}
+                        </Badge>
+                      </TableCell>
+                      <TableCell data-testid={`cell-status-${transaction.id}`}>
+                        {getStatusBadge(transaction.status)}
+                      </TableCell>
+                      <TableCell data-testid={`cell-payment-${transaction.id}`}>
+                        <span className="flex items-center gap-2">
+                          {getPaymentIcon(transaction.paymentMethod)}
+                          {getPaymentLabel(transaction.paymentMethod)}
+                        </span>
+                      </TableCell>
+                      <TableCell data-testid={`cell-customer-${transaction.id}`}>
+                        <div>
+                          <div className="font-mono text-xs">{transaction.customerUniqueCode || "-"}</div>
+                          {transaction.customerEmail && (
+                            <div className="text-xs text-muted-foreground">{transaction.customerEmail}</div>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => navigate(`/siae/transactions?eventId=${transaction.ticketedEventId}`)}
+                          title="Vedi Dettagli"
+                          data-testid={`button-view-${transaction.id}`}
+                        >
+                          <Eye className="w-4 h-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
       </div>
     );
   }

@@ -3,15 +3,25 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import {
   Dialog,
   DialogContent,
@@ -233,6 +243,7 @@ export default function StaffPage() {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const isMobile = useIsMobile();
 
   const [selectedRole, setSelectedRole] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -360,6 +371,444 @@ export default function StaffPage() {
     />
   );
 
+  const formContent = (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label htmlFor="firstName">Nome *</Label>
+          <Input
+            id="firstName"
+            name="firstName"
+            defaultValue={editingStaff?.firstName || ""}
+            required
+            className="h-12"
+            data-testid="input-staff-first-name"
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="lastName">Cognome *</Label>
+          <Input
+            id="lastName"
+            name="lastName"
+            defaultValue={editingStaff?.lastName || ""}
+            required
+            className="h-12"
+            data-testid="input-staff-last-name"
+          />
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="role">Ruolo *</Label>
+        <Select name="role" defaultValue={editingStaff?.role || "altro"}>
+          <SelectTrigger className="h-12" data-testid="select-staff-role">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="pr">PR</SelectItem>
+            <SelectItem value="barista">Barista</SelectItem>
+            <SelectItem value="sicurezza">Sicurezza</SelectItem>
+            <SelectItem value="fotografo">Fotografo</SelectItem>
+            <SelectItem value="dj">DJ</SelectItem>
+            <SelectItem value="tecnico">Tecnico</SelectItem>
+            <SelectItem value="altro">Altro</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label htmlFor="phone">Telefono</Label>
+          <Input
+            id="phone"
+            name="phone"
+            type="tel"
+            defaultValue={editingStaff?.phone || ""}
+            className="h-12"
+            data-testid="input-staff-phone"
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="email">Email</Label>
+          <Input
+            id="email"
+            name="email"
+            type="email"
+            defaultValue={editingStaff?.email || ""}
+            className="h-12"
+            data-testid="input-staff-email"
+          />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label htmlFor="hourlyRate">Tariffa Oraria (€)</Label>
+          <Input
+            id="hourlyRate"
+            name="hourlyRate"
+            type="number"
+            step="0.01"
+            defaultValue={editingStaff?.hourlyRate || ""}
+            placeholder="0.00"
+            className="h-12"
+            data-testid="input-staff-hourly-rate"
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="fixedRate">Tariffa Fissa (€)</Label>
+          <Input
+            id="fixedRate"
+            name="fixedRate"
+            type="number"
+            step="0.01"
+            defaultValue={editingStaff?.fixedRate || ""}
+            placeholder="0.00"
+            className="h-12"
+            data-testid="input-staff-fixed-rate"
+          />
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="fiscalCode">Codice Fiscale</Label>
+        <Input
+          id="fiscalCode"
+          name="fiscalCode"
+          defaultValue={editingStaff?.fiscalCode || ""}
+          maxLength={16}
+          className="h-12"
+          data-testid="input-staff-fiscal-code"
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="bankIban">IBAN</Label>
+        <Input
+          id="bankIban"
+          name="bankIban"
+          defaultValue={editingStaff?.bankIban || ""}
+          maxLength={34}
+          className="h-12"
+          data-testid="input-staff-iban"
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="address">Indirizzo</Label>
+        <Input
+          id="address"
+          name="address"
+          defaultValue={editingStaff?.address || ""}
+          className="h-12"
+          data-testid="input-staff-address"
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="notes">Note</Label>
+        <Textarea
+          id="notes"
+          name="notes"
+          defaultValue={editingStaff?.notes || ""}
+          className="min-h-[100px]"
+          data-testid="input-staff-notes"
+        />
+      </div>
+
+      <div className="flex items-center gap-3 py-2">
+        <Switch
+          id="active"
+          name="active"
+          defaultChecked={editingStaff?.active !== false}
+          data-testid="switch-staff-active"
+        />
+        <Label htmlFor="active" className="cursor-pointer">
+          Staff attivo
+        </Label>
+      </div>
+
+      <DialogFooter className="gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => setIsDialogOpen(false)}
+          className="flex-1 h-12"
+        >
+          Annulla
+        </Button>
+        <Button
+          type="submit"
+          className="flex-1 h-12 gradient-golden text-black font-semibold"
+          disabled={createMutation.isPending || updateMutation.isPending}
+          data-testid="button-save-staff"
+        >
+          {editingStaff ? "Aggiorna" : "Aggiungi"}
+        </Button>
+      </DialogFooter>
+    </form>
+  );
+
+  if (!isMobile) {
+    return (
+      <div className="container mx-auto p-6 space-y-6" data-testid="page-staff">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold">Staff</h1>
+            <p className="text-muted-foreground">{staffList.length} membri · {activeCount} attivi</p>
+          </div>
+          {isAdmin && (
+            <Button
+              onClick={() => {
+                setEditingStaff(null);
+                setIsDialogOpen(true);
+              }}
+              data-testid="button-add-staff"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Aggiungi Staff
+            </Button>
+          )}
+        </div>
+
+        <div className="grid grid-cols-4 gap-4">
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-2xl font-bold">{staffList.length}</div>
+              <p className="text-sm text-muted-foreground">Totale Staff</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-2xl font-bold text-green-500">{activeCount}</div>
+              <p className="text-sm text-muted-foreground">Attivi</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-2xl font-bold text-muted-foreground">{staffList.length - activeCount}</div>
+              <p className="text-sm text-muted-foreground">Inattivi</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-2xl font-bold text-pink-500">{staffList.filter(s => s.role === 'pr').length}</div>
+              <p className="text-sm text-muted-foreground">PR</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between gap-4 space-y-0 pb-4">
+            <div>
+              <CardTitle>Lista Staff</CardTitle>
+              <CardDescription>Gestisci il personale della tua organizzazione</CardDescription>
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Cerca staff..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10 w-64"
+                  data-testid="input-search-staff-desktop"
+                />
+              </div>
+              <Select value={selectedRole || "all"} onValueChange={(v) => setSelectedRole(v === "all" ? null : v)}>
+                <SelectTrigger className="w-40" data-testid="select-filter-role">
+                  <SelectValue placeholder="Tutti i ruoli" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tutti i ruoli</SelectItem>
+                  <SelectItem value="pr">PR</SelectItem>
+                  <SelectItem value="barista">Barista</SelectItem>
+                  <SelectItem value="sicurezza">Sicurezza</SelectItem>
+                  <SelectItem value="fotografo">Fotografo</SelectItem>
+                  <SelectItem value="dj">DJ</SelectItem>
+                  <SelectItem value="tecnico">Tecnico</SelectItem>
+                  <SelectItem value="altro">Altro</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <div className="space-y-3">
+                {[...Array(5)].map((_, i) => (
+                  <Skeleton key={i} className="h-16 w-full" />
+                ))}
+              </div>
+            ) : filteredStaff.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-16 text-center">
+                <Users className="h-12 w-12 text-muted-foreground mb-4" />
+                <h3 className="font-semibold text-lg mb-1">
+                  {searchQuery || selectedRole ? "Nessun risultato" : "Nessun staff"}
+                </h3>
+                <p className="text-muted-foreground text-sm">
+                  {searchQuery || selectedRole
+                    ? "Prova a modificare i filtri"
+                    : "Aggiungi il primo membro del team"}
+                </p>
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Staff</TableHead>
+                    <TableHead>Ruolo</TableHead>
+                    <TableHead>Contatti</TableHead>
+                    <TableHead>Compensi</TableHead>
+                    <TableHead>Stato</TableHead>
+                    {isAdmin && <TableHead className="text-right">Azioni</TableHead>}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredStaff.map((staff) => {
+                    const initials = `${staff.firstName?.[0] || ""}${staff.lastName?.[0] || ""}`.toUpperCase();
+                    const gradient = roleColors[staff.role] || roleColors.altro;
+                    return (
+                      <TableRow key={staff.id} data-testid={`row-staff-${staff.id}`}>
+                        <TableCell>
+                          <div className="flex items-center gap-3">
+                            <Avatar className="h-10 w-10">
+                              <AvatarFallback className={`bg-gradient-to-br ${gradient} text-white text-sm font-semibold`}>
+                                {initials}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div>
+                              <div className="font-medium" data-testid={`text-staff-name-${staff.id}`}>
+                                {staff.firstName} {staff.lastName}
+                              </div>
+                              {staff.fiscalCode && (
+                                <div className="text-xs text-muted-foreground">{staff.fiscalCode}</div>
+                              )}
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline">
+                            {roleLabels[staff.role] || staff.role}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div className="space-y-1">
+                            {staff.phone && (
+                              <div className="flex items-center gap-1 text-sm">
+                                <Phone className="h-3 w-3 text-muted-foreground" />
+                                <span>{staff.phone}</span>
+                              </div>
+                            )}
+                            {staff.email && (
+                              <div className="flex items-center gap-1 text-sm">
+                                <Mail className="h-3 w-3 text-muted-foreground" />
+                                <span className="truncate max-w-[200px]">{staff.email}</span>
+                              </div>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1 text-sm">
+                            <Euro className="h-3 w-3 text-muted-foreground" />
+                            <span>
+                              {staff.hourlyRate && `€${parseFloat(staff.hourlyRate).toFixed(0)}/h`}
+                              {staff.hourlyRate && staff.fixedRate && " · "}
+                              {staff.fixedRate && `€${parseFloat(staff.fixedRate).toFixed(0)} fisso`}
+                              {!staff.hourlyRate && !staff.fixedRate && "-"}
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          {staff.active ? (
+                            <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30">
+                              <UserCheck className="h-3 w-3 mr-1" />
+                              Attivo
+                            </Badge>
+                          ) : (
+                            <Badge variant="secondary">Inattivo</Badge>
+                          )}
+                        </TableCell>
+                        {isAdmin && (
+                          <TableCell className="text-right">
+                            <div className="flex items-center justify-end gap-1">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleEdit(staff)}
+                                data-testid={`button-edit-staff-${staff.id}`}
+                              >
+                                <Edit2 className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="text-destructive"
+                                onClick={() => handleDelete(staff.id)}
+                                data-testid={`button-delete-staff-${staff.id}`}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        )}
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+
+        <Dialog
+          open={isDialogOpen}
+          onOpenChange={(open) => {
+            setIsDialogOpen(open);
+            if (!open) setEditingStaff(null);
+          }}
+        >
+          <DialogContent className="max-h-[90vh] overflow-y-auto max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>
+                {editingStaff ? "Modifica Staff" : "Nuovo Staff"}
+              </DialogTitle>
+            </DialogHeader>
+            {formContent}
+          </DialogContent>
+        </Dialog>
+
+        <Dialog
+          open={!!deleteConfirmId}
+          onOpenChange={(open) => {
+            if (!open) setDeleteConfirmId(null);
+          }}
+        >
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Conferma eliminazione</DialogTitle>
+            </DialogHeader>
+            <p className="text-muted-foreground">
+              Sei sicuro di voler eliminare questo membro dello staff? L'azione non può essere annullata.
+            </p>
+            <DialogFooter className="gap-2">
+              <Button variant="outline" onClick={() => setDeleteConfirmId(null)}>
+                Annulla
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={confirmDelete}
+                disabled={deleteMutation.isPending}
+                data-testid="button-confirm-delete"
+              >
+                Elimina
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+    );
+  }
+
   return (
     <MobileAppLayout header={header} className="bg-background">
       <div className="pb-24">
@@ -462,181 +911,7 @@ export default function StaffPage() {
               {editingStaff ? "Modifica Staff" : "Nuovo Staff"}
             </DialogTitle>
           </DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="firstName">Nome *</Label>
-                <Input
-                  id="firstName"
-                  name="firstName"
-                  defaultValue={editingStaff?.firstName || ""}
-                  required
-                  className="h-12"
-                  data-testid="input-staff-first-name"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="lastName">Cognome *</Label>
-                <Input
-                  id="lastName"
-                  name="lastName"
-                  defaultValue={editingStaff?.lastName || ""}
-                  required
-                  className="h-12"
-                  data-testid="input-staff-last-name"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="role">Ruolo *</Label>
-              <Select name="role" defaultValue={editingStaff?.role || "altro"}>
-                <SelectTrigger className="h-12" data-testid="select-staff-role">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="pr">PR</SelectItem>
-                  <SelectItem value="barista">Barista</SelectItem>
-                  <SelectItem value="sicurezza">Sicurezza</SelectItem>
-                  <SelectItem value="fotografo">Fotografo</SelectItem>
-                  <SelectItem value="dj">DJ</SelectItem>
-                  <SelectItem value="tecnico">Tecnico</SelectItem>
-                  <SelectItem value="altro">Altro</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="phone">Telefono</Label>
-                <Input
-                  id="phone"
-                  name="phone"
-                  type="tel"
-                  defaultValue={editingStaff?.phone || ""}
-                  className="h-12"
-                  data-testid="input-staff-phone"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  name="email"
-                  type="email"
-                  defaultValue={editingStaff?.email || ""}
-                  className="h-12"
-                  data-testid="input-staff-email"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="hourlyRate">Tariffa Oraria (€)</Label>
-                <Input
-                  id="hourlyRate"
-                  name="hourlyRate"
-                  type="number"
-                  step="0.01"
-                  defaultValue={editingStaff?.hourlyRate || ""}
-                  placeholder="0.00"
-                  className="h-12"
-                  data-testid="input-staff-hourly-rate"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="fixedRate">Tariffa Fissa (€)</Label>
-                <Input
-                  id="fixedRate"
-                  name="fixedRate"
-                  type="number"
-                  step="0.01"
-                  defaultValue={editingStaff?.fixedRate || ""}
-                  placeholder="0.00"
-                  className="h-12"
-                  data-testid="input-staff-fixed-rate"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="fiscalCode">Codice Fiscale</Label>
-              <Input
-                id="fiscalCode"
-                name="fiscalCode"
-                defaultValue={editingStaff?.fiscalCode || ""}
-                maxLength={16}
-                className="h-12"
-                data-testid="input-staff-fiscal-code"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="bankIban">IBAN</Label>
-              <Input
-                id="bankIban"
-                name="bankIban"
-                defaultValue={editingStaff?.bankIban || ""}
-                maxLength={34}
-                className="h-12"
-                data-testid="input-staff-iban"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="address">Indirizzo</Label>
-              <Input
-                id="address"
-                name="address"
-                defaultValue={editingStaff?.address || ""}
-                className="h-12"
-                data-testid="input-staff-address"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="notes">Note</Label>
-              <Textarea
-                id="notes"
-                name="notes"
-                defaultValue={editingStaff?.notes || ""}
-                className="min-h-[100px]"
-                data-testid="input-staff-notes"
-              />
-            </div>
-
-            <div className="flex items-center gap-3 py-2">
-              <Switch
-                id="active"
-                name="active"
-                defaultChecked={editingStaff?.active !== false}
-                data-testid="switch-staff-active"
-              />
-              <Label htmlFor="active" className="cursor-pointer">
-                Staff attivo
-              </Label>
-            </div>
-
-            <DialogFooter className="gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setIsDialogOpen(false)}
-                className="flex-1 h-12"
-              >
-                Annulla
-              </Button>
-              <Button
-                type="submit"
-                className="flex-1 h-12 gradient-golden text-black font-semibold"
-                disabled={createMutation.isPending || updateMutation.isPending}
-                data-testid="button-save-staff"
-              >
-                {editingStaff ? "Aggiorna" : "Aggiungi"}
-              </Button>
-            </DialogFooter>
-          </form>
+          {formContent}
         </DialogContent>
       </Dialog>
 

@@ -3,6 +3,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import {
   AlertDialog,
@@ -14,6 +15,24 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Link, useLocation } from "wouter";
@@ -237,11 +256,14 @@ export default function Beverage() {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const isMobile = useIsMobile();
   const isBartender = user?.role === 'bartender';
   const isWarehouse = user?.role === 'warehouse';
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [resetWarehouseDialogOpen, setResetWarehouseDialogOpen] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [isProductDialogOpen, setIsProductDialogOpen] = useState(false);
 
   const { data: events, isLoading: eventsLoading } = useQuery<Event[]>({
     queryKey: ['/api/events'],
@@ -322,6 +344,401 @@ export default function Beverage() {
       });
     },
   });
+
+  const getStockColor = (quantity: number) => {
+    if (quantity < 10) return "text-red-500";
+    if (quantity < 30) return "text-amber-500";
+    return "text-emerald-500";
+  };
+
+  const getStockBadge = (quantity: number) => {
+    if (quantity < 10) return <Badge className="bg-red-500/20 text-red-400 border-red-500/30">Critico</Badge>;
+    if (quantity < 30) return <Badge className="bg-amber-500/20 text-amber-400 border-amber-500/30">Basso</Badge>;
+    return <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30">OK</Badge>;
+  };
+
+  if (!isMobile) {
+    return (
+      <div className="container mx-auto p-6 space-y-6" data-testid="page-beverage">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">Beverage</h1>
+            <p className="text-muted-foreground">Gestione prodotti e inventario bevande</p>
+          </div>
+          <div className="flex gap-2">
+            {user && (user.role === 'admin' || user.role === 'super_admin') && (
+              <Button 
+                variant="outline" 
+                onClick={() => setResetWarehouseDialogOpen(true)}
+                data-testid="button-reset-warehouse"
+              >
+                <RotateCcw className="w-4 h-4 mr-2" />
+                Reset Magazzino
+              </Button>
+            )}
+            <Link href="/products">
+              <Button data-testid="button-products">
+                <Package className="w-4 h-4 mr-2" />
+                Prodotti
+              </Button>
+            </Link>
+          </div>
+        </div>
+
+        <AlertDialog open={resetWarehouseDialogOpen} onOpenChange={setResetWarehouseDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Reset Magazzino</AlertDialogTitle>
+              <AlertDialogDescription>
+                Questa azione azzererà tutte le quantità del magazzino generale.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Annulla</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => resetWarehouseMutation.mutate()}
+                disabled={resetWarehouseMutation.isPending}
+                className="bg-destructive text-destructive-foreground"
+              >
+                {resetWarehouseMutation.isPending ? "Azzeramento..." : "Azzera"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        <Dialog open={isProductDialogOpen} onOpenChange={setIsProductDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>{selectedProduct?.name}</DialogTitle>
+              <DialogDescription>
+                Dettagli prodotto e stock
+              </DialogDescription>
+            </DialogHeader>
+            {selectedProduct && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Categoria</p>
+                    <p className="font-medium">{selectedProduct.category || "N/A"}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Prezzo</p>
+                    <p className="font-medium">€{Number(selectedProduct.price || 0).toFixed(2)}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Stock Attuale</p>
+                    <p className={`font-medium ${getStockColor(stockMap[selectedProduct.id] || 0)}`}>
+                      {stockMap[selectedProduct.id] || 0} unità
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Stato</p>
+                    {getStockBadge(stockMap[selectedProduct.id] || 0)}
+                  </div>
+                </div>
+                <div className="flex gap-2 pt-4">
+                  <Link href="/warehouse">
+                    <Button variant="outline" className="flex-1">
+                      <Warehouse className="w-4 h-4 mr-2" />
+                      Magazzino
+                    </Button>
+                  </Link>
+                  <Link href={`/products`}>
+                    <Button className="flex-1">
+                      <Package className="w-4 h-4 mr-2" />
+                      Dettagli Prodotto
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+
+        <div className="grid grid-cols-4 gap-4">
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-blue-500/20 flex items-center justify-center">
+                  <Package className="w-5 h-5 text-blue-500" />
+                </div>
+                <div>
+                  <div className="text-2xl font-bold" data-testid="stat-products">{products?.length || 0}</div>
+                  <p className="text-sm text-muted-foreground">Prodotti</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-amber-500/20 flex items-center justify-center">
+                  <AlertTriangle className="w-5 h-5 text-amber-500" />
+                </div>
+                <div>
+                  <div className="text-2xl font-bold text-amber-500" data-testid="stat-low-stock">{lowStockProducts.length}</div>
+                  <p className="text-sm text-muted-foreground">Scorte Basse</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-emerald-500/20 flex items-center justify-center">
+                  <Warehouse className="w-5 h-5 text-emerald-500" />
+                </div>
+                <div>
+                  <div className="text-2xl font-bold" data-testid="stat-total-stock">
+                    {generalStocks?.reduce((sum, s) => sum + Number(s.quantity), 0) || 0}
+                  </div>
+                  <p className="text-sm text-muted-foreground">Stock Totale</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-teal-500/20 flex items-center justify-center">
+                  <Calendar className="w-5 h-5 text-teal-500" />
+                </div>
+                <div>
+                  <div className="text-2xl font-bold text-teal-500" data-testid="stat-ongoing-events">{ongoingEvents.length}</div>
+                  <p className="text-sm text-muted-foreground">Eventi Attivi</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="grid grid-cols-3 gap-6">
+          <div className="col-span-2 space-y-6">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>Catalogo Prodotti</CardTitle>
+                    <CardDescription>Elenco prodotti con stato stock</CardDescription>
+                  </div>
+                  <div className="flex gap-2">
+                    {CATEGORIES.map((cat) => {
+                      const Icon = cat.icon;
+                      const isActive = selectedCategory === cat.id;
+                      return (
+                        <Button
+                          key={cat.id}
+                          variant={isActive ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setSelectedCategory(cat.id)}
+                          data-testid={`filter-${cat.id}`}
+                        >
+                          <Icon className="w-4 h-4 mr-1" />
+                          {cat.label}
+                        </Button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {productsLoading ? (
+                  <div className="space-y-2">
+                    <Skeleton className="h-12 w-full" />
+                    <Skeleton className="h-12 w-full" />
+                    <Skeleton className="h-12 w-full" />
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Prodotto</TableHead>
+                        <TableHead>Categoria</TableHead>
+                        <TableHead>Stock</TableHead>
+                        <TableHead>Stato</TableHead>
+                        <TableHead className="text-right">Azioni</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredProducts.length > 0 ? (
+                        filteredProducts.map((product) => {
+                          const stock = stockMap[product.id] || 0;
+                          return (
+                            <TableRow key={product.id} data-testid={`row-product-${product.id}`}>
+                              <TableCell>
+                                <div className="flex items-center gap-3">
+                                  <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                                    <Wine className="w-5 h-5 text-primary/50" />
+                                  </div>
+                                  <span className="font-medium">{product.name}</span>
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant="secondary">{product.category || "N/A"}</Badge>
+                              </TableCell>
+                              <TableCell className={getStockColor(stock)}>
+                                {stock} unità
+                              </TableCell>
+                              <TableCell>{getStockBadge(stock)}</TableCell>
+                              <TableCell className="text-right">
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm"
+                                  onClick={() => {
+                                    setSelectedProduct(product);
+                                    setIsProductDialogOpen(true);
+                                  }}
+                                  data-testid={`button-view-${product.id}`}
+                                >
+                                  Dettagli
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })
+                      ) : (
+                        <TableRow>
+                          <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                            Nessun prodotto trovato
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Azioni Rapide</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <Link href="/warehouse">
+                  <Button variant="outline" className="w-full justify-start" data-testid="action-magazzino">
+                    <Warehouse className="w-4 h-4 mr-2" />
+                    Magazzino
+                  </Button>
+                </Link>
+                <Link href="/products">
+                  <Button variant="outline" className="w-full justify-start" data-testid="action-prodotti">
+                    <Package className="w-4 h-4 mr-2" />
+                    Prodotti
+                  </Button>
+                </Link>
+                <Link href="/stations">
+                  <Button variant="outline" className="w-full justify-start" data-testid="action-postazioni">
+                    <MapPin className="w-4 h-4 mr-2" />
+                    Postazioni
+                  </Button>
+                </Link>
+                <Link href="/suppliers">
+                  <Button variant="outline" className="w-full justify-start" data-testid="action-fornitori">
+                    <Truck className="w-4 h-4 mr-2" />
+                    Fornitori
+                  </Button>
+                </Link>
+                <Link href="/purchase-orders">
+                  <Button variant="outline" className="w-full justify-start" data-testid="action-ordini">
+                    <ShoppingCart className="w-4 h-4 mr-2" />
+                    Ordini
+                  </Button>
+                </Link>
+                <Link href="/price-lists">
+                  <Button variant="outline" className="w-full justify-start" data-testid="action-listini">
+                    <Tag className="w-4 h-4 mr-2" />
+                    Listini
+                  </Button>
+                </Link>
+                <Link href="/reports">
+                  <Button variant="outline" className="w-full justify-start" data-testid="action-report">
+                    <BarChart3 className="w-4 h-4 mr-2" />
+                    Report
+                  </Button>
+                </Link>
+                <Link href="/ai-analysis">
+                  <Button variant="outline" className="w-full justify-start" data-testid="action-ai">
+                    <Sparkles className="w-4 h-4 mr-2" />
+                    Analisi AI
+                  </Button>
+                </Link>
+              </CardContent>
+            </Card>
+
+            {lowStockProducts.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="w-5 h-5 text-amber-500" />
+                    <CardTitle>Scorte Basse</CardTitle>
+                  </div>
+                  <CardDescription>{lowStockProducts.length} prodotti sotto soglia</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {lowStockProducts.slice(0, 5).map((stock) => (
+                    <div
+                      key={stock.productId}
+                      className="flex items-center justify-between p-3 rounded-lg bg-amber-500/10 border border-amber-500/20"
+                      data-testid={`low-stock-${stock.productId}`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <Package className="w-4 h-4 text-amber-500" />
+                        <span className="font-medium text-sm">{stock.productName}</span>
+                      </div>
+                      <Badge className="bg-amber-500/20 text-amber-400 border-amber-500/30">
+                        {Number(stock.quantity).toFixed(0)}
+                      </Badge>
+                    </div>
+                  ))}
+                  <Link href="/warehouse">
+                    <Button variant="ghost" className="w-full" size="sm">
+                      Visualizza Tutto
+                      <ChevronRight className="w-4 h-4 ml-1" />
+                    </Button>
+                  </Link>
+                </CardContent>
+              </Card>
+            )}
+
+            {ongoingEvents.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center gap-2">
+                    <Calendar className="w-5 h-5 text-teal-500" />
+                    <CardTitle>Eventi Attivi</CardTitle>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {ongoingEvents.slice(0, 3).map((event) => (
+                    <div
+                      key={event.id}
+                      className="p-3 rounded-lg border hover-elevate cursor-pointer"
+                      data-testid={`event-card-${event.id}`}
+                    >
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="w-2 h-2 rounded-full bg-teal-500 animate-pulse" />
+                        <span className="text-xs text-teal-500 font-medium">In Corso</span>
+                      </div>
+                      <p className="font-medium">{event.name}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {new Date(event.startDatetime).toLocaleDateString('it-IT', {
+                          weekday: 'short',
+                          day: 'numeric',
+                          month: 'short'
+                        })}
+                      </p>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (isBartender) {
     if (selectedEventId && selectedEvent) {

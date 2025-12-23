@@ -2,9 +2,27 @@ import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -33,7 +51,7 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Boxes, Edit, Trash2, ArrowLeft, MapPin, Calendar, Users, X } from "lucide-react";
+import { Plus, Boxes, Edit, Trash2, ArrowLeft, MapPin, Calendar, Users, X, Loader2 } from "lucide-react";
 import { Link } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -175,11 +193,13 @@ function StationCardSkeleton() {
 
 export default function StationsPage() {
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingStation, setEditingStation] = useState<Station | null>(null);
   const [stationType, setStationType] = useState<'general' | 'event'>('general');
   const [deleteStationId, setDeleteStationId] = useState<string | null>(null);
   const { toast } = useToast();
   const { user } = useAuth();
+  const isMobile = useIsMobile();
 
   const canCreateStations = user?.role === 'super_admin' || user?.role === 'gestore';
 
@@ -373,6 +393,46 @@ export default function StationsPage() {
     });
   };
 
+  const handleOpenDialog = () => {
+    if (!canCreateStations) {
+      toast({
+        title: "Accesso limitato",
+        description: "Solo gli admin possono creare postazioni",
+        variant: "destructive",
+      });
+      return;
+    }
+    setIsDialogOpen(true);
+  };
+
+  const handleCloseDialog = () => {
+    setIsDialogOpen(false);
+    setEditingStation(null);
+    setStationType('general');
+    form.reset({
+      name: '',
+      bartenderId: null,
+      stationType: 'general',
+      eventId: null,
+    });
+  };
+
+  const handleEditDesktop = (station: Station) => {
+    setEditingStation(station);
+    const isEventStation = !!station.eventId;
+    setStationType(isEventStation ? 'event' : 'general');
+    const bartenderId = station.bartenderIds && station.bartenderIds.length > 0 
+      ? station.bartenderIds[0] 
+      : null;
+    form.reset({
+      name: station.name,
+      bartenderId,
+      stationType: isEventStation ? 'event' : 'general',
+      eventId: station.eventId,
+    });
+    setIsDialogOpen(true);
+  };
+
   const getEventName = (eventId: string | null) => {
     if (!eventId) return null;
     const event = events?.find(e => e.id === eventId);
@@ -400,6 +460,321 @@ export default function StationsPage() {
       }
     />
   );
+
+  const formContent = (
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+        <FormField
+          control={form.control}
+          name="name"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Nome Postazione</FormLabel>
+              <FormControl>
+                <Input 
+                  {...field} 
+                  placeholder="Es. Bar Centrale, Privé 1" 
+                  data-testid="input-station-name-desktop" 
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="stationType"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Tipo Postazione</FormLabel>
+              <Select
+                onValueChange={(value) => {
+                  field.onChange(value);
+                  setStationType(value as 'general' | 'event');
+                  if (value === 'general') {
+                    form.setValue('eventId', null);
+                  }
+                }}
+                value={field.value}
+              >
+                <FormControl>
+                  <SelectTrigger data-testid="select-station-type-desktop">
+                    <SelectValue placeholder="Seleziona tipo" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  <SelectItem value="general">
+                    <div className="flex items-center gap-2">
+                      <MapPin className="h-4 w-4 text-violet-500" />
+                      <span>Postazione Generale (Fissa)</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="event">
+                    <div className="flex items-center gap-2">
+                      <Calendar className="h-4 w-4 text-amber-500" />
+                      <span>Postazione per Evento</span>
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        {stationType === 'event' && (
+          <FormField
+            control={form.control}
+            name="eventId"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Evento</FormLabel>
+                <Select
+                  onValueChange={field.onChange}
+                  value={field.value || undefined}
+                >
+                  <FormControl>
+                    <SelectTrigger data-testid="select-station-event-desktop">
+                      <SelectValue placeholder="Seleziona evento" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {events?.map((event) => (
+                      <SelectItem key={event.id} value={event.id}>
+                        {event.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        )}
+
+        <FormField
+          control={form.control}
+          name="bartenderId"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Barista Assegnato (opzionale)</FormLabel>
+              <Select
+                onValueChange={field.onChange}
+                value={field.value || undefined}
+              >
+                <FormControl>
+                  <SelectTrigger data-testid="select-station-bartender-desktop">
+                    <SelectValue placeholder="Seleziona bartender (opzionale)" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  <SelectItem value="null">Nessuno</SelectItem>
+                  {bartenders.map((bartender) => (
+                    <SelectItem key={bartender.id} value={bartender.id}>
+                      {bartender.firstName} {bartender.lastName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <DialogFooter className="gap-2 pt-4">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handleCloseDialog}
+            data-testid="button-cancel-station-desktop"
+          >
+            Annulla
+          </Button>
+          <Button
+            type="submit"
+            disabled={createMutation.isPending || updateMutation.isPending}
+            data-testid="button-save-station-desktop"
+          >
+            {createMutation.isPending || updateMutation.isPending ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Salvataggio...
+              </>
+            ) : (
+              editingStation ? 'Aggiorna' : 'Crea'
+            )}
+          </Button>
+        </DialogFooter>
+      </form>
+    </Form>
+  );
+
+  if (!isMobile) {
+    return (
+      <div className="container mx-auto p-6 space-y-6" data-testid="page-stations">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">Postazioni</h1>
+            <p className="text-muted-foreground">Gestione delle postazioni bar</p>
+          </div>
+          {canCreateStations && (
+            <Button onClick={handleOpenDialog} data-testid="button-create-station-desktop">
+              <Plus className="w-4 h-4 mr-2" />
+              Nuova Postazione
+            </Button>
+          )}
+        </div>
+
+        <div className="grid grid-cols-3 gap-4">
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-2xl font-bold">{stations?.length || 0}</div>
+              <p className="text-sm text-muted-foreground">Totale Postazioni</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-2xl font-bold text-violet-500">
+                {stations?.filter(s => !s.eventId).length || 0}
+              </div>
+              <p className="text-sm text-muted-foreground">Postazioni Generali</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-2xl font-bold text-amber-500">
+                {stations?.filter(s => s.eventId).length || 0}
+              </div>
+              <p className="text-sm text-muted-foreground">Postazioni Evento</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Lista Postazioni</CardTitle>
+            <CardDescription>Tutte le postazioni configurate</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {stationsLoading ? (
+              <div className="space-y-4">
+                {[1, 2, 3].map((i) => (
+                  <Skeleton key={i} className="h-16 w-full" />
+                ))}
+              </div>
+            ) : stations && stations.length > 0 ? (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Nome</TableHead>
+                    <TableHead>Tipo</TableHead>
+                    <TableHead>Evento</TableHead>
+                    <TableHead>Barista Assegnato</TableHead>
+                    {canCreateStations && <TableHead className="text-right">Azioni</TableHead>}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {stations.map((station) => (
+                    <TableRow key={station.id} data-testid={`row-station-${station.id}`}>
+                      <TableCell className="font-medium">{station.name}</TableCell>
+                      <TableCell>
+                        {station.eventId ? (
+                          <Badge variant="secondary">
+                            <Calendar className="h-3 w-3 mr-1" />
+                            Evento
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-violet-500 border-violet-500/30">
+                            <MapPin className="h-3 w-3 mr-1" />
+                            Generale
+                          </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell>{getEventName(station.eventId) || '-'}</TableCell>
+                      <TableCell>{getBartenderNames(station.bartenderIds)}</TableCell>
+                      {canCreateStations && (
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-2">
+                            <Button 
+                              variant="outline" 
+                              size="icon"
+                              onClick={() => handleEditDesktop(station)}
+                              data-testid={`button-edit-station-desktop-${station.id}`}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button 
+                              variant="outline" 
+                              size="icon"
+                              className="text-destructive"
+                              onClick={() => setDeleteStationId(station.id)}
+                              data-testid={`button-delete-station-desktop-${station.id}`}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      )}
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            ) : (
+              <div className="text-center py-12">
+                <Boxes className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                <h3 className="text-lg font-semibold mb-2">Nessuna postazione</h3>
+                <p className="text-muted-foreground mb-4">
+                  Crea la tua prima postazione per iniziare
+                </p>
+                {canCreateStations && (
+                  <Button onClick={handleOpenDialog} data-testid="button-create-first-station-desktop">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Crea Postazione
+                  </Button>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Dialog open={isDialogOpen} onOpenChange={(open) => !open && handleCloseDialog()}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>{editingStation ? 'Modifica Postazione' : 'Nuova Postazione'}</DialogTitle>
+              <DialogDescription>
+                {editingStation ? 'Modifica i dettagli della postazione' : 'Crea una nuova postazione per il bar'}
+              </DialogDescription>
+            </DialogHeader>
+            {formContent}
+          </DialogContent>
+        </Dialog>
+
+        <AlertDialog open={!!deleteStationId} onOpenChange={(open) => !open && setDeleteStationId(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Conferma Eliminazione</AlertDialogTitle>
+              <AlertDialogDescription>
+                Sei sicuro di voler eliminare questa postazione? I dati storici degli eventi saranno conservati.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel data-testid="button-cancel-delete-station-desktop">
+                Annulla
+              </AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => deleteStationId && deleteMutation.mutate(deleteStationId)}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                data-testid="button-confirm-delete-station-desktop"
+              >
+                Elimina
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </div>
+    );
+  }
 
   return (
     <MobileAppLayout

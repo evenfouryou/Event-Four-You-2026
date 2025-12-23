@@ -2,9 +2,12 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Mail, ArrowLeft, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
 import { Link } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { 
   MobileAppLayout, 
   HapticButton, 
@@ -14,6 +17,7 @@ import {
 const springConfig = { type: "spring" as const, stiffness: 400, damping: 30 };
 
 export default function ForgotPassword() {
+  const isMobile = useIsMobile();
   const [email, setEmail] = useState("");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -38,6 +42,110 @@ export default function ForgotPassword() {
       setIsLoading(false);
     }
   };
+
+  if (!isMobile) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-4" data-testid="page-forgot-password">
+        <div className="w-full max-w-md">
+          <div className="flex justify-center mb-8">
+            <Link href="/" data-testid="link-home">
+              <img 
+                src="/logo.png" 
+                alt="EventFourYou" 
+                className="h-16 w-auto"
+                data-testid="img-logo"
+              />
+            </Link>
+          </div>
+
+          <Card>
+            <CardHeader className="text-center">
+              <CardTitle className="text-2xl">Password dimenticata</CardTitle>
+              <CardDescription>
+                Inserisci la tua email per ricevere il link di reset
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <AnimatePresence mode="wait">
+                {error && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    className="mb-4 p-4 rounded-lg bg-destructive/10 border border-destructive/20 flex items-start gap-3"
+                    data-testid="alert-error"
+                  >
+                    <AlertCircle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
+                    <p className="text-destructive text-sm">{error}</p>
+                  </motion.div>
+                )}
+
+                {success && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    className="mb-4 p-4 rounded-lg bg-green-500/10 border border-green-500/20 flex items-start gap-3"
+                    data-testid="alert-success"
+                  >
+                    <CheckCircle2 className="h-5 w-5 text-green-500 shrink-0 mt-0.5" />
+                    <p className="text-green-600 dark:text-green-400 text-sm">{success}</p>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              <form onSubmit={handleSubmit} className="space-y-6">
+                <div className="space-y-2">
+                  <Label htmlFor="email-desktop">Email</Label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground pointer-events-none" />
+                    <Input
+                      id="email-desktop"
+                      type="email"
+                      placeholder="tuaemail@esempio.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      required
+                      disabled={isLoading}
+                      className="pl-10"
+                      data-testid="input-email"
+                    />
+                  </div>
+                </div>
+
+                <Button
+                  type="submit"
+                  disabled={isLoading}
+                  className="w-full"
+                  data-testid="button-submit"
+                >
+                  {isLoading ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span>Invio in corso...</span>
+                    </span>
+                  ) : (
+                    <span>Invia link</span>
+                  )}
+                </Button>
+              </form>
+
+              <div className="mt-6 text-center">
+                <Link 
+                  href="/login" 
+                  className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                  data-testid="link-login"
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                  <span>Torna al login</span>
+                </Link>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <MobileAppLayout
@@ -65,7 +173,7 @@ export default function ForgotPassword() {
               src="/logo.png" 
               alt="EventFourYou" 
               className="h-20 w-auto"
-              data-testid="img-logo"
+              data-testid="img-logo-mobile"
             />
           </Link>
         </motion.div>
@@ -92,7 +200,7 @@ export default function ForgotPassword() {
               exit={{ opacity: 0, y: -10, scale: 0.95 }}
               transition={springConfig}
               className="w-full mb-6 p-5 rounded-2xl bg-destructive/10 border border-destructive/20 flex items-start gap-4"
-              data-testid="alert-error"
+              data-testid="alert-error-mobile"
             >
               <AlertCircle className="h-6 w-6 text-destructive shrink-0 mt-0.5" />
               <p className="text-destructive text-base leading-relaxed">{error}</p>
@@ -106,7 +214,7 @@ export default function ForgotPassword() {
               exit={{ opacity: 0, y: -10, scale: 0.95 }}
               transition={springConfig}
               className="w-full mb-6 p-5 rounded-2xl bg-green-500/10 border border-green-500/20 flex items-start gap-4"
-              data-testid="alert-success"
+              data-testid="alert-success-mobile"
             >
               <CheckCircle2 className="h-6 w-6 text-green-500 shrink-0 mt-0.5" />
               <p className="text-green-600 dark:text-green-400 text-base leading-relaxed">{success}</p>
@@ -136,7 +244,7 @@ export default function ForgotPassword() {
                 required
                 disabled={isLoading}
                 className="h-16 pl-14 pr-5 text-lg rounded-2xl border-2 focus:border-primary"
-                data-testid="input-email"
+                data-testid="input-email-mobile"
               />
             </div>
           </div>
@@ -150,7 +258,7 @@ export default function ForgotPassword() {
               disabled={isLoading}
               hapticType="medium"
               className="w-full h-16 text-lg font-semibold rounded-2xl"
-              data-testid="button-submit"
+              data-testid="button-submit-mobile"
             >
               {isLoading ? (
                 <span className="flex items-center justify-center gap-3">
@@ -174,7 +282,7 @@ export default function ForgotPassword() {
             href="/login" 
             onClick={() => triggerHaptic('light')}
             className="flex items-center justify-center gap-3 text-muted-foreground min-h-[48px] min-w-[48px] px-6 py-3 rounded-xl active:bg-muted/50 transition-colors"
-            data-testid="link-login"
+            data-testid="link-login-mobile"
           >
             <ArrowLeft className="h-6 w-6" />
             <span className="text-lg font-medium">Torna al login</span>

@@ -7,6 +7,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
+import { useIsMobile } from "@/hooks/use-mobile";
 import {
   MobileAppLayout,
   MobileHeader,
@@ -34,6 +35,24 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import {
   Users,
   Plus,
@@ -99,12 +118,16 @@ const listItemVariants = {
 export default function PrGuestListsPage() {
   const { toast } = useToast();
   const { user } = useAuth();
+  const isMobile = useIsMobile();
   const [selectedEventId, setSelectedEventId] = useState<string>("");
   const [selectedListId, setSelectedListId] = useState<string>("");
   const [isAddGuestOpen, setIsAddGuestOpen] = useState(false);
   const [isCreateListOpen, setIsCreateListOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedGuest, setSelectedGuest] = useState<GuestListEntry | null>(null);
+  const [isAddGuestDialogOpen, setIsAddGuestDialogOpen] = useState(false);
+  const [isCreateListDialogOpen, setIsCreateListDialogOpen] = useState(false);
+  const [isGuestDetailDialogOpen, setIsGuestDetailDialogOpen] = useState(false);
 
   const { data: assignments = [], isLoading: loadingAssignments } = useQuery<EventStaffAssignment[]>({
     queryKey: ["/api/pr/my-assignments"],
@@ -268,6 +291,19 @@ export default function PrGuestListsPage() {
   };
 
   if (loadingAssignments || loadingEvents) {
+    if (!isMobile) {
+      return (
+        <div className="container mx-auto p-6 space-y-6">
+          <Skeleton className="h-10 w-64" />
+          <div className="grid grid-cols-4 gap-4">
+            {[1, 2, 3, 4].map((i) => (
+              <Skeleton key={i} className="h-24" />
+            ))}
+          </div>
+          <Skeleton className="h-96" />
+        </div>
+      );
+    }
     return (
       <MobileAppLayout>
         <div className="p-4 space-y-4 pb-24">
@@ -280,6 +316,566 @@ export default function PrGuestListsPage() {
           </div>
         </div>
       </MobileAppLayout>
+    );
+  }
+
+  if (!isMobile) {
+    return (
+      <div className="container mx-auto p-6 space-y-6" data-testid="page-pr-guest-lists">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">Liste Ospiti</h1>
+            <p className="text-muted-foreground">Gestione ospiti per eventi PR</p>
+          </div>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                refetchLists();
+                refetchEntries();
+              }}
+              data-testid="button-refresh"
+            >
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Aggiorna
+            </Button>
+            {selectedEventId && (
+              <Button onClick={() => setIsCreateListDialogOpen(true)} data-testid="button-create-list">
+                <Plus className="w-4 h-4 mr-2" />
+                Nuova Lista
+              </Button>
+            )}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="text-sm font-medium mb-2 block">Evento</label>
+            <Select value={selectedEventId} onValueChange={(val) => {
+              setSelectedEventId(val);
+              setSelectedListId("");
+            }}>
+              <SelectTrigger data-testid="select-event">
+                <SelectValue placeholder="Seleziona evento" />
+              </SelectTrigger>
+              <SelectContent>
+                {events.map((event) => (
+                  <SelectItem key={event.id} value={event.id}>
+                    <div>
+                      <div className="font-semibold">{event.name}</div>
+                      <div className="text-sm text-muted-foreground">
+                        {format(new Date(event.startDatetime), "d MMM yyyy", { locale: it })}
+                      </div>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <label className="text-sm font-medium mb-2 block">Lista</label>
+            <Select value={selectedListId} onValueChange={setSelectedListId} disabled={!selectedEventId}>
+              <SelectTrigger data-testid="select-list">
+                <SelectValue placeholder={selectedEventId ? "Seleziona lista" : "Prima scegli evento"} />
+              </SelectTrigger>
+              <SelectContent>
+                {loadingLists ? (
+                  <div className="p-4 text-center text-muted-foreground">Caricamento...</div>
+                ) : guestLists.length === 0 ? (
+                  <div className="p-4 text-center text-muted-foreground">Nessuna lista</div>
+                ) : (
+                  guestLists.map((list) => (
+                    <SelectItem key={list.id} value={list.id}>
+                      <div>
+                        <div className="font-semibold">{list.name}</div>
+                        <div className="text-sm text-muted-foreground">
+                          {list.currentCount}{list.maxGuests ? `/${list.maxGuests}` : ''} ospiti
+                        </div>
+                      </div>
+                    </SelectItem>
+                  ))
+                )}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        {selectedList && (
+          <>
+            <div className="grid grid-cols-5 gap-4">
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex items-center gap-3">
+                    <Users className="h-5 w-5 text-muted-foreground" />
+                    <div>
+                      <div className="text-2xl font-bold">{stats.total}</div>
+                      <p className="text-sm text-muted-foreground">Totali</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex items-center gap-3">
+                    <PartyPopper className="h-5 w-5 text-green-500" />
+                    <div>
+                      <div className="text-2xl font-bold text-green-500">{stats.arrived}</div>
+                      <p className="text-sm text-muted-foreground">Arrivati</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex items-center gap-3">
+                    <CheckCircle2 className="h-5 w-5 text-blue-500" />
+                    <div>
+                      <div className="text-2xl font-bold text-blue-500">{stats.confirmed}</div>
+                      <p className="text-sm text-muted-foreground">Confermati</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex items-center gap-3">
+                    <Clock className="h-5 w-5 text-yellow-500" />
+                    <div>
+                      <div className="text-2xl font-bold text-yellow-500">{stats.pending}</div>
+                      <p className="text-sm text-muted-foreground">In Attesa</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex items-center gap-3">
+                    <UserPlus className="h-5 w-5 text-purple-500" />
+                    <div>
+                      <div className="text-2xl font-bold text-purple-500">{stats.plusOnes}</div>
+                      <p className="text-sm text-muted-foreground">+1</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {selectedList.maxGuests && (
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium">Capienza Lista</span>
+                    <span className="text-sm text-muted-foreground">
+                      {selectedList.currentCount}/{selectedList.maxGuests}
+                    </span>
+                  </div>
+                  <Progress value={(selectedList.currentCount / selectedList.maxGuests) * 100} />
+                </CardContent>
+              </Card>
+            )}
+          </>
+        )}
+
+        {selectedListId && (
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between gap-4 space-y-0">
+              <CardTitle>Ospiti</CardTitle>
+              <div className="flex items-center gap-2">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Cerca ospite..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-10 w-64"
+                    data-testid="input-search-guest"
+                  />
+                </div>
+                {selectedList?.isActive && (
+                  <Button onClick={() => setIsAddGuestDialogOpen(true)} data-testid="button-add-guest">
+                    <UserPlus className="w-4 h-4 mr-2" />
+                    Aggiungi Ospite
+                  </Button>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent>
+              {loadingEntries ? (
+                <div className="space-y-2">
+                  {[1, 2, 3].map((i) => (
+                    <Skeleton key={i} className="h-16 w-full" />
+                  ))}
+                </div>
+              ) : filteredEntries.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                  <Users className="h-12 w-12 text-muted-foreground mb-4" />
+                  <h3 className="font-semibold text-lg mb-2">
+                    {searchQuery ? "Nessun risultato" : "Lista vuota"}
+                  </h3>
+                  <p className="text-muted-foreground">
+                    {searchQuery ? "Prova a cercare qualcos'altro" : "Aggiungi il primo ospite alla lista"}
+                  </p>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Nome</TableHead>
+                      <TableHead>Contatto</TableHead>
+                      <TableHead>+1</TableHead>
+                      <TableHead>Stato</TableHead>
+                      <TableHead>Azioni</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredEntries.map((guest) => {
+                      const statusConfig = getStatusConfig(guest.status);
+                      const StatusIcon = statusConfig.icon;
+                      return (
+                        <TableRow key={guest.id} data-testid={`row-guest-${guest.id}`}>
+                          <TableCell>
+                            <div className="font-medium">{guest.firstName} {guest.lastName}</div>
+                            {guest.notes && (
+                              <div className="text-sm text-muted-foreground">{guest.notes}</div>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <div className="space-y-1">
+                              {guest.phone && (
+                                <div className="flex items-center gap-1 text-sm">
+                                  <Phone className="h-3 w-3" />
+                                  {guest.phone}
+                                </div>
+                              )}
+                              {guest.email && (
+                                <div className="flex items-center gap-1 text-sm">
+                                  <Mail className="h-3 w-3" />
+                                  {guest.email}
+                                </div>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            {guest.plusOnes > 0 ? (
+                              <Badge variant="outline" className="bg-purple-500/10 text-purple-500 border-0">
+                                +{guest.plusOnes}
+                              </Badge>
+                            ) : (
+                              <span className="text-muted-foreground">-</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className={`${statusConfig.bg} ${statusConfig.color} border-0`}>
+                              <StatusIcon className="w-3 h-3 mr-1" />
+                              {statusConfig.label}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setSelectedGuest(guest);
+                                setIsGuestDetailDialogOpen(true);
+                              }}
+                              data-testid={`button-view-${guest.id}`}
+                            >
+                              <ChevronRight className="h-4 w-4" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {!selectedListId && (
+          <Card>
+            <CardContent className="py-12">
+              <div className="flex flex-col items-center justify-center text-center">
+                <ListChecks className="h-12 w-12 text-muted-foreground mb-4" />
+                <h3 className="font-semibold text-lg mb-2">Seleziona una Lista</h3>
+                <p className="text-muted-foreground">Scegli un evento e una lista per vedere gli ospiti</p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        <Dialog open={isCreateListDialogOpen} onOpenChange={setIsCreateListDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Crea Nuova Lista</DialogTitle>
+              <DialogDescription>Crea una nuova lista ospiti per l'evento selezionato</DialogDescription>
+            </DialogHeader>
+            <Form {...listForm}>
+              <form onSubmit={listForm.handleSubmit((data) => {
+                createListMutation.mutate(data);
+                setIsCreateListDialogOpen(false);
+              })} className="space-y-4">
+                <FormField
+                  control={listForm.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Nome Lista</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Es: VIP, Friends & Family" {...field} data-testid="input-list-name" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={listForm.control}
+                  name="maxGuests"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Limite Ospiti (opzionale)</FormLabel>
+                      <FormControl>
+                        <Input type="number" placeholder="Nessun limite" {...field} data-testid="input-max-guests" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={listForm.control}
+                  name="description"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Descrizione (opzionale)</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Note sulla lista" {...field} data-testid="input-list-description" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <DialogFooter>
+                  <Button type="button" variant="outline" onClick={() => setIsCreateListDialogOpen(false)}>
+                    Annulla
+                  </Button>
+                  <Button type="submit" disabled={createListMutation.isPending} data-testid="button-submit-list">
+                    {createListMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                    Crea Lista
+                  </Button>
+                </DialogFooter>
+              </form>
+            </Form>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={isAddGuestDialogOpen} onOpenChange={setIsAddGuestDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Aggiungi Ospite</DialogTitle>
+              <DialogDescription>Aggiungi un nuovo ospite alla lista</DialogDescription>
+            </DialogHeader>
+            <Form {...guestForm}>
+              <form onSubmit={guestForm.handleSubmit((data) => {
+                addGuestMutation.mutate(data);
+                setIsAddGuestDialogOpen(false);
+              })} className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={guestForm.control}
+                    name="firstName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Nome</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Nome" {...field} data-testid="input-guest-firstname" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={guestForm.control}
+                    name="lastName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Cognome</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Cognome" {...field} data-testid="input-guest-lastname" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <FormField
+                  control={guestForm.control}
+                  name="email"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Email (opzionale)</FormLabel>
+                      <FormControl>
+                        <Input type="email" placeholder="email@example.com" {...field} data-testid="input-guest-email" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={guestForm.control}
+                  name="phone"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Telefono (opzionale)</FormLabel>
+                      <FormControl>
+                        <Input placeholder="+39 333 1234567" {...field} data-testid="input-guest-phone" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={guestForm.control}
+                  name="plusOnes"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Accompagnatori (+1)</FormLabel>
+                      <FormControl>
+                        <Input type="number" min={0} {...field} data-testid="input-guest-plusones" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={guestForm.control}
+                  name="notes"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Note (opzionale)</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Note aggiuntive" {...field} data-testid="input-guest-notes" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <DialogFooter>
+                  <Button type="button" variant="outline" onClick={() => setIsAddGuestDialogOpen(false)}>
+                    Annulla
+                  </Button>
+                  <Button type="submit" disabled={addGuestMutation.isPending} data-testid="button-submit-guest">
+                    {addGuestMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                    Aggiungi Ospite
+                  </Button>
+                </DialogFooter>
+              </form>
+            </Form>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={isGuestDetailDialogOpen} onOpenChange={setIsGuestDetailDialogOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Dettagli Ospite</DialogTitle>
+            </DialogHeader>
+            {selectedGuest && (
+              <div className="space-y-6">
+                <div className="flex items-center gap-4">
+                  <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center">
+                    <User className="h-8 w-8 text-primary" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold">{selectedGuest.firstName} {selectedGuest.lastName}</h3>
+                    <Badge variant="outline" className={`${getStatusConfig(selectedGuest.status).bg} ${getStatusConfig(selectedGuest.status).color} border-0 mt-1`}>
+                      {getStatusConfig(selectedGuest.status).label}
+                    </Badge>
+                  </div>
+                </div>
+
+                {(selectedGuest.email || selectedGuest.phone) && (
+                  <div className="space-y-2">
+                    {selectedGuest.phone && (
+                      <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
+                        <Phone className="h-4 w-4 text-muted-foreground" />
+                        <span>{selectedGuest.phone}</span>
+                      </div>
+                    )}
+                    {selectedGuest.email && (
+                      <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
+                        <Mail className="h-4 w-4 text-muted-foreground" />
+                        <span>{selectedGuest.email}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {selectedGuest.plusOnes > 0 && (
+                  <div className="flex items-center gap-3 p-3 bg-purple-500/10 rounded-lg">
+                    <UserPlus className="h-4 w-4 text-purple-500" />
+                    <span>{selectedGuest.plusOnes} accompagnatori</span>
+                  </div>
+                )}
+
+                {selectedGuest.notes && (
+                  <div className="p-3 bg-muted/50 rounded-lg">
+                    <p className="text-sm text-muted-foreground mb-1">Note</p>
+                    <p>{selectedGuest.notes}</p>
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  <p className="text-sm font-medium text-muted-foreground">Cambia Stato</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {['pending', 'confirmed', 'arrived', 'cancelled'].map((status) => {
+                      const config = getStatusConfig(status);
+                      const Icon = config.icon;
+                      const isActive = selectedGuest.status === status;
+                      return (
+                        <Button
+                          key={status}
+                          variant={isActive ? "default" : "outline"}
+                          size="sm"
+                          className="justify-start gap-2"
+                          onClick={() => updateGuestMutation.mutate({
+                            id: selectedGuest.id,
+                            data: { status }
+                          })}
+                          disabled={updateGuestMutation.isPending}
+                          data-testid={`button-status-${status}`}
+                        >
+                          <Icon className={`h-4 w-4 ${isActive ? '' : config.color}`} />
+                          {config.label}
+                        </Button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <Button
+                  variant="outline"
+                  className="w-full text-red-500 border-red-500/30 hover:bg-red-500/10"
+                  onClick={() => {
+                    if (confirm("Rimuovere questo ospite dalla lista?")) {
+                      deleteGuestMutation.mutate(selectedGuest.id);
+                      setIsGuestDetailDialogOpen(false);
+                    }
+                  }}
+                  disabled={deleteGuestMutation.isPending}
+                  data-testid="button-delete-guest"
+                >
+                  {deleteGuestMutation.isPending ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <Trash2 className="w-4 h-4 mr-2" />
+                  )}
+                  Rimuovi Ospite
+                </Button>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+      </div>
     );
   }
 

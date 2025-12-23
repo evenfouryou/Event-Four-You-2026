@@ -57,10 +57,12 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { MobileAppLayout, MobileHeader } from "@/components/mobile-primitives";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 export default function SiaeResalesPage() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const isMobile = useIsMobile();
   const [selectedResale, setSelectedResale] = useState<SiaeResale | null>(null);
   const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -287,14 +289,14 @@ export default function SiaeResalesPage() {
                       <TableCell data-testid={`cell-verifiche-${resale.id}`}>
                         <div className="flex items-center gap-1">
                           {(resale as any).venditoreVerificato ? (
-                            <UserCheck className="w-4 h-4 text-emerald-400" title="Venditore verificato" />
+                            <UserCheck className="w-4 h-4 text-emerald-400" />
                           ) : (
-                            <AlertTriangle className="w-4 h-4 text-amber-400" title="Verifica venditore mancante" />
+                            <AlertTriangle className="w-4 h-4 text-amber-400" />
                           )}
                           {(resale as any).controlloPrezzoEseguito ? (
-                            <Shield className="w-4 h-4 text-emerald-400" title="Prezzo verificato" />
+                            <Shield className="w-4 h-4 text-emerald-400" />
                           ) : (
-                            <Shield className="w-4 h-4 text-muted-foreground" title="Controllo prezzo non eseguito" />
+                            <Shield className="w-4 h-4 text-muted-foreground" />
                           )}
                         </div>
                       </TableCell>

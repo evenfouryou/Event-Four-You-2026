@@ -3,12 +3,30 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
-import { Card, CardContent } from "@/components/ui/card";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { DollarSign, Plus, Edit, Trash2, Package, ArrowLeft, Calendar, ChevronRight } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { DollarSign, Plus, Edit, Trash2, Package, ArrowLeft, Calendar, ChevronRight, Eye } from "lucide-react";
 import { Link } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -71,6 +89,7 @@ const staggerItem = {
 export default function PriceLists() {
   const { toast } = useToast();
   const { user } = useAuth();
+  const isMobile = useIsMobile();
   const [selectedPriceList, setSelectedPriceList] = useState<PriceList | null>(null);
   const [isCreateSheetOpen, setIsCreateSheetOpen] = useState(false);
   const [isEditSheetOpen, setIsEditSheetOpen] = useState(false);
@@ -78,6 +97,10 @@ export default function PriceLists() {
   const [isDetailView, setIsDetailView] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [priceListToDelete, setPriceListToDelete] = useState<string | null>(null);
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isItemDialogOpen, setIsItemDialogOpen] = useState(false);
+  const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
   
   const canCreatePriceLists = user?.role === 'super_admin' || user?.role === 'gestore';
 
@@ -306,6 +329,490 @@ export default function PriceLists() {
     triggerHaptic('medium');
     setIsCreateSheetOpen(true);
   };
+
+  const handleOpenDetailDialog = (priceList: PriceList) => {
+    setSelectedPriceList(priceList);
+    setIsDetailDialogOpen(true);
+  };
+
+  const handleOpenEditDialog = (priceList: PriceList) => {
+    setSelectedPriceList(priceList);
+    editForm.reset({
+      name: priceList.name,
+      supplierId: priceList.supplierId,
+      validFrom: priceList.validFrom ? format(new Date(priceList.validFrom), 'yyyy-MM-dd') : "",
+      validTo: priceList.validTo ? format(new Date(priceList.validTo), 'yyyy-MM-dd') : "",
+      active: priceList.active,
+    });
+    setIsEditDialogOpen(true);
+  };
+
+  if (!isMobile) {
+    return (
+      <div className="container mx-auto p-6 space-y-6" data-testid="page-price-lists">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">Listini Prezzi</h1>
+            <p className="text-muted-foreground">Gestione listini prezzi e tariffe prodotti</p>
+          </div>
+          {canCreatePriceLists && (
+            <Button onClick={() => setIsCreateDialogOpen(true)} data-testid="button-create-price-list">
+              <Plus className="w-4 h-4 mr-2" />
+              Nuovo Listino
+            </Button>
+          )}
+        </div>
+
+        <div className="grid grid-cols-4 gap-4">
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-2xl font-bold">{priceLists.length}</div>
+              <p className="text-sm text-muted-foreground">Listini Totali</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-2xl font-bold text-green-500">{priceLists.filter(p => p.active).length}</div>
+              <p className="text-sm text-muted-foreground">Attivi</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-2xl font-bold text-muted-foreground">{priceLists.filter(p => !p.active).length}</div>
+              <p className="text-sm text-muted-foreground">Inattivi</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-2xl font-bold">{suppliers.length}</div>
+              <p className="text-sm text-muted-foreground">Fornitori</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Listini</CardTitle>
+            <CardDescription>Elenco di tutti i listini prezzi</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {priceListsLoading ? (
+              <div className="space-y-4">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="h-12 rounded bg-muted/50 animate-pulse" />
+                ))}
+              </div>
+            ) : priceLists.length === 0 ? (
+              <div className="text-center py-12">
+                <DollarSign className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <p className="text-lg font-medium">Nessun listino</p>
+                <p className="text-muted-foreground mb-4">Crea il tuo primo listino prezzi</p>
+                {canCreatePriceLists && (
+                  <Button onClick={() => setIsCreateDialogOpen(true)}>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Nuovo Listino
+                  </Button>
+                )}
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Nome</TableHead>
+                    <TableHead>Fornitore</TableHead>
+                    <TableHead>Validità</TableHead>
+                    <TableHead>Stato</TableHead>
+                    <TableHead className="text-right">Azioni</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {priceLists.map((priceList) => {
+                    const supplier = suppliers.find(s => s.id === priceList.supplierId);
+                    return (
+                      <TableRow key={priceList.id} data-testid={`row-price-list-${priceList.id}`}>
+                        <TableCell className="font-medium">{priceList.name}</TableCell>
+                        <TableCell>{supplier?.name || '-'}</TableCell>
+                        <TableCell>
+                          {priceList.validFrom ? (
+                            <span>
+                              {format(new Date(priceList.validFrom), 'dd/MM/yyyy', { locale: it })}
+                              {priceList.validTo && ` - ${format(new Date(priceList.validTo), 'dd/MM/yyyy', { locale: it })}`}
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={priceList.active ? "default" : "secondary"}>
+                            {priceList.active ? "Attivo" : "Inattivo"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleOpenDetailDialog(priceList)}
+                              data-testid={`button-view-${priceList.id}`}
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleOpenEditDialog(priceList)}
+                              data-testid={`button-edit-${priceList.id}`}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => {
+                                setPriceListToDelete(priceList.id);
+                                setDeleteDialogOpen(true);
+                              }}
+                              data-testid={`button-delete-${priceList.id}`}
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+
+        <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Nuovo Listino</DialogTitle>
+              <DialogDescription>Crea un nuovo listino prezzi</DialogDescription>
+            </DialogHeader>
+            <Form {...createForm}>
+              <form onSubmit={createForm.handleSubmit((data) => {
+                createMutation.mutate(data);
+                setIsCreateDialogOpen(false);
+              })} className="space-y-4">
+                <FormField
+                  control={createForm.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Nome Listino *</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="Listino Estate 2024" data-testid="input-name" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={createForm.control}
+                  name="supplierId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Fornitore *</FormLabel>
+                      <FormControl>
+                        <select
+                          {...field}
+                          className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm"
+                          data-testid="select-supplier"
+                        >
+                          <option value="">Seleziona fornitore</option>
+                          {suppliers.filter(s => s.active).map((supplier) => (
+                            <option key={supplier.id} value={supplier.id}>
+                              {supplier.name}
+                            </option>
+                          ))}
+                        </select>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={createForm.control}
+                    name="validFrom"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Valido Da</FormLabel>
+                        <FormControl>
+                          <Input {...field} type="date" data-testid="input-valid-from" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={createForm.control}
+                    name="validTo"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Valido Fino</FormLabel>
+                        <FormControl>
+                          <Input {...field} type="date" data-testid="input-valid-to" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <DialogFooter>
+                  <Button type="button" variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
+                    Annulla
+                  </Button>
+                  <Button type="submit" disabled={createMutation.isPending} data-testid="button-submit">
+                    {createMutation.isPending ? "Creazione..." : "Crea Listino"}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </Form>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Modifica Listino</DialogTitle>
+              <DialogDescription>Modifica i dettagli del listino</DialogDescription>
+            </DialogHeader>
+            <Form {...editForm}>
+              <form onSubmit={editForm.handleSubmit((data) => {
+                if (selectedPriceList) {
+                  updateMutation.mutate({ id: selectedPriceList.id, data });
+                  setIsEditDialogOpen(false);
+                }
+              })} className="space-y-4">
+                <FormField
+                  control={editForm.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Nome Listino *</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="Listino Estate 2024" data-testid="input-edit-name" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={editForm.control}
+                    name="validFrom"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Valido Da</FormLabel>
+                        <FormControl>
+                          <Input {...field} type="date" data-testid="input-edit-valid-from" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={editForm.control}
+                    name="validTo"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Valido Fino</FormLabel>
+                        <FormControl>
+                          <Input {...field} type="date" data-testid="input-edit-valid-to" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <DialogFooter>
+                  <Button type="button" variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+                    Annulla
+                  </Button>
+                  <Button type="submit" disabled={updateMutation.isPending} data-testid="button-submit-edit">
+                    {updateMutation.isPending ? "Salvataggio..." : "Salva"}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </Form>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen}>
+          <DialogContent className="max-w-3xl">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                {selectedPriceList?.name}
+                <Badge variant={selectedPriceList?.active ? "default" : "secondary"}>
+                  {selectedPriceList?.active ? "Attivo" : "Inattivo"}
+                </Badge>
+              </DialogTitle>
+              <DialogDescription>
+                {suppliers.find(s => s.id === selectedPriceList?.supplierId)?.name || 'Fornitore'}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <p className="text-sm text-muted-foreground">Prodotti nel listino</p>
+                <Button size="sm" onClick={() => setIsItemDialogOpen(true)} data-testid="button-add-item">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Aggiungi Prodotto
+                </Button>
+              </div>
+              {itemsLoading ? (
+                <div className="space-y-2">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="h-12 rounded bg-muted/50 animate-pulse" />
+                  ))}
+                </div>
+              ) : items.length === 0 ? (
+                <div className="text-center py-8 border rounded-lg">
+                  <Package className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                  <p className="text-muted-foreground">Nessun prodotto in questo listino</p>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Prodotto</TableHead>
+                      <TableHead>Codice</TableHead>
+                      <TableHead className="text-right">Costo</TableHead>
+                      <TableHead className="text-right">Vendita</TableHead>
+                      <TableHead className="text-right">Margine</TableHead>
+                      <TableHead className="text-right">Azioni</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {items.map((item) => {
+                      const product = products.find(p => p.id === item.productId);
+                      if (!product) return null;
+                      const costPrice = parseFloat(product.costPrice);
+                      const salePrice = parseFloat(item.salePrice);
+                      const margin = salePrice - costPrice;
+                      const marginPercent = costPrice > 0 ? (margin / costPrice) * 100 : 0;
+
+                      return (
+                        <TableRow key={item.id} data-testid={`row-item-${item.id}`}>
+                          <TableCell className="font-medium">{product.name}</TableCell>
+                          <TableCell className="font-mono text-sm text-muted-foreground">{product.code}</TableCell>
+                          <TableCell className="text-right">€ {costPrice.toFixed(2)}</TableCell>
+                          <TableCell className="text-right font-bold text-primary">€ {salePrice.toFixed(2)}</TableCell>
+                          <TableCell className={`text-right font-bold ${margin >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                            {marginPercent.toFixed(0)}%
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => deleteItemMutation.mutate(item.id)}
+                              disabled={deleteItemMutation.isPending}
+                              data-testid={`button-delete-item-${item.id}`}
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={isItemDialogOpen} onOpenChange={setIsItemDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Aggiungi Prodotto</DialogTitle>
+              <DialogDescription>Aggiungi un prodotto al listino</DialogDescription>
+            </DialogHeader>
+            <Form {...itemForm}>
+              <form onSubmit={itemForm.handleSubmit((data) => {
+                createItemMutation.mutate(data);
+                setIsItemDialogOpen(false);
+              })} className="space-y-4">
+                <FormField
+                  control={itemForm.control}
+                  name="productId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Prodotto *</FormLabel>
+                      <FormControl>
+                        <select
+                          {...field}
+                          className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm"
+                          data-testid="select-product"
+                        >
+                          <option value="">Seleziona prodotto</option>
+                          {products.filter(p => !items.some(i => i.productId === p.id)).map((product) => (
+                            <option key={product.id} value={product.id}>
+                              {product.name} ({product.code})
+                            </option>
+                          ))}
+                        </select>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={itemForm.control}
+                  name="salePrice"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Prezzo di Vendita *</FormLabel>
+                      <FormControl>
+                        <Input {...field} type="number" step="0.01" placeholder="10.00" data-testid="input-sale-price" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <DialogFooter>
+                  <Button type="button" variant="outline" onClick={() => setIsItemDialogOpen(false)}>
+                    Annulla
+                  </Button>
+                  <Button type="submit" disabled={createItemMutation.isPending} data-testid="button-submit-item">
+                    {createItemMutation.isPending ? "Aggiunta..." : "Aggiungi"}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </Form>
+          </DialogContent>
+        </Dialog>
+
+        <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Conferma Eliminazione</AlertDialogTitle>
+              <AlertDialogDescription>
+                Sei sicuro di voler eliminare questo listino? Questa azione è irreversibile e eliminerà anche tutti i prezzi associati.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Annulla</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => {
+                  if (priceListToDelete) {
+                    deleteMutation.mutate(priceListToDelete);
+                  }
+                }}
+                className="bg-destructive text-destructive-foreground"
+              >
+                Elimina
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </div>
+    );
+  }
 
   const header = (
     <MobileHeader

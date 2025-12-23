@@ -2,9 +2,27 @@ import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { motion, AnimatePresence } from "framer-motion";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import {
   Form,
   FormControl,
@@ -125,8 +143,11 @@ const staggerContainer = {
 };
 
 export default function PurchaseOrders() {
+  const isMobile = useIsMobile();
   const [formSheetOpen, setFormSheetOpen] = useState(false);
   const [suggestionsSheetOpen, setSuggestionsSheetOpen] = useState(false);
+  const [formDialogOpen, setFormDialogOpen] = useState(false);
+  const [suggestionsDialogOpen, setSuggestionsDialogOpen] = useState(false);
   const [editingOrder, setEditingOrder] = useState<PurchaseOrder | null>(null);
   const [deletingOrder, setDeletingOrder] = useState<PurchaseOrder | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -153,7 +174,11 @@ export default function PurchaseOrders() {
       const response = await apiRequest('POST', '/api/purchase-orders/suggested', {});
       const data = await response.json();
       setSuggestions(data as SuggestedOrder[]);
-      setSuggestionsSheetOpen(true);
+      if (isMobile) {
+        setSuggestionsSheetOpen(true);
+      } else {
+        setSuggestionsDialogOpen(true);
+      }
     } catch (error: any) {
       if (isUnauthorizedError(error)) {
         toast({
@@ -201,6 +226,7 @@ export default function PurchaseOrders() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/purchase-orders'] });
       setFormSheetOpen(false);
+      setFormDialogOpen(false);
       form.reset();
       triggerHaptic('success');
       toast({
@@ -239,6 +265,7 @@ export default function PurchaseOrders() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/purchase-orders'] });
       setFormSheetOpen(false);
+      setFormDialogOpen(false);
       setEditingOrder(null);
       form.reset();
       triggerHaptic('success');
@@ -339,7 +366,11 @@ export default function PurchaseOrders() {
         createdBy: '',
       });
     }
-    setFormSheetOpen(true);
+    if (isMobile) {
+      setFormSheetOpen(true);
+    } else {
+      setFormDialogOpen(true);
+    }
   };
 
   const onSubmit = (data: PurchaseOrderFormData) => {
@@ -460,6 +491,435 @@ export default function PurchaseOrders() {
     { value: 'received', label: 'Ricevuti' },
   ];
 
+  const stats = {
+    total: orders?.length || 0,
+    draft: orders?.filter(o => o.status === 'draft').length || 0,
+    submitted: orders?.filter(o => o.status === 'submitted').length || 0,
+    received: orders?.filter(o => o.status === 'received').length || 0,
+  };
+
+  // Desktop version
+  if (!isMobile) {
+    return (
+      <div className="container mx-auto p-6 space-y-6" data-testid="page-purchase-orders">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">Ordini d'Acquisto</h1>
+            <p className="text-muted-foreground">Gestione ordini fornitori</p>
+          </div>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={fetchSuggestions}
+              disabled={suggestionsLoading}
+              data-testid="button-generate-suggestions"
+            >
+              <Sparkles className="w-4 h-4 mr-2" />
+              Ordini Suggeriti
+            </Button>
+            <Button onClick={() => handleOpenForm()} data-testid="button-create-order">
+              <Plus className="w-4 h-4 mr-2" />
+              Nuovo Ordine
+            </Button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-4 gap-4">
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-2xl font-bold">{stats.total}</div>
+              <p className="text-sm text-muted-foreground">Totale Ordini</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-2xl font-bold text-muted-foreground">{stats.draft}</div>
+              <p className="text-sm text-muted-foreground">Bozze</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-2xl font-bold text-primary">{stats.submitted}</div>
+              <p className="text-sm text-muted-foreground">Inviati</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-2xl font-bold text-green-500">{stats.received}</div>
+              <p className="text-sm text-muted-foreground">Ricevuti</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between gap-4">
+              <CardTitle>Lista Ordini</CardTitle>
+              <div className="flex gap-2">
+                {filterButtons.map((filter) => (
+                  <Button
+                    key={filter.value}
+                    variant={statusFilter === filter.value ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setStatusFilter(filter.value)}
+                    data-testid={`filter-${filter.value}`}
+                  >
+                    {filter.label}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {ordersLoading ? (
+              <div className="space-y-2">
+                {[...Array(5)].map((_, i) => (
+                  <Skeleton key={i} className="h-12 w-full" />
+                ))}
+              </div>
+            ) : filteredOrders.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12">
+                <ShoppingCart className="h-12 w-12 text-muted-foreground/50 mb-4" />
+                <p className="text-muted-foreground">
+                  {statusFilter === 'all'
+                    ? "Nessun ordine creato"
+                    : `Nessun ordine ${statusLabels[statusFilter]?.toLowerCase()}`}
+                </p>
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Numero Ordine</TableHead>
+                    <TableHead>Fornitore</TableHead>
+                    <TableHead>Data</TableHead>
+                    <TableHead>Consegna Prev.</TableHead>
+                    <TableHead>Stato</TableHead>
+                    <TableHead className="text-right">Totale</TableHead>
+                    <TableHead className="text-right">Azioni</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredOrders.map((order) => (
+                    <TableRow key={order.id} data-testid={`row-order-${order.id}`}>
+                      <TableCell className="font-medium">{order.orderNumber || 'N/A'}</TableCell>
+                      <TableCell>{getSupplierName(order.supplierId)}</TableCell>
+                      <TableCell>
+                        {format(new Date(order.orderDate as any), 'dd/MM/yyyy', { locale: it })}
+                      </TableCell>
+                      <TableCell>
+                        {order.expectedDeliveryDate
+                          ? format(new Date(order.expectedDeliveryDate as any), 'dd/MM/yyyy', { locale: it })
+                          : '-'}
+                      </TableCell>
+                      <TableCell>
+                        <Badge className={statusColors[order.status]}>
+                          {statusLabels[order.status]}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right font-semibold">
+                        € {parseFloat(order.totalAmount || '0').toFixed(2)}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => exportToPDF(order)}
+                            data-testid={`button-export-pdf-${order.id}`}
+                          >
+                            <FileText className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => exportToCSV(order)}
+                            data-testid={`button-export-csv-${order.id}`}
+                          >
+                            <FileSpreadsheet className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleOpenForm(order)}
+                            data-testid={`button-edit-order-${order.id}`}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setDeletingOrder(order)}
+                            className="text-destructive"
+                            data-testid={`button-delete-order-${order.id}`}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+
+        <Dialog open={formDialogOpen} onOpenChange={(open) => {
+          setFormDialogOpen(open);
+          if (!open) setEditingOrder(null);
+        }}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle>{editingOrder ? 'Modifica Ordine' : 'Nuovo Ordine'}</DialogTitle>
+              <DialogDescription>
+                {editingOrder ? 'Modifica i dettagli dell\'ordine' : 'Compila i dettagli per creare un nuovo ordine'}
+              </DialogDescription>
+            </DialogHeader>
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                <FormField
+                  control={form.control}
+                  name="supplierId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Fornitore</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Seleziona fornitore" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {suppliers?.map((supplier) => (
+                            <SelectItem key={supplier.id} value={supplier.id}>
+                              {supplier.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="orderNumber"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Numero Ordine</FormLabel>
+                      <FormControl>
+                        <Input {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="orderDate"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Data Ordine</FormLabel>
+                        <FormControl>
+                          <Input type="date" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="expectedDeliveryDate"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Consegna Prevista</FormLabel>
+                        <FormControl>
+                          <Input type="date" {...field} value={field.value || ''} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <FormField
+                  control={form.control}
+                  name="status"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Stato</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="draft">Bozza</SelectItem>
+                          <SelectItem value="submitted">Inviato</SelectItem>
+                          <SelectItem value="received">Ricevuto</SelectItem>
+                          <SelectItem value="cancelled">Annullato</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="totalAmount"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Totale (€)</FormLabel>
+                      <FormControl>
+                        <Input type="number" step="0.01" {...field} value={field.value || ''} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="notes"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Note</FormLabel>
+                      <FormControl>
+                        <Input {...field} value={field.value || ''} placeholder="Note aggiuntive..." />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <DialogFooter>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      setFormDialogOpen(false);
+                      setEditingOrder(null);
+                    }}
+                  >
+                    Annulla
+                  </Button>
+                  <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending}>
+                    {createMutation.isPending || updateMutation.isPending
+                      ? 'Salvataggio...'
+                      : editingOrder ? 'Aggiorna' : 'Crea'}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </Form>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={suggestionsDialogOpen} onOpenChange={setSuggestionsDialogOpen}>
+          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Ordini Suggeriti</DialogTitle>
+              <DialogDescription>
+                Prodotti che necessitano riordino in base a scorte e consumi
+              </DialogDescription>
+            </DialogHeader>
+            {suggestionsLoading ? (
+              <div className="space-y-3">
+                {[...Array(3)].map((_, i) => (
+                  <Skeleton key={i} className="h-20 w-full" />
+                ))}
+              </div>
+            ) : !suggestions || suggestions.length === 0 ? (
+              <div className="flex flex-col items-center py-8">
+                <Package className="h-12 w-12 text-muted-foreground/50 mb-3" />
+                <p className="text-muted-foreground">Nessun prodotto necessita di riordino</p>
+                <p className="text-muted-foreground/70 text-sm mt-1">
+                  Tutte le scorte sono sopra la soglia minima
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {suggestions.map((suggestion) => (
+                  <Card key={suggestion.productId}>
+                    <CardContent className="p-4">
+                      <div className="flex items-start gap-3">
+                        <div className={`p-2 rounded-lg shrink-0 ${
+                          suggestion.reason.includes('sotto soglia')
+                            ? 'bg-destructive/10'
+                            : 'bg-primary/10'
+                        }`}>
+                          {suggestion.reason.includes('sotto soglia') ? (
+                            <AlertTriangle className="h-5 w-5 text-destructive" />
+                          ) : (
+                            <TrendingUp className="h-5 w-5 text-primary" />
+                          )}
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <h4 className="font-semibold">{suggestion.productName}</h4>
+                            <Badge variant="secondary" className="text-xs">
+                              {suggestion.productCode}
+                            </Badge>
+                          </div>
+                          <div className="grid grid-cols-4 gap-4 mt-2 text-sm">
+                            <div>
+                              <span className="text-muted-foreground">Stock: </span>
+                              <span className="font-medium">{suggestion.currentStock}</span>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">Min: </span>
+                              <span className="font-medium">{suggestion.minThreshold}</span>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">Consumo Medio: </span>
+                              <span className="font-medium">{suggestion.avgConsumption}</span>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">Suggerito: </span>
+                              <span className="font-bold text-primary">+{suggestion.suggestedQuantity}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+
+        <AlertDialog open={!!deletingOrder} onOpenChange={() => setDeletingOrder(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Conferma Eliminazione</AlertDialogTitle>
+              <AlertDialogDescription>
+                Sei sicuro di voler eliminare l'ordine {deletingOrder?.orderNumber}?
+                Questa azione non può essere annullata.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Annulla</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => deletingOrder && deleteMutation.mutate(deletingOrder.id)}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                Elimina
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </div>
+    );
+  }
+
+  // Mobile version
   const header = (
     <MobileHeader
       title="Ordini d'Acquisto"

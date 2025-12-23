@@ -3,9 +3,11 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, useLocation } from "wouter";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { motion, AnimatePresence } from "framer-motion";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -16,6 +18,23 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   MobileAppLayout,
   MobileHeader,
@@ -98,9 +117,12 @@ export default function AdminBillingOrganizerDetail() {
   const { companyId } = useParams<{ companyId: string }>();
   const [, navigate] = useLocation();
   const { toast } = useToast();
+  const isMobile = useIsMobile();
   const [activeTab, setActiveTab] = useState("subscription");
   const [isSubscriptionSheetOpen, setIsSubscriptionSheetOpen] = useState(false);
   const [isInvoiceSheetOpen, setIsInvoiceSheetOpen] = useState(false);
+  const [isSubscriptionDialogOpen, setIsSubscriptionDialogOpen] = useState(false);
+  const [isInvoiceDialogOpen, setIsInvoiceDialogOpen] = useState(false);
   const [thresholdValue, setThresholdValue] = useState("");
 
   const { data, isLoading } = useQuery<OrganizerDetailData>({
@@ -242,6 +264,15 @@ export default function AdminBillingOrganizerDetail() {
   };
 
   if (isLoading) {
+    if (!isMobile) {
+      return (
+        <div className="container mx-auto p-6 space-y-6" data-testid="page-admin-billing-organizer-detail">
+          <Skeleton className="h-12 w-64" />
+          <Skeleton className="h-32 w-full" />
+          <Skeleton className="h-64 w-full" />
+        </div>
+      );
+    }
     return (
       <MobileAppLayout
         header={
@@ -265,6 +296,19 @@ export default function AdminBillingOrganizerDetail() {
   }
 
   if (!data) {
+    if (!isMobile) {
+      return (
+        <div className="container mx-auto p-6" data-testid="page-admin-billing-organizer-detail">
+          <div className="flex items-center gap-4 mb-6">
+            <Button variant="ghost" size="icon" onClick={handleBack} data-testid="button-back">
+              <ArrowLeft className="w-5 h-5" />
+            </Button>
+            <h1 className="text-2xl font-bold">Organizzatore non trovato</h1>
+          </div>
+          <p className="text-muted-foreground">L'organizzatore richiesto non esiste o non è accessibile.</p>
+        </div>
+      );
+    }
     return (
       <MobileAppLayout
         header={
@@ -288,6 +332,636 @@ export default function AdminBillingOrganizerDetail() {
   const { company, subscription, plan, wallet, commissionProfile, invoices, recentLedgerEntries } = data;
   const balance = parseFloat(wallet.balance);
 
+  // Desktop version
+  if (!isMobile) {
+    return (
+      <div className="container mx-auto p-6 space-y-6" data-testid="page-admin-billing-organizer-detail">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" size="icon" onClick={handleBack} data-testid="button-back">
+              <ArrowLeft className="w-5 h-5" />
+            </Button>
+            <div className="flex items-center gap-3">
+              <div className="h-12 w-12 rounded-xl bg-yellow-500/20 flex items-center justify-center">
+                <Building2 className="w-6 h-6 text-yellow-500" />
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold">{company.name}</h1>
+                <p className="text-muted-foreground text-sm">Gestione billing organizzatore</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList>
+            {tabItems.map((tab) => (
+              <TabsTrigger key={tab.id} value={tab.id} className="gap-2" data-testid={`tab-${tab.id}`}>
+                <tab.icon className="w-4 h-4" />
+                {tab.label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+
+          <TabsContent value="subscription" className="space-y-6 mt-6">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between gap-4">
+                <div>
+                  <CardTitle>Abbonamento</CardTitle>
+                  <CardDescription>Stato attuale dell'abbonamento</CardDescription>
+                </div>
+                <Button onClick={() => setIsSubscriptionDialogOpen(true)} data-testid="button-assign-plan">
+                  <Plus className="w-4 h-4 mr-2" />
+                  {subscription ? "Cambia Piano" : "Assegna Piano"}
+                </Button>
+              </CardHeader>
+              <CardContent>
+                {subscription && plan ? (
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="p-4 rounded-lg bg-muted/50">
+                      <p className="text-sm text-muted-foreground mb-1">Piano</p>
+                      <p className="font-semibold">{plan.name}</p>
+                    </div>
+                    <div className="p-4 rounded-lg bg-muted/50">
+                      <p className="text-sm text-muted-foreground mb-1">Tipo Fatturazione</p>
+                      <Badge variant={subscription.billingCycle === "monthly" ? "default" : "secondary"}>
+                        {subscription.billingCycle === "monthly" ? "Mensile" : "Per Evento"}
+                      </Badge>
+                    </div>
+                    <div className="p-4 rounded-lg bg-muted/50">
+                      <p className="text-sm text-muted-foreground mb-1">Stato</p>
+                      {subscription.status === "active" ? (
+                        <Badge className="bg-green-500/20 text-green-500">
+                          <CheckCircle className="w-3 h-3 mr-1" />
+                          Attivo
+                        </Badge>
+                      ) : subscription.status === "suspended" ? (
+                        <Badge variant="secondary">
+                          <Clock className="w-3 h-3 mr-1" />
+                          Sospeso
+                        </Badge>
+                      ) : (
+                        <Badge variant="destructive">
+                          <XCircle className="w-3 h-3 mr-1" />
+                          Scaduto
+                        </Badge>
+                      )}
+                    </div>
+                    <div className="p-4 rounded-lg bg-muted/50">
+                      <p className="text-sm text-muted-foreground mb-1">Data Inizio</p>
+                      <p className="font-semibold">{formatDate(subscription.startDate)}</p>
+                    </div>
+                    <div className="p-4 rounded-lg bg-primary/10 border border-primary/20 col-span-2 lg:col-span-4">
+                      <p className="text-sm text-muted-foreground mb-1">Prezzo</p>
+                      <p className="text-3xl font-bold text-primary">{formatCurrency(plan.price)}</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="py-12 text-center">
+                    <CreditCard className="w-12 h-12 mx-auto text-muted-foreground/50 mb-3" />
+                    <p className="text-muted-foreground">Nessun abbonamento attivo</p>
+                    <p className="text-sm text-muted-foreground/70">Assegna un piano per iniziare</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="commissions" className="space-y-6 mt-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Profilo Commissioni</CardTitle>
+                <CardDescription>Configura le commissioni per ogni canale di vendita</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Form {...commissionForm}>
+                  <form
+                    onSubmit={commissionForm.handleSubmit((data) => updateCommissionsMutation.mutate(data))}
+                    className="space-y-6"
+                  >
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                      <div className="p-4 rounded-lg border space-y-4">
+                        <h4 className="font-medium flex items-center gap-2">
+                          <div className="h-8 w-8 rounded-lg bg-blue-500/20 flex items-center justify-center">
+                            <CreditCard className="w-4 h-4 text-blue-500" />
+                          </div>
+                          Vendite Online
+                        </h4>
+                        <div className="grid grid-cols-2 gap-3">
+                          <FormField
+                            control={commissionForm.control}
+                            name="channelOnlineType"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Tipo</FormLabel>
+                                <Select onValueChange={field.onChange} value={field.value}>
+                                  <FormControl>
+                                    <SelectTrigger data-testid="select-online-type">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    <SelectItem value="percent">Percentuale</SelectItem>
+                                    <SelectItem value="fixed">Fisso (€)</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={commissionForm.control}
+                            name="channelOnlineValue"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Valore</FormLabel>
+                                <FormControl>
+                                  <Input type="number" step="0.01" {...field} data-testid="input-online-value" />
+                                </FormControl>
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="p-4 rounded-lg border space-y-4">
+                        <h4 className="font-medium flex items-center gap-2">
+                          <div className="h-8 w-8 rounded-lg bg-green-500/20 flex items-center justify-center">
+                            <Receipt className="w-4 h-4 text-green-500" />
+                          </div>
+                          Biglietteria Fisica
+                        </h4>
+                        <div className="grid grid-cols-2 gap-3">
+                          <FormField
+                            control={commissionForm.control}
+                            name="channelPrintedType"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Tipo</FormLabel>
+                                <Select onValueChange={field.onChange} value={field.value}>
+                                  <FormControl>
+                                    <SelectTrigger data-testid="select-printed-type">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    <SelectItem value="percent">Percentuale</SelectItem>
+                                    <SelectItem value="fixed">Fisso (€)</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={commissionForm.control}
+                            name="channelPrintedValue"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Valore</FormLabel>
+                                <FormControl>
+                                  <Input type="number" step="0.01" {...field} data-testid="input-printed-value" />
+                                </FormControl>
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="p-4 rounded-lg border space-y-4">
+                        <h4 className="font-medium flex items-center gap-2">
+                          <div className="h-8 w-8 rounded-lg bg-purple-500/20 flex items-center justify-center">
+                            <Percent className="w-4 h-4 text-purple-500" />
+                          </div>
+                          Vendite PR
+                        </h4>
+                        <div className="grid grid-cols-2 gap-3">
+                          <FormField
+                            control={commissionForm.control}
+                            name="channelPrType"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Tipo</FormLabel>
+                                <Select onValueChange={field.onChange} value={field.value}>
+                                  <FormControl>
+                                    <SelectTrigger data-testid="select-pr-type">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    <SelectItem value="percent">Percentuale</SelectItem>
+                                    <SelectItem value="fixed">Fisso (€)</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={commissionForm.control}
+                            name="channelPrValue"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Valore</FormLabel>
+                                <FormControl>
+                                  <Input type="number" step="0.01" {...field} data-testid="input-pr-value" />
+                                </FormControl>
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <Button
+                      type="submit"
+                      disabled={updateCommissionsMutation.isPending}
+                      data-testid="button-save-commissions"
+                    >
+                      {updateCommissionsMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                      Salva Commissioni
+                    </Button>
+                  </form>
+                </Form>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="wallet" className="space-y-6 mt-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <Card className="lg:col-span-1">
+                <CardContent className="pt-6">
+                  <div className={`p-6 rounded-lg ${balance < 0 ? "bg-destructive/10" : "bg-green-500/10"}`}>
+                    <p className="text-sm text-muted-foreground mb-1">Saldo Wallet</p>
+                    <p className={`text-4xl font-bold ${balance < 0 ? "text-destructive" : "text-green-500"}`}>
+                      {formatCurrency(balance)}
+                    </p>
+                    <p className="text-sm text-muted-foreground mt-2">
+                      {balance < 0 ? "Debito accumulato" : "Credito disponibile"}
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="lg:col-span-2">
+                <CardHeader>
+                  <CardTitle>Soglia Fatturazione</CardTitle>
+                  <CardDescription>Importo minimo per fattura automatica</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex gap-3">
+                    <Input
+                      type="number"
+                      step="0.01"
+                      placeholder={wallet.thresholdAmount}
+                      value={thresholdValue}
+                      onChange={(e) => setThresholdValue(e.target.value)}
+                      className="flex-1"
+                      data-testid="input-threshold"
+                    />
+                    <Button
+                      onClick={() => updateThresholdMutation.mutate(thresholdValue || wallet.thresholdAmount)}
+                      disabled={updateThresholdMutation.isPending}
+                      data-testid="button-update-threshold"
+                    >
+                      {updateThresholdMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                      Aggiorna
+                    </Button>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    Attuale: {formatCurrency(wallet.thresholdAmount)}
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Movimenti Recenti</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {recentLedgerEntries?.length > 0 ? (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Tipo</TableHead>
+                        <TableHead>Data</TableHead>
+                        <TableHead>Descrizione</TableHead>
+                        <TableHead className="text-right">Importo</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {recentLedgerEntries.map((entry) => (
+                        <TableRow key={entry.id} data-testid={`row-ledger-${entry.id}`}>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <div className={`h-8 w-8 rounded-full flex items-center justify-center ${
+                                entry.direction === "debit" ? "bg-destructive/20" : "bg-green-500/20"
+                              }`}>
+                                {entry.direction === "debit" ? (
+                                  <ArrowDownRight className="w-4 h-4 text-destructive" />
+                                ) : (
+                                  <ArrowUpRight className="w-4 h-4 text-green-500" />
+                                )}
+                              </div>
+                              {entry.type === "commission"
+                                ? "Commissione"
+                                : entry.type === "subscription"
+                                ? "Abbonamento"
+                                : entry.type === "invoice"
+                                ? "Fattura"
+                                : entry.type === "payment"
+                                ? "Pagamento"
+                                : "Rettifica"}
+                            </div>
+                          </TableCell>
+                          <TableCell>{formatDate(entry.createdAt)}</TableCell>
+                          <TableCell className="text-muted-foreground">{entry.note || "-"}</TableCell>
+                          <TableCell className={`text-right font-semibold ${
+                            entry.direction === "debit" ? "text-destructive" : "text-green-500"
+                          }`}>
+                            {entry.direction === "debit" ? "-" : "+"}
+                            {formatCurrency(entry.amount)}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                ) : (
+                  <div className="py-12 text-center">
+                    <Wallet className="w-12 h-12 mx-auto text-muted-foreground/50 mb-3" />
+                    <p className="text-muted-foreground">Nessun movimento</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="invoices" className="space-y-6 mt-6">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between gap-4">
+                <div>
+                  <CardTitle>Fatture</CardTitle>
+                  <CardDescription>Elenco fatture generate</CardDescription>
+                </div>
+                <Button onClick={() => setIsInvoiceDialogOpen(true)} data-testid="button-create-invoice">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Genera Fattura
+                </Button>
+              </CardHeader>
+              <CardContent>
+                {invoices?.length > 0 ? (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Numero</TableHead>
+                        <TableHead>Periodo</TableHead>
+                        <TableHead>Scadenza</TableHead>
+                        <TableHead>Stato</TableHead>
+                        <TableHead className="text-right">Importo</TableHead>
+                        <TableHead></TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {invoices.map((invoice) => (
+                        <TableRow key={invoice.id} data-testid={`row-invoice-${invoice.id}`}>
+                          <TableCell className="font-medium">{invoice.invoiceNumber}</TableCell>
+                          <TableCell>
+                            {formatDate(invoice.periodStart)} - {formatDate(invoice.periodEnd)}
+                          </TableCell>
+                          <TableCell>{formatDate(invoice.dueDate)}</TableCell>
+                          <TableCell>
+                            {invoice.status === "paid" ? (
+                              <Badge className="bg-green-500/20 text-green-500">
+                                <CheckCircle className="w-3 h-3 mr-1" />
+                                Pagata
+                              </Badge>
+                            ) : invoice.status === "issued" ? (
+                              <Badge variant="secondary">
+                                <Clock className="w-3 h-3 mr-1" />
+                                Emessa
+                              </Badge>
+                            ) : invoice.status === "void" ? (
+                              <Badge variant="destructive">Annullata</Badge>
+                            ) : (
+                              <Badge variant="outline">Bozza</Badge>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right font-semibold">
+                            {formatCurrency(invoice.amount)}
+                          </TableCell>
+                          <TableCell>
+                            {invoice.status === "issued" && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => markPaidMutation.mutate(invoice.id)}
+                                disabled={markPaidMutation.isPending}
+                                data-testid={`button-mark-paid-${invoice.id}`}
+                              >
+                                {markPaidMutation.isPending ? (
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                  <>
+                                    <CheckCircle className="w-4 h-4 mr-2" />
+                                    Segna Pagata
+                                  </>
+                                )}
+                              </Button>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                ) : (
+                  <div className="py-12 text-center">
+                    <Receipt className="w-12 h-12 mx-auto text-muted-foreground/50 mb-3" />
+                    <p className="text-muted-foreground">Nessuna fattura</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+
+        <Dialog open={isSubscriptionDialogOpen} onOpenChange={setIsSubscriptionDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Assegna Piano</DialogTitle>
+              <DialogDescription>Seleziona un piano e configura l'abbonamento</DialogDescription>
+            </DialogHeader>
+            <Form {...subscriptionForm}>
+              <form
+                onSubmit={subscriptionForm.handleSubmit((data) => {
+                  createSubscriptionMutation.mutate(data, {
+                    onSuccess: () => setIsSubscriptionDialogOpen(false),
+                  });
+                })}
+                className="space-y-4"
+              >
+                <FormField
+                  control={subscriptionForm.control}
+                  name="planId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Piano</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-plan">
+                            <SelectValue placeholder="Seleziona piano" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {plans
+                            ?.filter((p) => p.isActive)
+                            .map((p) => (
+                              <SelectItem key={p.id} value={p.id}>
+                                {p.name} - {formatCurrency(p.price)}
+                              </SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={subscriptionForm.control}
+                  name="billingCycle"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Ciclo Fatturazione</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-billing-cycle">
+                            <SelectValue />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="monthly">Mensile</SelectItem>
+                          <SelectItem value="per_event">Per Evento</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={subscriptionForm.control}
+                  name="startDate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Data Inizio</FormLabel>
+                      <FormControl>
+                        <Input type="date" {...field} data-testid="input-start-date" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <DialogFooter>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setIsSubscriptionDialogOpen(false)}
+                  >
+                    Annulla
+                  </Button>
+                  <Button
+                    type="submit"
+                    disabled={createSubscriptionMutation.isPending}
+                    data-testid="button-confirm-subscription"
+                  >
+                    {createSubscriptionMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                    Assegna
+                  </Button>
+                </DialogFooter>
+              </form>
+            </Form>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={isInvoiceDialogOpen} onOpenChange={setIsInvoiceDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Genera Fattura</DialogTitle>
+              <DialogDescription>Seleziona il periodo per la fattura</DialogDescription>
+            </DialogHeader>
+            <Form {...invoiceForm}>
+              <form
+                onSubmit={invoiceForm.handleSubmit((data) => {
+                  createInvoiceMutation.mutate(data, {
+                    onSuccess: () => {
+                      setIsInvoiceDialogOpen(false);
+                      invoiceForm.reset();
+                    },
+                  });
+                })}
+                className="space-y-4"
+              >
+                <FormField
+                  control={invoiceForm.control}
+                  name="periodStart"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Data Inizio Periodo</FormLabel>
+                      <FormControl>
+                        <Input type="date" {...field} data-testid="input-period-start" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={invoiceForm.control}
+                  name="periodEnd"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Data Fine Periodo</FormLabel>
+                      <FormControl>
+                        <Input type="date" {...field} data-testid="input-period-end" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={invoiceForm.control}
+                  name="notes"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Note (opzionale)</FormLabel>
+                      <FormControl>
+                        <Input {...field} data-testid="input-invoice-notes" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <DialogFooter>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setIsInvoiceDialogOpen(false)}
+                  >
+                    Annulla
+                  </Button>
+                  <Button
+                    type="submit"
+                    disabled={createInvoiceMutation.isPending}
+                    data-testid="button-confirm-invoice"
+                  >
+                    {createInvoiceMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                    Genera
+                  </Button>
+                </DialogFooter>
+              </form>
+            </Form>
+          </DialogContent>
+        </Dialog>
+      </div>
+    );
+  }
+
+  // Mobile version
   return (
     <MobileAppLayout
       header={

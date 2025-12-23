@@ -18,6 +18,7 @@ import {
   Clock,
   Settings,
   Menu,
+  Eye,
 } from "lucide-react";
 import { useSidebar } from "@/components/ui/sidebar";
 import { motion } from "framer-motion";
@@ -27,6 +28,26 @@ import {
   HapticButton, 
   triggerHaptic 
 } from "@/components/mobile-primitives";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
 import type { Company, Event } from "@shared/schema";
 
 const springConfig = { type: "spring", stiffness: 400, damping: 30 };
@@ -203,6 +224,7 @@ export default function Home() {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
   const { toggleSidebar } = useSidebar();
+  const isMobile = useIsMobile();
 
   const isSuperAdmin = user?.role === 'super_admin';
   const isBartender = user?.role === 'bartender';
@@ -248,6 +270,176 @@ export default function Home() {
   };
 
   if (isSuperAdmin) {
+    if (!isMobile) {
+      return (
+        <div className="container mx-auto p-6 space-y-6" data-testid="page-home-desktop">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <Avatar className="h-12 w-12 border-2 border-primary/20">
+                <AvatarFallback className="bg-gradient-to-br from-primary to-primary/60 text-primary-foreground font-semibold">
+                  {getInitials(user?.firstName ?? undefined, user?.lastName ?? undefined)}
+                </AvatarFallback>
+              </Avatar>
+              <div>
+                <p className="text-sm text-muted-foreground">{getGreeting()}</p>
+                <h1 className="text-2xl font-bold">{user?.firstName || 'Utente'}</h1>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 bg-teal/10 px-3 py-2 rounded-full">
+                <div className="w-2 h-2 rounded-full bg-teal animate-pulse" />
+                <span className="text-sm text-teal font-medium">Online</span>
+              </div>
+              <Link href="/companies">
+                <Button data-testid="button-create-company">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Nuova Azienda
+                </Button>
+              </Link>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-4 gap-4">
+            <Card>
+              <CardContent className="pt-6">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
+                    <Building2 className="h-6 w-6 text-white" />
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold">{companiesLoading ? '--' : companies?.length || 0}</p>
+                    <p className="text-sm text-muted-foreground">Aziende Totali</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-teal-500 to-emerald-600 flex items-center justify-center">
+                    <Sparkles className="h-6 w-6 text-white" />
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold">{companiesLoading ? '--' : companies?.filter(c => c.active).length || 0}</p>
+                    <p className="text-sm text-muted-foreground">Aziende Attive</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center">
+                    <Calendar className="h-6 w-6 text-white" />
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold">--</p>
+                    <p className="text-sm text-muted-foreground">Eventi Mese</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-rose-500 to-pink-600 flex items-center justify-center">
+                    <Euro className="h-6 w-6 text-white" />
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold">--</p>
+                    <p className="text-sm text-muted-foreground">Incasso Totale</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between gap-4">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <Building2 className="h-5 w-5" />
+                  Aziende
+                </CardTitle>
+                <CardDescription>Gestisci le aziende registrate</CardDescription>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {companiesLoading ? (
+                <div className="space-y-3">
+                  <Skeleton className="h-12 w-full" />
+                  <Skeleton className="h-12 w-full" />
+                  <Skeleton className="h-12 w-full" />
+                </div>
+              ) : companies && companies.length > 0 ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Nome</TableHead>
+                      <TableHead>P.IVA</TableHead>
+                      <TableHead>Stato</TableHead>
+                      <TableHead className="text-right">Azioni</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {companies.map((company) => (
+                      <TableRow key={company.id} data-testid={`company-row-${company.id}`}>
+                        <TableCell className="font-medium">{company.name}</TableCell>
+                        <TableCell>{company.taxId || 'Non specificata'}</TableCell>
+                        <TableCell>
+                          <Badge variant={company.active ? "default" : "secondary"}>
+                            {company.active ? 'Attiva' : 'Inattiva'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Dialog>
+                            <DialogTrigger asChild>
+                              <Button variant="ghost" size="icon" data-testid={`button-view-company-${company.id}`}>
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                            </DialogTrigger>
+                            <DialogContent>
+                              <DialogHeader>
+                                <DialogTitle>{company.name}</DialogTitle>
+                                <DialogDescription>Dettagli azienda</DialogDescription>
+                              </DialogHeader>
+                              <div className="space-y-4">
+                                <div>
+                                  <p className="text-sm text-muted-foreground">P.IVA</p>
+                                  <p className="font-medium">{company.taxId || 'Non specificata'}</p>
+                                </div>
+                                <div>
+                                  <p className="text-sm text-muted-foreground">Stato</p>
+                                  <Badge variant={company.active ? "default" : "secondary"}>
+                                    {company.active ? 'Attiva' : 'Inattiva'}
+                                  </Badge>
+                                </div>
+                              </div>
+                            </DialogContent>
+                          </Dialog>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              ) : (
+                <div className="text-center py-12">
+                  <Building2 className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                  <p className="text-lg text-muted-foreground mb-4">Nessuna azienda presente</p>
+                  <Link href="/companies">
+                    <Button data-testid="button-create-first-company">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Crea Prima Azienda
+                    </Button>
+                  </Link>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      );
+    }
+
     return (
       <MobileAppLayout
         header={
@@ -392,6 +584,233 @@ export default function Home() {
           </motion.div>
         </div>
       </MobileAppLayout>
+    );
+  }
+
+  if (!isMobile) {
+    return (
+      <div className="container mx-auto p-6 space-y-6" data-testid="page-home-desktop">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Avatar className="h-12 w-12 border-2 border-primary/20">
+              <AvatarFallback className="bg-gradient-to-br from-primary to-primary/60 text-primary-foreground font-semibold">
+                {getInitials(user?.firstName ?? undefined, user?.lastName ?? undefined)}
+              </AvatarFallback>
+            </Avatar>
+            <div>
+              <p className="text-sm text-muted-foreground">{getGreeting()}</p>
+              <h1 className="text-2xl font-bold">{user?.firstName || 'Utente'}</h1>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 bg-teal/10 px-3 py-2 rounded-full">
+              <div className="w-2 h-2 rounded-full bg-teal animate-pulse" />
+              <span className="text-sm text-teal font-medium">Online</span>
+            </div>
+            <Link href="/events/new">
+              <Button data-testid="button-create-event">
+                <Plus className="h-4 w-4 mr-2" />
+                Nuovo Evento
+              </Button>
+            </Link>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-4 gap-4">
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
+                  <Calendar className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold">{events.filter(e => new Date(e.startDatetime) >= new Date()).length}</p>
+                  <p className="text-sm text-muted-foreground">Eventi Attivi</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center">
+                  <Ticket className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold">--</p>
+                  <p className="text-sm text-muted-foreground">Biglietti Venduti</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-teal-500 to-emerald-600 flex items-center justify-center">
+                  <Euro className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold">€0</p>
+                  <p className="text-sm text-muted-foreground">Incasso Oggi</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-rose-500 to-pink-600 flex items-center justify-center">
+                  <Clock className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold">{recentEvents[0] ? new Date(recentEvents[0].startDatetime).toLocaleDateString('it-IT', { day: '2-digit', month: 'short' }) : '--'}</p>
+                  <p className="text-sm text-muted-foreground">Prossimo Evento</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="grid grid-cols-3 gap-4">
+          <Link href="/events/new">
+            <Card className="hover-elevate cursor-pointer">
+              <CardContent className="pt-6 flex items-center gap-4">
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
+                  <Plus className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <p className="font-semibold">Nuovo Evento</p>
+                  <p className="text-sm text-muted-foreground">Crea un evento</p>
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
+          <Link href="/scanner">
+            <Card className="hover-elevate cursor-pointer">
+              <CardContent className="pt-6 flex items-center gap-4">
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-teal-500 to-emerald-600 flex items-center justify-center">
+                  <QrCode className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <p className="font-semibold">Scanner</p>
+                  <p className="text-sm text-muted-foreground">Scansiona biglietti</p>
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
+          <Link href="/beverage">
+            <Card className="hover-elevate cursor-pointer">
+              <CardContent className="pt-6 flex items-center gap-4">
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center">
+                  <Wine className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <p className="font-semibold">Beverage</p>
+                  <p className="text-sm text-muted-foreground">Gestione bevande</p>
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
+        </div>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between gap-4">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Calendar className="h-5 w-5" />
+                Eventi Recenti
+              </CardTitle>
+              <CardDescription>I tuoi eventi più recenti</CardDescription>
+            </div>
+            <Link href="/events">
+              <Button variant="outline" data-testid="link-view-all-events">
+                Vedi tutti
+                <ChevronRight className="h-4 w-4 ml-2" />
+              </Button>
+            </Link>
+          </CardHeader>
+          <CardContent>
+            {eventsLoading ? (
+              <div className="space-y-3">
+                <Skeleton className="h-12 w-full" />
+                <Skeleton className="h-12 w-full" />
+                <Skeleton className="h-12 w-full" />
+              </div>
+            ) : recentEvents.length > 0 ? (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Nome</TableHead>
+                    <TableHead>Data</TableHead>
+                    <TableHead>Stato</TableHead>
+                    <TableHead className="text-right">Azioni</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {recentEvents.map((event) => {
+                    const eventDate = new Date(event.startDatetime);
+                    const isUpcoming = eventDate >= new Date();
+                    return (
+                      <TableRow key={event.id} data-testid={`event-row-${event.id}`}>
+                        <TableCell className="font-medium">{event.name}</TableCell>
+                        <TableCell>{eventDate.toLocaleDateString('it-IT', { day: 'numeric', month: 'short', year: 'numeric' })}</TableCell>
+                        <TableCell>
+                          <Badge variant={isUpcoming ? "default" : "secondary"}>
+                            {isUpcoming ? 'In arrivo' : 'Passato'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Dialog>
+                            <DialogTrigger asChild>
+                              <Button variant="ghost" size="icon" data-testid={`button-view-event-${event.id}`}>
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                            </DialogTrigger>
+                            <DialogContent>
+                              <DialogHeader>
+                                <DialogTitle>{event.name}</DialogTitle>
+                                <DialogDescription>Dettagli evento</DialogDescription>
+                              </DialogHeader>
+                              <div className="space-y-4">
+                                <div>
+                                  <p className="text-sm text-muted-foreground">Data</p>
+                                  <p className="font-medium">{eventDate.toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
+                                </div>
+                                <div>
+                                  <p className="text-sm text-muted-foreground">Stato</p>
+                                  <Badge variant={isUpcoming ? "default" : "secondary"}>
+                                    {isUpcoming ? 'In arrivo' : 'Passato'}
+                                  </Badge>
+                                </div>
+                                <Link href={`/events/${event.id}`}>
+                                  <Button className="w-full" data-testid={`button-go-to-event-${event.id}`}>
+                                    Vai all'evento
+                                  </Button>
+                                </Link>
+                              </div>
+                            </DialogContent>
+                          </Dialog>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            ) : (
+              <div className="text-center py-12">
+                <Calendar className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <p className="text-lg text-muted-foreground mb-4">Nessun evento creato</p>
+                <Link href="/event-wizard">
+                  <Button data-testid="button-create-first-event">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Crea Primo Evento
+                  </Button>
+                </Link>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     );
   }
 

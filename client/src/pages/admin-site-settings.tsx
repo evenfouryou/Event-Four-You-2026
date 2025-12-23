@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Cookie, FileText, Settings, Save, Loader2, AlertCircle } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -25,6 +26,7 @@ interface SiteSettings {
 
 export default function AdminSiteSettings() {
   const { toast } = useToast();
+  const isMobile = useIsMobile();
   const [activeTab, setActiveTab] = useState("cookies");
 
   const { data: settings, isLoading, error } = useQuery<SiteSettings>({
@@ -111,6 +113,187 @@ export default function AdminSiteSettings() {
           <Skeleton className="h-[400px] w-full" />
         </div>
       </MobileAppLayout>
+    );
+  }
+
+  if (!isMobile) {
+    return (
+      <div className="container mx-auto p-6 space-y-6" data-testid="page-admin-site-settings">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">Impostazioni Sito</h1>
+            <p className="text-muted-foreground">
+              Gestisci le impostazioni globali del sito, cookie e testi legali
+            </p>
+          </div>
+          <Button
+            onClick={handleSave}
+            disabled={updateMutation.isPending || !hasChanges}
+            data-testid="button-save-settings"
+          >
+            {updateMutation.isPending ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : (
+              <Save className="w-4 h-4 mr-2" />
+            )}
+            Salva Modifiche
+          </Button>
+        </div>
+
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList>
+            <TabsTrigger value="cookies" className="gap-2" data-testid="tab-cookies">
+              <Cookie className="w-4 h-4" />
+              Cookie
+            </TabsTrigger>
+            <TabsTrigger value="legal" className="gap-2" data-testid="tab-legal">
+              <FileText className="w-4 h-4" />
+              Testi Legali
+            </TabsTrigger>
+            <TabsTrigger value="contact" className="gap-2" data-testid="tab-contact">
+              <Settings className="w-4 h-4" />
+              Contatti
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="cookies" className="mt-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Cookie className="w-5 h-5 text-primary" />
+                  Consenso Cookie
+                </CardTitle>
+                <CardDescription>
+                  Configura il banner dei cookie secondo la normativa GDPR
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="flex items-center justify-between p-4 rounded-lg bg-muted/50">
+                  <div>
+                    <Label className="text-base font-medium">Abilita Banner Cookie</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Mostra il banner di consenso cookie ai visitatori
+                    </p>
+                  </div>
+                  <Switch
+                    checked={getValue("cookie_consent_enabled", true)}
+                    onCheckedChange={(checked) => setValue("cookie_consent_enabled", checked)}
+                    data-testid="switch-cookie-enabled"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="cookie_text_desktop">Testo del Banner</Label>
+                  <Textarea
+                    id="cookie_text_desktop"
+                    placeholder="Utilizziamo i cookie per migliorare la tua esperienza..."
+                    value={getValue("cookie_consent_text", "")}
+                    onChange={(e) => setValue("cookie_consent_text", e.target.value)}
+                    rows={4}
+                    data-testid="textarea-cookie-text"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Questo testo verrà mostrato nel banner dei cookie
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="privacy_url_desktop">URL Privacy Policy</Label>
+                  <Input
+                    id="privacy_url_desktop"
+                    type="url"
+                    placeholder="https://esempio.com/privacy"
+                    value={getValue("privacy_policy_url", "")}
+                    onChange={(e) => setValue("privacy_policy_url", e.target.value)}
+                    data-testid="input-privacy-url"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Link alla pagina della privacy policy
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="legal" className="mt-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <FileText className="w-5 h-5 text-primary" />
+                  Documenti Legali
+                </CardTitle>
+                <CardDescription>
+                  Configura i link ai documenti legali del sito
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="space-y-2">
+                  <Label htmlFor="terms_url_desktop">URL Termini di Servizio</Label>
+                  <Input
+                    id="terms_url_desktop"
+                    type="url"
+                    placeholder="https://esempio.com/termini"
+                    value={getValue("terms_of_service_url", "")}
+                    onChange={(e) => setValue("terms_of_service_url", e.target.value)}
+                    data-testid="input-terms-url"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="privacy_url_legal_desktop">URL Privacy Policy</Label>
+                  <Input
+                    id="privacy_url_legal_desktop"
+                    type="url"
+                    placeholder="https://esempio.com/privacy"
+                    value={getValue("privacy_policy_url", "")}
+                    onChange={(e) => setValue("privacy_policy_url", e.target.value)}
+                    data-testid="input-privacy-url-legal"
+                  />
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="contact" className="mt-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Settings className="w-5 h-5 text-primary" />
+                  Informazioni di Contatto
+                </CardTitle>
+                <CardDescription>
+                  Configura le informazioni di contatto del sito
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="space-y-2">
+                  <Label htmlFor="contact_email_desktop">Email di Contatto</Label>
+                  <Input
+                    id="contact_email_desktop"
+                    type="email"
+                    placeholder="info@esempio.com"
+                    value={getValue("contact_email", "")}
+                    onChange={(e) => setValue("contact_email", e.target.value)}
+                    data-testid="input-contact-email"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="support_phone_desktop">Telefono Supporto</Label>
+                  <Input
+                    id="support_phone_desktop"
+                    type="tel"
+                    placeholder="+39 02 1234567"
+                    value={getValue("support_phone", "")}
+                    onChange={(e) => setValue("support_phone", e.target.value)}
+                    data-testid="input-support-phone"
+                  />
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+      </div>
     );
   }
 

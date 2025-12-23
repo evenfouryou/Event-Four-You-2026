@@ -3,10 +3,15 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
@@ -125,6 +130,7 @@ function MobileTabPill({
 
 export default function Accounting() {
   const { user } = useAuth();
+  const isMobile = useIsMobile();
   const [activeTab, setActiveTab] = useState<TabType>("fixed-costs");
   const isAdmin = user?.role === "super_admin" || user?.role === "gestore";
 
@@ -155,6 +161,111 @@ export default function Accounting() {
   const totalExtraCosts = extraCosts.reduce((sum, cost) => sum + parseFloat(cost.amount || "0"), 0);
   const pendingMaintenances = maintenances.filter(m => m.status === "pending" || m.status === "scheduled").length;
   const pendingDocuments = documents.filter(d => d.status === "pending").length;
+
+  if (!isMobile) {
+    return (
+      <div className="container mx-auto p-6 space-y-6" data-testid="page-accounting">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold">Contabilità</h1>
+            <p className="text-muted-foreground">Gestione costi fissi, extra, manutenzioni e documenti</p>
+          </div>
+          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center">
+            <Calculator className="h-6 w-6 text-white" />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-4 gap-4">
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
+                  <Receipt className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <div className="text-2xl font-bold" data-testid="stat-desktop-fixed-costs">€{totalFixedCosts.toFixed(0)}</div>
+                  <p className="text-sm text-muted-foreground">Costi Fissi/Mese</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center">
+                  <Euro className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <div className="text-2xl font-bold" data-testid="stat-desktop-extra-costs">€{totalExtraCosts.toFixed(0)}</div>
+                  <p className="text-sm text-muted-foreground">Costi Extra</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
+                  <Wrench className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <div className="text-2xl font-bold" data-testid="stat-desktop-maintenances">{pendingMaintenances}</div>
+                  <p className="text-sm text-muted-foreground">Manutenzioni</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-rose-500 to-pink-600 flex items-center justify-center">
+                  <FileText className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <div className="text-2xl font-bold" data-testid="stat-desktop-documents">{pendingDocuments}</div>
+                  <p className="text-sm text-muted-foreground">Doc. in Attesa</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabType)} className="space-y-4">
+          <TabsList className="grid grid-cols-4 w-full max-w-2xl">
+            <TabsTrigger value="fixed-costs" className="flex items-center gap-2" data-testid="tab-desktop-fixed-costs">
+              <Receipt className="h-4 w-4" />
+              Costi Fissi
+            </TabsTrigger>
+            <TabsTrigger value="extra-costs" className="flex items-center gap-2" data-testid="tab-desktop-extra-costs">
+              <Euro className="h-4 w-4" />
+              Extra
+            </TabsTrigger>
+            <TabsTrigger value="maintenances" className="flex items-center gap-2" data-testid="tab-desktop-maintenances">
+              <Wrench className="h-4 w-4" />
+              Manutenzioni
+            </TabsTrigger>
+            <TabsTrigger value="documents" className="flex items-center gap-2" data-testid="tab-desktop-documents">
+              <FileText className="h-4 w-4" />
+              Documenti
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="fixed-costs">
+            <DesktopFixedCostsSection isAdmin={isAdmin} />
+          </TabsContent>
+          <TabsContent value="extra-costs">
+            <DesktopExtraCostsSection isAdmin={isAdmin} />
+          </TabsContent>
+          <TabsContent value="maintenances">
+            <DesktopMaintenancesSection isAdmin={isAdmin} />
+          </TabsContent>
+          <TabsContent value="documents">
+            <DesktopDocumentsSection isAdmin={isAdmin} />
+          </TabsContent>
+        </Tabs>
+      </div>
+    );
+  }
 
   const header = (
     <MobileHeader
@@ -1678,5 +1789,992 @@ function DocumentsSection({ isAdmin }: { isAdmin: boolean }) {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+function DesktopFixedCostsSection({ isAdmin }: { isAdmin: boolean }) {
+  const { toast } = useToast();
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingCost, setEditingCost] = useState<FixedCost | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
+
+  const { data: fixedCosts = [], isLoading } = useQuery<FixedCost[]>({
+    queryKey: ["/api/fixed-costs"],
+  });
+
+  const { data: locations = [] } = useQuery<Location[]>({
+    queryKey: ["/api/locations"],
+  });
+
+  const createMutation = useMutation({
+    mutationFn: (data: any) => apiRequest("POST", "/api/fixed-costs", data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/fixed-costs"] });
+      setIsDialogOpen(false);
+      toast({ title: "Costo fisso creato con successo" });
+    },
+    onError: (err: any) => {
+      toast({ title: "Errore", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: any }) => 
+      apiRequest("PATCH", `/api/fixed-costs/${id}`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/fixed-costs"] });
+      setEditingCost(null);
+      setIsDialogOpen(false);
+      toast({ title: "Costo fisso aggiornato" });
+    },
+    onError: (err: any) => {
+      toast({ title: "Errore", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => apiRequest("DELETE", `/api/fixed-costs/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/fixed-costs"] });
+      toast({ title: "Costo fisso eliminato" });
+    },
+    onError: (err: any) => {
+      toast({ title: "Errore", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    const locationValue = formData.get("locationId") as string;
+    const data = {
+      name: formData.get("name") as string,
+      category: formData.get("category") as string,
+      amount: formData.get("amount") as string,
+      frequency: formData.get("frequency") as string,
+      locationId: locationValue && locationValue !== "_none" ? locationValue : null,
+      validFrom: formData.get("validFrom") as string || null,
+      validTo: formData.get("validTo") as string || null,
+      notes: formData.get("notes") as string || null,
+    };
+    if (editingCost) {
+      updateMutation.mutate({ id: editingCost.id, data });
+    } else {
+      createMutation.mutate(data);
+    }
+  };
+
+  const filteredCosts = fixedCosts.filter(cost =>
+    cost.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (cost.notes?.toLowerCase().includes(searchTerm.toLowerCase()))
+  );
+
+  const getLocationName = (locationId: string | null) => {
+    if (!locationId) return "Generale";
+    const location = locations.find(l => l.id === locationId);
+    return location?.name || "N/D";
+  };
+
+  const frequencyLabels: Record<string, string> = {
+    monthly: "Mensile",
+    quarterly: "Trimestrale",
+    yearly: "Annuale",
+    per_event: "Per evento",
+  };
+
+  const categoryLabels: Record<string, string> = {
+    affitto: "Affitto",
+    service: "Servizi",
+    permessi: "Permessi",
+    sicurezza: "Sicurezza",
+    amministrativi: "Amministrativi",
+    utenze: "Utenze",
+    altro: "Altro",
+  };
+
+  if (isLoading) {
+    return <Skeleton className="h-96" />;
+  }
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between gap-4">
+        <div>
+          <CardTitle>Costi Fissi</CardTitle>
+          <CardDescription>Gestione dei costi ricorrenti</CardDescription>
+        </div>
+        <div className="flex items-center gap-2">
+          <Input
+            placeholder="Cerca..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-64"
+            data-testid="input-desktop-search-fixed-costs"
+          />
+          {isAdmin && (
+            <Button onClick={() => setIsDialogOpen(true)} data-testid="button-desktop-add-fixed-cost">
+              <Plus className="h-4 w-4 mr-2" />
+              Nuovo
+            </Button>
+          )}
+        </div>
+      </CardHeader>
+      <CardContent>
+        {filteredCosts.length === 0 ? (
+          <div className="text-center py-12 text-muted-foreground">
+            {searchTerm ? "Nessun risultato trovato" : "Nessun costo fisso registrato"}
+          </div>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Nome</TableHead>
+                <TableHead>Categoria</TableHead>
+                <TableHead>Frequenza</TableHead>
+                <TableHead>Location</TableHead>
+                <TableHead className="text-right">Importo</TableHead>
+                {isAdmin && <TableHead className="text-right">Azioni</TableHead>}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredCosts.map((cost) => (
+                <TableRow key={cost.id} data-testid={`row-desktop-fixed-cost-${cost.id}`}>
+                  <TableCell className="font-medium">{cost.name}</TableCell>
+                  <TableCell><Badge variant="outline">{categoryLabels[cost.category] || cost.category}</Badge></TableCell>
+                  <TableCell><Badge variant="secondary">{frequencyLabels[cost.frequency] || cost.frequency}</Badge></TableCell>
+                  <TableCell>{getLocationName(cost.locationId)}</TableCell>
+                  <TableCell className="text-right font-bold">€{parseFloat(cost.amount).toFixed(2)}</TableCell>
+                  {isAdmin && (
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-1">
+                        <Button size="icon" variant="ghost" onClick={() => { setEditingCost(cost); setIsDialogOpen(true); }} data-testid={`button-desktop-edit-fixed-cost-${cost.id}`}>
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button size="icon" variant="ghost" data-testid={`button-desktop-delete-fixed-cost-${cost.id}`}>
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Conferma eliminazione</AlertDialogTitle>
+                              <AlertDialogDescription>Questa azione non può essere annullata.</AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Annulla</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => deleteMutation.mutate(cost.id)}>Elimina</AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
+                    </TableCell>
+                  )}
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </CardContent>
+
+      <Dialog open={isDialogOpen} onOpenChange={(open) => { setIsDialogOpen(open); if (!open) setEditingCost(null); }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{editingCost ? "Modifica Costo Fisso" : "Nuovo Costo Fisso"}</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="name">Nome *</Label>
+              <Input id="name" name="name" defaultValue={editingCost?.name || ""} placeholder="es. Affitto locale" required data-testid="input-desktop-fixed-cost-name" />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="category">Categoria *</Label>
+                <Select name="category" defaultValue={editingCost?.category || "altro"}>
+                  <SelectTrigger data-testid="select-desktop-fixed-cost-category"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="affitto">Affitto</SelectItem>
+                    <SelectItem value="service">Servizi</SelectItem>
+                    <SelectItem value="permessi">Permessi</SelectItem>
+                    <SelectItem value="sicurezza">Sicurezza</SelectItem>
+                    <SelectItem value="amministrativi">Amministrativi</SelectItem>
+                    <SelectItem value="utenze">Utenze</SelectItem>
+                    <SelectItem value="altro">Altro</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="frequency">Frequenza *</Label>
+                <Select name="frequency" defaultValue={editingCost?.frequency || "monthly"}>
+                  <SelectTrigger data-testid="select-desktop-fixed-cost-frequency"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="monthly">Mensile</SelectItem>
+                    <SelectItem value="quarterly">Trimestrale</SelectItem>
+                    <SelectItem value="yearly">Annuale</SelectItem>
+                    <SelectItem value="per_event">Per evento</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="amount">Importo (€) *</Label>
+                <Input id="amount" name="amount" type="number" step="0.01" defaultValue={editingCost?.amount || ""} placeholder="0.00" required data-testid="input-desktop-fixed-cost-amount" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="locationId">Location</Label>
+                <Select name="locationId" defaultValue={editingCost?.locationId || "_none"}>
+                  <SelectTrigger data-testid="select-desktop-fixed-cost-location"><SelectValue placeholder="Generale" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="_none">Generale</SelectItem>
+                    {locations.map((loc) => (<SelectItem key={loc.id} value={loc.id}>{loc.name}</SelectItem>))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="notes">Note</Label>
+              <Textarea id="notes" name="notes" defaultValue={editingCost?.notes || ""} placeholder="Note aggiuntive" data-testid="input-desktop-fixed-cost-notes" />
+            </div>
+            <DialogFooter>
+              <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending} data-testid="button-desktop-save-fixed-cost">
+                {editingCost ? "Aggiorna" : "Crea"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+    </Card>
+  );
+}
+
+function DesktopExtraCostsSection({ isAdmin }: { isAdmin: boolean }) {
+  const { toast } = useToast();
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingCost, setEditingCost] = useState<ExtraCost | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
+
+  const { data: extraCosts = [], isLoading } = useQuery<ExtraCost[]>({
+    queryKey: ["/api/extra-costs"],
+  });
+
+  const { data: events = [] } = useQuery<Event[]>({
+    queryKey: ["/api/events"],
+  });
+
+  const createMutation = useMutation({
+    mutationFn: (data: any) => apiRequest("POST", "/api/extra-costs", data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/extra-costs"] });
+      setIsDialogOpen(false);
+      toast({ title: "Costo extra creato con successo" });
+    },
+    onError: (err: any) => {
+      toast({ title: "Errore", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: any }) => 
+      apiRequest("PATCH", `/api/extra-costs/${id}`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/extra-costs"] });
+      setEditingCost(null);
+      setIsDialogOpen(false);
+      toast({ title: "Costo extra aggiornato" });
+    },
+    onError: (err: any) => {
+      toast({ title: "Errore", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => apiRequest("DELETE", `/api/extra-costs/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/extra-costs"] });
+      toast({ title: "Costo extra eliminato" });
+    },
+    onError: (err: any) => {
+      toast({ title: "Errore", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    const eventValue = formData.get("eventId") as string;
+    const data = {
+      name: formData.get("name") as string,
+      category: formData.get("category") as string,
+      amount: formData.get("amount") as string,
+      eventId: eventValue && eventValue !== "_none" ? eventValue : null,
+      invoiceNumber: formData.get("invoiceNumber") as string || null,
+      notes: formData.get("notes") as string || null,
+    };
+    if (editingCost) {
+      updateMutation.mutate({ id: editingCost.id, data });
+    } else {
+      createMutation.mutate(data);
+    }
+  };
+
+  const filteredCosts = extraCosts.filter(cost =>
+    cost.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (cost.notes?.toLowerCase().includes(searchTerm.toLowerCase()))
+  );
+
+  const getEventName = (eventId: string | null) => {
+    if (!eventId) return "-";
+    const event = events.find(e => e.id === eventId);
+    return event?.name || "N/D";
+  };
+
+  const categoryLabels: Record<string, string> = {
+    artisti: "Artisti",
+    promozione: "Promozione",
+    materiali: "Materiali",
+    personale: "Personale",
+    affitto: "Affitto",
+    catering: "Catering",
+    altro: "Altro",
+  };
+
+  if (isLoading) {
+    return <Skeleton className="h-96" />;
+  }
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between gap-4">
+        <div>
+          <CardTitle>Costi Extra</CardTitle>
+          <CardDescription>Spese variabili e per eventi</CardDescription>
+        </div>
+        <div className="flex items-center gap-2">
+          <Input placeholder="Cerca..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-64" data-testid="input-desktop-search-extra-costs" />
+          {isAdmin && (
+            <Button onClick={() => setIsDialogOpen(true)} data-testid="button-desktop-add-extra-cost">
+              <Plus className="h-4 w-4 mr-2" />
+              Nuovo
+            </Button>
+          )}
+        </div>
+      </CardHeader>
+      <CardContent>
+        {filteredCosts.length === 0 ? (
+          <div className="text-center py-12 text-muted-foreground">
+            {searchTerm ? "Nessun risultato trovato" : "Nessun costo extra registrato"}
+          </div>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Nome</TableHead>
+                <TableHead>Categoria</TableHead>
+                <TableHead>Evento</TableHead>
+                <TableHead>Fattura</TableHead>
+                <TableHead className="text-right">Importo</TableHead>
+                {isAdmin && <TableHead className="text-right">Azioni</TableHead>}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredCosts.map((cost) => (
+                <TableRow key={cost.id} data-testid={`row-desktop-extra-cost-${cost.id}`}>
+                  <TableCell className="font-medium">{cost.name}</TableCell>
+                  <TableCell><Badge variant="outline">{categoryLabels[cost.category] || cost.category}</Badge></TableCell>
+                  <TableCell>{getEventName(cost.eventId)}</TableCell>
+                  <TableCell>{cost.invoiceNumber || "-"}</TableCell>
+                  <TableCell className="text-right font-bold">€{parseFloat(cost.amount || "0").toFixed(2)}</TableCell>
+                  {isAdmin && (
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-1">
+                        <Button size="icon" variant="ghost" onClick={() => { setEditingCost(cost); setIsDialogOpen(true); }} data-testid={`button-desktop-edit-extra-cost-${cost.id}`}>
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button size="icon" variant="ghost" data-testid={`button-desktop-delete-extra-cost-${cost.id}`}>
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Conferma eliminazione</AlertDialogTitle>
+                              <AlertDialogDescription>Questa azione non può essere annullata.</AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Annulla</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => deleteMutation.mutate(cost.id)}>Elimina</AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
+                    </TableCell>
+                  )}
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </CardContent>
+
+      <Dialog open={isDialogOpen} onOpenChange={(open) => { setIsDialogOpen(open); if (!open) setEditingCost(null); }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{editingCost ? "Modifica Costo Extra" : "Nuovo Costo Extra"}</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="name">Nome *</Label>
+              <Input id="name" name="name" defaultValue={editingCost?.name || ""} placeholder="es. DJ Fee" required data-testid="input-desktop-extra-cost-name" />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="category">Categoria *</Label>
+                <Select name="category" defaultValue={editingCost?.category || "altro"}>
+                  <SelectTrigger data-testid="select-desktop-extra-cost-category"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="artisti">Artisti</SelectItem>
+                    <SelectItem value="promozione">Promozione</SelectItem>
+                    <SelectItem value="materiali">Materiali</SelectItem>
+                    <SelectItem value="personale">Personale</SelectItem>
+                    <SelectItem value="affitto">Affitto</SelectItem>
+                    <SelectItem value="catering">Catering</SelectItem>
+                    <SelectItem value="altro">Altro</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="amount">Importo (€) *</Label>
+                <Input id="amount" name="amount" type="number" step="0.01" defaultValue={editingCost?.amount || ""} placeholder="0.00" required data-testid="input-desktop-extra-cost-amount" />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="eventId">Evento</Label>
+              <Select name="eventId" defaultValue={editingCost?.eventId || "_none"}>
+                <SelectTrigger data-testid="select-desktop-extra-cost-event"><SelectValue placeholder="Seleziona evento" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="_none">Nessun evento</SelectItem>
+                  {events.map((event) => (<SelectItem key={event.id} value={event.id}>{event.name}</SelectItem>))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="invoiceNumber">N. Fattura</Label>
+              <Input id="invoiceNumber" name="invoiceNumber" defaultValue={editingCost?.invoiceNumber || ""} placeholder="es. FT-2024-001" data-testid="input-desktop-extra-cost-invoice" />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="notes">Note</Label>
+              <Textarea id="notes" name="notes" defaultValue={editingCost?.notes || ""} placeholder="Note aggiuntive" data-testid="input-desktop-extra-cost-notes" />
+            </div>
+            <DialogFooter>
+              <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending} data-testid="button-desktop-save-extra-cost">
+                {editingCost ? "Aggiorna" : "Crea"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+    </Card>
+  );
+}
+
+function DesktopMaintenancesSection({ isAdmin }: { isAdmin: boolean }) {
+  const { toast } = useToast();
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingMaintenance, setEditingMaintenance] = useState<Maintenance | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
+
+  const { data: maintenances = [], isLoading } = useQuery<Maintenance[]>({
+    queryKey: ["/api/maintenances"],
+  });
+
+  const { data: locations = [] } = useQuery<Location[]>({
+    queryKey: ["/api/locations"],
+  });
+
+  const createMutation = useMutation({
+    mutationFn: (data: any) => apiRequest("POST", "/api/maintenances", data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/maintenances"] });
+      setIsDialogOpen(false);
+      toast({ title: "Manutenzione creata con successo" });
+    },
+    onError: (err: any) => {
+      toast({ title: "Errore", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: any }) => 
+      apiRequest("PATCH", `/api/maintenances/${id}`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/maintenances"] });
+      setEditingMaintenance(null);
+      setIsDialogOpen(false);
+      toast({ title: "Manutenzione aggiornata" });
+    },
+    onError: (err: any) => {
+      toast({ title: "Errore", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => apiRequest("DELETE", `/api/maintenances/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/maintenances"] });
+      toast({ title: "Manutenzione eliminata" });
+    },
+    onError: (err: any) => {
+      toast({ title: "Errore", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    const locationValue = formData.get("locationId") as string;
+    const data = {
+      name: formData.get("name") as string,
+      description: formData.get("description") as string || null,
+      type: formData.get("type") as string,
+      status: formData.get("status") as string,
+      locationId: locationValue && locationValue !== "_none" ? locationValue : null,
+      amount: formData.get("amount") as string || null,
+      scheduledDate: formData.get("scheduledDate") as string || null,
+      completedDate: formData.get("completedDate") as string || null,
+      notes: formData.get("notes") as string || null,
+    };
+    if (editingMaintenance) {
+      updateMutation.mutate({ id: editingMaintenance.id, data });
+    } else {
+      createMutation.mutate(data);
+    }
+  };
+
+  const filteredMaintenances = maintenances.filter(m =>
+    m.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (m.description?.toLowerCase().includes(searchTerm.toLowerCase()))
+  );
+
+  const getLocationName = (locationId: string | null) => {
+    if (!locationId) return "Generale";
+    const location = locations.find(l => l.id === locationId);
+    return location?.name || "N/D";
+  };
+
+  const typeLabels: Record<string, string> = {
+    ordinaria: "Ordinaria",
+    straordinaria: "Straordinaria",
+    urgente: "Urgente",
+  };
+
+  const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
+    pending: { label: "In attesa", variant: "secondary" },
+    scheduled: { label: "Programmata", variant: "outline" },
+    completed: { label: "Completata", variant: "default" },
+  };
+
+  if (isLoading) {
+    return <Skeleton className="h-96" />;
+  }
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between gap-4">
+        <div>
+          <CardTitle>Manutenzioni</CardTitle>
+          <CardDescription>Interventi programmati e completati</CardDescription>
+        </div>
+        <div className="flex items-center gap-2">
+          <Input placeholder="Cerca..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-64" data-testid="input-desktop-search-maintenances" />
+          {isAdmin && (
+            <Button onClick={() => setIsDialogOpen(true)} data-testid="button-desktop-add-maintenance">
+              <Plus className="h-4 w-4 mr-2" />
+              Nuova
+            </Button>
+          )}
+        </div>
+      </CardHeader>
+      <CardContent>
+        {filteredMaintenances.length === 0 ? (
+          <div className="text-center py-12 text-muted-foreground">
+            {searchTerm ? "Nessun risultato trovato" : "Nessuna manutenzione registrata"}
+          </div>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Nome</TableHead>
+                <TableHead>Tipo</TableHead>
+                <TableHead>Stato</TableHead>
+                <TableHead>Location</TableHead>
+                <TableHead>Data Prevista</TableHead>
+                <TableHead className="text-right">Costo</TableHead>
+                {isAdmin && <TableHead className="text-right">Azioni</TableHead>}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredMaintenances.map((maintenance) => {
+                const statusInfo = statusConfig[maintenance.status] || statusConfig.pending;
+                return (
+                  <TableRow key={maintenance.id} data-testid={`row-desktop-maintenance-${maintenance.id}`}>
+                    <TableCell className="font-medium">{maintenance.name}</TableCell>
+                    <TableCell><Badge variant="outline">{typeLabels[maintenance.type] || maintenance.type}</Badge></TableCell>
+                    <TableCell><Badge variant={statusInfo.variant}>{statusInfo.label}</Badge></TableCell>
+                    <TableCell>{getLocationName(maintenance.locationId)}</TableCell>
+                    <TableCell>{maintenance.scheduledDate ? format(new Date(maintenance.scheduledDate), "dd/MM/yyyy", { locale: it }) : "-"}</TableCell>
+                    <TableCell className="text-right font-bold">{maintenance.amount ? `€${parseFloat(maintenance.amount).toFixed(2)}` : "-"}</TableCell>
+                    {isAdmin && (
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-1">
+                          <Button size="icon" variant="ghost" onClick={() => { setEditingMaintenance(maintenance); setIsDialogOpen(true); }} data-testid={`button-desktop-edit-maintenance-${maintenance.id}`}>
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button size="icon" variant="ghost" data-testid={`button-desktop-delete-maintenance-${maintenance.id}`}>
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Conferma eliminazione</AlertDialogTitle>
+                                <AlertDialogDescription>Questa azione non può essere annullata.</AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Annulla</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => deleteMutation.mutate(maintenance.id)}>Elimina</AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
+                      </TableCell>
+                    )}
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        )}
+      </CardContent>
+
+      <Dialog open={isDialogOpen} onOpenChange={(open) => { setIsDialogOpen(open); if (!open) setEditingMaintenance(null); }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{editingMaintenance ? "Modifica Manutenzione" : "Nuova Manutenzione"}</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="name">Nome *</Label>
+              <Input id="name" name="name" defaultValue={editingMaintenance?.name || ""} placeholder="es. Revisione impianto" required data-testid="input-desktop-maintenance-name" />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="description">Descrizione</Label>
+              <Textarea id="description" name="description" defaultValue={editingMaintenance?.description || ""} placeholder="Descrizione intervento" data-testid="input-desktop-maintenance-description" />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="type">Tipo *</Label>
+                <Select name="type" defaultValue={editingMaintenance?.type || "ordinaria"}>
+                  <SelectTrigger data-testid="select-desktop-maintenance-type"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ordinaria">Ordinaria</SelectItem>
+                    <SelectItem value="straordinaria">Straordinaria</SelectItem>
+                    <SelectItem value="urgente">Urgente</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="status">Stato *</Label>
+                <Select name="status" defaultValue={editingMaintenance?.status || "pending"}>
+                  <SelectTrigger data-testid="select-desktop-maintenance-status"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="pending">In attesa</SelectItem>
+                    <SelectItem value="scheduled">Programmata</SelectItem>
+                    <SelectItem value="completed">Completata</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="locationId">Location</Label>
+                <Select name="locationId" defaultValue={editingMaintenance?.locationId || "_none"}>
+                  <SelectTrigger data-testid="select-desktop-maintenance-location"><SelectValue placeholder="Generale" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="_none">Generale</SelectItem>
+                    {locations.map((loc) => (<SelectItem key={loc.id} value={loc.id}>{loc.name}</SelectItem>))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="amount">Costo (€)</Label>
+                <Input id="amount" name="amount" type="number" step="0.01" defaultValue={editingMaintenance?.amount || ""} placeholder="0.00" data-testid="input-desktop-maintenance-amount" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="scheduledDate">Data Prevista</Label>
+                <Input id="scheduledDate" name="scheduledDate" type="date" defaultValue={editingMaintenance?.scheduledDate ? format(new Date(editingMaintenance.scheduledDate), "yyyy-MM-dd") : ""} data-testid="input-desktop-maintenance-scheduled-date" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="completedDate">Completata il</Label>
+                <Input id="completedDate" name="completedDate" type="date" defaultValue={editingMaintenance?.completedDate ? format(new Date(editingMaintenance.completedDate), "yyyy-MM-dd") : ""} data-testid="input-desktop-maintenance-completed-date" />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="notes">Note</Label>
+              <Textarea id="notes" name="notes" defaultValue={editingMaintenance?.notes || ""} placeholder="Note aggiuntive" data-testid="input-desktop-maintenance-notes" />
+            </div>
+            <DialogFooter>
+              <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending} data-testid="button-desktop-save-maintenance">
+                {editingMaintenance ? "Aggiorna" : "Crea"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+    </Card>
+  );
+}
+
+function DesktopDocumentsSection({ isAdmin }: { isAdmin: boolean }) {
+  const { toast } = useToast();
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingDocument, setEditingDocument] = useState<AccountingDocument | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
+
+  const { data: documents = [], isLoading } = useQuery<AccountingDocument[]>({
+    queryKey: ["/api/accounting-documents"],
+  });
+
+  const createMutation = useMutation({
+    mutationFn: (data: any) => apiRequest("POST", "/api/accounting-documents", data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/accounting-documents"] });
+      setIsDialogOpen(false);
+      toast({ title: "Documento creato con successo" });
+    },
+    onError: (err: any) => {
+      toast({ title: "Errore", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: any }) => 
+      apiRequest("PATCH", `/api/accounting-documents/${id}`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/accounting-documents"] });
+      setEditingDocument(null);
+      setIsDialogOpen(false);
+      toast({ title: "Documento aggiornato" });
+    },
+    onError: (err: any) => {
+      toast({ title: "Errore", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => apiRequest("DELETE", `/api/accounting-documents/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/accounting-documents"] });
+      toast({ title: "Documento eliminato" });
+    },
+    onError: (err: any) => {
+      toast({ title: "Errore", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    const data = {
+      type: formData.get("type") as string,
+      status: formData.get("status") as string,
+      documentNumber: formData.get("documentNumber") as string || null,
+      amount: formData.get("amount") as string || null,
+      issueDate: formData.get("issueDate") as string || null,
+      dueDate: formData.get("dueDate") as string || null,
+      notes: formData.get("notes") as string || null,
+    };
+    if (editingDocument) {
+      updateMutation.mutate({ id: editingDocument.id, data });
+    } else {
+      createMutation.mutate(data);
+    }
+  };
+
+  const filteredDocuments = documents.filter(doc =>
+    doc.type.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (doc.documentNumber?.toLowerCase().includes(searchTerm.toLowerCase())) ||
+    (doc.notes?.toLowerCase().includes(searchTerm.toLowerCase()))
+  );
+
+  const typeLabels: Record<string, string> = {
+    fattura: "Fattura",
+    preventivo: "Preventivo",
+    contratto: "Contratto",
+    ricevuta: "Ricevuta",
+    altro: "Altro",
+  };
+
+  const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
+    pending: { label: "In attesa", variant: "secondary" },
+    paid: { label: "Pagato", variant: "default" },
+    overdue: { label: "Scaduto", variant: "destructive" },
+    cancelled: { label: "Annullato", variant: "outline" },
+  };
+
+  if (isLoading) {
+    return <Skeleton className="h-96" />;
+  }
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between gap-4">
+        <div>
+          <CardTitle>Documenti</CardTitle>
+          <CardDescription>Fatture, contratti e altri documenti</CardDescription>
+        </div>
+        <div className="flex items-center gap-2">
+          <Input placeholder="Cerca..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-64" data-testid="input-desktop-search-documents" />
+          {isAdmin && (
+            <Button onClick={() => setIsDialogOpen(true)} data-testid="button-desktop-add-document">
+              <Plus className="h-4 w-4 mr-2" />
+              Nuovo
+            </Button>
+          )}
+        </div>
+      </CardHeader>
+      <CardContent>
+        {filteredDocuments.length === 0 ? (
+          <div className="text-center py-12 text-muted-foreground">
+            {searchTerm ? "Nessun risultato trovato" : "Nessun documento registrato"}
+          </div>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Tipo</TableHead>
+                <TableHead>Numero</TableHead>
+                <TableHead>Stato</TableHead>
+                <TableHead>Data Emissione</TableHead>
+                <TableHead>Scadenza</TableHead>
+                <TableHead className="text-right">Importo</TableHead>
+                {isAdmin && <TableHead className="text-right">Azioni</TableHead>}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredDocuments.map((doc) => {
+                const statusInfo = statusConfig[doc.status] || statusConfig.pending;
+                return (
+                  <TableRow key={doc.id} data-testid={`row-desktop-document-${doc.id}`}>
+                    <TableCell className="font-medium"><Badge variant="outline">{typeLabels[doc.type] || doc.type}</Badge></TableCell>
+                    <TableCell>{doc.documentNumber || "-"}</TableCell>
+                    <TableCell><Badge variant={statusInfo.variant}>{statusInfo.label}</Badge></TableCell>
+                    <TableCell>{doc.issueDate ? format(new Date(doc.issueDate), "dd/MM/yyyy", { locale: it }) : "-"}</TableCell>
+                    <TableCell>{doc.dueDate ? format(new Date(doc.dueDate), "dd/MM/yyyy", { locale: it }) : "-"}</TableCell>
+                    <TableCell className="text-right font-bold">{doc.amount ? `€${parseFloat(doc.amount).toFixed(2)}` : "-"}</TableCell>
+                    {isAdmin && (
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-1">
+                          <Button size="icon" variant="ghost" onClick={() => { setEditingDocument(doc); setIsDialogOpen(true); }} data-testid={`button-desktop-edit-document-${doc.id}`}>
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button size="icon" variant="ghost" data-testid={`button-desktop-delete-document-${doc.id}`}>
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Conferma eliminazione</AlertDialogTitle>
+                                <AlertDialogDescription>Questa azione non può essere annullata.</AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Annulla</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => deleteMutation.mutate(doc.id)}>Elimina</AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
+                      </TableCell>
+                    )}
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        )}
+      </CardContent>
+
+      <Dialog open={isDialogOpen} onOpenChange={(open) => { setIsDialogOpen(open); if (!open) setEditingDocument(null); }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{editingDocument ? "Modifica Documento" : "Nuovo Documento"}</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="type">Tipo *</Label>
+                <Select name="type" defaultValue={editingDocument?.type || "fattura"}>
+                  <SelectTrigger data-testid="select-desktop-document-type"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="fattura">Fattura</SelectItem>
+                    <SelectItem value="preventivo">Preventivo</SelectItem>
+                    <SelectItem value="contratto">Contratto</SelectItem>
+                    <SelectItem value="ricevuta">Ricevuta</SelectItem>
+                    <SelectItem value="altro">Altro</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="status">Stato *</Label>
+                <Select name="status" defaultValue={editingDocument?.status || "pending"}>
+                  <SelectTrigger data-testid="select-desktop-document-status"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="pending">In attesa</SelectItem>
+                    <SelectItem value="paid">Pagato</SelectItem>
+                    <SelectItem value="overdue">Scaduto</SelectItem>
+                    <SelectItem value="cancelled">Annullato</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="documentNumber">N. Documento</Label>
+                <Input id="documentNumber" name="documentNumber" defaultValue={editingDocument?.documentNumber || ""} placeholder="es. FT-001" data-testid="input-desktop-document-number" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="amount">Importo (€)</Label>
+                <Input id="amount" name="amount" type="number" step="0.01" defaultValue={editingDocument?.amount || ""} placeholder="0.00" data-testid="input-desktop-document-amount" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="issueDate">Data Emissione</Label>
+                <Input id="issueDate" name="issueDate" type="date" defaultValue={editingDocument?.issueDate ? format(new Date(editingDocument.issueDate), "yyyy-MM-dd") : ""} data-testid="input-desktop-document-issue-date" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="dueDate">Data Scadenza</Label>
+                <Input id="dueDate" name="dueDate" type="date" defaultValue={editingDocument?.dueDate ? format(new Date(editingDocument.dueDate), "yyyy-MM-dd") : ""} data-testid="input-desktop-document-due-date" />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="notes">Note</Label>
+              <Textarea id="notes" name="notes" defaultValue={editingDocument?.notes || ""} placeholder="Note aggiuntive" data-testid="input-desktop-document-notes" />
+            </div>
+            <DialogFooter>
+              <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending} data-testid="button-desktop-save-document">
+                {editingDocument ? "Aggiorna" : "Crea"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+    </Card>
   );
 }

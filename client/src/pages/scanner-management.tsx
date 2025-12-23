@@ -3,6 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -12,6 +13,14 @@ import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import {
   Dialog,
   DialogContent,
@@ -86,6 +95,7 @@ interface SectorOption {
 export default function ScannerManagement() {
   const { toast } = useToast();
   const { user } = useAuth();
+  const isMobile = useIsMobile();
   const [searchQuery, setSearchQuery] = useState("");
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showAssignDialog, setShowAssignDialog] = useState(false);
@@ -339,6 +349,580 @@ export default function ScannerManagement() {
     );
   }
 
+  // Shared dialogs for both mobile and desktop
+  const renderDialogs = () => (
+    <>
+      <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ScanLine className="h-5 w-5 text-emerald-500" />
+              Nuovo Scanner
+            </DialogTitle>
+            <DialogDescription>
+              Crea un account scanner per il controllo accessi
+            </DialogDescription>
+          </DialogHeader>
+          
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmitCreate)} className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <FormField
+                  control={form.control}
+                  name="firstName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Nome</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Mario" {...field} data-testid="input-scanner-firstname" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="lastName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Cognome</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Rossi" {...field} data-testid="input-scanner-lastname" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <FormField
+                control={form.control}
+                name="username"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Nome Utente</FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="text" 
+                        placeholder="scanner1" 
+                        {...field} 
+                        data-testid="input-scanner-username" 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="password"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Password</FormLabel>
+                    <FormControl>
+                      <div className="relative">
+                        <Input 
+                          type={showPassword ? "text" : "password"}
+                          placeholder="Minimo 8 caratteri" 
+                          {...field} 
+                          data-testid="input-scanner-password" 
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="absolute right-0 top-0 h-full"
+                          onClick={() => setShowPassword(!showPassword)}
+                        >
+                          {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </Button>
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <DialogFooter>
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={() => setShowCreateDialog(false)}
+                >
+                  Annulla
+                </Button>
+                <Button 
+                  type="submit" 
+                  disabled={createScannerMutation.isPending}
+                  className="bg-gradient-to-r from-emerald-500 to-green-600"
+                  data-testid="btn-submit-create-scanner"
+                >
+                  {createScannerMutation.isPending ? (
+                    <RefreshCw className="h-4 w-4 animate-spin mr-2" />
+                  ) : (
+                    <Plus className="h-4 w-4 mr-2" />
+                  )}
+                  Crea Scanner
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showAssignDialog} onOpenChange={setShowAssignDialog}>
+        <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Calendar className="h-5 w-5 text-blue-500" />
+              Assegna a Evento
+            </DialogTitle>
+            <DialogDescription>
+              {selectedScanner && (
+                <span>
+                  Scanner: <strong>{selectedScanner.firstName} {selectedScanner.lastName}</strong>
+                </span>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div>
+              <Label>Seleziona Evento</Label>
+              <Select value={selectedEventId} onValueChange={setSelectedEventId}>
+                <SelectTrigger className="mt-1.5" data-testid="select-event">
+                  <SelectValue placeholder="Scegli un evento" />
+                </SelectTrigger>
+                <SelectContent>
+                  {events?.filter(e => e.status !== 'closed').map(event => (
+                    <SelectItem key={event.id} value={event.id}>
+                      {event.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-3">
+              <Label>Permessi Scansione</Label>
+              
+              <div className="flex items-center justify-between p-3 bg-background/30 rounded-lg">
+                <div className="flex items-center gap-2">
+                  <Users className="h-4 w-4 text-cyan-400" />
+                  <span className="text-sm">Liste Ospiti</span>
+                </div>
+                <Switch 
+                  checked={canScanLists} 
+                  onCheckedChange={setCanScanLists}
+                  data-testid="switch-scan-lists"
+                />
+              </div>
+
+              <div className="flex items-center justify-between p-3 bg-background/30 rounded-lg">
+                <div className="flex items-center gap-2">
+                  <Users className="h-4 w-4 text-purple-400" />
+                  <span className="text-sm">Tavoli</span>
+                </div>
+                <Switch 
+                  checked={canScanTables} 
+                  onCheckedChange={setCanScanTables}
+                  data-testid="switch-scan-tables"
+                />
+              </div>
+
+              <div className="flex items-center justify-between p-3 bg-background/30 rounded-lg">
+                <div className="flex items-center gap-2">
+                  <Ticket className="h-4 w-4 text-amber-400" />
+                  <span className="text-sm">Biglietti</span>
+                </div>
+                <Switch 
+                  checked={canScanTickets} 
+                  onCheckedChange={setCanScanTickets}
+                  data-testid="switch-scan-tickets"
+                />
+              </div>
+            </div>
+
+            {canScanLists && selectedEventId && eventLists && eventLists.length > 0 && (
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <List className="h-4 w-4 text-cyan-400" />
+                  Liste Consentite
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Seleziona quali liste questo scanner può validare. Lascia vuoto per consentire tutte.
+                </p>
+                <div className="space-y-2 max-h-32 overflow-y-auto">
+                  {eventLists.map(list => (
+                    <div 
+                      key={list.id}
+                      className="flex items-center gap-2 p-2 bg-background/30 rounded-lg"
+                    >
+                      <Checkbox
+                        id={`list-${list.id}`}
+                        checked={selectedListIds.includes(list.id)}
+                        onCheckedChange={() => toggleList(list.id)}
+                        data-testid={`checkbox-list-${list.id}`}
+                      />
+                      <label 
+                        htmlFor={`list-${list.id}`}
+                        className="text-sm cursor-pointer flex-1"
+                      >
+                        {list.name}
+                      </label>
+                    </div>
+                  ))}
+                </div>
+                {selectedListIds.length > 0 && (
+                  <p className="text-xs text-cyan-400">
+                    {selectedListIds.length} liste selezionate
+                  </p>
+                )}
+              </div>
+            )}
+
+            {canScanTables && selectedEventId && eventTableTypes && eventTableTypes.length > 0 && (
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <Table2 className="h-4 w-4 text-purple-400" />
+                  Tipi Tavolo Consentiti
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Seleziona quali tipi di tavolo questo scanner può validare. Lascia vuoto per consentire tutti.
+                </p>
+                <div className="space-y-2 max-h-32 overflow-y-auto">
+                  {eventTableTypes.map(tableType => (
+                    <div 
+                      key={tableType.id}
+                      className="flex items-center gap-2 p-2 bg-background/30 rounded-lg"
+                    >
+                      <Checkbox
+                        id={`tabletype-${tableType.id}`}
+                        checked={selectedTableTypeIds.includes(tableType.id)}
+                        onCheckedChange={() => toggleTableType(tableType.id)}
+                        data-testid={`checkbox-tabletype-${tableType.id}`}
+                      />
+                      <label 
+                        htmlFor={`tabletype-${tableType.id}`}
+                        className="text-sm cursor-pointer flex-1"
+                      >
+                        {tableType.name}
+                      </label>
+                    </div>
+                  ))}
+                </div>
+                {selectedTableTypeIds.length > 0 && (
+                  <p className="text-xs text-purple-400">
+                    {selectedTableTypeIds.length} tipi tavolo selezionati
+                  </p>
+                )}
+              </div>
+            )}
+
+            {canScanTickets && selectedEventId && eventSectors && eventSectors.length > 0 && (
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <Ticket className="h-4 w-4 text-amber-400" />
+                  Tipologie Biglietto Consentite
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Seleziona quali tipologie questo scanner può validare. Lascia vuoto per consentire tutte.
+                </p>
+                <div className="space-y-2 max-h-32 overflow-y-auto">
+                  {eventSectors.map(sector => (
+                    <div 
+                      key={sector.id}
+                      className="flex items-center gap-2 p-2 bg-background/30 rounded-lg"
+                    >
+                      <Checkbox
+                        id={`sector-${sector.id}`}
+                        checked={selectedSectorIds.includes(sector.id)}
+                        onCheckedChange={() => toggleSector(sector.id)}
+                        data-testid={`checkbox-sector-${sector.id}`}
+                      />
+                      <label 
+                        htmlFor={`sector-${sector.id}`}
+                        className="text-sm cursor-pointer flex-1"
+                      >
+                        {sector.name}
+                        <span className="text-muted-foreground ml-1">({sector.code})</span>
+                      </label>
+                    </div>
+                  ))}
+                </div>
+                {selectedSectorIds.length > 0 && (
+                  <p className="text-xs text-amber-400">
+                    {selectedSectorIds.length} tipologie selezionate
+                  </p>
+                )}
+              </div>
+            )}
+
+            {selectedEventId && (
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <Clock className="h-4 w-4 text-green-400" />
+                  Orario di Lavoro (opzionale)
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Imposta l'orario in cui lo scanner può operare. Lascia vuoto per nessun limite.
+                </p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Inizio</Label>
+                    <Input
+                      type="time"
+                      value={startTime}
+                      onChange={(e) => setStartTime(e.target.value)}
+                      className="mt-1"
+                      data-testid="input-start-time"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Fine</Label>
+                    <Input
+                      type="time"
+                      value={endTime}
+                      onChange={(e) => setEndTime(e.target.value)}
+                      className="mt-1"
+                      data-testid="input-end-time"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAssignDialog(false)}>
+              Annulla
+            </Button>
+            <Button
+              onClick={handleAssign}
+              disabled={!selectedEventId || assignScannerMutation.isPending}
+              className="bg-gradient-to-r from-blue-500 to-indigo-600"
+              data-testid="btn-submit-assign"
+            >
+              {assignScannerMutation.isPending ? (
+                <RefreshCw className="h-4 w-4 animate-spin mr-2" />
+              ) : (
+                <CheckCircle className="h-4 w-4 mr-2" />
+              )}
+              Assegna
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+
+  // Desktop version
+  if (!isMobile) {
+    return (
+      <div className="container mx-auto p-6 space-y-6" data-testid="page-scanner-management">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">Gestione Scanner</h1>
+            <p className="text-muted-foreground">Gestisci gli account scanner per il controllo accessi</p>
+          </div>
+          <Button 
+            onClick={() => setShowCreateDialog(true)}
+            className="bg-gradient-to-r from-emerald-500 to-green-600"
+            data-testid="btn-create-scanner"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Nuovo Scanner
+          </Button>
+        </div>
+
+        <div className="grid grid-cols-4 gap-4">
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-2xl font-bold">{scanners?.length || 0}</div>
+              <p className="text-sm text-muted-foreground">Totale Scanner</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-2xl font-bold text-emerald-500">
+                {scanners?.filter(s => s.isActive).length || 0}
+              </div>
+              <p className="text-sm text-muted-foreground">Attivi</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-2xl font-bold text-gray-500">
+                {scanners?.filter(s => !s.isActive).length || 0}
+              </div>
+              <p className="text-sm text-muted-foreground">Disattivati</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-2xl font-bold text-blue-500">
+                {scannerAssignments?.length || 0}
+              </div>
+              <p className="text-sm text-muted-foreground">Assegnazioni</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <CardTitle>Lista Scanner</CardTitle>
+                <CardDescription>Tutti gli account scanner registrati</CardDescription>
+              </div>
+              <div className="relative w-64">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Cerca scanner..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10"
+                  data-testid="input-search-scanner"
+                />
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {scannersLoading ? (
+              <div className="space-y-3">
+                {[1, 2, 3].map(i => (
+                  <div key={i} className="flex items-center gap-4">
+                    <Skeleton className="h-10 w-10 rounded-full" />
+                    <div className="flex-1 space-y-2">
+                      <Skeleton className="h-4 w-32" />
+                      <Skeleton className="h-3 w-48" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : filteredScanners.length === 0 ? (
+              <div className="py-12 text-center">
+                <QrCode className="h-16 w-16 mx-auto mb-4 text-muted-foreground opacity-50" />
+                <h3 className="text-lg font-semibold mb-2">Nessuno Scanner</h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  {searchQuery ? "Nessun risultato per la ricerca" : "Crea il primo account scanner"}
+                </p>
+                {!searchQuery && (
+                  <Button onClick={() => setShowCreateDialog(true)} data-testid="btn-create-first-scanner">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Crea Scanner
+                  </Button>
+                )}
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Scanner</TableHead>
+                    <TableHead>Username</TableHead>
+                    <TableHead>Stato</TableHead>
+                    <TableHead>Eventi Assegnati</TableHead>
+                    <TableHead className="text-right">Azioni</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredScanners.map((scanner) => {
+                    const assignments = getScannerAssignments(scanner.id);
+                    return (
+                      <TableRow key={scanner.id} data-testid={`row-scanner-${scanner.id}`}>
+                        <TableCell>
+                          <div className="flex items-center gap-3">
+                            <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                              scanner.isActive 
+                                ? 'bg-gradient-to-br from-emerald-500 to-green-600' 
+                                : 'bg-gray-500'
+                            }`}>
+                              <User className="h-5 w-5 text-white" />
+                            </div>
+                            <div>
+                              <p className="font-medium" data-testid={`text-scanner-name-${scanner.id}`}>
+                                {scanner.firstName} {scanner.lastName}
+                              </p>
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-muted-foreground">{scanner.email}</span>
+                        </TableCell>
+                        <TableCell>
+                          <Badge 
+                            variant={scanner.isActive ? "default" : "secondary"}
+                            className={scanner.isActive ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30" : ""}
+                          >
+                            {scanner.isActive ? "Attivo" : "Disattivato"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {assignments.length > 0 ? (
+                            <div className="flex flex-wrap gap-1">
+                              {assignments.slice(0, 2).map(assignment => (
+                                <Badge 
+                                  key={assignment.id} 
+                                  variant="outline" 
+                                  className="text-xs bg-blue-500/10 text-blue-400 border-blue-500/30"
+                                >
+                                  {getEventName(assignment.eventId)}
+                                </Badge>
+                              ))}
+                              {assignments.length > 2 && (
+                                <Badge variant="outline" className="text-xs">
+                                  +{assignments.length - 2}
+                                </Badge>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground text-sm">Nessun evento</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => openAssignDialog(scanner)}
+                              title="Assegna a evento"
+                              data-testid={`btn-assign-scanner-${scanner.id}`}
+                            >
+                              <Calendar className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => toggleScannerActiveMutation.mutate({
+                                userId: scanner.id,
+                                isActive: !scanner.isActive,
+                              })}
+                              title={scanner.isActive ? "Disattiva" : "Attiva"}
+                              data-testid={`btn-toggle-scanner-${scanner.id}`}
+                            >
+                              {scanner.isActive ? (
+                                <XCircle className="h-4 w-4 text-destructive" />
+                              ) : (
+                                <CheckCircle className="h-4 w-4 text-emerald-500" />
+                              )}
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+
+        {renderDialogs()}
+      </div>
+    );
+  }
+
   return (
     <MobileAppLayout
       header={<MobileHeader title="Gestione Scanner" showBackButton showMenuButton />}
@@ -543,372 +1127,7 @@ export default function ScannerManagement() {
         )}
       </div>
 
-      <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <ScanLine className="h-5 w-5 text-emerald-500" />
-              Nuovo Scanner
-            </DialogTitle>
-            <DialogDescription>
-              Crea un account scanner per il controllo accessi
-            </DialogDescription>
-          </DialogHeader>
-          
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmitCreate)} className="space-y-4">
-              <div className="grid grid-cols-2 gap-3">
-                <FormField
-                  control={form.control}
-                  name="firstName"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Nome</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Mario" {...field} data-testid="input-scanner-firstname" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="lastName"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Cognome</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Rossi" {...field} data-testid="input-scanner-lastname" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              <FormField
-                control={form.control}
-                name="username"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Nome Utente</FormLabel>
-                    <FormControl>
-                      <Input 
-                        type="text" 
-                        placeholder="scanner1" 
-                        {...field} 
-                        data-testid="input-scanner-username" 
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="password"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Password</FormLabel>
-                    <FormControl>
-                      <div className="relative">
-                        <Input 
-                          type={showPassword ? "text" : "password"}
-                          placeholder="Minimo 8 caratteri" 
-                          {...field} 
-                          data-testid="input-scanner-password" 
-                        />
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="absolute right-0 top-0 h-full"
-                          onClick={() => setShowPassword(!showPassword)}
-                        >
-                          {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                        </Button>
-                      </div>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <DialogFooter>
-                <Button 
-                  type="button" 
-                  variant="outline" 
-                  onClick={() => setShowCreateDialog(false)}
-                >
-                  Annulla
-                </Button>
-                <Button 
-                  type="submit" 
-                  disabled={createScannerMutation.isPending}
-                  className="bg-gradient-to-r from-emerald-500 to-green-600"
-                  data-testid="btn-submit-create-scanner"
-                >
-                  {createScannerMutation.isPending ? (
-                    <RefreshCw className="h-4 w-4 animate-spin mr-2" />
-                  ) : (
-                    <Plus className="h-4 w-4 mr-2" />
-                  )}
-                  Crea Scanner
-                </Button>
-              </DialogFooter>
-            </form>
-          </Form>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={showAssignDialog} onOpenChange={setShowAssignDialog}>
-        <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Calendar className="h-5 w-5 text-blue-500" />
-              Assegna a Evento
-            </DialogTitle>
-            <DialogDescription>
-              {selectedScanner && (
-                <span>
-                  Scanner: <strong>{selectedScanner.firstName} {selectedScanner.lastName}</strong>
-                </span>
-              )}
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4">
-            <div>
-              <Label>Seleziona Evento</Label>
-              <Select value={selectedEventId} onValueChange={setSelectedEventId}>
-                <SelectTrigger className="mt-1.5" data-testid="select-event">
-                  <SelectValue placeholder="Scegli un evento" />
-                </SelectTrigger>
-                <SelectContent>
-                  {events?.filter(e => e.status !== 'closed').map(event => (
-                    <SelectItem key={event.id} value={event.id}>
-                      {event.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-3">
-              <Label>Permessi Scansione</Label>
-              
-              <div className="flex items-center justify-between p-3 bg-background/30 rounded-lg">
-                <div className="flex items-center gap-2">
-                  <Users className="h-4 w-4 text-cyan-400" />
-                  <span className="text-sm">Liste Ospiti</span>
-                </div>
-                <Switch 
-                  checked={canScanLists} 
-                  onCheckedChange={setCanScanLists}
-                  data-testid="switch-scan-lists"
-                />
-              </div>
-
-              <div className="flex items-center justify-between p-3 bg-background/30 rounded-lg">
-                <div className="flex items-center gap-2">
-                  <Users className="h-4 w-4 text-purple-400" />
-                  <span className="text-sm">Tavoli</span>
-                </div>
-                <Switch 
-                  checked={canScanTables} 
-                  onCheckedChange={setCanScanTables}
-                  data-testid="switch-scan-tables"
-                />
-              </div>
-
-              <div className="flex items-center justify-between p-3 bg-background/30 rounded-lg">
-                <div className="flex items-center gap-2">
-                  <Ticket className="h-4 w-4 text-amber-400" />
-                  <span className="text-sm">Biglietti</span>
-                </div>
-                <Switch 
-                  checked={canScanTickets} 
-                  onCheckedChange={setCanScanTickets}
-                  data-testid="switch-scan-tickets"
-                />
-              </div>
-            </div>
-
-            {/* Selezione Liste */}
-            {canScanLists && selectedEventId && eventLists && eventLists.length > 0 && (
-              <div className="space-y-2">
-                <Label className="flex items-center gap-2">
-                  <List className="h-4 w-4 text-cyan-400" />
-                  Liste Consentite
-                </Label>
-                <p className="text-xs text-muted-foreground">
-                  Seleziona quali liste questo scanner può validare. Lascia vuoto per consentire tutte.
-                </p>
-                <div className="space-y-2 max-h-32 overflow-y-auto">
-                  {eventLists.map(list => (
-                    <div 
-                      key={list.id}
-                      className="flex items-center gap-2 p-2 bg-background/30 rounded-lg"
-                    >
-                      <Checkbox
-                        id={`list-${list.id}`}
-                        checked={selectedListIds.includes(list.id)}
-                        onCheckedChange={() => toggleList(list.id)}
-                        data-testid={`checkbox-list-${list.id}`}
-                      />
-                      <label 
-                        htmlFor={`list-${list.id}`}
-                        className="text-sm cursor-pointer flex-1"
-                      >
-                        {list.name}
-                      </label>
-                    </div>
-                  ))}
-                </div>
-                {selectedListIds.length > 0 && (
-                  <p className="text-xs text-cyan-400">
-                    {selectedListIds.length} liste selezionate
-                  </p>
-                )}
-              </div>
-            )}
-
-            {/* Selezione Tipi Tavolo */}
-            {canScanTables && selectedEventId && eventTableTypes && eventTableTypes.length > 0 && (
-              <div className="space-y-2">
-                <Label className="flex items-center gap-2">
-                  <Table2 className="h-4 w-4 text-purple-400" />
-                  Tipi Tavolo Consentiti
-                </Label>
-                <p className="text-xs text-muted-foreground">
-                  Seleziona quali tipi di tavolo questo scanner può validare. Lascia vuoto per consentire tutti.
-                </p>
-                <div className="space-y-2 max-h-32 overflow-y-auto">
-                  {eventTableTypes.map(tableType => (
-                    <div 
-                      key={tableType.id}
-                      className="flex items-center gap-2 p-2 bg-background/30 rounded-lg"
-                    >
-                      <Checkbox
-                        id={`tabletype-${tableType.id}`}
-                        checked={selectedTableTypeIds.includes(tableType.id)}
-                        onCheckedChange={() => toggleTableType(tableType.id)}
-                        data-testid={`checkbox-tabletype-${tableType.id}`}
-                      />
-                      <label 
-                        htmlFor={`tabletype-${tableType.id}`}
-                        className="text-sm cursor-pointer flex-1"
-                      >
-                        {tableType.name}
-                      </label>
-                    </div>
-                  ))}
-                </div>
-                {selectedTableTypeIds.length > 0 && (
-                  <p className="text-xs text-purple-400">
-                    {selectedTableTypeIds.length} tipi tavolo selezionati
-                  </p>
-                )}
-              </div>
-            )}
-
-            {/* Selezione Settori Biglietti */}
-            {canScanTickets && selectedEventId && eventSectors && eventSectors.length > 0 && (
-              <div className="space-y-2">
-                <Label className="flex items-center gap-2">
-                  <Ticket className="h-4 w-4 text-amber-400" />
-                  Tipologie Biglietto Consentite
-                </Label>
-                <p className="text-xs text-muted-foreground">
-                  Seleziona quali tipologie questo scanner può validare. Lascia vuoto per consentire tutte.
-                </p>
-                <div className="space-y-2 max-h-32 overflow-y-auto">
-                  {eventSectors.map(sector => (
-                    <div 
-                      key={sector.id}
-                      className="flex items-center gap-2 p-2 bg-background/30 rounded-lg"
-                    >
-                      <Checkbox
-                        id={`sector-${sector.id}`}
-                        checked={selectedSectorIds.includes(sector.id)}
-                        onCheckedChange={() => toggleSector(sector.id)}
-                        data-testid={`checkbox-sector-${sector.id}`}
-                      />
-                      <label 
-                        htmlFor={`sector-${sector.id}`}
-                        className="text-sm cursor-pointer flex-1"
-                      >
-                        {sector.name}
-                        <span className="text-muted-foreground ml-1">({sector.code})</span>
-                      </label>
-                    </div>
-                  ))}
-                </div>
-                {selectedSectorIds.length > 0 && (
-                  <p className="text-xs text-amber-400">
-                    {selectedSectorIds.length} tipologie selezionate
-                  </p>
-                )}
-              </div>
-            )}
-
-            {/* Orario di Lavoro */}
-            {selectedEventId && (
-              <div className="space-y-2">
-                <Label className="flex items-center gap-2">
-                  <Clock className="h-4 w-4 text-green-400" />
-                  Orario di Lavoro (opzionale)
-                </Label>
-                <p className="text-xs text-muted-foreground">
-                  Imposta l'orario in cui lo scanner può operare. Lascia vuoto per nessun limite.
-                </p>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <Label className="text-xs text-muted-foreground">Inizio</Label>
-                    <Input
-                      type="time"
-                      value={startTime}
-                      onChange={(e) => setStartTime(e.target.value)}
-                      className="mt-1"
-                      data-testid="input-start-time"
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-xs text-muted-foreground">Fine</Label>
-                    <Input
-                      type="time"
-                      value={endTime}
-                      onChange={(e) => setEndTime(e.target.value)}
-                      className="mt-1"
-                      data-testid="input-end-time"
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAssignDialog(false)}>
-              Annulla
-            </Button>
-            <Button
-              onClick={handleAssign}
-              disabled={!selectedEventId || assignScannerMutation.isPending}
-              className="bg-gradient-to-r from-blue-500 to-indigo-600"
-              data-testid="btn-submit-assign"
-            >
-              {assignScannerMutation.isPending ? (
-                <RefreshCw className="h-4 w-4 animate-spin mr-2" />
-              ) : (
-                <CheckCircle className="h-4 w-4 mr-2" />
-              )}
-              Assegna
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        {renderDialogs()}
       </div>
     </MobileAppLayout>
   );

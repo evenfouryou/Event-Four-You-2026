@@ -4,6 +4,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
@@ -622,6 +623,7 @@ export default function EventHub() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const { user } = useAuth();
+  const isMobile = useIsMobile();
   const [activeTab, setActiveTab] = useState("overview");
   const [isLive, setIsLive] = useState(false);
   const [wsConnection, setWsConnection] = useState<WebSocket | null>(null);
@@ -1461,6 +1463,1150 @@ export default function EventHub() {
       </div>
     </div>
   );
+
+  // Desktop version
+  if (!isMobile) {
+    return (
+      <div className="container mx-auto p-6 space-y-6" data-testid="page-event-hub">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" size="icon" onClick={() => navigate('/events')} data-testid="button-back">
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <div>
+              <div className="flex items-center gap-3">
+                <h1 className="text-3xl font-bold">{event.name}</h1>
+                <Badge className={`${status.bgColor} ${status.color}`}>
+                  <status.icon className="h-3 w-3 mr-1" />
+                  {status.label}
+                </Badge>
+                <LiveIndicator isLive={isLive} />
+              </div>
+              <div className="flex items-center gap-4 text-sm text-muted-foreground mt-1">
+                <span className="flex items-center gap-1.5">
+                  <Calendar className="h-4 w-4" />
+                  {format(new Date(event.startDatetime), "d MMM yyyy", { locale: it })}
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <Clock className="h-4 w-4" />
+                  {format(new Date(event.startDatetime), "HH:mm")}
+                </span>
+                {location && (
+                  <span className="flex items-center gap-1.5">
+                    <MapPin className="h-4 w-4" />
+                    {location.name}
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {currentTransition && (
+              <Button 
+                onClick={() => setStatusChangeDialogOpen(true)}
+                className={`bg-gradient-to-r ${status.gradient} text-white`}
+                data-testid="button-status-change"
+              >
+                <currentTransition.icon className="h-4 w-4 mr-2" />
+                {currentTransition.label}
+              </Button>
+            )}
+            <Button variant="outline" onClick={() => navigate(`/events/${id}`)} data-testid="button-edit-event">
+              <Edit className="h-4 w-4 mr-2" />
+              Modifica
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="icon" data-testid="button-more-options">
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => navigate('/scanner')}>
+                  <QrCode className="h-4 w-4 mr-2" />
+                  Apri Scanner
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => navigate(`/reports?eventId=${id}`)}>
+                  <BarChart3 className="h-4 w-4 mr-2" />
+                  Report
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => navigate(`/night-file?eventId=${id}`)}>
+                  <FileText className="h-4 w-4 mr-2" />
+                  File della Serata
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => {
+                  queryClient.invalidateQueries({ queryKey: ['/api/events', id] });
+                  toast({ title: "Dati aggiornati" });
+                }}>
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Aggiorna Dati
+                </DropdownMenuItem>
+                {(user?.role === 'super_admin' || user?.role === 'gestore') && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => setDeleteDialogOpen(true)} className="text-destructive">
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Elimina Evento
+                    </DropdownMenuItem>
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
+
+        {/* Alerts */}
+        <AnimatePresence>
+          {alerts.filter(a => !a.dismissed).map(alert => (
+            <AlertBanner key={alert.id} alert={alert} onDismiss={() => dismissAlert(alert.id)} />
+          ))}
+        </AnimatePresence>
+
+        {/* KPI Cards */}
+        <div className="grid grid-cols-4 gap-4">
+          <Card className="cursor-pointer hover-elevate" onClick={() => setActiveTab('ticketing')} data-testid="kpi-card-tickets">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Biglietti</p>
+                  <p className="text-2xl font-bold">{ticketedEvent?.ticketsSold || 0}</p>
+                  <p className="text-xs text-muted-foreground">{ticketedEvent ? `/ ${ticketedEvent.totalCapacity}` : 'Non attivo'}</p>
+                </div>
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
+                  <Ticket className="h-6 w-6 text-white" />
+                </div>
+              </div>
+              {ticketedEvent && (
+                <Progress value={(ticketedEvent.ticketsSold / ticketedEvent.totalCapacity) * 100} className="h-1.5 mt-4" />
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="cursor-pointer hover-elevate" onClick={() => setActiveTab('guests')} data-testid="kpi-card-guests">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Ospiti Liste</p>
+                  <p className="text-2xl font-bold">{checkedInGuests}/{totalGuests}</p>
+                  <p className="text-xs text-muted-foreground">{maxGuests > 0 ? `Max ${maxGuests}` : 'Nessuna lista'}</p>
+                </div>
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-cyan-500 to-teal-600 flex items-center justify-center">
+                  <Users className="h-6 w-6 text-white" />
+                </div>
+              </div>
+              {maxGuests > 0 && (
+                <Progress value={(checkedInGuests / maxGuests) * 100} className="h-1.5 mt-4" />
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="cursor-pointer hover-elevate" onClick={() => setActiveTab('tables')} data-testid="kpi-card-tables">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Tavoli</p>
+                  <p className="text-2xl font-bold">{bookedTables}/{tables.length}</p>
+                  <p className="text-xs text-muted-foreground">{tables.length > 0 ? 'Prenotati' : 'Nessun tavolo'}</p>
+                </div>
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center">
+                  <Armchair className="h-6 w-6 text-white" />
+                </div>
+              </div>
+              {tables.length > 0 && (
+                <Progress value={(bookedTables / tables.length) * 100} className="h-1.5 mt-4" />
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="cursor-pointer hover-elevate" onClick={() => setActiveTab('finance')} data-testid="kpi-card-revenue">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Incasso</p>
+                  <p className="text-2xl font-bold">€{totalRevenue.toFixed(0)}</p>
+                  <p className="text-xs text-muted-foreground">Totale evento</p>
+                </div>
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center">
+                  <Euro className="h-6 w-6 text-white" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Tabs */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+          <TabsList>
+            <TabsTrigger value="overview" data-testid="tab-overview">
+              <LayoutDashboard className="h-4 w-4 mr-2" />
+              Panoramica
+            </TabsTrigger>
+            <TabsTrigger value="ticketing" data-testid="tab-ticketing">
+              <Ticket className="h-4 w-4 mr-2" />
+              Biglietti
+            </TabsTrigger>
+            <TabsTrigger value="cashiers" data-testid="tab-cashiers">
+              <Banknote className="h-4 w-4 mr-2" />
+              Cassieri
+            </TabsTrigger>
+            <TabsTrigger value="guests" data-testid="tab-guests">
+              <Users className="h-4 w-4 mr-2" />
+              Ospiti
+            </TabsTrigger>
+            <TabsTrigger value="tables" data-testid="tab-tables">
+              <Armchair className="h-4 w-4 mr-2" />
+              Tavoli
+            </TabsTrigger>
+            <TabsTrigger value="staff" data-testid="tab-staff">
+              <Shield className="h-4 w-4 mr-2" />
+              Staff
+            </TabsTrigger>
+            <TabsTrigger value="pr" data-testid="tab-pr">
+              <Megaphone className="h-4 w-4 mr-2" />
+              PR
+            </TabsTrigger>
+            <TabsTrigger value="access" data-testid="tab-access">
+              <QrCode className="h-4 w-4 mr-2" />
+              Accessi
+            </TabsTrigger>
+            <TabsTrigger value="inventory" data-testid="tab-inventory">
+              <Package className="h-4 w-4 mr-2" />
+              Stock
+            </TabsTrigger>
+            <TabsTrigger value="finance" data-testid="tab-finance">
+              <Euro className="h-4 w-4 mr-2" />
+              Finanza
+            </TabsTrigger>
+            <TabsTrigger value="report" data-testid="tab-report">
+              <BarChart3 className="h-4 w-4 mr-2" />
+              Report
+            </TabsTrigger>
+          </TabsList>
+
+          {/* Overview Tab */}
+          <TabsContent value="overview" className="space-y-6">
+            <div className="grid grid-cols-2 gap-6">
+              {/* Status Card */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Activity className="h-5 w-5 text-primary" />
+                    Stato Evento
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center gap-2">
+                    {Object.entries(statusConfig).map(([key, config], index) => {
+                      const isActive = event.status === key;
+                      const isPassed = Object.keys(statusConfig).indexOf(event.status) > index;
+                      const IconComponent = config.icon;
+                      return (
+                        <div key={key} className="flex items-center flex-1">
+                          <div className="flex flex-col items-center gap-1.5 flex-1">
+                            <div className={`flex items-center justify-center w-12 h-12 rounded-full border-2 transition-all ${
+                              isActive ? 'border-primary bg-primary text-primary-foreground' 
+                                : isPassed ? 'border-primary bg-primary/20 text-primary' 
+                                : 'border-muted bg-muted/20 text-muted-foreground'
+                            }`}>
+                              <IconComponent className="h-5 w-5" />
+                            </div>
+                            <span className={`text-xs text-center ${isActive ? 'font-semibold text-primary' : 'text-muted-foreground'}`}>
+                              {config.label}
+                            </span>
+                          </div>
+                          {index < 3 && (
+                            <div className={`h-0.5 w-full mx-2 rounded-full ${isPassed ? 'bg-primary' : 'bg-muted'}`} />
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Quick Actions Card */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Zap className="h-5 w-5 text-amber-400" />
+                    Azioni Rapide
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-3 gap-3">
+                    <Button variant="outline" onClick={() => navigate('/scanner')} className="flex flex-col h-auto py-4 gap-2" data-testid="quick-scan">
+                      <QrCode className="h-5 w-5" />
+                      <span className="text-xs">Scansiona</span>
+                    </Button>
+                    <Button variant="outline" onClick={() => navigate(`/pr/guest-lists?eventId=${id}`)} className="flex flex-col h-auto py-4 gap-2" data-testid="quick-guest">
+                      <UserPlus className="h-5 w-5" />
+                      <span className="text-xs">Ospite</span>
+                    </Button>
+                    <Button variant="outline" onClick={() => navigate(`/pr/tables?eventId=${id}`)} className="flex flex-col h-auto py-4 gap-2" data-testid="quick-table">
+                      <Armchair className="h-5 w-5" />
+                      <span className="text-xs">Tavolo</span>
+                    </Button>
+                    <Button variant="outline" onClick={() => navigate(`/events/${id}`)} className="flex flex-col h-auto py-4 gap-2" data-testid="quick-stock">
+                      <Package className="h-5 w-5" />
+                      <span className="text-xs">Stock</span>
+                    </Button>
+                    <Button variant="outline" onClick={() => navigate(`/reports?eventId=${id}`)} className="flex flex-col h-auto py-4 gap-2" data-testid="quick-report">
+                      <BarChart3 className="h-5 w-5" />
+                      <span className="text-xs">Report</span>
+                    </Button>
+                    <Button variant="outline" onClick={() => navigate(`/night-file?eventId=${id}`)} className="flex flex-col h-auto py-4 gap-2" data-testid="quick-night-file">
+                      <FileText className="h-5 w-5" />
+                      <span className="text-xs">File Serata</span>
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Charts Row */}
+            <div className="grid grid-cols-2 gap-6">
+              <EntranceChart data={e4uStats?.entranceFlowData || []} />
+              <TopConsumptionsWidget eventId={id || ''} />
+            </div>
+
+            {/* Venue Map */}
+            <VenueMap 
+              tables={tables} 
+              bookings={bookings}
+              onTableClick={(table) => navigate(`/pr/tables?tableId=${table.id}`)}
+            />
+
+            {/* Activity Log */}
+            {activityLog.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Activity className="h-5 w-5 text-primary" />
+                    Attività Recente
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-1">
+                    {activityLog.slice(0, 10).map(item => (
+                      <ActivityLogEntry key={item.id} item={item} />
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+
+          {/* Ticketing Tab */}
+          <TabsContent value="ticketing" className="space-y-6">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between gap-4">
+                <div>
+                  <CardTitle>Biglietti Emessi</CardTitle>
+                  <CardDescription>Gestione biglietteria SIAE</CardDescription>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Select value={ticketSectorFilter} onValueChange={setTicketSectorFilter}>
+                    <SelectTrigger className="w-40" data-testid="select-sector-filter">
+                      <SelectValue placeholder="Tutti i settori" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Tutti i settori</SelectItem>
+                      {ticketedEvent?.sectors?.map(sector => (
+                        <SelectItem key={sector.id} value={sector.id}>{sector.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select value={ticketStatusFilter} onValueChange={setTicketStatusFilter}>
+                    <SelectTrigger className="w-32" data-testid="select-status-filter">
+                      <SelectValue placeholder="Stato" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Tutti</SelectItem>
+                      <SelectItem value="valid">Validi</SelectItem>
+                      <SelectItem value="used">Usati</SelectItem>
+                      <SelectItem value="cancelled">Annullati</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Button onClick={() => navigate(`/siae/box-office?eventId=${id}`)} data-testid="button-box-office">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Nuovo Biglietto
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {siaeTickets.length === 0 ? (
+                  <div className="text-center py-12 text-muted-foreground">
+                    <Ticket className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                    <p>Nessun biglietto emesso</p>
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Numero</TableHead>
+                        <TableHead>Settore</TableHead>
+                        <TableHead>Tipo</TableHead>
+                        <TableHead>Prezzo</TableHead>
+                        <TableHead>Stato</TableHead>
+                        <TableHead>Data</TableHead>
+                        <TableHead className="w-12"></TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {displayedTickets.map(ticket => (
+                        <TableRow key={ticket.id} data-testid={`row-ticket-${ticket.id}`}>
+                          <TableCell className="font-mono">{ticket.progressiveNumber}</TableCell>
+                          <TableCell>{getSectorName(ticket.sectorId)}</TableCell>
+                          <TableCell>
+                            <Badge variant="secondary">{ticket.ticketTypeCode === '01' ? 'Intero' : 'Ridotto'}</Badge>
+                          </TableCell>
+                          <TableCell>€{Number(ticket.grossAmount).toFixed(2)}</TableCell>
+                          <TableCell>{getTicketStatusBadge(ticket.status)}</TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {ticket.emissionDate ? format(new Date(ticket.emissionDate), 'dd/MM HH:mm') : '-'}
+                          </TableCell>
+                          <TableCell>
+                            {ticket.status === 'valid' && (
+                              <Button variant="ghost" size="icon" onClick={() => handleCancelTicket(ticket)} data-testid={`button-cancel-ticket-${ticket.id}`}>
+                                <X className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+                {filteredTickets.length > ticketsDisplayLimit && (
+                  <div className="text-center mt-4">
+                    <Button variant="outline" onClick={() => setTicketsDisplayLimit(prev => prev + 20)}>
+                      Carica altri
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Cashiers Tab */}
+          <TabsContent value="cashiers">
+            <EventCashierAllocations eventId={id || ''} />
+          </TabsContent>
+
+          {/* Guests Tab */}
+          <TabsContent value="guests" className="space-y-6">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between gap-4">
+                <div>
+                  <CardTitle>Liste Ospiti</CardTitle>
+                  <CardDescription>{totalGuests} ospiti totali, {checkedInGuests} entrati</CardDescription>
+                </div>
+                <Button onClick={() => setShowCreateListDialog(true)} data-testid="button-create-list">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Nuova Lista
+                </Button>
+              </CardHeader>
+              <CardContent>
+                {guestLists.length === 0 ? (
+                  <div className="text-center py-12 text-muted-foreground">
+                    <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                    <p>Nessuna lista ospiti</p>
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Nome Lista</TableHead>
+                        <TableHead>Ospiti</TableHead>
+                        <TableHead>Capacità Max</TableHead>
+                        <TableHead>Prezzo</TableHead>
+                        <TableHead>Check-in</TableHead>
+                        <TableHead className="w-12"></TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {guestLists.map(list => {
+                        const guests = e4uStats?.guestsByList?.[list.id] || { total: 0, checkedIn: 0 };
+                        return (
+                          <TableRow key={list.id} data-testid={`row-list-${list.id}`}>
+                            <TableCell className="font-medium">{list.name}</TableCell>
+                            <TableCell>{guests.total}</TableCell>
+                            <TableCell>{list.maxGuests || '∞'}</TableCell>
+                            <TableCell>-</TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                <Progress value={guests.total > 0 ? (guests.checkedIn / guests.total) * 100 : 0} className="h-2 w-20" />
+                                <span className="text-sm text-muted-foreground">{guests.checkedIn}/{guests.total}</span>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <Button variant="ghost" size="icon" onClick={() => navigate(`/pr/guest-lists?listId=${list.id}`)}>
+                                <ChevronRight className="h-4 w-4" />
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Tables Tab */}
+          <TabsContent value="tables" className="space-y-6">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between gap-4">
+                <div>
+                  <CardTitle>Prenotazioni Tavoli</CardTitle>
+                  <CardDescription>{bookedTables} su {tables.length} tavoli prenotati</CardDescription>
+                </div>
+                <Button onClick={() => setShowCreateTableTypeDialog(true)} data-testid="button-create-table-type">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Nuovo Tipo Tavolo
+                </Button>
+              </CardHeader>
+              <CardContent>
+                <VenueMap 
+                  tables={tables} 
+                  bookings={bookings}
+                  onTableClick={(table) => navigate(`/pr/tables?tableId=${table.id}`)}
+                />
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Staff Tab */}
+          <TabsContent value="staff" className="space-y-6">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between gap-4">
+                <div>
+                  <CardTitle>Staff Evento</CardTitle>
+                  <CardDescription>Gestione personale assegnato</CardDescription>
+                </div>
+                <Button onClick={() => setShowAssignStaffDialog(true)} data-testid="button-assign-staff">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Assegna Staff
+                </Button>
+              </CardHeader>
+              <CardContent>
+                {e4uStaff.length === 0 ? (
+                  <div className="text-center py-12 text-muted-foreground">
+                    <Shield className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                    <p>Nessuno staff assegnato</p>
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Nome</TableHead>
+                        <TableHead>Ruolo</TableHead>
+                        <TableHead>Permessi</TableHead>
+                        <TableHead className="w-12"></TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {e4uStaff.map((staff: any) => {
+                        const staffUser = users.find(u => u.id === staff.userId);
+                        return (
+                          <TableRow key={staff.id} data-testid={`row-staff-${staff.id}`}>
+                            <TableCell className="font-medium">
+                              {staffUser ? `${staffUser.firstName} ${staffUser.lastName}` : 'Staff sconosciuto'}
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="secondary">{staffUser?.role || 'staff'}</Badge>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex gap-1">
+                                {staff.canManageLists && <Badge className="bg-cyan-500/20 text-cyan-400">Liste</Badge>}
+                                {staff.canManageTables && <Badge className="bg-purple-500/20 text-purple-400">Tavoli</Badge>}
+                                {staff.canCreatePr && <Badge className="bg-orange-500/20 text-orange-400">PR</Badge>}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <Button variant="ghost" size="icon" onClick={() => removeStaffMutation.mutate(staff.id)}>
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* PR Tab */}
+          <TabsContent value="pr" className="space-y-6">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between gap-4">
+                <div>
+                  <CardTitle>PR Evento</CardTitle>
+                  <CardDescription>Gestione promoter</CardDescription>
+                </div>
+                <Button onClick={() => setShowAssignPrDialog(true)} data-testid="button-assign-pr">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Assegna PR
+                </Button>
+              </CardHeader>
+              <CardContent>
+                {e4uPr.length === 0 ? (
+                  <div className="text-center py-12 text-muted-foreground">
+                    <Megaphone className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                    <p>Nessun PR assegnato</p>
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Nome</TableHead>
+                        <TableHead>Supervisore</TableHead>
+                        <TableHead>Permessi</TableHead>
+                        <TableHead className="w-12"></TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {e4uPr.map((pr: any) => {
+                        const prUser = users.find(u => u.id === pr.userId);
+                        const supervisorStaff = e4uStaff.find((s: any) => s.userId === pr.staffUserId);
+                        const supervisorUser = supervisorStaff ? users.find(u => u.id === supervisorStaff.userId) : null;
+                        return (
+                          <TableRow key={pr.id} data-testid={`row-pr-${pr.id}`}>
+                            <TableCell className="font-medium">
+                              {prUser ? `${prUser.firstName} ${prUser.lastName}` : 'PR sconosciuto'}
+                            </TableCell>
+                            <TableCell className="text-muted-foreground">
+                              {supervisorUser ? `${supervisorUser.firstName} ${supervisorUser.lastName}` : '-'}
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex gap-1">
+                                {pr.canAddToLists && <Badge className="bg-cyan-500/20 text-cyan-400">Liste</Badge>}
+                                {pr.canProposeTables && <Badge className="bg-purple-500/20 text-purple-400">Tavoli</Badge>}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <Button variant="ghost" size="icon" onClick={() => removePrMutation.mutate(pr.id)}>
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Access Tab */}
+          <TabsContent value="access" className="space-y-6">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between gap-4">
+                <div>
+                  <CardTitle>Scanner Accessi</CardTitle>
+                  <CardDescription>Gestione addetti scansione</CardDescription>
+                </div>
+                <Button onClick={() => setShowAssignScannerDialog(true)} data-testid="button-assign-scanner">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Assegna Scanner
+                </Button>
+              </CardHeader>
+              <CardContent>
+                {e4uScanners.length === 0 ? (
+                  <div className="text-center py-12 text-muted-foreground">
+                    <QrCode className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                    <p>Nessun scanner assegnato</p>
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Nome</TableHead>
+                        <TableHead>Permessi</TableHead>
+                        <TableHead>Settori</TableHead>
+                        <TableHead className="w-24"></TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {e4uScanners.map((scanner: any) => {
+                        const scannerUser = users.find(u => u.id === scanner.userId);
+                        const sectorDisplay = getScannerSectorDisplay(scanner);
+                        return (
+                          <TableRow key={scanner.id} data-testid={`row-scanner-${scanner.id}`}>
+                            <TableCell className="font-medium">
+                              {scannerUser ? `${scannerUser.firstName} ${scannerUser.lastName}` : 'Scanner sconosciuto'}
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex gap-1">
+                                {scanner.canScanLists && <Badge className="bg-cyan-500/20 text-cyan-400">Liste</Badge>}
+                                {scanner.canScanTables && <Badge className="bg-purple-500/20 text-purple-400">Tavoli</Badge>}
+                                {scanner.canScanTickets && <Badge className="bg-blue-500/20 text-blue-400">Biglietti</Badge>}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <Badge className={sectorDisplay.color}>{sectorDisplay.label}</Badge>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex gap-1">
+                                <Button variant="ghost" size="icon" onClick={() => openScannerAccessDialog(scanner)}>
+                                  <Settings className="h-4 w-4" />
+                                </Button>
+                                <Button variant="ghost" size="icon" onClick={() => removeScannerMutation.mutate(scanner.id)}>
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Inventory Tab */}
+          <TabsContent value="inventory" className="space-y-6">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between gap-4">
+                <div>
+                  <CardTitle>Stock Evento</CardTitle>
+                  <CardDescription>Prodotti e giacenze per l'evento</CardDescription>
+                </div>
+                <Button onClick={() => navigate(`/events/${id}`)} data-testid="button-manage-stock">
+                  <Package className="h-4 w-4 mr-2" />
+                  Gestisci Stock
+                </Button>
+              </CardHeader>
+              <CardContent>
+                {eventStocks.length === 0 ? (
+                  <div className="text-center py-12 text-muted-foreground">
+                    <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                    <p>Nessun prodotto assegnato all'evento</p>
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Prodotto</TableHead>
+                        <TableHead>Quantità</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {eventStocks.slice(0, 10).map(stock => (
+                        <TableRow key={stock.id} data-testid={`row-stock-${stock.id}`}>
+                          <TableCell>Prodotto #{stock.productId}</TableCell>
+                          <TableCell>{stock.quantity}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Finance Tab */}
+          <TabsContent value="finance" className="space-y-6">
+            <div className="grid grid-cols-3 gap-4">
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="text-sm text-muted-foreground">Biglietti</div>
+                  <div className="text-2xl font-bold">€{(e4uReport?.overview?.ticketRevenue || 0).toFixed(2)}</div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="text-sm text-muted-foreground">Tavoli</div>
+                  <div className="text-2xl font-bold">€{(e4uReport?.overview?.tableRevenue || 0).toFixed(2)}</div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="text-sm text-muted-foreground">Totale</div>
+                  <div className="text-2xl font-bold text-primary">€{totalRevenue.toFixed(2)}</div>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
+          {/* Report Tab */}
+          <TabsContent value="report" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Report SIAE</CardTitle>
+                <CardDescription>Genera e scarica report ufficiali</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 gap-4">
+                  <Button variant="outline" onClick={() => handleReportC1('giornaliero')} disabled={!ticketedEvent} data-testid="button-report-c1">
+                    <FileText className="h-4 w-4 mr-2" />
+                    Registro C1 Giornaliero
+                  </Button>
+                  <Button variant="outline" onClick={() => handleReportC1('mensile')} disabled={!ticketedEvent} data-testid="button-report-c1-monthly">
+                    <FileText className="h-4 w-4 mr-2" />
+                    Registro C1 Mensile
+                  </Button>
+                  <Button variant="outline" onClick={handleReportC2} disabled={!ticketedEvent} data-testid="button-report-c2">
+                    <FileText className="h-4 w-4 mr-2" />
+                    Registro C2
+                  </Button>
+                  <Button variant="outline" onClick={handleExportXML} disabled={!ticketedEvent || reportLoading} data-testid="button-export-xml">
+                    {reportLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
+                    Esporta XML
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+
+        {/* Dialogs - same as mobile version */}
+        <AlertDialog open={statusChangeDialogOpen} onOpenChange={setStatusChangeDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Cambia Stato Evento</AlertDialogTitle>
+              <AlertDialogDescription>
+                {currentTransition && `Vuoi ${currentTransition.label.toLowerCase()} l'evento "${event.name}"?`}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Annulla</AlertDialogCancel>
+              <AlertDialogAction onClick={() => {
+                if (currentTransition) {
+                  changeStatusMutation.mutate(currentTransition.next);
+                }
+              }}>
+                Conferma
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Elimina Evento</AlertDialogTitle>
+              <AlertDialogDescription>
+                Sei sicuro di voler eliminare l'evento "{event.name}"? Questa azione è irreversibile.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Annulla</AlertDialogCancel>
+              <AlertDialogAction onClick={() => deleteEventMutation.mutate()} className="bg-destructive text-destructive-foreground">
+                Elimina
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        <Dialog open={cancelTicketDialogOpen} onOpenChange={setCancelTicketDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Annulla Biglietto</DialogTitle>
+              <DialogDescription>
+                Stai per annullare il biglietto #{ticketToCancel?.progressiveNumber}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label>Motivo Annullamento</Label>
+                <Select value={cancelReason} onValueChange={setCancelReason}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="01">Richiesta cliente</SelectItem>
+                    <SelectItem value="02">Errore emissione</SelectItem>
+                    <SelectItem value="03">Evento annullato</SelectItem>
+                    <SelectItem value="04">Altro</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Note (opzionale)</Label>
+                <Textarea value={cancelNote} onChange={(e) => setCancelNote(e.target.value)} placeholder="Inserisci note aggiuntive..." />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setCancelTicketDialogOpen(false)}>Annulla</Button>
+              <Button variant="destructive" onClick={confirmCancelTicket} disabled={cancelTicketMutation.isPending}>
+                {cancelTicketMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                Conferma Annullamento
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Create List Dialog */}
+        <Dialog open={showCreateListDialog} onOpenChange={setShowCreateListDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Nuova Lista Ospiti</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label>Nome Lista</Label>
+                <Input value={newListData.name} onChange={(e) => setNewListData(p => ({ ...p, name: e.target.value }))} placeholder="Es. VIP, Staff, Amici..." />
+              </div>
+              <div className="space-y-2">
+                <Label>Capacità Massima (opzionale)</Label>
+                <Input type="number" value={newListData.maxCapacity} onChange={(e) => setNewListData(p => ({ ...p, maxCapacity: e.target.value }))} placeholder="Lascia vuoto per illimitato" />
+              </div>
+              <div className="space-y-2">
+                <Label>Prezzo Ingresso</Label>
+                <Input type="number" step="0.01" value={newListData.price} onChange={(e) => setNewListData(p => ({ ...p, price: e.target.value }))} placeholder="0.00" />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowCreateListDialog(false)}>Annulla</Button>
+              <Button onClick={() => {
+                createListMutation.mutate({
+                  name: newListData.name,
+                  maxCapacity: newListData.maxCapacity ? parseInt(newListData.maxCapacity) : undefined,
+                  price: newListData.price || "0",
+                });
+              }} disabled={createListMutation.isPending || !newListData.name}>
+                {createListMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                Crea Lista
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Create Table Type Dialog */}
+        <Dialog open={showCreateTableTypeDialog} onOpenChange={setShowCreateTableTypeDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Nuovo Tipo Tavolo</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label>Nome Tipo</Label>
+                <Input value={newTableTypeData.name} onChange={(e) => setNewTableTypeData(p => ({ ...p, name: e.target.value }))} placeholder="Es. VIP, Privé..." />
+              </div>
+              <div className="space-y-2">
+                <Label>Prezzo</Label>
+                <Input type="number" step="0.01" value={newTableTypeData.price} onChange={(e) => setNewTableTypeData(p => ({ ...p, price: e.target.value }))} placeholder="0.00" />
+              </div>
+              <div className="space-y-2">
+                <Label>Ospiti Massimi</Label>
+                <Input type="number" value={newTableTypeData.maxGuests} onChange={(e) => setNewTableTypeData(p => ({ ...p, maxGuests: e.target.value }))} placeholder="10" />
+              </div>
+              <div className="space-y-2">
+                <Label>Quantità Tavoli</Label>
+                <Input type="number" value={newTableTypeData.totalQuantity} onChange={(e) => setNewTableTypeData(p => ({ ...p, totalQuantity: e.target.value }))} placeholder="5" />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowCreateTableTypeDialog(false)}>Annulla</Button>
+              <Button onClick={() => {
+                createTableTypeMutation.mutate({
+                  name: newTableTypeData.name,
+                  price: newTableTypeData.price || "0",
+                  maxGuests: parseInt(newTableTypeData.maxGuests) || 10,
+                  totalQuantity: parseInt(newTableTypeData.totalQuantity) || 1,
+                });
+              }} disabled={createTableTypeMutation.isPending || !newTableTypeData.name}>
+                {createTableTypeMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                Crea Tipo Tavolo
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Assign Staff Dialog */}
+        <Dialog open={showAssignStaffDialog} onOpenChange={setShowAssignStaffDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Assegna Staff</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label>Seleziona Utente</Label>
+                <select className="w-full h-10 px-3 rounded-md border bg-background" value={newStaffData.userId} onChange={(e) => setNewStaffData(p => ({ ...p, userId: e.target.value }))}>
+                  <option value="">Seleziona...</option>
+                  {users.filter(u => ['staff', 'capo_staff', 'gestore'].includes(u.role)).filter(u => !e4uStaff.some((s: any) => s.userId === u.id)).map(u => (
+                    <option key={u.id} value={u.id}>{u.firstName} {u.lastName} ({u.role})</option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-2">
+                <Label>Permessi</Label>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between p-3 rounded-lg border">
+                    <span className="text-sm">Gestione Liste</span>
+                    <Switch checked={newStaffData.canManageLists} onCheckedChange={(c) => setNewStaffData(p => ({ ...p, canManageLists: c }))} />
+                  </div>
+                  <div className="flex items-center justify-between p-3 rounded-lg border">
+                    <span className="text-sm">Gestione Tavoli</span>
+                    <Switch checked={newStaffData.canManageTables} onCheckedChange={(c) => setNewStaffData(p => ({ ...p, canManageTables: c }))} />
+                  </div>
+                  <div className="flex items-center justify-between p-3 rounded-lg border">
+                    <span className="text-sm">Creare PR</span>
+                    <Switch checked={newStaffData.canCreatePr} onCheckedChange={(c) => setNewStaffData(p => ({ ...p, canCreatePr: c }))} />
+                  </div>
+                  <div className="flex items-center justify-between p-3 rounded-lg border">
+                    <span className="text-sm">Approvare Tavoli</span>
+                    <Switch checked={newStaffData.canApproveTables} onCheckedChange={(c) => setNewStaffData(p => ({ ...p, canApproveTables: c }))} />
+                  </div>
+                </div>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowAssignStaffDialog(false)}>Annulla</Button>
+              <Button onClick={() => assignStaffMutation.mutate(newStaffData)} disabled={assignStaffMutation.isPending || !newStaffData.userId}>
+                {assignStaffMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                Assegna
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Assign PR Dialog */}
+        <Dialog open={showAssignPrDialog} onOpenChange={setShowAssignPrDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Assegna PR</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label>Seleziona PR</Label>
+                <select className="w-full h-10 px-3 rounded-md border bg-background" value={newPrData.userId} onChange={(e) => setNewPrData(p => ({ ...p, userId: e.target.value }))}>
+                  <option value="">Seleziona...</option>
+                  {users.filter(u => ['pr', 'staff', 'capo_staff'].includes(u.role)).filter(u => !e4uPr.some((p: any) => p.userId === u.id)).map(u => (
+                    <option key={u.id} value={u.id}>{u.firstName} {u.lastName} ({u.role})</option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-2">
+                <Label>Supervisore (opzionale)</Label>
+                <select className="w-full h-10 px-3 rounded-md border bg-background" value={newPrData.staffUserId} onChange={(e) => setNewPrData(p => ({ ...p, staffUserId: e.target.value }))}>
+                  <option value="">Nessuno</option>
+                  {e4uStaff.map((staff: any) => {
+                    const u = users.find(u => u.id === staff.userId);
+                    return <option key={staff.id} value={staff.userId}>{u ? `${u.firstName} ${u.lastName}` : 'Staff'}</option>;
+                  })}
+                </select>
+              </div>
+              <div className="space-y-2">
+                <Label>Permessi</Label>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between p-3 rounded-lg border">
+                    <span className="text-sm">Aggiungere alle Liste</span>
+                    <Switch checked={newPrData.canAddToLists} onCheckedChange={(c) => setNewPrData(p => ({ ...p, canAddToLists: c }))} />
+                  </div>
+                  <div className="flex items-center justify-between p-3 rounded-lg border">
+                    <span className="text-sm">Proporre Tavoli</span>
+                    <Switch checked={newPrData.canProposeTables} onCheckedChange={(c) => setNewPrData(p => ({ ...p, canProposeTables: c }))} />
+                  </div>
+                </div>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowAssignPrDialog(false)}>Annulla</Button>
+              <Button onClick={() => assignPrMutation.mutate({ userId: newPrData.userId, staffUserId: newPrData.staffUserId || undefined, canAddToLists: newPrData.canAddToLists, canProposeTables: newPrData.canProposeTables })} disabled={assignPrMutation.isPending || !newPrData.userId}>
+                {assignPrMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                Assegna
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Assign Scanner Dialog */}
+        <Dialog open={showAssignScannerDialog} onOpenChange={setShowAssignScannerDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Assegna Scanner</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label>Seleziona Utente</Label>
+                <select className="w-full h-10 px-3 rounded-md border bg-background" value={newScannerData.userId} onChange={(e) => setNewScannerData(p => ({ ...p, userId: e.target.value }))}>
+                  <option value="">Seleziona...</option>
+                  {users.filter(u => !e4uScanners.some((s: any) => s.userId === u.id)).map(u => (
+                    <option key={u.id} value={u.id}>{u.firstName} {u.lastName} ({u.role})</option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-2">
+                <Label>Permessi Scansione</Label>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between p-3 rounded-lg border">
+                    <span className="text-sm">Scansione Liste</span>
+                    <Switch checked={newScannerData.canScanLists} onCheckedChange={(c) => setNewScannerData(p => ({ ...p, canScanLists: c }))} />
+                  </div>
+                  <div className="flex items-center justify-between p-3 rounded-lg border">
+                    <span className="text-sm">Scansione Tavoli</span>
+                    <Switch checked={newScannerData.canScanTables} onCheckedChange={(c) => setNewScannerData(p => ({ ...p, canScanTables: c }))} />
+                  </div>
+                  <div className="flex items-center justify-between p-3 rounded-lg border">
+                    <span className="text-sm">Scansione Biglietti</span>
+                    <Switch checked={newScannerData.canScanTickets} onCheckedChange={(c) => setNewScannerData(p => ({ ...p, canScanTickets: c }))} />
+                  </div>
+                </div>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowAssignScannerDialog(false)}>Annulla</Button>
+              <Button onClick={() => assignScannerMutation.mutate(newScannerData)} disabled={assignScannerMutation.isPending || !newScannerData.userId}>
+                {assignScannerMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                Assegna
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Scanner Access Dialog */}
+        <Dialog open={showScannerAccessDialog} onOpenChange={setShowScannerAccessDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Configura Accesso Scanner</DialogTitle>
+              <DialogDescription>
+                {selectedScannerForAccess && `Configura i settori per ${selectedScannerForAccess.user?.firstName || ''} ${selectedScannerForAccess.user?.lastName || ''}`}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="flex items-center justify-between p-3 rounded-lg border">
+                <div>
+                  <div className="font-medium">Accesso a tutti i settori</div>
+                  <div className="text-sm text-muted-foreground">Può scansionare biglietti di tutti i settori</div>
+                </div>
+                <Switch checked={scannerAccessAllSectors} onCheckedChange={(c) => { setScannerAccessAllSectors(c); if (c) setScannerAccessSelectedSectors([]); }} />
+              </div>
+              {!scannerAccessAllSectors && ticketedEvent?.sectors && ticketedEvent.sectors.length > 0 && (
+                <div className="space-y-2">
+                  <Label>Seleziona Settori</Label>
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                    {ticketedEvent.sectors.map(sector => (
+                      <div key={sector.id} className="flex items-center gap-3 p-3 rounded-lg border cursor-pointer" onClick={() => toggleSectorSelection(sector.id)}>
+                        <input type="checkbox" checked={scannerAccessSelectedSectors.includes(sector.id)} onChange={() => toggleSectorSelection(sector.id)} className="h-4 w-4" />
+                        <div>{sector.name}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowScannerAccessDialog(false)}>Annulla</Button>
+              <Button onClick={handleSaveScannerAccess} disabled={updateScannerAccessMutation.isPending || (!scannerAccessAllSectors && scannerAccessSelectedSectors.length === 0)}>
+                {updateScannerAccessMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                Salva
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+    );
+  }
 
   return (
     <MobileAppLayout 

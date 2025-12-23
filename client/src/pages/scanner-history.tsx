@@ -3,11 +3,35 @@ import { useQuery } from "@tanstack/react-query";
 import { format, parseISO, isBefore, subMonths, isAfter } from "date-fns";
 import { it } from "date-fns/locale";
 import { Link, useLocation } from "wouter";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { motion, AnimatePresence } from "framer-motion";
 import { MobileAppLayout, HapticButton, triggerHaptic } from "@/components/mobile-primitives";
+import { useIsMobile } from "@/hooks/use-mobile";
 import {
   ArrowLeft,
   History,
@@ -20,6 +44,7 @@ import {
   CalendarDays,
   CalendarRange,
   Sparkles,
+  Eye,
 } from "lucide-react";
 
 interface Event {
@@ -50,7 +75,10 @@ const filters: { id: FilterType; label: string; icon: React.ElementType }[] = [
 
 export default function ScannerHistoryPage() {
   const [, setLocation] = useLocation();
+  const isMobile = useIsMobile();
   const [activeFilter, setActiveFilter] = useState<FilterType>('all');
+  const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
+  const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
 
   const { data: events, isLoading } = useQuery<Event[]>({
     queryKey: ['/api/events'],
@@ -85,6 +113,201 @@ export default function ScannerHistoryPage() {
     triggerHaptic('medium');
     setLocation(`/scanner/stats/${eventId}`);
   };
+
+  const handleViewDetails = (event: Event) => {
+    setSelectedEvent(event);
+    setIsDetailDialogOpen(true);
+  };
+
+  const handleGoToStats = (eventId: string) => {
+    setIsDetailDialogOpen(false);
+    setLocation(`/scanner/stats/${eventId}`);
+  };
+
+  const stats = {
+    total: pastEvents.length,
+    thisWeek: pastEvents.filter(e => isAfter(parseISO(e.startDatetime), subMonths(new Date(), 0.25))).length,
+    thisMonth: pastEvents.filter(e => isAfter(parseISO(e.startDatetime), subMonths(new Date(), 1))).length,
+  };
+
+  if (!isMobile) {
+    return (
+      <div className="container mx-auto p-6 space-y-6" data-testid="page-scanner-history">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold flex items-center gap-3" data-testid="text-title">
+              <History className="h-8 w-8 text-purple-400" />
+              Eventi Passati
+            </h1>
+            <p className="text-muted-foreground">Storico degli eventi scansionati</p>
+          </div>
+          <Link href="/scanner">
+            <Button variant="outline" data-testid="button-back">
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Torna allo Scanner
+            </Button>
+          </Link>
+        </div>
+
+        <div className="grid grid-cols-3 gap-4">
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-2xl font-bold">{stats.total}</div>
+              <p className="text-sm text-muted-foreground">Totale Eventi</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-2xl font-bold text-purple-500">{stats.thisWeek}</div>
+              <p className="text-sm text-muted-foreground">Questa Settimana</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-2xl font-bold text-emerald-500">{stats.thisMonth}</div>
+              <p className="text-sm text-muted-foreground">Questo Mese</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <CardTitle>Elenco Eventi</CardTitle>
+                <CardDescription>Eventi conclusi con dati di scansione</CardDescription>
+              </div>
+              <Select value={activeFilter} onValueChange={(v) => setActiveFilter(v as FilterType)}>
+                <SelectTrigger className="w-[180px]" data-testid="select-filter">
+                  <SelectValue placeholder="Periodo" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tutti</SelectItem>
+                  <SelectItem value="week">Ultima Settimana</SelectItem>
+                  <SelectItem value="month">Ultimo Mese</SelectItem>
+                  <SelectItem value="3months">Ultimi 3 Mesi</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <div className="space-y-2">
+                {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-12 w-full" />)}
+              </div>
+            ) : pastEvents.length > 0 ? (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Evento</TableHead>
+                    <TableHead>Data</TableHead>
+                    <TableHead>Location</TableHead>
+                    <TableHead>Stato</TableHead>
+                    <TableHead className="text-right">Azioni</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {pastEvents.map((event) => (
+                    <TableRow key={event.id} data-testid={`row-event-${event.id}`}>
+                      <TableCell className="font-medium">{event.name}</TableCell>
+                      <TableCell>
+                        {format(parseISO(event.startDatetime), "d MMM yyyy", { locale: it })}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {event.location?.name || "-"}
+                      </TableCell>
+                      <TableCell>
+                        <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30">
+                          <CheckCircle2 className="h-3 w-3 mr-1" />
+                          Concluso
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleViewDetails(event)}
+                            data-testid={`button-view-${event.id}`}
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleGoToStats(event.id)}
+                            data-testid={`button-stats-${event.id}`}
+                          >
+                            <ChevronRight className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            ) : (
+              <div className="py-12 text-center">
+                <History className="h-12 w-12 text-muted-foreground/40 mx-auto mb-4" />
+                <h3 className="text-lg font-semibold mb-2">Nessun evento trovato</h3>
+                <p className="text-muted-foreground text-sm">
+                  {activeFilter === 'all' 
+                    ? "Non ci sono eventi passati nel tuo storico"
+                    : "Prova a selezionare un periodo diverso"
+                  }
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Dialog open={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>{selectedEvent?.name}</DialogTitle>
+              <DialogDescription>Dettagli evento</DialogDescription>
+            </DialogHeader>
+            {selectedEvent && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Data</p>
+                    <p className="font-medium">
+                      {format(parseISO(selectedEvent.startDatetime), "d MMMM yyyy", { locale: it })}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Orario</p>
+                    <p className="font-medium">
+                      {format(parseISO(selectedEvent.startDatetime), "HH:mm", { locale: it })}
+                    </p>
+                  </div>
+                  {selectedEvent.location && (
+                    <div className="col-span-2">
+                      <p className="text-sm text-muted-foreground">Location</p>
+                      <p className="font-medium flex items-center gap-2">
+                        <MapPin className="h-4 w-4" />
+                        {selectedEvent.location.name}
+                      </p>
+                    </div>
+                  )}
+                </div>
+                <div className="flex justify-end gap-2">
+                  <Button variant="outline" onClick={() => setIsDetailDialogOpen(false)}>
+                    Chiudi
+                  </Button>
+                  <Button onClick={() => handleGoToStats(selectedEvent.id)} data-testid="button-go-stats">
+                    Vedi Statistiche
+                    <ChevronRight className="h-4 w-4 ml-2" />
+                  </Button>
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+      </div>
+    );
+  }
 
   const header = (
     <div className="bg-background/90 backdrop-blur-xl border-b border-white/5">

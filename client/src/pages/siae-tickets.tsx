@@ -9,6 +9,7 @@ import { it } from "date-fns/locale";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { useIsMobile } from "@/hooks/use-mobile";
 import {
   insertSiaeTicketSchema,
   type SiaeTicket,
@@ -20,6 +21,8 @@ import {
   type Event,
 } from "@shared/schema";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Form,
   FormControl,
@@ -40,6 +43,22 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import {
   Ticket,
   Euro,
@@ -89,12 +108,17 @@ export default function SiaeTicketsPage() {
   const [, navigate] = useLocation();
   const [, params] = useRoute("/siae/tickets/:eventId");
   const eventId = params?.eventId || "";
+  const isMobile = useIsMobile();
   
   const smartCardStatus = useSmartCardStatus();
   const [isEmissionSheetOpen, setIsEmissionSheetOpen] = useState(false);
   const [isCancelSheetOpen, setIsCancelSheetOpen] = useState(false);
   const [isValidateSheetOpen, setIsValidateSheetOpen] = useState(false);
   const [isTicketDetailOpen, setIsTicketDetailOpen] = useState(false);
+  const [isEmissionDialogOpen, setIsEmissionDialogOpen] = useState(false);
+  const [isCancelDialogOpen, setIsCancelDialogOpen] = useState(false);
+  const [isValidateDialogOpen, setIsValidateDialogOpen] = useState(false);
+  const [isTicketDetailDialogOpen, setIsTicketDetailDialogOpen] = useState(false);
   const [selectedTicket, setSelectedTicket] = useState<SiaeTicket | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -401,8 +425,744 @@ export default function SiaeTicketsPage() {
   const handleTicketPress = (ticket: SiaeTicket) => {
     triggerHaptic('light');
     setSelectedTicket(ticket);
-    setIsTicketDetailOpen(true);
+    if (isMobile) {
+      setIsTicketDetailOpen(true);
+    } else {
+      setIsTicketDetailDialogOpen(true);
+    }
   };
+
+  const emissionFormContent = (
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4" data-testid="form-emission">
+        <FormField
+          control={form.control}
+          name="ticketedEventId"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Evento</FormLabel>
+              <Select onValueChange={field.onChange} value={field.value}>
+                <FormControl>
+                  <SelectTrigger className="h-12" data-testid="select-event">
+                    <SelectValue placeholder="Seleziona evento" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  {ticketedEvents
+                    ?.filter(e => e.ticketingStatus === "active")
+                    .map((event) => (
+                      <SelectItem key={event.id} value={event.id}>
+                        {(event as any).eventName || `Evento #${event.id.slice(0, 8)}`}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        {formSectors && formSectors.length > 1 && (
+          <FormField
+            control={form.control}
+            name="sectorId"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Tipologia</FormLabel>
+                <Select onValueChange={field.onChange} value={field.value}>
+                  <FormControl>
+                    <SelectTrigger className="h-12" data-testid="select-sector">
+                      <SelectValue placeholder="Seleziona tipologia" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {formSectors
+                      .filter(sector => !(sector as any).salesSuspended)
+                      .map((sector) => (
+                        <SelectItem key={sector.id} value={sector.id}>
+                          {sector.name} - {sector.availableSeats} disp.
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        )}
+
+        {hasSingleSector && selectedSector && (
+          <div className="rounded-xl border border-border bg-muted/30 p-4">
+            <p className="text-xs text-muted-foreground mb-1">Tipologia</p>
+            <p className="font-medium">{selectedSector.name}</p>
+            <p className="text-sm text-muted-foreground">{selectedSector.availableSeats} posti disponibili</p>
+          </div>
+        )}
+
+        <FormField
+          control={form.control}
+          name="ticketTypeCode"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Tipo Biglietto</FormLabel>
+              <Select onValueChange={field.onChange} value={field.value}>
+                <FormControl>
+                  <SelectTrigger className="h-12" data-testid="select-ticket-type">
+                    <SelectValue placeholder="Seleziona tipo" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  <SelectItem value="INT">
+                    Intero - €{selectedSector ? Number(selectedSector.priceIntero).toFixed(2) : "0.00"}
+                  </SelectItem>
+                  {selectedSector?.priceRidotto && Number(selectedSector.priceRidotto) > 0 && (
+                    <SelectItem value="RID">
+                      Ridotto - €{Number(selectedSector.priceRidotto).toFixed(2)}
+                    </SelectItem>
+                  )}
+                  <SelectItem value="OMA">
+                    Omaggio - €0.00
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <div className="grid grid-cols-2 gap-3">
+          <FormField
+            control={form.control}
+            name="participantFirstName"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>
+                  Nome
+                  {isNominativeRequired && <span className="text-destructive ml-1">*</span>}
+                </FormLabel>
+                <FormControl>
+                  <Input {...field} placeholder="Nome" className="h-12" data-testid="input-first-name" />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="participantLastName"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>
+                  Cognome
+                  {isNominativeRequired && <span className="text-destructive ml-1">*</span>}
+                </FormLabel>
+                <FormControl>
+                  <Input {...field} placeholder="Cognome" className="h-12" data-testid="input-last-name" />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+
+        {isNominativeRequired && (
+          <p className="text-xs text-amber-500 flex items-center gap-1">
+            <AlertTriangle className="w-3 h-3" />
+            Biglietti nominativi obbligatori
+          </p>
+        )}
+
+        <FormField
+          control={form.control}
+          name="quantity"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Quantità</FormLabel>
+              <FormControl>
+                <Input 
+                  type="number" 
+                  min={1} 
+                  max={10}
+                  value={field.value || 1}
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value, 10);
+                    field.onChange(isNaN(val) || val < 1 ? 1 : Math.min(val, 10));
+                  }}
+                  className="h-12"
+                  data-testid="input-quantity" 
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        {selectedSector && selectedTicketType && (
+          <div className="rounded-xl border border-border bg-muted/30 p-4 space-y-2">
+            <p className="text-sm font-medium text-muted-foreground mb-3">Riepilogo</p>
+            <div className="flex justify-between text-sm">
+              <span>Biglietto:</span>
+              <span>€{ticketPrice.toFixed(2)}</span>
+            </div>
+            {prevenditaPrice > 0 && (
+              <div className="flex justify-between text-sm">
+                <span>Prevendita:</span>
+                <span>€{prevenditaPrice.toFixed(2)}</span>
+              </div>
+            )}
+            <div className="flex justify-between text-base font-bold text-[#FFD700] border-t border-border pt-2 mt-2">
+              <span>Totale:</span>
+              <span>€{totalPrice.toFixed(2)}</span>
+            </div>
+          </div>
+        )}
+      </form>
+    </Form>
+  );
+
+  // Desktop version
+  if (!isMobile) {
+    return (
+      <div className="container mx-auto p-6 space-y-6" data-testid="page-siae-tickets">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Button variant="outline" size="icon" onClick={() => navigate(`/events/${ticketedEvent?.eventId}/hub`)} data-testid="button-back">
+              <ArrowLeft className="w-4 h-4" />
+            </Button>
+            <div>
+              <h1 className="text-3xl font-bold">Biglietti SIAE</h1>
+              <p className="text-muted-foreground">{baseEvent?.name}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium ${
+              cardReadiness.ready 
+                ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' 
+                : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+            }`}>
+              <CreditCard className="w-4 h-4" />
+              <span>{cardReadiness.ready ? 'Smart Card OK' : 'Smart Card Non Disponibile'}</span>
+            </div>
+            <Button 
+              onClick={() => setIsEmissionDialogOpen(true)}
+              disabled={!ticketedEvents?.some(e => e.ticketingStatus === "active") || !cardReadiness.ready}
+              data-testid="button-emit-ticket"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Emetti Biglietto
+            </Button>
+          </div>
+        </div>
+
+        {!cardReadiness.ready && (
+          <Card className="border-amber-500/30 bg-amber-500/10">
+            <CardContent className="pt-6">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="h-5 w-5 text-amber-400 shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-semibold text-amber-400">Smart Card Non Disponibile</p>
+                  <p className="text-sm text-amber-400/80 mt-1">
+                    {cardReadiness.error || 'Collega la Smart Card SIAE per emettere biglietti.'}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        <div className="grid grid-cols-4 gap-4">
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-2xl font-bold text-[#FFD700]" data-testid="stat-total">{stats.total}</div>
+              <p className="text-sm text-muted-foreground">Totale</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-2xl font-bold text-emerald-400" data-testid="stat-valid">{stats.valid}</div>
+              <p className="text-sm text-muted-foreground">Validi</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-2xl font-bold text-blue-400" data-testid="stat-used">{stats.used}</div>
+              <p className="text-sm text-muted-foreground">Utilizzati</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-2xl font-bold text-red-400" data-testid="stat-cancelled">{stats.cancelled}</div>
+              <p className="text-sm text-muted-foreground">Annullati</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="flex items-center gap-4">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4" />
+            <Input
+              placeholder="Cerca biglietto..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10"
+              data-testid="input-search"
+            />
+          </div>
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-48" data-testid="select-status-filter">
+              <SelectValue placeholder="Filtra per stato" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Tutti gli stati</SelectItem>
+              <SelectItem value="valid">Validi</SelectItem>
+              <SelectItem value="used">Utilizzati</SelectItem>
+              <SelectItem value="cancelled">Annullati</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {eventId && sectors && sectors.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Settings className="w-5 h-5 text-[#FFD700]" />
+                Tipologie Biglietto
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Nome</TableHead>
+                    <TableHead>Prezzo Intero</TableHead>
+                    <TableHead>Prezzo Ridotto</TableHead>
+                    <TableHead>Posti Disponibili</TableHead>
+                    <TableHead>Biglietti Emessi</TableHead>
+                    <TableHead>Stato</TableHead>
+                    <TableHead className="text-right">Sospendi Vendite</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {sectors.map((sector) => {
+                    const hasTickets = hasTicketsForSector(sector.id);
+                    const ticketsCount = tickets?.filter(t => t.sectorId === sector.id && t.status !== "cancelled").length || 0;
+                    const isSuspended = (sector as any).salesSuspended || false;
+                    
+                    return (
+                      <TableRow key={sector.id} data-testid={`sector-row-${sector.id}`}>
+                        <TableCell className="font-medium">{sector.name}</TableCell>
+                        <TableCell>€{Number(sector.priceIntero).toFixed(2)}</TableCell>
+                        <TableCell>€{Number(sector.priceRidotto || 0).toFixed(2)}</TableCell>
+                        <TableCell>{sector.availableSeats}/{sector.capacity}</TableCell>
+                        <TableCell>
+                          {ticketsCount > 0 ? (
+                            <Badge variant="outline">{ticketsCount}</Badge>
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {hasTickets && (
+                            <div className="flex items-center gap-1 text-xs text-amber-500">
+                              <Lock className="w-3 h-3" />
+                              <span>Prezzo bloccato</span>
+                            </div>
+                          )}
+                          {isSuspended && (
+                            <Badge className="bg-amber-500/20 text-amber-400 border-amber-500/30">Sospeso</Badge>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Switch
+                            checked={isSuspended}
+                            onCheckedChange={(checked) => {
+                              toggleSectorSalesMutation.mutate({ 
+                                sectorId: sector.id, 
+                                salesSuspended: checked 
+                              });
+                            }}
+                            disabled={toggleSectorSalesMutation.isPending}
+                            data-testid={`switch-suspend-${sector.id}`}
+                          />
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        )}
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Ticket className="w-5 h-5 text-[#FFD700]" />
+              Elenco Biglietti
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {!eventId ? (
+              <div className="text-center py-12">
+                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-[#FFD700]/10 flex items-center justify-center">
+                  <Ticket className="w-8 h-8 text-[#FFD700]" />
+                </div>
+                <h3 className="font-semibold mb-2">Seleziona un Evento</h3>
+                <p className="text-sm text-muted-foreground">
+                  Seleziona un evento per visualizzare i biglietti
+                </p>
+              </div>
+            ) : ticketsLoading ? (
+              <div className="space-y-3">
+                {[1, 2, 3].map((i) => (
+                  <Skeleton key={i} className="h-12 w-full" />
+                ))}
+              </div>
+            ) : filteredTickets?.length === 0 ? (
+              <div className="text-center py-12">
+                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-muted/30 flex items-center justify-center">
+                  <Ticket className="w-8 h-8 text-muted-foreground" />
+                </div>
+                <h3 className="font-semibold mb-2">Nessun Biglietto</h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Non ci sono biglietti per questo evento
+                </p>
+                <Button onClick={() => setIsEmissionDialogOpen(true)}>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Emetti Primo Biglietto
+                </Button>
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>N°</TableHead>
+                    <TableHead>Tipologia</TableHead>
+                    <TableHead>Tipo</TableHead>
+                    <TableHead>Nominativo</TableHead>
+                    <TableHead>Importo</TableHead>
+                    <TableHead>Data Emissione</TableHead>
+                    <TableHead>Stato</TableHead>
+                    <TableHead className="text-right">Azioni</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredTickets?.map((ticket) => (
+                    <TableRow key={ticket.id} data-testid={`row-ticket-${ticket.id}`}>
+                      <TableCell className="font-mono font-bold">#{ticket.progressiveNumber}</TableCell>
+                      <TableCell>{sectors?.find(s => s.id === ticket.sectorId)?.name || ticket.sectorCode}</TableCell>
+                      <TableCell>{ticketTypes?.find(t => t.code === ticket.ticketTypeCode)?.description || ticket.ticketTypeCode}</TableCell>
+                      <TableCell>
+                        {(ticket.participantFirstName || ticket.participantLastName) 
+                          ? `${ticket.participantFirstName || ""} ${ticket.participantLastName || ""}`.trim()
+                          : <span className="text-muted-foreground">-</span>}
+                      </TableCell>
+                      <TableCell className="font-semibold text-[#FFD700]">€{Number(ticket.grossAmount).toFixed(2)}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {ticket.emissionDate && format(new Date(ticket.emissionDate), "dd/MM/yyyy HH:mm", { locale: it })}
+                      </TableCell>
+                      <TableCell>{getStatusBadge(ticket.status)}</TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            onClick={() => handleTicketPress(ticket)}
+                            data-testid={`button-view-${ticket.id}`}
+                          >
+                            <Eye className="w-4 h-4" />
+                          </Button>
+                          {(ticket.status === "valid" || ticket.status === "active") && (
+                            <>
+                              <Button 
+                                variant="ghost" 
+                                size="icon"
+                                className="text-emerald-400 hover:text-emerald-300"
+                                onClick={() => {
+                                  setSelectedTicket(ticket);
+                                  setIsValidateDialogOpen(true);
+                                }}
+                                data-testid={`button-validate-${ticket.id}`}
+                              >
+                                <Scan className="w-4 h-4" />
+                              </Button>
+                              <Button 
+                                variant="ghost" 
+                                size="icon"
+                                className="text-red-400 hover:text-red-300"
+                                onClick={() => {
+                                  setSelectedTicket(ticket);
+                                  setIsCancelDialogOpen(true);
+                                }}
+                                data-testid={`button-cancel-${ticket.id}`}
+                              >
+                                <Ban className="w-4 h-4" />
+                              </Button>
+                            </>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+
+        <Dialog open={isEmissionDialogOpen} onOpenChange={setIsEmissionDialogOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Emetti Biglietto</DialogTitle>
+              <DialogDescription>Compila i dati per emettere un nuovo biglietto.</DialogDescription>
+            </DialogHeader>
+            {emissionFormContent}
+            <DialogFooter className="gap-2">
+              <Button variant="outline" onClick={() => setIsEmissionDialogOpen(false)}>
+                Annulla
+              </Button>
+              <Button
+                onClick={form.handleSubmit(onSubmit)}
+                disabled={emitTicketMutation.isPending || isGeneratingSeal || !cardReadiness.ready}
+                data-testid="button-submit"
+              >
+                {isGeneratingSeal || emitTicketMutation.isPending ? (
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                ) : (
+                  <CreditCard className="w-4 h-4 mr-2" />
+                )}
+                Emetti
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={isTicketDetailDialogOpen} onOpenChange={(open) => {
+          setIsTicketDetailDialogOpen(open);
+          if (!open) setSelectedTicket(null);
+        }}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Biglietto #{selectedTicket?.progressiveNumber}</DialogTitle>
+            </DialogHeader>
+            {selectedTicket && (
+              <div className="space-y-4">
+                <div className="bg-muted/30 rounded-xl p-4 space-y-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">Stato</span>
+                    {getStatusBadge(selectedTicket.status)}
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">Tipologia</span>
+                    <span className="font-medium">
+                      {sectors?.find(s => s.id === selectedTicket.sectorId)?.name}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">Tipo</span>
+                    <span className="font-medium">
+                      {ticketTypes?.find(t => t.code === selectedTicket.ticketTypeCode)?.description}
+                    </span>
+                  </div>
+                  {(selectedTicket.participantFirstName || selectedTicket.participantLastName) && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-muted-foreground">Nominativo</span>
+                      <span className="font-medium">
+                        {`${selectedTicket.participantFirstName || ""} ${selectedTicket.participantLastName || ""}`.trim()}
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">Importo</span>
+                    <span className="font-bold text-[#FFD700]">
+                      €{Number(selectedTicket.grossAmount).toFixed(2)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">Emesso</span>
+                    <span className="text-sm">
+                      {selectedTicket.emissionDate && format(new Date(selectedTicket.emissionDate), "dd/MM/yyyy HH:mm", { locale: it })}
+                    </span>
+                  </div>
+                  {selectedTicket.fiscalSealCode && (
+                    <div className="pt-2 border-t border-border">
+                      <span className="text-xs text-muted-foreground block mb-1">Sigillo Fiscale</span>
+                      <span className="font-mono text-xs break-all">{selectedTicket.fiscalSealCode}</span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex gap-2">
+                  <Button variant="outline" className="flex-1">
+                    <Eye className="w-4 h-4 mr-2" />
+                    Visualizza
+                  </Button>
+                  <Button variant="outline" className="flex-1">
+                    <Printer className="w-4 h-4 mr-2" />
+                    Stampa
+                  </Button>
+                </div>
+
+                {(selectedTicket.status === "valid" || selectedTicket.status === "active") && (
+                  <div className="flex gap-2 pt-2">
+                    <Button
+                      onClick={() => {
+                        setIsTicketDetailDialogOpen(false);
+                        setIsValidateDialogOpen(true);
+                      }}
+                      className="flex-1 bg-emerald-600 hover:bg-emerald-700"
+                    >
+                      <Scan className="w-4 h-4 mr-2" />
+                      Valida Ingresso
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      onClick={() => {
+                        setIsTicketDetailDialogOpen(false);
+                        setIsCancelDialogOpen(true);
+                      }}
+                      className="flex-1"
+                    >
+                      <Ban className="w-4 h-4 mr-2" />
+                      Annulla
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={isValidateDialogOpen} onOpenChange={(open) => {
+          setIsValidateDialogOpen(open);
+          if (!open) setSelectedTicket(null);
+        }}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader>
+              <DialogTitle>Conferma Validazione</DialogTitle>
+            </DialogHeader>
+            <div className="text-center py-4">
+              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-emerald-500/10 flex items-center justify-center">
+                <Scan className="w-8 h-8 text-emerald-400" />
+              </div>
+              <p className="text-muted-foreground">
+                Stai per validare il biglietto <strong>#{selectedTicket?.progressiveNumber}</strong>.
+              </p>
+              <p className="text-sm text-muted-foreground mt-2">
+                Questa azione non può essere annullata.
+              </p>
+            </div>
+            <DialogFooter className="gap-2">
+              <Button variant="outline" onClick={() => { setIsValidateDialogOpen(false); setSelectedTicket(null); }}>
+                Annulla
+              </Button>
+              <Button
+                onClick={() => selectedTicket && validateTicketMutation.mutate(selectedTicket.id)}
+                disabled={validateTicketMutation.isPending}
+                className="bg-emerald-600 hover:bg-emerald-700"
+                data-testid="button-confirm-validate"
+              >
+                {validateTicketMutation.isPending ? (
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                ) : (
+                  <CheckCircle2 className="w-4 h-4 mr-2" />
+                )}
+                Conferma
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={isCancelDialogOpen} onOpenChange={(open) => {
+          setIsCancelDialogOpen(open);
+          if (!open) {
+            setSelectedTicket(null);
+            setCancelReasonCode("");
+            setRefundOnCancel(false);
+          }
+        }}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Annulla Biglietto</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="text-center py-2">
+                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-red-500/10 flex items-center justify-center">
+                  <Ban className="w-8 h-8 text-red-400" />
+                </div>
+                <p className="text-muted-foreground">
+                  Annullamento biglietto <strong>#{selectedTicket?.progressiveNumber}</strong>
+                </p>
+              </div>
+
+              <div>
+                <Label className="text-sm font-medium mb-2 block">Causale</Label>
+                <Select value={cancelReasonCode} onValueChange={setCancelReasonCode}>
+                  <SelectTrigger data-testid="select-cancel-reason">
+                    <SelectValue placeholder="Seleziona causale" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {cancellationReasons?.map((reason) => (
+                      <SelectItem key={reason.code} value={reason.code}>
+                        {reason.code} - {reason.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className={`flex items-center gap-3 p-4 rounded-xl ${
+                selectedTicket?.transactionId 
+                  ? 'bg-amber-500/10 border border-amber-500/30' 
+                  : 'bg-muted/50 border border-border opacity-60'
+              }`}>
+                <Checkbox 
+                  id="refund-checkbox-desktop" 
+                  checked={refundOnCancel} 
+                  onCheckedChange={(checked) => setRefundOnCancel(checked === true)}
+                  disabled={!selectedTicket?.transactionId}
+                  data-testid="checkbox-refund"
+                />
+                <div>
+                  <Label htmlFor="refund-checkbox-desktop" className={`font-medium ${selectedTicket?.transactionId ? 'cursor-pointer' : 'cursor-not-allowed'}`}>
+                    Rimborso automatico
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    {selectedTicket?.transactionId 
+                      ? 'Il cliente riceverà il rimborso via Stripe'
+                      : 'Non disponibile - biglietto senza pagamento online'}
+                  </p>
+                </div>
+              </div>
+            </div>
+            <DialogFooter className="gap-2">
+              <Button variant="outline" onClick={() => { setIsCancelDialogOpen(false); setSelectedTicket(null); setCancelReasonCode(""); setRefundOnCancel(false); }}>
+                Annulla
+              </Button>
+              <Button
+                variant="destructive"
+                disabled={!cancelReasonCode || cancelTicketMutation.isPending}
+                onClick={() => selectedTicket && cancelTicketMutation.mutate({ 
+                  ticketId: selectedTicket.id, 
+                  reasonCode: cancelReasonCode,
+                  refund: refundOnCancel
+                })}
+                data-testid="button-confirm-cancel"
+              >
+                {cancelTicketMutation.isPending ? (
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                ) : (
+                  <XCircle className="w-4 h-4 mr-2" />
+                )}
+                Conferma Annullamento
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+    );
+  }
 
   const header = (
     <MobileHeader

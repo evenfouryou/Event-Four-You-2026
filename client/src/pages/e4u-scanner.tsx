@@ -5,12 +5,29 @@ import { motion, AnimatePresence } from "framer-motion";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { MobileAppLayout, MobileHeader, HapticButton, triggerHaptic } from "@/components/mobile-primitives";
 import {
   ArrowLeft,
@@ -94,11 +111,14 @@ export default function E4uScannerPage() {
   const { eventId } = useParams<{ eventId?: string }>();
   const { toast } = useToast();
   const { user } = useAuth();
+  const isMobile = useIsMobile();
   
   const [selectedEventId, setSelectedEventId] = useState<string>(eventId || "");
   const [qrInput, setQrInput] = useState("");
   const [scanResult, setScanResult] = useState<ScanResult | null>(null);
   const [recentScans, setRecentScans] = useState<RecentScan[]>([]);
+  const [selectedScan, setSelectedScan] = useState<RecentScan | null>(null);
+  const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
 
   const activeEventId = eventId || selectedEventId;
 
@@ -236,6 +256,422 @@ export default function E4uScannerPage() {
       }
     />
   );
+
+  const getStatusBadge = (scan: RecentScan) => {
+    if (scan.success) {
+      return <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30">Check-in</Badge>;
+    } else if (scan.alreadyCheckedIn) {
+      return <Badge className="bg-amber-500/20 text-amber-400 border-amber-500/30">Già registrato</Badge>;
+    } else {
+      return <Badge className="bg-red-500/20 text-red-400 border-red-500/30">Errore</Badge>;
+    }
+  };
+
+  if (!isMobile) {
+    return (
+      <div className="container mx-auto p-6 space-y-6" data-testid="page-e4u-scanner">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            {!isStandaloneScanner && (
+              <Link href="/events">
+                <Button variant="ghost" size="icon" data-testid="button-back-desktop">
+                  <ArrowLeft className="h-5 w-5" />
+                </Button>
+              </Link>
+            )}
+            <div>
+              <h1 className="text-3xl font-bold">Scanner QR</h1>
+              <p className="text-muted-foreground">
+                {selectedEvent?.name || "Seleziona un evento per iniziare"}
+              </p>
+            </div>
+          </div>
+          {isStandaloneScanner && (
+            <Button variant="outline" onClick={handleLogout} data-testid="button-logout-desktop">
+              <LogOut className="w-4 h-4 mr-2" />
+              Logout
+            </Button>
+          )}
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-1 space-y-6">
+            {!eventId && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Ticket className="h-5 w-5" />
+                    Seleziona Evento
+                  </CardTitle>
+                  <CardDescription>Scegli l'evento per il check-in</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Select 
+                    value={selectedEventId} 
+                    onValueChange={setSelectedEventId}
+                  >
+                    <SelectTrigger data-testid="select-event-desktop">
+                      <SelectValue placeholder="Scegli un evento..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {eventsLoading ? (
+                        <div className="p-4 text-center text-muted-foreground">
+                          <Loader2 className="h-5 w-5 animate-spin mx-auto mb-2" />
+                          Caricamento...
+                        </div>
+                      ) : events && events.length > 0 ? (
+                        events.map((event: any) => (
+                          <SelectItem 
+                            key={event.id} 
+                            value={event.id.toString()}
+                            data-testid={`select-event-option-desktop-${event.id}`}
+                          >
+                            <div className="flex flex-col">
+                              <span className="font-medium">{event.name}</span>
+                              <span className="text-xs text-muted-foreground">
+                                {format(new Date(event.startDatetime), "d MMM yyyy", { locale: it })}
+                              </span>
+                            </div>
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <div className="p-4 text-center text-muted-foreground">
+                          Nessun evento disponibile
+                        </div>
+                      )}
+                    </SelectContent>
+                  </Select>
+                </CardContent>
+              </Card>
+            )}
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <QrCode className="h-5 w-5" />
+                  Scansione QR Code
+                </CardTitle>
+                <CardDescription>Usa il lettore o inserisci manualmente</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <Input
+                  placeholder="Inserisci o scansiona QR code..."
+                  value={qrInput}
+                  onChange={(e) => setQrInput(e.target.value)}
+                  onKeyDown={handleKeyPress}
+                  autoFocus
+                  className="font-mono"
+                  disabled={!activeEventId}
+                  data-testid="input-qr-code-desktop"
+                />
+                <div className="flex gap-2">
+                  <Button
+                    onClick={handleScan}
+                    disabled={scanMutation.isPending || !qrInput.trim() || !activeEventId}
+                    className="flex-1"
+                    data-testid="button-scan-desktop"
+                  >
+                    {scanMutation.isPending ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <>
+                        <ScanLine className="w-4 h-4 mr-2" />
+                        Scansiona
+                      </>
+                    )}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={resetScanner}
+                    data-testid="button-reset-desktop"
+                  >
+                    <RefreshCw className="w-4 h-4" />
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            {scanResult && scanResult.success && scanResult.person && (
+              <Card className="border-2 border-emerald-500/50 bg-emerald-500/5" data-testid="card-success-desktop">
+                <CardContent className="pt-6">
+                  <div className="flex items-center gap-4 mb-4">
+                    <div className="w-12 h-12 rounded-full bg-emerald-500/20 flex items-center justify-center">
+                      <CheckCircle2 className="w-6 h-6 text-emerald-400" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="text-lg font-bold text-emerald-400">Check-in Effettuato</h3>
+                      <p className="text-sm text-muted-foreground">{scanResult.message || "Ingresso registrato"}</p>
+                    </div>
+                  </div>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <User className="w-4 h-4 text-muted-foreground" />
+                        <span className="font-bold" data-testid="text-person-name-desktop">
+                          {scanResult.person.firstName} {scanResult.person.lastName}
+                        </span>
+                      </div>
+                      <Badge variant="outline" className="capitalize" data-testid="badge-type-desktop">
+                        {scanResult.person.type === 'lista' ? 'Lista' : scanResult.person.type === 'biglietto' ? 'Biglietto' : 'Tavolo'}
+                      </Badge>
+                    </div>
+                    {scanResult.person.listName && (
+                      <p className="text-sm text-muted-foreground">Lista: {scanResult.person.listName}</p>
+                    )}
+                    {scanResult.person.tableName && (
+                      <p className="text-sm text-muted-foreground">Tavolo: {scanResult.person.tableName}</p>
+                    )}
+                    {scanResult.person.ticketCode && (
+                      <p className="text-sm font-mono text-muted-foreground">Codice: {scanResult.person.ticketCode}</p>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {scanResult && scanResult.alreadyCheckedIn && (
+              <Card className="border-2 border-amber-500/50 bg-amber-500/5" data-testid="card-already-desktop">
+                <CardContent className="pt-6">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-full bg-amber-500/20 flex items-center justify-center">
+                      <AlertTriangle className="w-6 h-6 text-amber-400" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-bold text-amber-400">Già Registrato</h3>
+                      <p className="text-sm text-muted-foreground">
+                        {scanResult.checkedInAt 
+                          ? `Check-in alle ${format(new Date(scanResult.checkedInAt), "HH:mm", { locale: it })}`
+                          : "QR già utilizzato"
+                        }
+                      </p>
+                      {scanResult.person && (
+                        <p className="font-medium mt-2">{scanResult.person.firstName} {scanResult.person.lastName}</p>
+                      )}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {scanResult && !scanResult.success && scanResult.error && (
+              <Card className="border-2 border-rose-500/50 bg-rose-500/5" data-testid="card-error-desktop">
+                <CardContent className="pt-6">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-full bg-rose-500/20 flex items-center justify-center">
+                      <XCircle className="w-6 h-6 text-rose-400" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-bold text-rose-400">Errore Scansione</h3>
+                      <p className="text-sm text-muted-foreground">{scanResult.error}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+
+          <div className="lg:col-span-2">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between gap-4">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <Clock className="h-5 w-5" />
+                    Scansioni Recenti
+                  </CardTitle>
+                  <CardDescription>
+                    {recentScans.length > 0 ? `${recentScans.length} scansioni` : "Nessuna scansione recente"}
+                  </CardDescription>
+                </div>
+                {recentScans.length > 0 && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={clearHistory}
+                    data-testid="button-clear-history-desktop"
+                  >
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Cancella
+                  </Button>
+                )}
+              </CardHeader>
+              <CardContent>
+                {recentScans.length > 0 ? (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Stato</TableHead>
+                        <TableHead>Nome</TableHead>
+                        <TableHead>Tipo</TableHead>
+                        <TableHead>Dettaglio</TableHead>
+                        <TableHead>Ora</TableHead>
+                        <TableHead></TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {recentScans.map((scan, index) => (
+                        <TableRow key={index} data-testid={`row-scan-${index}`}>
+                          <TableCell>{getStatusBadge(scan)}</TableCell>
+                          <TableCell className="font-medium">
+                            {scan.person 
+                              ? `${scan.person.firstName} ${scan.person.lastName}`
+                              : "-"
+                            }
+                          </TableCell>
+                          <TableCell>
+                            {scan.person ? (
+                              <Badge variant="outline" className="capitalize">
+                                {scan.person.type === 'lista' ? 'Lista' : scan.person.type === 'biglietto' ? 'Biglietto' : 'Tavolo'}
+                              </Badge>
+                            ) : "-"}
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {scan.person?.listName || scan.person?.tableName || scan.person?.ticketCode || scan.error || "-"}
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {format(scan.scannedAt, "HH:mm:ss", { locale: it })}
+                          </TableCell>
+                          <TableCell>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setSelectedScan(scan);
+                                setIsDetailDialogOpen(true);
+                              }}
+                              data-testid={`button-view-scan-${index}`}
+                            >
+                              Dettagli
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                ) : (
+                  <div className="text-center py-12">
+                    <QrCode className="w-16 h-16 mx-auto text-muted-foreground/30 mb-4" />
+                    <p className="text-muted-foreground">Nessuna scansione recente</p>
+                    <p className="text-sm text-muted-foreground">Scansiona un QR code per iniziare</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+
+        <Dialog open={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Dettagli Scansione</DialogTitle>
+              <DialogDescription>
+                Informazioni complete sulla scansione
+              </DialogDescription>
+            </DialogHeader>
+            {selectedScan && (
+              <div className="space-y-4">
+                <div className="flex items-center gap-3">
+                  {selectedScan.success ? (
+                    <div className="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center">
+                      <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                    </div>
+                  ) : selectedScan.alreadyCheckedIn ? (
+                    <div className="w-10 h-10 rounded-full bg-amber-500/20 flex items-center justify-center">
+                      <AlertTriangle className="w-5 h-5 text-amber-400" />
+                    </div>
+                  ) : (
+                    <div className="w-10 h-10 rounded-full bg-rose-500/20 flex items-center justify-center">
+                      <XCircle className="w-5 h-5 text-rose-400" />
+                    </div>
+                  )}
+                  <div>
+                    <p className="font-bold">
+                      {selectedScan.success ? "Check-in Effettuato" : selectedScan.alreadyCheckedIn ? "Già Registrato" : "Errore"}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {format(selectedScan.scannedAt, "d MMM yyyy HH:mm:ss", { locale: it })}
+                    </p>
+                  </div>
+                </div>
+                {selectedScan.person && (
+                  <div className="grid grid-cols-2 gap-4 pt-4 border-t">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Nome</p>
+                      <p className="font-medium">{selectedScan.person.firstName} {selectedScan.person.lastName}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Tipo</p>
+                      <p className="font-medium capitalize">
+                        {selectedScan.person.type === 'lista' ? 'Lista' : selectedScan.person.type === 'biglietto' ? 'Biglietto' : 'Tavolo'}
+                      </p>
+                    </div>
+                    {selectedScan.person.phone && (
+                      <div>
+                        <p className="text-sm text-muted-foreground">Telefono</p>
+                        <p className="font-medium">{selectedScan.person.phone}</p>
+                      </div>
+                    )}
+                    {selectedScan.person.listName && (
+                      <div>
+                        <p className="text-sm text-muted-foreground">Lista</p>
+                        <p className="font-medium">{selectedScan.person.listName}</p>
+                      </div>
+                    )}
+                    {selectedScan.person.tableName && (
+                      <div>
+                        <p className="text-sm text-muted-foreground">Tavolo</p>
+                        <p className="font-medium">{selectedScan.person.tableName}</p>
+                      </div>
+                    )}
+                    {selectedScan.person.ticketCode && (
+                      <div>
+                        <p className="text-sm text-muted-foreground">Codice Biglietto</p>
+                        <p className="font-medium font-mono">{selectedScan.person.ticketCode}</p>
+                      </div>
+                    )}
+                    {selectedScan.person.ticketType && (
+                      <div>
+                        <p className="text-sm text-muted-foreground">Tipo Biglietto</p>
+                        <p className="font-medium">{selectedScan.person.ticketType}</p>
+                      </div>
+                    )}
+                    {selectedScan.person.sector && (
+                      <div>
+                        <p className="text-sm text-muted-foreground">Settore</p>
+                        <p className="font-medium">{selectedScan.person.sector}</p>
+                      </div>
+                    )}
+                    {selectedScan.person.price && (
+                      <div>
+                        <p className="text-sm text-muted-foreground">Prezzo</p>
+                        <p className="font-medium">€{parseFloat(selectedScan.person.price).toFixed(2)}</p>
+                      </div>
+                    )}
+                    {selectedScan.person.plusOnes !== undefined && selectedScan.person.plusOnes > 0 && (
+                      <div>
+                        <p className="text-sm text-muted-foreground">Accompagnatori</p>
+                        <p className="font-medium">+{selectedScan.person.plusOnes}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+                {selectedScan.error && (
+                  <div className="pt-4 border-t">
+                    <p className="text-sm text-muted-foreground">Errore</p>
+                    <p className="font-medium text-rose-400">{selectedScan.error}</p>
+                  </div>
+                )}
+                <div className="pt-4 border-t">
+                  <p className="text-sm text-muted-foreground">Codice QR</p>
+                  <p className="font-mono text-sm break-all">{selectedScan.qrCode}</p>
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+      </div>
+    );
+  }
 
   return (
     <MobileAppLayout

@@ -2,8 +2,10 @@ import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { isUnauthorizedError } from "@/lib/authUtils";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import {
   Form,
   FormControl,
@@ -17,7 +19,23 @@ import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { Plus, MapPin, Users, Clock, Globe, Ticket, ChevronRight, Calendar } from "lucide-react";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Plus, MapPin, Users, Clock, Globe, Ticket, ChevronRight, Calendar, Eye } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { insertLocationSchema, type Location, type InsertLocation, type Event } from "@shared/schema";
@@ -40,8 +58,10 @@ const springConfig = {
 
 export default function Locations() {
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
   const [, setLocationPath] = useLocation();
   const { toast } = useToast();
+  const isMobile = useIsMobile();
 
   const { data: locations, isLoading } = useQuery<Location[]>({
     queryKey: ['/api/locations'],
@@ -149,6 +169,373 @@ export default function Locations() {
       showBackButton showMenuButton
     />
   );
+
+  const handleDialogClose = () => {
+    setDialogOpen(false);
+    form.reset();
+  };
+
+  // Desktop version
+  if (!isMobile) {
+    return (
+      <div className="container mx-auto p-6 space-y-6" data-testid="page-locations">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">Locali</h1>
+            <p className="text-muted-foreground">Gestione delle sedi per i tuoi eventi</p>
+          </div>
+          <Button onClick={() => setDialogOpen(true)} data-testid="button-create-location-desktop">
+            <Plus className="w-4 h-4 mr-2" />
+            Nuovo Locale
+          </Button>
+        </div>
+
+        <div className="grid grid-cols-4 gap-4">
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-2xl font-bold">{locations?.length || 0}</div>
+              <p className="text-sm text-muted-foreground">Totale Locali</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-2xl font-bold text-teal-500">
+                {locations?.filter(l => l.isPublic).length || 0}
+              </div>
+              <p className="text-sm text-muted-foreground">Pubblici</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-2xl font-bold text-blue-500">
+                {locations?.reduce((sum, l) => sum + (l.capacity || 0), 0) || 0}
+              </div>
+              <p className="text-sm text-muted-foreground">Capienza Totale</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-2xl font-bold text-amber-500">
+                {events?.filter(e => e.status === 'ongoing' || e.status === 'scheduled').length || 0}
+              </div>
+              <p className="text-sm text-muted-foreground">Eventi Attivi</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Elenco Locali</CardTitle>
+            <CardDescription>Gestisci i locali per i tuoi eventi</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <div className="space-y-4">
+                {[1, 2, 3].map((i) => (
+                  <Skeleton key={i} className="h-16 w-full" />
+                ))}
+              </div>
+            ) : locations && locations.length > 0 ? (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Nome</TableHead>
+                    <TableHead>Città</TableHead>
+                    <TableHead>Capienza</TableHead>
+                    <TableHead>Orari</TableHead>
+                    <TableHead>Stato</TableHead>
+                    <TableHead>Eventi</TableHead>
+                    <TableHead className="text-right">Azioni</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {locations.map((location) => {
+                    const eventCounts = getLocationEventCount(location.id);
+                    return (
+                      <TableRow 
+                        key={location.id} 
+                        className="cursor-pointer hover-elevate"
+                        onClick={() => setLocationPath(`/locations/${location.id}`)}
+                        data-testid={`row-location-${location.id}`}
+                      >
+                        <TableCell>
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                              <MapPin className="w-5 h-5 text-primary" />
+                            </div>
+                            <div>
+                              <span className="font-medium">{location.name}</span>
+                              {location.address && (
+                                <p className="text-sm text-muted-foreground truncate max-w-[200px]">
+                                  {location.address}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>{location.city || '-'}</TableCell>
+                        <TableCell>
+                          {location.capacity ? (
+                            <div className="flex items-center gap-1">
+                              <Users className="w-4 h-4 text-muted-foreground" />
+                              <span>{location.capacity}</span>
+                            </div>
+                          ) : '-'}
+                        </TableCell>
+                        <TableCell>
+                          {location.openingHours ? (
+                            <div className="flex items-center gap-1">
+                              <Clock className="w-4 h-4 text-muted-foreground" />
+                              <span className="text-sm">{location.openingHours}</span>
+                            </div>
+                          ) : '-'}
+                        </TableCell>
+                        <TableCell>
+                          {location.isPublic ? (
+                            <Badge variant="outline" className="bg-teal-500/10 text-teal-600 border-teal-500/30">
+                              <Globe className="w-3 h-3 mr-1" />
+                              Pubblico
+                            </Badge>
+                          ) : (
+                            <Badge variant="secondary">Privato</Badge>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {eventCounts.active > 0 ? (
+                            <Badge className="bg-teal-500/20 text-teal-600 border-teal-500/30">
+                              <Calendar className="w-3 h-3 mr-1" />
+                              {eventCounts.active} attivi
+                            </Badge>
+                          ) : (
+                            <span className="text-muted-foreground text-sm">Nessuno</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button 
+                            variant="ghost" 
+                            size="icon"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setLocationPath(`/locations/${location.id}`);
+                            }}
+                            data-testid={`button-view-location-${location.id}`}
+                          >
+                            <Eye className="w-4 h-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            ) : (
+              <div className="text-center py-12">
+                <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
+                  <MapPin className="w-8 h-8 text-primary" />
+                </div>
+                <h3 className="text-lg font-semibold mb-2">Nessun locale</h3>
+                <p className="text-muted-foreground mb-6">Aggiungi il primo locale per iniziare</p>
+                <Button onClick={() => setDialogOpen(true)} data-testid="button-create-first-location-desktop">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Aggiungi Locale
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Nuovo Locale</DialogTitle>
+              <DialogDescription>Inserisci i dettagli del nuovo locale</DialogDescription>
+            </DialogHeader>
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="name"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Nome Locale</FormLabel>
+                        <FormControl>
+                          <Input {...field} data-testid="input-location-name-desktop" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="city"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Città</FormLabel>
+                        <FormControl>
+                          <Input {...field} value={field.value || ''} placeholder="es. Milano, Roma" data-testid="input-location-city-desktop" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <FormField
+                  control={form.control}
+                  name="address"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Indirizzo</FormLabel>
+                      <FormControl>
+                        <Textarea {...field} value={field.value || ''} data-testid="input-location-address-desktop" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="capacity"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Capienza (persone)</FormLabel>
+                        <FormControl>
+                          <Input
+                            {...field}
+                            type="number"
+                            value={field.value || ''}
+                            onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : undefined)}
+                            data-testid="input-location-capacity-desktop"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="openingHours"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Orari di Apertura</FormLabel>
+                        <FormControl>
+                          <Input {...field} value={field.value || ''} placeholder="es. Ven-Sab 23:00-05:00" data-testid="input-opening-hours-desktop" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <FormField
+                  control={form.control}
+                  name="notes"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Note</FormLabel>
+                      <FormControl>
+                        <Textarea {...field} value={field.value || ''} placeholder="Tipo locale, impianti disponibili, ecc." data-testid="input-location-notes-desktop" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <div className="border-t pt-4">
+                  <div className="flex items-center gap-2 mb-4">
+                    <Ticket className="w-5 h-5 text-primary" />
+                    <span className="font-semibold">Impostazioni SIAE</span>
+                  </div>
+                  <FormField
+                    control={form.control}
+                    name="siaeLocationCode"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Codice Locale SIAE</FormLabel>
+                        <FormControl>
+                          <Input {...field} value={field.value || ''} placeholder="es. 12345678" data-testid="input-siae-location-code-desktop" />
+                        </FormControl>
+                        <p className="text-sm text-muted-foreground">Codice identificativo del locale rilasciato dalla SIAE</p>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <div className="border-t pt-4">
+                  <div className="flex items-center gap-2 mb-4">
+                    <Globe className="w-5 h-5 text-teal-500" />
+                    <span className="font-semibold">Vetrina Pubblica</span>
+                  </div>
+
+                  <FormField
+                    control={form.control}
+                    name="isPublic"
+                    render={({ field }) => (
+                      <FormItem className="flex items-center justify-between rounded-lg border p-4">
+                        <div>
+                          <FormLabel className="font-medium">Mostra nella Vetrina</FormLabel>
+                          <p className="text-sm text-muted-foreground">Rendi visibile il locale al pubblico</p>
+                        </div>
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                            data-testid="switch-is-public-desktop"
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+
+                  <div className="grid grid-cols-2 gap-4 mt-4">
+                    <FormField
+                      control={form.control}
+                      name="heroImageUrl"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>URL Immagine di Copertina</FormLabel>
+                          <FormControl>
+                            <Input {...field} value={field.value || ''} placeholder="https://esempio.com/immagine.jpg" data-testid="input-hero-image-desktop" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="shortDescription"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Descrizione Breve</FormLabel>
+                          <FormControl>
+                            <Input {...field} value={field.value || ''} placeholder="Una breve descrizione" data-testid="input-short-description-desktop" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </div>
+
+                <DialogFooter className="gap-2">
+                  <Button type="button" variant="outline" onClick={handleDialogClose} data-testid="button-cancel-location-desktop">
+                    Annulla
+                  </Button>
+                  <Button type="submit" disabled={createMutation.isPending} data-testid="button-submit-location-desktop">
+                    {createMutation.isPending ? "Creazione..." : "Crea Locale"}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </Form>
+          </DialogContent>
+        </Dialog>
+      </div>
+    );
+  }
 
   return (
     <MobileAppLayout

@@ -34,12 +34,22 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Plus, Truck, Edit, Trash2, Search, ArrowLeft, Mail, Phone, MapPin, FileText } from "lucide-react";
 import { Link } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { insertSupplierSchema, type Supplier, type InsertSupplier } from "@shared/schema";
 import { useAuth } from "@/hooks/useAuth";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { motion } from "framer-motion";
 import { 
   MobileAppLayout, 
@@ -181,6 +191,7 @@ export default function Suppliers() {
   const [searchQuery, setSearchQuery] = useState("");
   const { toast } = useToast();
   const { user } = useAuth();
+  const isMobile = useIsMobile();
   
   const canManageSuppliers = user?.role === 'super_admin' || user?.role === 'gestore';
 
@@ -353,6 +364,367 @@ export default function Suppliers() {
 
   const activeSuppliers = filteredSuppliers.filter(s => s.active);
   const inactiveSuppliers = filteredSuppliers.filter(s => !s.active);
+
+  const formContent = (
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        <FormField
+          control={form.control}
+          name="name"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Nome *</FormLabel>
+              <FormControl>
+                <Input 
+                  {...field} 
+                  placeholder="Nome fornitore" 
+                  data-testid="input-supplier-name"
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        
+        <FormField
+          control={form.control}
+          name="vatNumber"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Partita IVA</FormLabel>
+              <FormControl>
+                <Input 
+                  {...field} 
+                  value={field.value ?? ''} 
+                  placeholder="IT12345678901" 
+                  data-testid="input-supplier-vat"
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <div className="grid grid-cols-2 gap-4">
+          <FormField
+            control={form.control}
+            name="email"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Email</FormLabel>
+                <FormControl>
+                  <Input 
+                    {...field} 
+                    value={field.value ?? ''} 
+                    type="email" 
+                    placeholder="info@fornitore.it" 
+                    data-testid="input-supplier-email"
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          
+          <FormField
+            control={form.control}
+            name="phone"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Telefono</FormLabel>
+                <FormControl>
+                  <Input 
+                    {...field} 
+                    value={field.value ?? ''} 
+                    placeholder="+39 02 1234567" 
+                    data-testid="input-supplier-phone"
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+
+        <FormField
+          control={form.control}
+          name="address"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Indirizzo</FormLabel>
+              <FormControl>
+                <Textarea 
+                  {...field} 
+                  value={field.value ?? ''} 
+                  placeholder="Via, Città, CAP" 
+                  rows={2} 
+                  data-testid="input-supplier-address"
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="notes"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Note</FormLabel>
+              <FormControl>
+                <Textarea 
+                  {...field} 
+                  value={field.value ?? ''} 
+                  placeholder="Note aggiuntive..." 
+                  rows={2} 
+                  data-testid="input-supplier-notes"
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="active"
+          render={({ field }) => (
+            <FormItem className="flex items-center gap-3 space-y-0">
+              <FormControl>
+                <input
+                  type="checkbox"
+                  checked={field.value}
+                  onChange={field.onChange}
+                  className="h-5 w-5 rounded"
+                  data-testid="checkbox-supplier-active"
+                />
+              </FormControl>
+              <FormLabel className="!mt-0">Fornitore attivo</FormLabel>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <DialogFooter className="gap-2 pt-4">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setDialogOpen(false)}
+            data-testid="button-cancel-supplier"
+          >
+            Annulla
+          </Button>
+          <Button
+            type="submit"
+            disabled={createMutation.isPending || updateMutation.isPending}
+            data-testid="button-submit-supplier"
+          >
+            {createMutation.isPending || updateMutation.isPending ? 'Salvataggio...' : 
+              editingSupplier ? 'Salva Modifiche' : 'Crea Fornitore'}
+          </Button>
+        </DialogFooter>
+      </form>
+    </Form>
+  );
+
+  if (!isMobile) {
+    return (
+      <div className="container mx-auto p-6 space-y-6" data-testid="page-suppliers">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">Fornitori</h1>
+            <p className="text-muted-foreground">Gestione fornitori aziendali</p>
+          </div>
+          {canManageSuppliers && (
+            <Button onClick={() => handleOpenDialog()} data-testid="button-create-supplier">
+              <Plus className="w-4 h-4 mr-2" />
+              Nuovo Fornitore
+            </Button>
+          )}
+        </div>
+
+        <div className="grid grid-cols-4 gap-4">
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-2xl font-bold">{suppliers?.length || 0}</div>
+              <p className="text-sm text-muted-foreground">Totale Fornitori</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-2xl font-bold text-green-500">{activeSuppliers.length}</div>
+              <p className="text-sm text-muted-foreground">Attivi</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-2xl font-bold text-muted-foreground">{inactiveSuppliers.length}</div>
+              <p className="text-sm text-muted-foreground">Disattivati</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-2xl font-bold text-blue-500">
+                {suppliers?.filter(s => s.email).length || 0}
+              </div>
+              <p className="text-sm text-muted-foreground">Con Email</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <CardTitle>Elenco Fornitori</CardTitle>
+                <CardDescription>Gestisci i tuoi fornitori</CardDescription>
+              </div>
+              <div className="relative w-72">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder="Cerca per nome o P.IVA..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10"
+                  data-testid="input-search-suppliers"
+                />
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <div className="space-y-4">
+                {[...Array(5)].map((_, i) => (
+                  <Skeleton key={i} className="h-16 w-full" />
+                ))}
+              </div>
+            ) : filteredSuppliers.length === 0 ? (
+              <div className="text-center py-12">
+                <Truck className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <p className="text-lg text-muted-foreground">
+                  {searchQuery ? "Nessun fornitore trovato" : "Nessun fornitore configurato"}
+                </p>
+                {!searchQuery && canManageSuppliers && (
+                  <p className="text-sm text-muted-foreground mt-2">
+                    Clicca "Nuovo Fornitore" per aggiungere il primo fornitore
+                  </p>
+                )}
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Nome</TableHead>
+                    <TableHead>P.IVA</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Telefono</TableHead>
+                    <TableHead>Stato</TableHead>
+                    <TableHead className="text-right">Azioni</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredSuppliers.map((supplier) => (
+                    <TableRow key={supplier.id} data-testid={`row-supplier-${supplier.id}`}>
+                      <TableCell className="font-medium">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-rose-500 to-pink-600 flex items-center justify-center flex-shrink-0">
+                            <Truck className="h-4 w-4 text-white" />
+                          </div>
+                          <span>{supplier.name}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>{supplier.vatNumber || '-'}</TableCell>
+                      <TableCell>
+                        {supplier.email ? (
+                          <div className="flex items-center gap-1">
+                            <Mail className="h-3 w-3 text-muted-foreground" />
+                            <span className="text-sm">{supplier.email}</span>
+                          </div>
+                        ) : '-'}
+                      </TableCell>
+                      <TableCell>
+                        {supplier.phone ? (
+                          <div className="flex items-center gap-1">
+                            <Phone className="h-3 w-3 text-muted-foreground" />
+                            <span className="text-sm">{supplier.phone}</span>
+                          </div>
+                        ) : '-'}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={supplier.active ? "default" : "secondary"}>
+                          {supplier.active ? 'Attivo' : 'Disattivo'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleOpenDialog(supplier)}
+                            disabled={!canManageSuppliers}
+                            data-testid={`button-edit-supplier-${supplier.id}`}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setDeletingSupplier(supplier)}
+                            disabled={!canManageSuppliers}
+                            className="text-destructive hover:text-destructive"
+                            data-testid={`button-delete-supplier-${supplier.id}`}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+
+        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle>
+                {editingSupplier ? 'Modifica Fornitore' : 'Nuovo Fornitore'}
+              </DialogTitle>
+              <DialogDescription>
+                {editingSupplier ? 'Modifica i dati del fornitore' : 'Inserisci i dati del nuovo fornitore'}
+              </DialogDescription>
+            </DialogHeader>
+            {formContent}
+          </DialogContent>
+        </Dialog>
+
+        <AlertDialog open={!!deletingSupplier} onOpenChange={(open) => !open && setDeletingSupplier(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Conferma Eliminazione</AlertDialogTitle>
+              <AlertDialogDescription>
+                Sei sicuro di voler eliminare il fornitore "{deletingSupplier?.name}"?
+                Questa azione non può essere annullata.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel data-testid="button-cancel-delete">Annulla</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => deletingSupplier && deleteMutation.mutate(deletingSupplier.id)}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                data-testid="button-confirm-delete"
+              >
+                Elimina
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </div>
+    );
+  }
 
   const headerContent = (
     <MobileHeader

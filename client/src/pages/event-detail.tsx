@@ -4,8 +4,19 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog,
   DialogContent,
@@ -133,6 +144,7 @@ export default function EventDetail() {
   const [adjustReason, setAdjustReason] = useState('');
   const { toast } = useToast();
   const { user, isLoading: authLoading } = useAuth();
+  const isMobile = useIsMobile();
 
   const isBartender = user?.role === 'bartender';
   useEffect(() => {
@@ -1103,6 +1115,658 @@ export default function EventDetail() {
       )}
     </motion.div>
   );
+
+  // Desktop version
+  if (!isMobile) {
+    return (
+      <div className="container mx-auto p-6 space-y-6" data-testid="page-event-detail">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" size="icon" onClick={() => setLocation('/events')} data-testid="button-back">
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <div>
+              <h1 className="text-3xl font-bold">{event.name}</h1>
+              <div className="flex items-center gap-2 mt-1">
+                <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${status.bgColor} ${status.color}`}>
+                  <StatusIcon className="h-3 w-3" />
+                  {status.label}
+                </span>
+              </div>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setStatusChangeDialogOpen(true)} data-testid="button-change-status-desktop">
+              <Clock className="w-4 h-4 mr-2" />
+              Cambia Stato
+            </Button>
+            <Link href={`/events/${id}/direct-stock`}>
+              <Button variant="outline" data-testid="button-direct-stock">
+                <Warehouse className="w-4 h-4 mr-2" />
+                Carico Diretto
+              </Button>
+            </Link>
+            <Link href={`/reports?eventId=${id}`}>
+              <Button variant="outline" data-testid="button-reports">
+                <Package className="w-4 h-4 mr-2" />
+                Report
+              </Button>
+            </Link>
+            {user && (user.role === 'admin' || user.role === 'super_admin' || user.role === 'gestore') && (
+              <Button variant="destructive" onClick={() => setDeleteDialogOpen(true)} data-testid="button-delete-event">
+                <Trash2 className="w-4 h-4 mr-2" />
+                Elimina
+              </Button>
+            )}
+          </div>
+        </div>
+
+        {/* Stats Cards */}
+        <div className="grid grid-cols-4 gap-4">
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-md bg-primary/10 flex items-center justify-center">
+                  <Calendar className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Data</p>
+                  <p className="font-semibold">
+                    {new Date(event.startDatetime).toLocaleDateString('it-IT', { day: 'numeric', month: 'short', year: 'numeric' })}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-md bg-blue-500/10 flex items-center justify-center">
+                  <Package className="h-5 w-5 text-blue-500" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Prodotti</p>
+                  <p className="text-2xl font-bold">{totalStockItems}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-md bg-violet-500/10 flex items-center justify-center">
+                  <MapPin className="h-5 w-5 text-violet-500" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Postazioni</p>
+                  <p className="text-2xl font-bold">{totalStations}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-md bg-teal-500/10 flex items-center justify-center">
+                  <Users className="h-5 w-5 text-teal-500" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Staff</p>
+                  <p className="text-2xl font-bold">{assignedBartendersCount}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Tabs */}
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabType)} className="space-y-6">
+          <TabsList>
+            {tabs.map((tab) => {
+              const Icon = tab.icon;
+              return (
+                <TabsTrigger key={tab.id} value={tab.id} data-testid={`desktop-tab-${tab.id}`}>
+                  <Icon className="h-4 w-4 mr-2" />
+                  {tab.label}
+                </TabsTrigger>
+              );
+            })}
+          </TabsList>
+
+          {/* Info Tab */}
+          <TabsContent value="info" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Dettagli Evento</CardTitle>
+                <CardDescription>Informazioni generali sull'evento</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="flex items-center gap-3">
+                    <Calendar className="h-5 w-5 text-muted-foreground" />
+                    <div>
+                      <p className="text-sm text-muted-foreground">Data Evento</p>
+                      <p className="font-medium">
+                        {new Date(event.startDatetime).toLocaleDateString('it-IT', {
+                          weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
+                        })}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Clock className="h-5 w-5 text-muted-foreground" />
+                    <div>
+                      <p className="text-sm text-muted-foreground">Orario</p>
+                      <p className="font-medium">
+                        {new Date(event.startDatetime).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}
+                        {event.endDatetime && ` - ${new Date(event.endDatetime).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}`}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Tickets Tab */}
+          <TabsContent value="tickets" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Gestione Biglietti</CardTitle>
+                <CardDescription>Visualizza e gestisci i biglietti per questo evento</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Button onClick={() => setLocation(`/siae/ticketed-events/${id}`)} data-testid="button-manage-tickets-desktop">
+                  <Ticket className="h-4 w-4 mr-2" />
+                  Vai alla Gestione Biglietti
+                </Button>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Staff Tab */}
+          <TabsContent value="staff" className="space-y-6">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between gap-4">
+                <div>
+                  <CardTitle>Postazioni</CardTitle>
+                  <CardDescription>Gestisci le postazioni e assegna lo staff</CardDescription>
+                </div>
+                <Button onClick={() => setStationDialogOpen(true)} data-testid="button-create-station-desktop">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Nuova Postazione
+                </Button>
+              </CardHeader>
+              <CardContent>
+                {stationsLoading ? (
+                  <div className="space-y-3">
+                    <Skeleton className="h-12 w-full" />
+                    <Skeleton className="h-12 w-full" />
+                  </div>
+                ) : allStations.length > 0 ? (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Nome</TableHead>
+                        <TableHead>Tipo</TableHead>
+                        <TableHead>Staff Assegnato</TableHead>
+                        <TableHead className="text-right">Azioni</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {allStations.map((station) => {
+                        const assignedBartenders = users?.filter(u => station.bartenderIds?.includes(u.id)) || [];
+                        const isEditing = editingStationIds.has(station.id);
+                        return (
+                          <TableRow key={station.id} data-testid={`station-row-${station.id}`}>
+                            <TableCell className="font-medium">{station.name}</TableCell>
+                            <TableCell>
+                              {station.isGeneral ? (
+                                <Badge variant="secondary">Fissa</Badge>
+                              ) : (
+                                <Badge>Evento</Badge>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              {isEditing ? (
+                                <div className="flex flex-wrap gap-2">
+                                  {bartenders.map((bartender) => {
+                                    const currentIds = editingBartenderIds.get(station.id) || [];
+                                    return (
+                                      <label key={bartender.id} className="flex items-center gap-2 cursor-pointer">
+                                        <Checkbox
+                                          checked={currentIds.includes(bartender.id)}
+                                          onCheckedChange={(checked) => {
+                                            setEditingBartenderIds(prev => {
+                                              const newMap = new Map(prev);
+                                              const ids = newMap.get(station.id) || [];
+                                              if (checked) {
+                                                newMap.set(station.id, [...ids, bartender.id]);
+                                              } else {
+                                                newMap.set(station.id, ids.filter(i => i !== bartender.id));
+                                              }
+                                              return newMap;
+                                            });
+                                          }}
+                                        />
+                                        <span className="text-sm">
+                                          {bartender.firstName && bartender.lastName
+                                            ? `${bartender.firstName} ${bartender.lastName}`
+                                            : bartender.email}
+                                        </span>
+                                      </label>
+                                    );
+                                  })}
+                                </div>
+                              ) : assignedBartenders.length > 0 ? (
+                                <div className="flex flex-wrap gap-1">
+                                  {assignedBartenders.map(b => (
+                                    <Badge key={b.id} variant="secondary">
+                                      {b.firstName && b.lastName ? `${b.firstName} ${b.lastName}` : b.email}
+                                    </Badge>
+                                  ))}
+                                </div>
+                              ) : (
+                                <span className="text-muted-foreground text-sm">Nessuno assegnato</span>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {isEditing ? (
+                                <div className="flex gap-2 justify-end">
+                                  <Button
+                                    size="sm"
+                                    onClick={() => {
+                                      const ids = editingBartenderIds.get(station.id) || [];
+                                      updateBartendersMutation.mutate({ stationId: station.id, bartenderIds: ids });
+                                    }}
+                                    disabled={updateBartendersMutation.isPending}
+                                  >
+                                    Salva
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => {
+                                      setEditingStationIds(prev => {
+                                        const s = new Set(prev);
+                                        s.delete(station.id);
+                                        return s;
+                                      });
+                                      setEditingBartenderIds(prev => {
+                                        const m = new Map(prev);
+                                        m.delete(station.id);
+                                        return m;
+                                      });
+                                    }}
+                                  >
+                                    Annulla
+                                  </Button>
+                                </div>
+                              ) : (
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  onClick={() => {
+                                    setEditingStationIds(prev => new Set(prev).add(station.id));
+                                    setEditingBartenderIds(prev => {
+                                      const newMap = new Map(prev);
+                                      if (!newMap.has(station.id)) {
+                                        newMap.set(station.id, station.bartenderIds || []);
+                                      }
+                                      return newMap;
+                                    });
+                                  }}
+                                  data-testid={`button-edit-bartenders-desktop-${station.id}`}
+                                >
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                ) : (
+                  <div className="text-center py-10">
+                    <MapPin className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                    <p className="text-muted-foreground">Nessuna postazione</p>
+                    <Button className="mt-4" onClick={() => setStationDialogOpen(true)}>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Crea Postazione
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Inventory Tab */}
+          <TabsContent value="inventory" className="space-y-6">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between gap-4">
+                <div>
+                  <CardTitle>Stock Evento</CardTitle>
+                  <CardDescription>Prodotti trasferiti a questo evento</CardDescription>
+                </div>
+                <Button onClick={() => setTransferDialogOpen(true)} data-testid="button-transfer-stock-desktop">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Trasferisci Stock
+                </Button>
+              </CardHeader>
+              <CardContent>
+                {eventStocksLoading ? (
+                  <div className="space-y-3">
+                    <Skeleton className="h-12 w-full" />
+                    <Skeleton className="h-12 w-full" />
+                  </div>
+                ) : eventStocks && eventStocks.length > 0 ? (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Prodotto</TableHead>
+                        <TableHead>Postazione</TableHead>
+                        <TableHead className="text-right">Quantità</TableHead>
+                        <TableHead className="text-right">Azioni</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {eventStocks.map((stock) => {
+                        const product = products?.find(p => p.id === stock.productId);
+                        const station = eventStations?.find(s => s.id === stock.stationId);
+                        const quantity = parseFloat(stock.quantity);
+                        const isLowStock = product?.minThreshold && !isNaN(quantity) && quantity < parseFloat(product.minThreshold);
+                        return (
+                          <TableRow key={stock.id} data-testid={`stock-row-${stock.id}`}>
+                            <TableCell className="font-medium">
+                              <div className="flex items-center gap-2">
+                                {product?.name || 'Prodotto'}
+                                {isLowStock && (
+                                  <Badge variant="destructive">
+                                    <AlertTriangle className="h-3 w-3" />
+                                  </Badge>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell>{station ? station.name : 'Magazzino Evento'}</TableCell>
+                            <TableCell className="text-right font-mono">
+                              {isNaN(quantity) ? '0' : quantity.toFixed(2)}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                onClick={() => handleEditStock(stock)}
+                                data-testid={`button-edit-stock-desktop-${stock.id}`}
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                ) : (
+                  <div className="text-center py-10">
+                    <Package className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                    <p className="text-muted-foreground">Nessun prodotto trasferito</p>
+                    <Button className="mt-4" onClick={() => setTransferDialogOpen(true)}>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Trasferisci Stock
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+
+        {/* Dialogs */}
+        <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Eliminare l'evento?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Questa azione è irreversibile. Tutti i dati dell'evento verranno eliminati.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Annulla</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => deleteEventMutation.mutate()}
+                disabled={deleteEventMutation.isPending}
+                className="bg-destructive text-destructive-foreground"
+              >
+                {deleteEventMutation.isPending ? 'Eliminazione...' : 'Elimina'}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        <Dialog open={statusChangeDialogOpen} onOpenChange={setStatusChangeDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Cambia Stato Evento</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-3 py-4">
+              {Object.entries(statusConfig).map(([key, config]) => {
+                const Icon = config.icon;
+                const isCurrentStatus = event.status === key;
+                return (
+                  <button
+                    key={key}
+                    onClick={() => changeStatusMutation.mutate(key)}
+                    disabled={changeStatusMutation.isPending || isCurrentStatus}
+                    className={`w-full flex items-center gap-4 p-4 rounded-md transition-colors ${
+                      isCurrentStatus
+                        ? 'bg-primary/15 border-2 border-primary'
+                        : 'bg-muted/50 hover-elevate border-2 border-transparent'
+                    }`}
+                    data-testid={`status-option-desktop-${key}`}
+                  >
+                    <div className={`w-10 h-10 rounded-md ${config.bgColor} flex items-center justify-center`}>
+                      <Icon className={`h-5 w-5 ${config.color}`} />
+                    </div>
+                    <span className="font-medium">{config.label}</span>
+                    {isCurrentStatus && <CheckCircle2 className="h-5 w-5 text-primary ml-auto" />}
+                  </button>
+                );
+              })}
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={stationDialogOpen} onOpenChange={setStationDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Nuova Postazione</DialogTitle>
+            </DialogHeader>
+            <Form {...stationForm}>
+              <form
+                onSubmit={stationForm.handleSubmit((data) => {
+                  createStationMutation.mutate({ ...data, bartenderIds: selectedBartenderIds });
+                })}
+                className="space-y-4"
+              >
+                <FormField
+                  control={stationForm.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Nome Postazione</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="Es. Bar Centrale" data-testid="input-station-name-desktop" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormItem>
+                  <FormLabel>Baristi (opzionale)</FormLabel>
+                  <div className="border rounded-md p-3 space-y-2 max-h-48 overflow-y-auto">
+                    {bartenders.length > 0 ? bartenders.map((bartender) => (
+                      <label key={bartender.id} className="flex items-center gap-3 p-2 rounded-md cursor-pointer hover-elevate">
+                        <Checkbox
+                          checked={selectedBartenderIds.includes(bartender.id)}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              setSelectedBartenderIds([...selectedBartenderIds, bartender.id]);
+                            } else {
+                              setSelectedBartenderIds(selectedBartenderIds.filter(i => i !== bartender.id));
+                            }
+                          }}
+                        />
+                        <span className="text-sm">
+                          {bartender.firstName && bartender.lastName
+                            ? `${bartender.firstName} ${bartender.lastName}`
+                            : bartender.email}
+                        </span>
+                      </label>
+                    )) : (
+                      <p className="text-sm text-muted-foreground p-2">Nessun barista disponibile</p>
+                    )}
+                  </div>
+                </FormItem>
+                <DialogFooter>
+                  <Button type="button" variant="outline" onClick={() => setStationDialogOpen(false)}>
+                    Annulla
+                  </Button>
+                  <Button type="submit" disabled={createStationMutation.isPending}>
+                    {createStationMutation.isPending ? 'Creazione...' : 'Crea'}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </Form>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={transferDialogOpen} onOpenChange={setTransferDialogOpen}>
+          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Trasferisci Stock</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div>
+                <label className="text-sm font-medium mb-2 block">Destinazione</label>
+                <Select value={destinationStationId} onValueChange={setDestinationStationId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleziona destinazione" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="general">Magazzino Evento</SelectItem>
+                    {allStations.map((station) => (
+                      <SelectItem key={station.id} value={station.id}>
+                        {station.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {generalStocks && generalStocks.length > 0 ? (
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">Prodotti disponibili</p>
+                  {generalStocks.map((stock) => {
+                    const isSelected = selectedProducts.has(stock.productId);
+                    const quantity = selectedProducts.get(stock.productId) || '';
+                    const available = parseFloat(stock.quantity);
+                    return (
+                      <div key={stock.productId} className="p-3 rounded-md bg-muted/50 flex items-center gap-4">
+                        <Checkbox
+                          checked={isSelected}
+                          onCheckedChange={(checked) => handleProductToggle(stock.productId, checked as boolean)}
+                        />
+                        <div className="flex-1">
+                          <p className="font-medium">{stock.productName}</p>
+                          <p className="text-sm text-muted-foreground">
+                            Disponibili: {available.toFixed(2)} {stock.unitOfMeasure}
+                          </p>
+                        </div>
+                        {isSelected && (
+                          <Input
+                            type="number"
+                            step="0.01"
+                            min="0.01"
+                            max={available}
+                            placeholder="Qtà"
+                            value={quantity}
+                            onChange={(e) => handleQuantityChange(stock.productId, e.target.value)}
+                            className="w-24"
+                          />
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <Package className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
+                  <p className="text-muted-foreground">Nessun prodotto disponibile</p>
+                </div>
+              )}
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setTransferDialogOpen(false)}>
+                Annulla
+              </Button>
+              <Button
+                onClick={validateAndSubmitTransfers}
+                disabled={transferStockMutation.isPending || selectedProducts.size === 0}
+              >
+                {transferStockMutation.isPending ? 'Trasferimento...' : 'Trasferisci'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={editStockDialogOpen} onOpenChange={setEditStockDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Correggi Quantità</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="p-4 rounded-md bg-muted/50">
+                <p className="text-sm text-muted-foreground">Prodotto</p>
+                <p className="font-bold">{editingStock?.productName}</p>
+              </div>
+              <div className="p-4 rounded-md bg-muted/50">
+                <p className="text-sm text-muted-foreground">Quantità attuale</p>
+                <p className="text-2xl font-bold">{editingStock?.currentQuantity}</p>
+              </div>
+              <div>
+                <label className="text-sm font-medium mb-2 block">Nuova Quantità</label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={newQuantity}
+                  onChange={(e) => setNewQuantity(e.target.value)}
+                  placeholder="0.00"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium mb-2 block">Motivo (opzionale)</label>
+                <Input
+                  value={adjustReason}
+                  onChange={(e) => setAdjustReason(e.target.value)}
+                  placeholder="Es. Correzione inventario"
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setEditStockDialogOpen(false)}>
+                Annulla
+              </Button>
+              <Button onClick={submitStockAdjustment} disabled={adjustStockMutation.isPending}>
+                {adjustStockMutation.isPending ? 'Salvataggio...' : 'Salva'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+    );
+  }
 
   return (
     <MobileAppLayout

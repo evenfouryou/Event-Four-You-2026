@@ -3,6 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -213,6 +214,7 @@ function SectionHeader({
 
 export default function NightFilePage() {
   const { user } = useAuth();
+  const isMobile = useIsMobile();
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("beverage");
   const isAdmin = user?.role === "super_admin" || user?.role === "gestore";
@@ -231,6 +233,158 @@ export default function NightFilePage() {
   const activeEvents = events.filter(e => 
     e.status === 'ongoing' || e.status === 'scheduled' || e.status === 'closed'
   ).sort((a, b) => new Date(b.startDatetime || 0).getTime() - new Date(a.startDatetime || 0).getTime());
+
+  // Desktop version
+  if (!isMobile) {
+    return (
+      <div className="container mx-auto p-6 space-y-6" data-testid="page-night-file">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">File della Serata</h1>
+            <p className="text-muted-foreground">Gestione completa degli eventi</p>
+          </div>
+        </div>
+
+        {eventsLoading ? (
+          <div className="flex items-center justify-center min-h-[40vh]">
+            <div className="text-muted-foreground">Caricamento...</div>
+          </div>
+        ) : selectedEventId && selectedEvent ? (
+          <div className="space-y-6">
+            <div className="flex items-center gap-4">
+              <Button 
+                variant="ghost" 
+                onClick={() => setSelectedEventId(null)}
+                data-testid="button-back-events"
+              >
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Torna agli eventi
+              </Button>
+              <div className="flex-1">
+                <h2 className="text-2xl font-bold" data-testid="text-event-file-title">{selectedEvent.name}</h2>
+                <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                  {selectedEvent.startDatetime && (
+                    <span className="flex items-center gap-1">
+                      <Calendar className="h-4 w-4" />
+                      {format(new Date(selectedEvent.startDatetime), "dd MMMM yyyy", { locale: it })}
+                    </span>
+                  )}
+                  {eventLocation && (
+                    <span className="flex items-center gap-1">
+                      <MapPin className="h-4 w-4" />
+                      {eventLocation.name}
+                    </span>
+                  )}
+                </div>
+              </div>
+              <Badge className={`${
+                selectedEvent.status === 'ongoing' 
+                  ? 'bg-teal-500/20 text-teal-400' 
+                  : selectedEvent.status === 'closed' 
+                    ? 'bg-rose-500/20 text-rose-400' 
+                    : 'bg-blue-500/20 text-blue-400'
+              }`}>
+                {selectedEvent.status === 'ongoing' ? 'In Corso' : selectedEvent.status === 'closed' ? 'Chiuso' : 'Programmato'}
+              </Badge>
+            </div>
+
+            <div className="flex gap-2 flex-wrap">
+              {tabs.map((tab) => {
+                const Icon = tab.icon;
+                const isActive = activeTab === tab.id;
+                return (
+                  <Button
+                    key={tab.id}
+                    variant={isActive ? "default" : "outline"}
+                    onClick={() => setActiveTab(tab.id)}
+                    className="gap-2"
+                    data-testid={`tab-${tab.id}`}
+                  >
+                    <Icon className="h-4 w-4" />
+                    {tab.label}
+                  </Button>
+                );
+              })}
+            </div>
+
+            <div className="min-h-[50vh]">
+              {activeTab === "beverage" && <BeverageSection eventId={selectedEventId} />}
+              {activeTab === "cassa" && (
+                <div className="grid gap-6 lg:grid-cols-2">
+                  <CashPositionsSection eventId={selectedEventId} isAdmin={isAdmin} />
+                  <CashFundsSection eventId={selectedEventId} isAdmin={isAdmin} />
+                </div>
+              )}
+              {activeTab === "incassi" && <CashEntriesSection eventId={selectedEventId} isAdmin={isAdmin} />}
+              {activeTab === "personale" && <PersonnelSection eventId={selectedEventId} isAdmin={isAdmin} />}
+              {activeTab === "costi" && <CostsSection eventId={selectedEventId} isAdmin={isAdmin} />}
+              {activeTab === "riepilogo" && <SummarySection eventId={selectedEventId} />}
+            </div>
+          </div>
+        ) : activeEvents.length === 0 ? (
+          <Card className="p-12 text-center">
+            <Calendar className="h-16 w-16 mx-auto mb-4 text-muted-foreground/50" />
+            <h3 className="text-xl font-semibold mb-2">Nessun Evento</h3>
+            <p className="text-muted-foreground">
+              Crea prima un evento dalla sezione Eventi
+            </p>
+          </Card>
+        ) : (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {activeEvents.map((event) => {
+              const location = locations.find(l => l.id === event.locationId);
+              return (
+                <Card 
+                  key={event.id}
+                  className="hover-elevate cursor-pointer overflow-hidden"
+                  onClick={() => setSelectedEventId(event.id)}
+                  data-testid={`card-event-${event.id}`}
+                >
+                  <div className={`h-1 ${
+                    event.status === 'ongoing' ? 'bg-gradient-to-r from-teal-500 to-cyan-500' : 
+                    event.status === 'closed' ? 'bg-gradient-to-r from-rose-500 to-pink-500' :
+                    'bg-gradient-to-r from-blue-500 to-indigo-500'
+                  }`} />
+                  <CardHeader className="pb-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <CardTitle className="text-lg">{event.name}</CardTitle>
+                      <Badge className={`flex-shrink-0 ${
+                        event.status === 'ongoing' 
+                          ? 'bg-teal-500/20 text-teal-400' 
+                          : event.status === 'closed' 
+                            ? 'bg-rose-500/20 text-rose-400' 
+                            : 'bg-blue-500/20 text-blue-400'
+                      }`}>
+                        {event.status === 'ongoing' ? 'In Corso' : event.status === 'closed' ? 'Chiuso' : 'Programmato'}
+                      </Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    {event.startDatetime && (
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Calendar className="h-4 w-4" />
+                        {format(new Date(event.startDatetime), "dd MMMM yyyy", { locale: it })}
+                      </div>
+                    )}
+                    {location && (
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <MapPin className="h-4 w-4" />
+                        {location.name}
+                      </div>
+                    )}
+                  </CardContent>
+                  <CardFooter className="pt-3 border-t flex items-center justify-between gap-2">
+                    <span className="text-sm text-muted-foreground">Apri file serata</span>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                  </CardFooter>
+                </Card>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  }
 
   if (eventsLoading) {
     return (

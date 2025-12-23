@@ -4,12 +4,30 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import {
   MobileAppLayout,
   MobileHeader,
@@ -67,7 +85,9 @@ export default function StationDetail() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const { user } = useAuth();
+  const isMobile = useIsMobile();
   const [adjustSheetOpen, setAdjustSheetOpen] = useState(false);
+  const [adjustDialogOpen, setAdjustDialogOpen] = useState(false);
   const [selectedStock, setSelectedStock] = useState<EnrichedStock | null>(null);
   const [newQuantity, setNewQuantity] = useState('');
   const [adjustReason, setAdjustReason] = useState('');
@@ -125,6 +145,7 @@ export default function StationDetail() {
       queryClient.invalidateQueries({ queryKey: ['/api/stock/movements'] });
       queryClient.invalidateQueries({ queryKey: ['/api/events', eventId, 'stocks'] });
       setAdjustSheetOpen(false);
+      setAdjustDialogOpen(false);
       setSelectedStock(null);
       setNewQuantity('');
       setAdjustReason('');
@@ -144,12 +165,16 @@ export default function StationDetail() {
     },
   });
 
-  const handleOpenAdjust = (stock: EnrichedStock) => {
+  const handleOpenAdjust = (stock: EnrichedStock, forMobile?: boolean) => {
     triggerHaptic('medium');
     setSelectedStock(stock);
     setNewQuantity(parseFloat(stock.quantity).toFixed(2));
     setAdjustReason('');
-    setAdjustSheetOpen(true);
+    if (forMobile || isMobile) {
+      setAdjustSheetOpen(true);
+    } else {
+      setAdjustDialogOpen(true);
+    }
   };
 
   const handleSubmitAdjust = () => {
@@ -229,6 +254,25 @@ export default function StationDetail() {
   }
 
   if (!event || !station) {
+    if (!isMobile) {
+      return (
+        <div className="container mx-auto p-6" data-testid="page-station-detail-not-found">
+          <div className="flex flex-col items-center justify-center py-16">
+            <div className="w-20 h-20 rounded-full bg-muted flex items-center justify-center mb-6">
+              <MapPin className="h-10 w-10 text-muted-foreground" />
+            </div>
+            <h2 className="text-xl font-semibold mb-2 text-center">Postazione non trovata</h2>
+            <p className="text-muted-foreground text-center mb-6">
+              La postazione richiesta non esiste o non hai i permessi per visualizzarla.
+            </p>
+            <Button variant="outline" onClick={handleBack} data-testid="button-back-to-event">
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Torna all'Evento
+            </Button>
+          </div>
+        </div>
+      );
+    }
     return (
       <MobileAppLayout
         header={
@@ -266,6 +310,305 @@ export default function StationDetail() {
           </HapticButton>
         </div>
       </MobileAppLayout>
+    );
+  }
+
+  if (!isMobile) {
+    return (
+      <div className="container mx-auto p-6 space-y-6" data-testid="page-station-detail">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" size="icon" onClick={handleBack} data-testid="button-back">
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
+                <MapPin className="h-6 w-6 text-white" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h1 className="text-2xl font-bold" data-testid="text-station-name">{station.name}</h1>
+                  {(station as any).isGeneral && (
+                    <Badge variant="secondary">Fissa</Badge>
+                  )}
+                </div>
+                <p className="text-sm text-muted-foreground flex items-center gap-1.5">
+                  <Calendar className="h-4 w-4" />
+                  {event.name}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-3 gap-4">
+          <Card data-testid="card-total-products">
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
+                  <Package className="h-6 w-6 text-primary" />
+                </div>
+                <div>
+                  <div className="text-3xl font-bold tabular-nums">{stockWithQuantity.length}</div>
+                  <p className="text-sm text-muted-foreground">Prodotti in stock</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card data-testid="card-movements-count">
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-xl bg-blue-500/10 flex items-center justify-center">
+                  <History className="h-6 w-6 text-blue-500" />
+                </div>
+                <div>
+                  <div className="text-3xl font-bold tabular-nums">{stationMovements.length}</div>
+                  <p className="text-sm text-muted-foreground">Movimenti</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card data-testid="card-bartenders">
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-xl bg-green-500/10 flex items-center justify-center">
+                  <Users className="h-6 w-6 text-green-500" />
+                </div>
+                <div>
+                  <div className="text-3xl font-bold tabular-nums">{assignedBartenders.length}</div>
+                  <p className="text-sm text-muted-foreground">Baristi assegnati</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full max-w-md grid-cols-2">
+            <TabsTrigger value="stock" data-testid="tab-stock">
+              <Package className="h-4 w-4 mr-2" />
+              Stock
+            </TabsTrigger>
+            <TabsTrigger value="movements" data-testid="tab-movements">
+              <History className="h-4 w-4 mr-2" />
+              Movimenti
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="stock" className="mt-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Prodotti in Postazione</CardTitle>
+                <CardDescription>Lista dei prodotti con quantità disponibile</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {stocksLoading ? (
+                  <div className="space-y-2">
+                    <Skeleton className="h-12 w-full" />
+                    <Skeleton className="h-12 w-full" />
+                    <Skeleton className="h-12 w-full" />
+                  </div>
+                ) : stockWithQuantity.length > 0 ? (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Prodotto</TableHead>
+                        <TableHead>Codice</TableHead>
+                        <TableHead className="text-right">Quantità</TableHead>
+                        <TableHead>Stato</TableHead>
+                        {canAdjustStock && <TableHead className="w-[80px]">Azioni</TableHead>}
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {stockWithQuantity.map((stock) => {
+                        const product = getProductInfo(stock.productId);
+                        const quantity = parseFloat(stock.quantity);
+                        const isLowStock = product?.minThreshold && !isNaN(quantity) && quantity < parseFloat(product.minThreshold);
+                        const productName = stock.productName || product?.name || 'Sconosciuto';
+                        const productCode = stock.productCode || product?.code || '-';
+                        const unitOfMeasure = stock.unitOfMeasure || product?.unitOfMeasure || '';
+
+                        return (
+                          <TableRow key={stock.id} data-testid={`row-stock-${stock.id}`}>
+                            <TableCell className="font-medium">{productName}</TableCell>
+                            <TableCell className="text-muted-foreground">{productCode}</TableCell>
+                            <TableCell className="text-right font-mono">
+                              {isNaN(quantity) ? '0.00' : quantity.toFixed(2)} {unitOfMeasure}
+                            </TableCell>
+                            <TableCell>
+                              {isLowStock ? (
+                                <Badge variant="destructive" data-testid={`badge-low-stock-${stock.id}`}>
+                                  <AlertTriangle className="h-3 w-3 mr-1" />
+                                  Stock Basso
+                                </Badge>
+                              ) : (
+                                <Badge variant="secondary">OK</Badge>
+                              )}
+                            </TableCell>
+                            {canAdjustStock && (
+                              <TableCell>
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  onClick={() => handleOpenAdjust(stock)}
+                                  data-testid={`button-adjust-${stock.id}`}
+                                >
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                              </TableCell>
+                            )}
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-12 text-center">
+                    <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
+                      <Package className="h-8 w-8 text-muted-foreground" />
+                    </div>
+                    <p className="text-muted-foreground font-medium mb-1">Nessun prodotto</p>
+                    <p className="text-sm text-muted-foreground">
+                      Trasferisci prodotti dal magazzino per iniziare
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="movements" className="mt-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Storico Movimenti</CardTitle>
+                <CardDescription>Tutti i movimenti di stock della postazione</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {stationMovements.length > 0 ? (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Tipo</TableHead>
+                        <TableHead>Prodotto</TableHead>
+                        <TableHead className="text-right">Quantità</TableHead>
+                        <TableHead>Motivo</TableHead>
+                        <TableHead>Operatore</TableHead>
+                        <TableHead>Data</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {stationMovements.map((movement) => {
+                        const product = getProductInfo(movement.productId);
+                        const config = movementTypeConfig[movement.type] || { 
+                          label: movement.type, 
+                          color: 'text-muted-foreground',
+                          bgColor: 'bg-muted',
+                          icon: RefreshCw 
+                        };
+                        const Icon = config.icon;
+                        const isIncoming = movement.toStationId === stationId;
+
+                        return (
+                          <TableRow key={movement.id} data-testid={`row-movement-${movement.id}`}>
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                <div className={`w-8 h-8 rounded-lg ${config.bgColor} flex items-center justify-center`}>
+                                  <Icon className={`h-4 w-4 ${config.color}`} />
+                                </div>
+                                <span className={`font-medium ${config.color}`}>{config.label}</span>
+                              </div>
+                            </TableCell>
+                            <TableCell className="font-medium">
+                              {movement.productName || product?.name || 'Sconosciuto'}
+                            </TableCell>
+                            <TableCell className={`text-right font-mono ${isIncoming ? 'text-green-500' : 'text-red-500'}`}>
+                              {isIncoming ? '+' : '-'}{parseFloat(movement.quantity).toFixed(2)}
+                            </TableCell>
+                            <TableCell className="text-muted-foreground max-w-[200px] truncate">
+                              {movement.reason || '-'}
+                            </TableCell>
+                            <TableCell>{getUserName(movement.performedBy)}</TableCell>
+                            <TableCell className="text-muted-foreground font-mono">
+                              {movement.createdAt 
+                                ? format(new Date(movement.createdAt), 'dd/MM/yyyy HH:mm', { locale: it })
+                                : '-'}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-12 text-center">
+                    <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
+                      <History className="h-8 w-8 text-muted-foreground" />
+                    </div>
+                    <p className="text-muted-foreground font-medium mb-1">Nessun movimento</p>
+                    <p className="text-sm text-muted-foreground">
+                      I movimenti appariranno qui quando saranno effettuati
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+
+        <Dialog open={adjustDialogOpen} onOpenChange={setAdjustDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Correggi Quantità</DialogTitle>
+              <DialogDescription>
+                Modifica la quantità del prodotto in questa postazione
+              </DialogDescription>
+            </DialogHeader>
+            {selectedStock && (
+              <div className="space-y-4" data-testid="dialog-adjust-stock">
+                <div className="p-4 rounded-lg bg-muted/50">
+                  <p className="font-semibold text-lg">{selectedStock.productName || 'Prodotto'}</p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Quantità attuale: <span className="font-medium tabular-nums">{parseFloat(selectedStock.quantity).toFixed(2)}</span> {selectedStock.unitOfMeasure || ''}
+                  </p>
+                </div>
+                
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Nuova Quantità</label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={newQuantity}
+                    onChange={(e) => setNewQuantity(e.target.value)}
+                    placeholder="0.00"
+                    data-testid="input-new-quantity"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Motivo della correzione (opzionale)</label>
+                  <Textarea
+                    value={adjustReason}
+                    onChange={(e) => setAdjustReason(e.target.value)}
+                    placeholder="Es. Inventario fisico, rottura, errore precedente..."
+                    rows={3}
+                    data-testid="input-adjust-reason"
+                  />
+                </div>
+              </div>
+            )}
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setAdjustDialogOpen(false)} data-testid="button-cancel-adjust">
+                Annulla
+              </Button>
+              <Button onClick={handleSubmitAdjust} disabled={adjustMutation.isPending} data-testid="button-confirm-adjust">
+                {adjustMutation.isPending ? 'Salvataggio...' : 'Salva'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
     );
   }
 

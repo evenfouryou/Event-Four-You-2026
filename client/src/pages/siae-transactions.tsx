@@ -75,10 +75,12 @@ import {
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { MobileAppLayout, MobileHeader } from "@/components/mobile-primitives";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 export default function SiaeTransactionsPage() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const isMobile = useIsMobile();
   const [, navigate] = useLocation();
   const [, params] = useRoute("/siae/transactions/:eventId");
   const eventId = params?.eventId || "";
@@ -259,6 +261,464 @@ export default function SiaeTransactionsPage() {
       ?.filter(t => t.status === "completed")
       .reduce((sum, t) => sum + (t.ticketsCount || 0), 0) || 0,
   };
+
+  if (!isMobile) {
+    return (
+      <div className="container mx-auto p-6 space-y-6" data-testid="page-siae-transactions">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">Transazioni SIAE</h1>
+            <p className="text-muted-foreground">{baseEvent?.name || "Caricamento..."}</p>
+          </div>
+          <Button variant="outline" data-testid="button-export">
+            <Download className="w-4 h-4 mr-2" />
+            Esporta Report
+          </Button>
+        </div>
+
+        <Card data-testid="card-filters">
+          <CardContent className="pt-6">
+            <div className="flex flex-col md:flex-row gap-4">
+              <div className="flex-1">
+                <Label className="mb-2 block">Cerca</Label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                  <Input
+                    placeholder="Cerca per codice, cliente..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-10"
+                    data-testid="input-search"
+                  />
+                </div>
+              </div>
+              <div className="w-full md:w-40">
+                <Label className="mb-2 block">Stato</Label>
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger data-testid="select-status-filter">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Tutti</SelectItem>
+                    <SelectItem value="completed">Completate</SelectItem>
+                    <SelectItem value="pending">In Attesa</SelectItem>
+                    <SelectItem value="failed">Fallite</SelectItem>
+                    <SelectItem value="refunded">Rimborsate</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="w-full md:w-40">
+                <Label className="mb-2 block">Periodo</Label>
+                <Select value={dateRange} onValueChange={setDateRange}>
+                  <SelectTrigger data-testid="select-date-filter">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Tutto</SelectItem>
+                    <SelectItem value="today">Oggi</SelectItem>
+                    <SelectItem value="week">Ultima settimana</SelectItem>
+                    <SelectItem value="month">Ultimo mese</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {eventId && (
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
+            <Card>
+              <CardContent className="pt-6">
+                <div className="text-2xl font-bold" data-testid="stat-total">{stats.total}</div>
+                <p className="text-sm text-muted-foreground">Totale</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6">
+                <div className="text-2xl font-bold text-emerald-500" data-testid="stat-completed">{stats.completed}</div>
+                <p className="text-sm text-muted-foreground">Completate</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6">
+                <div className="text-2xl font-bold text-amber-500" data-testid="stat-pending">{stats.pending}</div>
+                <p className="text-sm text-muted-foreground">In Attesa</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6">
+                <div className="text-2xl font-bold text-destructive" data-testid="stat-failed">{stats.failed}</div>
+                <p className="text-sm text-muted-foreground">Fallite</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6">
+                <div className="text-2xl font-bold text-blue-500" data-testid="stat-refunded">{stats.refunded}</div>
+                <p className="text-sm text-muted-foreground">Rimborsate</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6">
+                <div className="text-2xl font-bold text-[#FFD700] flex items-center gap-1" data-testid="stat-revenue">
+                  <Euro className="w-4 h-4" />
+                  {stats.totalRevenue.toFixed(2)}
+                </div>
+                <p className="text-sm text-muted-foreground">Incasso</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6">
+                <div className="text-2xl font-bold flex items-center gap-1" data-testid="stat-tickets">
+                  <Ticket className="w-4 h-4" />
+                  {stats.totalTickets}
+                </div>
+                <p className="text-sm text-muted-foreground">Biglietti</p>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {transactionsLoading ? (
+          <Card>
+            <CardContent className="p-6 space-y-4">
+              {[1, 2, 3].map((i) => (
+                <Skeleton key={i} className="h-16 w-full" />
+              ))}
+            </CardContent>
+          </Card>
+        ) : filteredTransactions?.length === 0 ? (
+          <Card data-testid="card-no-transactions">
+            <CardContent className="p-12 text-center">
+              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-muted/30 flex items-center justify-center">
+                <Receipt className="w-8 h-8 text-muted-foreground" />
+              </div>
+              <h3 className="text-lg font-semibold mb-2">Nessuna Transazione</h3>
+              <p className="text-muted-foreground">Non ci sono transazioni per questo evento</p>
+            </CardContent>
+          </Card>
+        ) : (
+          <Card data-testid="card-transactions-table">
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Codice</TableHead>
+                    <TableHead>Cliente</TableHead>
+                    <TableHead>Biglietti</TableHead>
+                    <TableHead>Importo</TableHead>
+                    <TableHead>Pagamento</TableHead>
+                    <TableHead>Stato</TableHead>
+                    <TableHead>Data</TableHead>
+                    <TableHead className="text-right">Azioni</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredTransactions?.map((transaction) => (
+                    <TableRow key={transaction.id} data-testid={`row-transaction-${transaction.id}`}>
+                      <TableCell className="font-mono text-xs" data-testid={`cell-code-${transaction.id}`}>
+                        {transaction.transactionCode}
+                      </TableCell>
+                      <TableCell data-testid={`cell-customer-${transaction.id}`}>
+                        <div>
+                          <div className="font-mono text-xs">{transaction.customerUniqueCode}</div>
+                          {transaction.customerEmail && (
+                            <div className="text-xs text-muted-foreground">{transaction.customerEmail}</div>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell data-testid={`cell-tickets-${transaction.id}`}>
+                        <span className="flex items-center gap-1">
+                          <Ticket className="w-3 h-3" />
+                          {transaction.ticketsCount}
+                        </span>
+                      </TableCell>
+                      <TableCell data-testid={`cell-amount-${transaction.id}`}>
+                        <span className="flex items-center gap-1 font-medium text-[#FFD700]">
+                          <Euro className="w-3 h-3" />
+                          {Number(transaction.totalAmount).toFixed(2)}
+                        </span>
+                      </TableCell>
+                      <TableCell data-testid={`cell-payment-${transaction.id}`}>
+                        <span className="flex items-center gap-2">
+                          {getPaymentIcon(transaction.paymentMethod)}
+                          {getPaymentLabel(transaction.paymentMethod)}
+                        </span>
+                      </TableCell>
+                      <TableCell data-testid={`cell-status-${transaction.id}`}>
+                        {getStatusBadge(transaction.status)}
+                      </TableCell>
+                      <TableCell data-testid={`cell-date-${transaction.id}`}>
+                        <div className="text-sm">
+                          {transaction.createdAt && format(new Date(transaction.createdAt), "dd/MM/yyyy", { locale: it })}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {transaction.createdAt && format(new Date(transaction.createdAt), "HH:mm", { locale: it })}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => {
+                              setSelectedTransaction(transaction);
+                              setIsDetailDialogOpen(true);
+                            }}
+                            title="Dettagli Transazione"
+                            data-testid={`button-view-${transaction.id}`}
+                          >
+                            <Eye className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleViewTickets(transaction)}
+                            title="Gestisci Biglietti"
+                            data-testid={`button-tickets-${transaction.id}`}
+                          >
+                            <Ticket className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        )}
+
+        <Dialog open={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen}>
+          <DialogContent className="max-w-lg" data-testid="dialog-detail">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Receipt className="w-5 h-5 text-[#FFD700]" />
+                Dettaglio Transazione
+              </DialogTitle>
+              <DialogDescription>
+                Codice: {selectedTransaction?.transactionCode}
+              </DialogDescription>
+            </DialogHeader>
+
+            {selectedTransaction && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="p-3 rounded-lg bg-muted/30">
+                    <div className="text-xs text-muted-foreground mb-1">Stato</div>
+                    {getStatusBadge(selectedTransaction.status)}
+                  </div>
+                  <div className="p-3 rounded-lg bg-muted/30">
+                    <div className="text-xs text-muted-foreground mb-1">Importo Totale</div>
+                    <div className="text-xl font-bold text-[#FFD700] flex items-center gap-1">
+                      <Euro className="w-4 h-4" />
+                      {Number(selectedTransaction.totalAmount).toFixed(2)}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between py-2 border-b">
+                    <span className="text-muted-foreground">Cliente</span>
+                    <span className="font-mono text-sm">{selectedTransaction.customerUniqueCode}</span>
+                  </div>
+                  {selectedTransaction.customerEmail && (
+                    <div className="flex items-center justify-between py-2 border-b">
+                      <span className="text-muted-foreground">Email</span>
+                      <span className="text-sm">{selectedTransaction.customerEmail}</span>
+                    </div>
+                  )}
+                  {selectedTransaction.customerPhone && (
+                    <div className="flex items-center justify-between py-2 border-b">
+                      <span className="text-muted-foreground">Telefono</span>
+                      <span className="text-sm">{selectedTransaction.customerPhone}</span>
+                    </div>
+                  )}
+                  <div className="flex items-center justify-between py-2 border-b">
+                    <span className="text-muted-foreground">Numero Biglietti</span>
+                    <span className="font-medium">{selectedTransaction.ticketsCount}</span>
+                  </div>
+                  <div className="flex items-center justify-between py-2 border-b">
+                    <span className="text-muted-foreground">Metodo Pagamento</span>
+                    <span className="flex items-center gap-2">
+                      {getPaymentIcon(selectedTransaction.paymentMethod)}
+                      {getPaymentLabel(selectedTransaction.paymentMethod)}
+                    </span>
+                  </div>
+                  {selectedTransaction.paymentReference && (
+                    <div className="flex items-center justify-between py-2 border-b">
+                      <span className="text-muted-foreground">Riferimento</span>
+                      <span className="font-mono text-sm">{selectedTransaction.paymentReference}</span>
+                    </div>
+                  )}
+                  <div className="flex items-center justify-between py-2 border-b">
+                    <span className="text-muted-foreground">Canale Emissione</span>
+                    <span className="font-mono text-sm">{selectedTransaction.emissionChannelCode}</span>
+                  </div>
+                  {selectedTransaction.transactionIp && (
+                    <div className="flex items-center justify-between py-2 border-b">
+                      <span className="text-muted-foreground">IP</span>
+                      <span className="font-mono text-xs">{selectedTransaction.transactionIp}</span>
+                    </div>
+                  )}
+                  <div className="flex items-center justify-between py-2 border-b">
+                    <span className="text-muted-foreground">Data Creazione</span>
+                    <span className="text-sm">
+                      {selectedTransaction.createdAt && format(new Date(selectedTransaction.createdAt), "dd/MM/yyyy HH:mm", { locale: it })}
+                    </span>
+                  </div>
+                  {selectedTransaction.paymentCompletedAt && (
+                    <div className="flex items-center justify-between py-2 border-b">
+                      <span className="text-muted-foreground">Pagamento Completato</span>
+                      <span className="text-sm">
+                        {format(new Date(selectedTransaction.paymentCompletedAt), "dd/MM/yyyy HH:mm", { locale: it })}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {selectedTransaction.totalVat && (
+                  <div className="grid grid-cols-2 gap-4 pt-2">
+                    <div className="p-3 rounded-lg bg-muted/30">
+                      <div className="text-xs text-muted-foreground mb-1">IVA</div>
+                      <div className="font-medium">€{Number(selectedTransaction.totalVat).toFixed(2)}</div>
+                    </div>
+                    {selectedTransaction.totalPrevendita && (
+                      <div className="p-3 rounded-lg bg-muted/30">
+                        <div className="text-xs text-muted-foreground mb-1">Prevendita</div>
+                        <div className="font-medium">€{Number(selectedTransaction.totalPrevendita).toFixed(2)}</div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={ticketsDialogOpen} onOpenChange={setTicketsDialogOpen}>
+          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto" data-testid="dialog-tickets">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Ticket className="w-5 h-5 text-emerald-400" />
+                Biglietti della Transazione
+              </DialogTitle>
+              <DialogDescription>
+                {transactionForTickets && (
+                  <>Codice: {transactionForTickets.transactionCode} - {transactionForTickets.ticketsCount} bigliett{transactionForTickets.ticketsCount === 1 ? 'o' : 'i'}</>
+                )}
+              </DialogDescription>
+            </DialogHeader>
+
+            {transactionForTickets && (
+              <div className="space-y-3">
+                {getTransactionTickets(transactionForTickets.id).length === 0 ? (
+                  <div className="p-4 text-center text-muted-foreground">
+                    Nessun biglietto trovato per questa transazione
+                  </div>
+                ) : (
+                  getTransactionTickets(transactionForTickets.id).map((ticket) => (
+                    <div 
+                      key={ticket.id}
+                      className="flex items-center justify-between p-3 rounded-lg bg-muted/30"
+                      data-testid={`ticket-item-${ticket.id}`}
+                    >
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-mono text-sm">
+                            {ticket.fiscalSealCode || ticket.progressiveNumber || ticket.id.slice(0, 8)}
+                          </span>
+                          {getTicketStatusBadge(ticket.status)}
+                        </div>
+                        <div className="text-xs text-muted-foreground mt-1">
+                          {ticket.ticketType || ticket.ticketTypeCode || 'N/D'} - €{Number(ticket.ticketPrice || ticket.grossAmount || 0).toFixed(2)}
+                        </div>
+                      </div>
+                      {(ticket.status === 'valid' || ticket.status === 'active') && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleCancelTicket(ticket)}
+                          className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                          data-testid={`button-cancel-ticket-${ticket.id}`}
+                        >
+                          <Ban className="w-4 h-4 mr-1" />
+                          Annulla
+                        </Button>
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setTicketsDialogOpen(false)}>
+                Chiudi
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <AlertDialog open={cancelTicketDialogOpen} onOpenChange={setCancelTicketDialogOpen}>
+          <AlertDialogContent className="max-w-md" data-testid="dialog-cancel-ticket">
+            <AlertDialogHeader>
+              <AlertDialogTitle>Annulla Biglietto</AlertDialogTitle>
+              <AlertDialogDescription>
+                Stai per annullare il biglietto{' '}
+                <span className="font-mono font-semibold">
+                  {ticketToCancel?.fiscalSealCode || ticketToCancel?.progressiveNumber || ticketToCancel?.id.slice(0, 8)}
+                </span>.
+                Questa azione non può essere annullata.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="cancel-reason">Causale Annullamento</Label>
+                <Select value={cancelReason} onValueChange={setCancelReason}>
+                  <SelectTrigger data-testid="select-cancel-reason">
+                    <SelectValue placeholder="Seleziona causale" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="01">01 - Richiesta cliente</SelectItem>
+                    <SelectItem value="02">02 - Errore emissione</SelectItem>
+                    <SelectItem value="03">03 - Evento annullato</SelectItem>
+                    <SelectItem value="04">04 - Duplicato</SelectItem>
+                    <SelectItem value="99">99 - Altro</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="cancel-note">Note aggiuntive (opzionale)</Label>
+                <Textarea
+                  id="cancel-note"
+                  value={cancelNote}
+                  onChange={(e) => setCancelNote(e.target.value)}
+                  placeholder="Descrivi il motivo dell'annullamento..."
+                  className="resize-none min-h-[80px]"
+                  data-testid="input-cancel-note"
+                />
+              </div>
+            </div>
+            <AlertDialogFooter>
+              <AlertDialogCancel data-testid="button-cancel-dialog-close">Annulla</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={confirmCancelTicket}
+                className="bg-red-600 hover:bg-red-700"
+                disabled={cancelTicketMutation.isPending}
+                data-testid="button-confirm-cancel-ticket"
+              >
+                {cancelTicketMutation.isPending ? (
+                  <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Annullamento...</>
+                ) : (
+                  'Conferma Annullamento'
+                )}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </div>
+    );
+  }
 
   return (
     <MobileAppLayout

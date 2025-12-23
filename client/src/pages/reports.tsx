@@ -1,9 +1,27 @@
 import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { 
   FileText, 
   FileSpreadsheet, 
@@ -132,8 +150,10 @@ export default function Reports() {
   const urlEventId = urlParams.get('eventId');
   const { toast } = useToast();
   const { user } = useAuth();
+  const isMobile = useIsMobile();
 
   const [selectedEventId, setSelectedEventId] = useState<string>(urlEventId || "");
+  const [correctionDialogOpen, setCorrectionDialogOpen] = useState(false);
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
   const [showDateFilter, setShowDateFilter] = useState(false);
@@ -199,6 +219,7 @@ export default function Reports() {
     },
     onSuccess: async (_, variables) => {
       setCorrectionSheetOpen(false);
+      setCorrectionDialogOpen(false);
       setCorrectingProduct(null);
       setNewQuantity("");
       setCorrectionReason("");
@@ -446,6 +467,500 @@ export default function Reports() {
   };
 
   const selectedEvent = events.find(e => e.id === selectedEventId);
+
+  const openCorrectionDialog = (productId: string, productName: string, currentQuantity: number, stationId?: string | null) => {
+    setCorrectingProduct({ productId, productName, currentQuantity, stationId });
+    setNewQuantity(currentQuantity.toString());
+    setCorrectionReason("");
+    setCorrectionDialogOpen(true);
+  };
+
+  const handleCorrectConsumptionDesktop = () => {
+    if (!correctingProduct || !selectedEventId) return;
+    
+    const qty = parseFloat(newQuantity);
+    if (isNaN(qty) || qty < 0) {
+      toast({
+        title: "Errore",
+        description: "Inserisci una quantità valida",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    correctConsumptionMutation.mutate({
+      eventId: selectedEventId,
+      productId: correctingProduct.productId,
+      newQuantity: qty,
+      stationId: correctingProduct.stationId,
+      reason: correctionReason || undefined,
+    });
+  };
+
+  // Desktop version
+  if (!isMobile) {
+    return (
+      <div className="container mx-auto p-6 space-y-6" data-testid="page-reports">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">Report Fine Serata</h1>
+            <p className="text-muted-foreground">Analisi consumi e ricavi per evento</p>
+          </div>
+          {reportData && selectedEventId && (
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={handleExportPDF} data-testid="button-export-pdf-desktop">
+                <FileText className="w-4 h-4 mr-2" />
+                Esporta PDF
+              </Button>
+              <Button variant="outline" onClick={handleExportExcel} data-testid="button-export-excel-desktop">
+                <FileSpreadsheet className="w-4 h-4 mr-2" />
+                Esporta Excel
+              </Button>
+            </div>
+          )}
+        </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Calendar className="w-5 h-5" />
+              Filtri
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap gap-4 items-end">
+              <div className="flex-1 min-w-[250px]">
+                <label className="text-sm font-medium mb-2 block">Evento</label>
+                <Select value={selectedEventId} onValueChange={setSelectedEventId}>
+                  <SelectTrigger data-testid="select-event-desktop">
+                    <SelectValue placeholder="Seleziona un evento..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {filteredEvents.map((event) => (
+                      <SelectItem key={event.id} value={event.id}>
+                        <div className="flex flex-col items-start">
+                          <span className="font-medium">{event.name}</span>
+                          <span className="text-xs text-muted-foreground">
+                            {new Date((event as any).startDatetime || (event as any).eventDate).toLocaleDateString('it-IT', {
+                              weekday: 'short',
+                              day: 'numeric',
+                              month: 'short',
+                              year: 'numeric',
+                            })}
+                          </span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="w-[180px]">
+                <label className="text-sm font-medium mb-2 block">Data Inizio</label>
+                <Input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  data-testid="input-start-date-desktop"
+                />
+              </div>
+              <div className="w-[180px]">
+                <label className="text-sm font-medium mb-2 block">Data Fine</label>
+                <Input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  data-testid="input-end-date-desktop"
+                />
+              </div>
+              {(startDate || endDate) && (
+                <Button
+                  variant="ghost"
+                  onClick={() => { setStartDate(""); setEndDate(""); }}
+                  data-testid="button-clear-dates-desktop"
+                >
+                  Azzera
+                </Button>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {eventsLoading && (
+          <div className="flex items-center justify-center py-16">
+            <div className="text-center">
+              <div className="w-12 h-12 rounded-full border-4 border-primary/20 border-t-primary animate-spin mx-auto" />
+              <p className="text-muted-foreground mt-4">Caricamento eventi...</p>
+            </div>
+          </div>
+        )}
+
+        {reportLoading && selectedEventId && (
+          <div className="flex items-center justify-center py-16">
+            <div className="text-center">
+              <div className="w-12 h-12 rounded-full border-4 border-primary/20 border-t-primary animate-spin mx-auto" />
+              <p className="text-muted-foreground mt-4">Caricamento report...</p>
+            </div>
+          </div>
+        )}
+
+        {!selectedEventId && !eventsLoading && (
+          <Card className="border-dashed">
+            <CardContent className="py-16 text-center">
+              <div className="w-16 h-16 rounded-2xl bg-muted/50 flex items-center justify-center mx-auto mb-4">
+                <FileText className="w-8 h-8 text-muted-foreground/50" />
+              </div>
+              <p className="text-muted-foreground">
+                Seleziona un evento per visualizzare il report
+              </p>
+            </CardContent>
+          </Card>
+        )}
+
+        {reportData && !reportLoading && (
+          <div className="space-y-6">
+            {revenueAnalysis && revenueAnalysis.theoreticalRevenue > 0 && (
+              <>
+                <div className="grid grid-cols-4 gap-4">
+                  <Card className={`bg-gradient-to-br ${cardColors.theoretical.bg} border-0`}>
+                    <CardContent className="pt-6">
+                      <div className="flex items-center gap-3 mb-2">
+                        <div className={`w-10 h-10 rounded-xl ${cardColors.theoretical.icon} flex items-center justify-center`}>
+                          <DollarSign className="w-5 h-5 text-white" />
+                        </div>
+                        <span className="text-sm text-muted-foreground">Ricavo Teorico</span>
+                      </div>
+                      <div className="text-2xl font-bold" data-testid="text-theoretical-revenue-desktop">
+                        €{revenueAnalysis.theoreticalRevenue.toFixed(2)}
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card className={`bg-gradient-to-br ${cardColors.actual.bg} border-0`}>
+                    <CardContent className="pt-6">
+                      <div className="flex items-center gap-3 mb-2">
+                        <div className={`w-10 h-10 rounded-xl ${cardColors.actual.icon} flex items-center justify-center`}>
+                          <CircleDollarSign className="w-5 h-5 text-white" />
+                        </div>
+                        <span className="text-sm text-muted-foreground">Ricavo Effettivo</span>
+                      </div>
+                      <div className="text-2xl font-bold" data-testid="text-actual-revenue-desktop">
+                        €{revenueAnalysis.actualRevenue.toFixed(2)}
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card className={`bg-gradient-to-br ${revenueAnalysis.variance >= 0 ? 'from-green-500/20 to-green-600/10' : 'from-red-500/20 to-red-600/10'} border-0`}>
+                    <CardContent className="pt-6">
+                      <div className="flex items-center gap-3 mb-2">
+                        <div className={`w-10 h-10 rounded-xl ${revenueAnalysis.variance >= 0 ? 'bg-green-500' : 'bg-red-500'} flex items-center justify-center`}>
+                          {revenueAnalysis.variance >= 0 ? (
+                            <TrendingUp className="w-5 h-5 text-white" />
+                          ) : (
+                            <TrendingDown className="w-5 h-5 text-white" />
+                          )}
+                        </div>
+                        <span className="text-sm text-muted-foreground">Varianza</span>
+                      </div>
+                      <div className={`text-2xl font-bold ${revenueAnalysis.variance >= 0 ? 'text-green-500' : 'text-red-500'}`} data-testid="text-variance-desktop">
+                        €{revenueAnalysis.variance.toFixed(2)}
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card className={`bg-gradient-to-br ${cardColors.percent.bg} border-0`}>
+                    <CardContent className="pt-6">
+                      <div className="flex items-center gap-3 mb-2">
+                        <div className={`w-10 h-10 rounded-xl ${cardColors.percent.icon} flex items-center justify-center`}>
+                          <Percent className="w-5 h-5 text-white" />
+                        </div>
+                        <span className="text-sm text-muted-foreground">Varianza %</span>
+                      </div>
+                      <div className={`text-2xl font-bold ${revenueAnalysis.variancePercent >= 0 ? 'text-green-500' : 'text-red-500'}`} data-testid="text-variance-percent-desktop">
+                        {revenueAnalysis.variancePercent.toFixed(1)}%
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <BarChart3 className="w-5 h-5" />
+                      Analisi Ricavi
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <ResponsiveContainer width="100%" height={300}>
+                      <BarChart
+                        data={[
+                          { name: 'Ricavo Teorico', value: revenueAnalysis.theoreticalRevenue, fill: '#3B82F6' },
+                          { name: 'Ricavo Effettivo', value: revenueAnalysis.actualRevenue, fill: '#10B981' },
+                        ]}
+                        margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
+                        barSize={80}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" opacity={0.2} vertical={false} />
+                        <XAxis dataKey="name" fontSize={12} tickLine={false} axisLine={false} />
+                        <YAxis fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `€${value}`} />
+                        <Tooltip
+                          formatter={(value: number) => [`€${value.toFixed(2)}`, '']}
+                          contentStyle={{
+                            backgroundColor: 'hsl(var(--card))',
+                            border: '1px solid hsl(var(--border))',
+                            borderRadius: '8px',
+                            padding: '12px',
+                          }}
+                        />
+                        <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                          {[
+                            { name: 'Ricavo Teorico', value: revenueAnalysis.theoreticalRevenue, fill: '#3B82F6' },
+                            { name: 'Ricavo Effettivo', value: revenueAnalysis.actualRevenue, fill: '#10B981' },
+                          ].map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.fill} />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </CardContent>
+                </Card>
+              </>
+            )}
+
+            {revenueAnalysis && revenueAnalysis.theoreticalRevenue === 0 && (
+              <Card className="border-dashed">
+                <CardContent className="py-8 text-center">
+                  <BarChart3 className="w-8 h-8 text-muted-foreground mx-auto mb-3" />
+                  <p className="text-muted-foreground">
+                    Nessun dato ricavi disponibile. Assicurati di aver assegnato un listino prezzi e registrato dei consumi.
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+
+            <Card className={`bg-gradient-to-br ${cardColors.total.bg} border-0`}>
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className={`w-14 h-14 rounded-2xl ${cardColors.total.icon} flex items-center justify-center`}>
+                      <DollarSign className="w-7 h-7 text-primary-foreground" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Costo Totale</p>
+                      <div className="text-3xl font-bold" data-testid="text-total-cost-desktop">
+                        €{reportData.totalCost.toFixed(2)}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {reportData.stations.length} postazioni
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {reportData.consumedProducts && reportData.consumedProducts.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Package className="w-5 h-5 text-amber-500" />
+                    Consumo Beverage
+                  </CardTitle>
+                  <CardDescription>{reportData.consumedProducts.length} prodotti consumati</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Prodotto</TableHead>
+                        <TableHead className="text-right">Quantità</TableHead>
+                        <TableHead className="text-right">Prezzo Unitario</TableHead>
+                        <TableHead className="text-right">Costo Totale</TableHead>
+                        {canCorrect && <TableHead className="w-[60px]"></TableHead>}
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {reportData.consumedProducts.map((product) => (
+                        <TableRow key={product.productId} data-testid={`row-consumed-product-desktop-${product.productId}`}>
+                          <TableCell className="font-medium">{product.productName}</TableCell>
+                          <TableCell className="text-right">{product.totalQuantity.toFixed(2)}</TableCell>
+                          <TableCell className="text-right">€{parseFloat(product.costPrice).toFixed(2)}</TableCell>
+                          <TableCell className="text-right font-semibold">€{product.totalCost.toFixed(2)}</TableCell>
+                          {canCorrect && (
+                            <TableCell>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => openCorrectionDialog(
+                                  product.productId,
+                                  product.productName,
+                                  product.totalQuantity
+                                )}
+                                disabled={correctConsumptionMutation.isPending}
+                                data-testid={`button-correct-desktop-${product.productId}`}
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                            </TableCell>
+                          )}
+                        </TableRow>
+                      ))}
+                      <TableRow className="bg-primary/10">
+                        <TableCell className="font-bold" colSpan={3}>TOTALE BEVERAGE</TableCell>
+                        <TableCell className="text-right font-bold text-lg" data-testid="text-total-beverage-cost-desktop">
+                          €{reportData.totalCost.toFixed(2)}
+                        </TableCell>
+                        {canCorrect && <TableCell />}
+                      </TableRow>
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            )}
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Store className="w-5 h-5 text-teal-500" />
+                  Dettaglio Postazioni
+                </CardTitle>
+                <CardDescription>{reportData.stations.length} postazioni</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {reportData.stations.map((station) => (
+                    <div key={station.stationId} className="border rounded-lg overflow-hidden">
+                      <button
+                        onClick={() => toggleStation(station.stationId)}
+                        className="w-full flex items-center justify-between p-4 bg-muted/30 hover-elevate transition-colors"
+                        data-testid={`accordion-station-desktop-${station.stationId}`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <Store className="w-5 h-5 text-muted-foreground" />
+                          <span className="font-medium">{station.stationName}</span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className="font-semibold">€{station.totalCost.toFixed(2)}</span>
+                          {expandedStations.has(station.stationId) ? (
+                            <ChevronUp className="h-5 w-5 text-muted-foreground" />
+                          ) : (
+                            <ChevronDown className="h-5 w-5 text-muted-foreground" />
+                          )}
+                        </div>
+                      </button>
+                      {expandedStations.has(station.stationId) && (
+                        <div className="p-4">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>Prodotto</TableHead>
+                                <TableHead className="text-right">Quantità</TableHead>
+                                <TableHead className="text-right">Prezzo Unitario</TableHead>
+                                <TableHead className="text-right">Costo Totale</TableHead>
+                                {canCorrect && <TableHead className="w-[60px]"></TableHead>}
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {station.items.map((item, idx) => (
+                                <TableRow key={idx} data-testid={`row-product-desktop-${item.productId}`}>
+                                  <TableCell className="font-medium">{item.productName}</TableCell>
+                                  <TableCell className="text-right">{item.quantity.toFixed(2)}</TableCell>
+                                  <TableCell className="text-right">€{parseFloat(item.costPrice).toFixed(2)}</TableCell>
+                                  <TableCell className="text-right font-semibold">€{item.totalCost.toFixed(2)}</TableCell>
+                                  {canCorrect && (
+                                    <TableCell>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={() => openCorrectionDialog(
+                                          item.productId.toString(),
+                                          item.productName,
+                                          item.quantity,
+                                          station.stationId.toString()
+                                        )}
+                                        disabled={correctConsumptionMutation.isPending}
+                                        data-testid={`button-correct-station-desktop-${station.stationId}-${item.productId}`}
+                                      >
+                                        <Pencil className="h-4 w-4" />
+                                      </Button>
+                                    </TableCell>
+                                  )}
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        <Dialog open={correctionDialogOpen} onOpenChange={setCorrectionDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Correggi Consumo</DialogTitle>
+              <DialogDescription>
+                Modifica la quantità consumata per {correctingProduct?.productName}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="p-4 bg-muted/30 rounded-lg">
+                <p className="text-xs text-muted-foreground mb-1">Prodotto</p>
+                <p className="font-semibold">{correctingProduct?.productName}</p>
+              </div>
+              <div className="p-4 bg-amber-500/10 rounded-lg">
+                <p className="text-xs text-muted-foreground mb-1">Quantità attuale</p>
+                <p className="font-bold text-xl text-amber-600">{correctingProduct?.currentQuantity.toFixed(2)}</p>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Nuova Quantità</label>
+                <Input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={newQuantity}
+                  onChange={(e) => setNewQuantity(e.target.value)}
+                  placeholder="Inserisci nuova quantità"
+                  data-testid="input-correct-quantity-desktop"
+                />
+                <p className="text-xs text-muted-foreground">
+                  La giacenza verrà aggiornata automaticamente
+                </p>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Motivo (opzionale)</label>
+                <Textarea
+                  value={correctionReason}
+                  onChange={(e) => setCorrectionReason(e.target.value)}
+                  placeholder="Es: Errore di conteggio..."
+                  data-testid="input-correct-reason-desktop"
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setCorrectionDialogOpen(false)}
+                data-testid="button-cancel-correct-desktop"
+              >
+                Annulla
+              </Button>
+              <Button
+                onClick={handleCorrectConsumptionDesktop}
+                disabled={correctConsumptionMutation.isPending}
+                data-testid="button-confirm-correct-desktop"
+              >
+                {correctConsumptionMutation.isPending ? 'Salvataggio...' : 'Salva Correzione'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+    );
+  }
 
   if (eventsLoading) {
     return (

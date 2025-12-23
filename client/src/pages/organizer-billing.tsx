@@ -43,6 +43,7 @@ import {
   Euro,
 } from "lucide-react";
 import { MobileAppLayout, MobileHeader } from "@/components/mobile-primitives";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
 import type {
@@ -112,6 +113,7 @@ interface SalesReportData {
 
 export default function OrganizerBilling() {
   const { toast } = useToast();
+  const isMobile = useIsMobile();
   const [activeTab, setActiveTab] = useState("subscription");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
@@ -264,6 +266,690 @@ export default function OrganizerBilling() {
       <Skeleton className="h-[200px] w-full" />
     </div>
   );
+
+  if (!isMobile) {
+    return (
+      <div className="container mx-auto p-6 space-y-6" data-testid="page-organizer-billing">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">Billing</h1>
+            <p className="text-muted-foreground">Visualizza abbonamento, costi e fatture</p>
+          </div>
+        </div>
+
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList className="grid w-full grid-cols-5 h-auto p-1 gap-1">
+            <TabsTrigger value="subscription" className="gap-2" data-testid="tab-subscription">
+              <CreditCard className="w-4 h-4" />
+              Abbonamento
+            </TabsTrigger>
+            <TabsTrigger value="costs" className="gap-2" data-testid="tab-costs">
+              <Percent className="w-4 h-4" />
+              Costi
+            </TabsTrigger>
+            <TabsTrigger value="invoices" className="gap-2" data-testid="tab-invoices">
+              <Receipt className="w-4 h-4" />
+              Fatture
+            </TabsTrigger>
+            <TabsTrigger value="wallet" className="gap-2" data-testid="tab-wallet">
+              <Wallet className="w-4 h-4" />
+              Wallet
+            </TabsTrigger>
+            <TabsTrigger value="report" className="gap-2" data-testid="tab-report">
+              <BarChart3 className="w-4 h-4" />
+              Report
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="subscription" className="mt-6 space-y-4">
+            {subscriptionLoading ? (
+              renderSkeleton()
+            ) : subscriptionData?.subscription && subscriptionData?.plan ? (
+              <Card data-testid="card-subscription-details">
+                <CardHeader>
+                  <CardTitle>Dettagli Abbonamento</CardTitle>
+                  <CardDescription>Stato e informazioni del tuo piano</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-4 gap-6">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Piano</p>
+                      <p className="font-semibold text-lg" data-testid="text-plan-name">{subscriptionData.plan.name}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Tipo</p>
+                      <Badge variant={subscriptionData.subscription.billingCycle === "monthly" ? "default" : "secondary"} data-testid="badge-billing-cycle">
+                        {subscriptionData.subscription.billingCycle === "monthly" ? "Mensile" : "Per Evento"}
+                      </Badge>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Stato</p>
+                      {getStatusBadge(subscriptionData.subscription.status)}
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Prezzo</p>
+                      <p className="font-semibold" data-testid="text-plan-price">{formatCurrency(subscriptionData.plan.price)}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Data Inizio</p>
+                      <p className="font-medium flex items-center gap-2" data-testid="text-start-date">
+                        <Calendar className="w-4 h-4 text-muted-foreground" />
+                        {formatDate(subscriptionData.subscription.startDate)}
+                      </p>
+                    </div>
+                    {subscriptionData.subscription.endDate && (
+                      <div>
+                        <p className="text-sm text-muted-foreground">Scadenza</p>
+                        <p className="font-medium flex items-center gap-2" data-testid="text-end-date">
+                          <Calendar className="w-4 h-4 text-muted-foreground" />
+                          {formatDate(subscriptionData.subscription.endDate)}
+                        </p>
+                      </div>
+                    )}
+                    {subscriptionData.subscription.billingCycle === "monthly" && subscriptionData.subscription.nextBillingDate && (
+                      <div>
+                        <p className="text-sm text-muted-foreground">Prossima Fatturazione</p>
+                        <p className="font-medium flex items-center gap-2" data-testid="text-next-billing">
+                          <Calendar className="w-4 h-4 text-yellow-500" />
+                          {formatDate(subscriptionData.subscription.nextBillingDate)}
+                        </p>
+                      </div>
+                    )}
+                    {subscriptionData.subscription.billingCycle === "per_event" && (
+                      <div>
+                        <p className="text-sm text-muted-foreground">Eventi Utilizzati</p>
+                        <p className="font-semibold text-lg" data-testid="text-events-used">
+                          {subscriptionData.subscription.eventsUsed} / {subscriptionData.plan.eventsIncluded || "∞"}
+                        </p>
+                        {subscriptionData.eventsRemaining !== null && subscriptionData.eventsRemaining <= 3 && (
+                          <p className="text-xs text-yellow-500 mt-1">
+                            Rimangono {subscriptionData.eventsRemaining} eventi
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  {subscriptionData.plan.description && (
+                    <div className="mt-6 pt-4 border-t">
+                      <p className="text-sm text-muted-foreground">Descrizione Piano</p>
+                      <p className="mt-1">{subscriptionData.plan.description}</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            ) : (
+              <Card data-testid="card-no-subscription">
+                <CardContent className="py-12 text-center">
+                  <CreditCard className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                  <p className="text-muted-foreground">
+                    Nessun abbonamento attivo. Contatta l'amministratore per attivare un piano.
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+
+          <TabsContent value="costs" className="mt-6 space-y-4">
+            <Card data-testid="card-ledger-filters">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Filter className="w-5 h-5" />
+                  Filtri
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <Label htmlFor="dateFromDesktop">Da</Label>
+                    <Input
+                      id="dateFromDesktop"
+                      type="date"
+                      value={dateFrom}
+                      onChange={(e) => setDateFrom(e.target.value)}
+                      data-testid="input-date-from"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="dateToDesktop">A</Label>
+                    <Input
+                      id="dateToDesktop"
+                      type="date"
+                      value={dateTo}
+                      onChange={(e) => setDateTo(e.target.value)}
+                      data-testid="input-date-to"
+                    />
+                  </div>
+                  <div className="flex items-end">
+                    <Button
+                      variant="outline"
+                      onClick={() => { setDateFrom(""); setDateTo(""); }}
+                      data-testid="button-clear-filters"
+                    >
+                      Azzera Filtri
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {ledgerLoading ? (
+              renderSkeleton()
+            ) : (
+              <Card data-testid="card-ledger-table">
+                <CardHeader>
+                  <CardTitle>Movimenti Wallet</CardTitle>
+                  <CardDescription>Storico di tutte le transazioni e commissioni</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {ledgerEntries && ledgerEntries.length > 0 ? (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Data</TableHead>
+                          <TableHead>Tipo</TableHead>
+                          <TableHead>Direzione</TableHead>
+                          <TableHead>Canale</TableHead>
+                          <TableHead className="text-right">Importo</TableHead>
+                          <TableHead className="text-right">Saldo Dopo</TableHead>
+                          <TableHead>Note</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {ledgerEntries.map((entry) => (
+                          <TableRow key={entry.id} data-testid={`row-ledger-${entry.id}`}>
+                            <TableCell className="whitespace-nowrap">
+                              {formatDateTime(entry.createdAt)}
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="outline">{getTypeLabel(entry.type)}</Badge>
+                            </TableCell>
+                            <TableCell>
+                              {entry.direction === "debit" ? (
+                                <span className="flex items-center gap-1 text-destructive">
+                                  <ArrowDownRight className="w-4 h-4" />
+                                  Debito
+                                </span>
+                              ) : (
+                                <span className="flex items-center gap-1 text-green-500">
+                                  <ArrowUpRight className="w-4 h-4" />
+                                  Credito
+                                </span>
+                              )}
+                            </TableCell>
+                            <TableCell>{getChannelLabel(entry.channel)}</TableCell>
+                            <TableCell className={`text-right font-medium ${entry.direction === "debit" ? "text-destructive" : "text-green-500"}`}>
+                              {entry.direction === "debit" ? "-" : "+"}{formatCurrency(entry.amount)}
+                            </TableCell>
+                            <TableCell className={`text-right font-medium ${parseFloat(entry.balanceAfter) < 0 ? "text-destructive" : ""}`}>
+                              {formatCurrency(entry.balanceAfter)}
+                            </TableCell>
+                            <TableCell className="max-w-[200px] truncate" title={entry.note || ""}>
+                              {entry.note || "-"}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  ) : (
+                    <div className="py-12 text-center">
+                      <Receipt className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                      <p className="text-muted-foreground">Nessun movimento trovato</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+
+          <TabsContent value="invoices" className="mt-6 space-y-4">
+            {invoicesLoading ? (
+              renderSkeleton()
+            ) : (
+              <Card data-testid="card-invoices-table">
+                <CardHeader>
+                  <CardTitle>Le Mie Fatture</CardTitle>
+                  <CardDescription>Elenco di tutte le fatture emesse</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {invoices && invoices.length > 0 ? (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Numero</TableHead>
+                          <TableHead>Periodo</TableHead>
+                          <TableHead className="text-right">Importo</TableHead>
+                          <TableHead>Stato</TableHead>
+                          <TableHead>Scadenza</TableHead>
+                          <TableHead>Data Emissione</TableHead>
+                          <TableHead></TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {invoices.map((invoice) => (
+                          <TableRow key={invoice.id} data-testid={`row-invoice-${invoice.id}`}>
+                            <TableCell className="font-medium" data-testid={`text-invoice-number-${invoice.id}`}>
+                              {invoice.invoiceNumber}
+                            </TableCell>
+                            <TableCell>
+                              {formatDate(invoice.periodStart)} - {formatDate(invoice.periodEnd)}
+                            </TableCell>
+                            <TableCell className="text-right font-semibold">
+                              {formatCurrency(invoice.amount)}
+                            </TableCell>
+                            <TableCell>{getInvoiceStatusBadge(invoice.status)}</TableCell>
+                            <TableCell>{formatDate(invoice.dueDate)}</TableCell>
+                            <TableCell>{formatDate(invoice.issuedAt)}</TableCell>
+                            <TableCell>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => setSelectedInvoice(invoice)}
+                                data-testid={`button-view-invoice-${invoice.id}`}
+                              >
+                                <Eye className="w-4 h-4" />
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  ) : (
+                    <div className="py-12 text-center">
+                      <Receipt className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                      <p className="text-muted-foreground">Nessuna fattura presente</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+
+          <TabsContent value="wallet" className="mt-6 space-y-4">
+            {walletLoading ? (
+              renderSkeleton()
+            ) : walletData ? (
+              <>
+                <div className="grid grid-cols-2 gap-4">
+                  <Card
+                    className={parseFloat(walletData.wallet.balance) < 0 ? "border-destructive" : ""}
+                    data-testid="card-wallet-balance"
+                  >
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Wallet className="w-5 h-5" />
+                        Saldo Attuale
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <p
+                        className={`text-4xl font-bold ${parseFloat(walletData.wallet.balance) < 0 ? "text-destructive" : "text-green-500"}`}
+                        data-testid="text-wallet-balance"
+                      >
+                        {formatCurrency(walletData.wallet.balance)}
+                      </p>
+                      <p className="text-sm text-muted-foreground mt-2">
+                        {parseFloat(walletData.wallet.balance) < 0 ? "Debito accumulato" : "Credito disponibile"}
+                      </p>
+                    </CardContent>
+                  </Card>
+
+                  <Card data-testid="card-wallet-threshold">
+                    <CardHeader>
+                      <CardTitle>Soglia Fatturazione</CardTitle>
+                      <CardDescription>Importo minimo per la generazione automatica della fattura</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-2xl font-semibold" data-testid="text-threshold-amount">
+                        {formatCurrency(walletData.wallet.thresholdAmount)}
+                      </p>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {walletData.thresholdStatus.exceeded && (
+                  <Card className="border-yellow-500 bg-yellow-500/10" data-testid="card-threshold-warning">
+                    <CardContent className="py-4">
+                      <div className="flex items-center gap-3">
+                        <AlertTriangle className="w-6 h-6 text-yellow-500" />
+                        <div>
+                          <p className="font-semibold text-yellow-500">Da Fatturare</p>
+                          <p className="text-sm text-muted-foreground">
+                            Il tuo saldo ha superato la soglia di fatturazione.
+                            Importo da fatturare: <strong>{formatCurrency(Math.abs(walletData.thresholdStatus.amountToInvoice))}</strong>
+                          </p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
+                <Card data-testid="card-wallet-info">
+                  <CardHeader>
+                    <CardTitle>Informazioni Wallet</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-sm text-muted-foreground">Valuta</p>
+                        <p className="font-medium">{walletData.wallet.currency}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground">Stato</p>
+                        <Badge variant={walletData.wallet.isActive ? "default" : "secondary"}>
+                          {walletData.wallet.isActive ? "Attivo" : "Disattivato"}
+                        </Badge>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </>
+            ) : (
+              <Card data-testid="card-no-wallet">
+                <CardContent className="py-12 text-center">
+                  <Wallet className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                  <p className="text-muted-foreground">
+                    Wallet non disponibile. Contatta l'amministratore.
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+
+          <TabsContent value="report" className="mt-6 space-y-4">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <h2 className="text-xl font-semibold flex items-center gap-2">
+                  <BarChart3 className="w-5 h-5 text-yellow-500" />
+                  Report Vendite
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                  Analisi vendite e commissioni per i tuoi eventi
+                </p>
+              </div>
+              <Button onClick={handleExportCSV} className="gap-2" data-testid="button-export-csv">
+                <Download className="w-4 h-4" />
+                Esporta CSV
+              </Button>
+            </div>
+
+            <Card data-testid="card-report-filters">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Filter className="w-5 h-5" />
+                  Filtri
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <Label htmlFor="reportDateFromDesktop">Da</Label>
+                    <Input
+                      id="reportDateFromDesktop"
+                      type="date"
+                      value={reportDateFrom}
+                      onChange={(e) => setReportDateFrom(e.target.value)}
+                      data-testid="input-report-date-from"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="reportDateToDesktop">A</Label>
+                    <Input
+                      id="reportDateToDesktop"
+                      type="date"
+                      value={reportDateTo}
+                      onChange={(e) => setReportDateTo(e.target.value)}
+                      data-testid="input-report-date-to"
+                    />
+                  </div>
+                  <div className="flex items-end">
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        const date = new Date();
+                        date.setMonth(date.getMonth() - 1);
+                        setReportDateFrom(date.toISOString().split("T")[0]);
+                        setReportDateTo(new Date().toISOString().split("T")[0]);
+                      }}
+                      data-testid="button-reset-report-filters"
+                    >
+                      Azzera Filtri
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {reportLoading ? (
+              renderSkeleton()
+            ) : reportData ? (
+              <>
+                <div className="grid grid-cols-4 gap-4">
+                  <Card data-testid="card-report-tickets">
+                    <CardContent className="pt-6">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-yellow-500/20 rounded-lg">
+                          <Ticket className="w-5 h-5 text-yellow-500" />
+                        </div>
+                        <div>
+                          <p className="text-sm text-muted-foreground">Biglietti Venduti</p>
+                          <p className="text-2xl font-bold" data-testid="text-report-tickets-total">
+                            {reportData.summary.ticketsSoldTotal}
+                          </p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card data-testid="card-report-gross">
+                    <CardContent className="pt-6">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-green-500/20 rounded-lg">
+                          <Euro className="w-5 h-5 text-green-500" />
+                        </div>
+                        <div>
+                          <p className="text-sm text-muted-foreground">Ricavo Lordo</p>
+                          <p className="text-2xl font-bold" data-testid="text-report-gross">
+                            {formatCurrency(reportData.summary.grossRevenueTotal)}
+                          </p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card data-testid="card-report-commissions">
+                    <CardContent className="pt-6">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-blue-500/20 rounded-lg">
+                          <Percent className="w-5 h-5 text-blue-500" />
+                        </div>
+                        <div>
+                          <p className="text-sm text-muted-foreground">Commissioni</p>
+                          <p className="text-2xl font-bold" data-testid="text-report-commissions">
+                            {formatCurrency(reportData.summary.commissionTotal)}
+                          </p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card data-testid="card-report-net">
+                    <CardContent className="pt-6">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-teal-500/20 rounded-lg">
+                          <Wallet className="w-5 h-5 text-teal-500" />
+                        </div>
+                        <div>
+                          <p className="text-sm text-muted-foreground">Netto</p>
+                          <p className="text-2xl font-bold" data-testid="text-report-net">
+                            {formatCurrency(reportData.summary.netToOrganizer)}
+                          </p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                <div className="grid grid-cols-3 gap-4">
+                  <Card data-testid="card-report-online">
+                    <CardContent className="pt-6">
+                      <p className="text-sm text-muted-foreground">Online</p>
+                      <p className="text-xl font-semibold">{reportData.summary.ticketsSoldOnline} biglietti</p>
+                      <p className="text-sm text-muted-foreground">
+                        Commissioni: {formatCurrency(reportData.summary.commissionOnline)}
+                      </p>
+                    </CardContent>
+                  </Card>
+                  <Card data-testid="card-report-printed">
+                    <CardContent className="pt-6">
+                      <p className="text-sm text-muted-foreground">Biglietteria</p>
+                      <p className="text-xl font-semibold">{reportData.summary.ticketsSoldPrinted} biglietti</p>
+                      <p className="text-sm text-muted-foreground">
+                        Commissioni: {formatCurrency(reportData.summary.commissionPrinted)}
+                      </p>
+                    </CardContent>
+                  </Card>
+                  <Card data-testid="card-report-pr">
+                    <CardContent className="pt-6">
+                      <p className="text-sm text-muted-foreground">PR</p>
+                      <p className="text-xl font-semibold">{reportData.summary.ticketsSoldPr} biglietti</p>
+                      <p className="text-sm text-muted-foreground">
+                        Commissioni: {formatCurrency(reportData.summary.commissionPr)}
+                      </p>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {reportData.byEvent.length > 0 && (
+                  <Card data-testid="card-report-by-event">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Calendar className="w-5 h-5" />
+                        Vendite per Evento
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Evento</TableHead>
+                            <TableHead>Data</TableHead>
+                            <TableHead className="text-right">Biglietti</TableHead>
+                            <TableHead className="text-right">Ricavo Lordo</TableHead>
+                            <TableHead className="text-right">Commissioni</TableHead>
+                            <TableHead className="text-right">Netto</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {reportData.byEvent.map((event) => (
+                            <TableRow key={event.eventId} data-testid={`row-report-event-${event.eventId}`}>
+                              <TableCell className="font-medium">{event.eventName}</TableCell>
+                              <TableCell>{event.eventDate}</TableCell>
+                              <TableCell className="text-right">{event.ticketsSold}</TableCell>
+                              <TableCell className="text-right">{formatCurrency(event.grossRevenue)}</TableCell>
+                              <TableCell className="text-right">{formatCurrency(event.commissions)}</TableCell>
+                              <TableCell className="text-right font-semibold">{formatCurrency(event.netRevenue)}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {reportData.byEvent.length === 0 && (
+                  <Card data-testid="card-no-report-data">
+                    <CardContent className="py-12 text-center">
+                      <BarChart3 className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                      <p className="text-muted-foreground">
+                        Nessun dato disponibile per il periodo selezionato
+                      </p>
+                    </CardContent>
+                  </Card>
+                )}
+              </>
+            ) : null}
+          </TabsContent>
+        </Tabs>
+
+        <Dialog open={!!selectedInvoice} onOpenChange={() => setSelectedInvoice(null)}>
+          <DialogContent className="max-w-2xl" data-testid="dialog-invoice-detail">
+            <DialogHeader>
+              <DialogTitle>Dettaglio Fattura</DialogTitle>
+              <DialogDescription>
+                {selectedInvoice?.invoiceNumber}
+              </DialogDescription>
+            </DialogHeader>
+            {selectedInvoice && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-4 gap-4">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Stato</p>
+                    {getInvoiceStatusBadge(selectedInvoice.status)}
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Importo Totale</p>
+                    <p className="font-semibold text-lg">{formatCurrency(selectedInvoice.amount)}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Scadenza</p>
+                    <p className="font-medium">{formatDate(selectedInvoice.dueDate)}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Pagata il</p>
+                    <p className="font-medium">{formatDate(selectedInvoice.paidAt)}</p>
+                  </div>
+                </div>
+
+                <div>
+                  <p className="text-sm text-muted-foreground mb-2">Periodo</p>
+                  <p className="font-medium">
+                    {formatDate(selectedInvoice.periodStart)} - {formatDate(selectedInvoice.periodEnd)}
+                  </p>
+                </div>
+
+                {selectedInvoice.notes && (
+                  <div>
+                    <p className="text-sm text-muted-foreground mb-2">Note</p>
+                    <p>{selectedInvoice.notes}</p>
+                  </div>
+                )}
+
+                <div>
+                  <p className="text-sm text-muted-foreground mb-2">Voci Fattura</p>
+                  {selectedInvoice.items && selectedInvoice.items.length > 0 ? (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Descrizione</TableHead>
+                          <TableHead className="text-center">Qtà</TableHead>
+                          <TableHead className="text-right">Prezzo Unit.</TableHead>
+                          <TableHead className="text-right">Totale</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {selectedInvoice.items.map((item) => (
+                          <TableRow key={item.id} data-testid={`row-invoice-item-${item.id}`}>
+                            <TableCell>
+                              {item.description || getItemTypeLabel(item.itemType)}
+                            </TableCell>
+                            <TableCell className="text-center">{item.quantity}</TableCell>
+                            <TableCell className="text-right">{formatCurrency(item.unitPrice)}</TableCell>
+                            <TableCell className="text-right font-medium">{formatCurrency(item.amount)}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  ) : (
+                    <p className="text-muted-foreground">Nessuna voce disponibile</p>
+                  )}
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+      </div>
+    );
+  }
 
   return (
     <MobileAppLayout

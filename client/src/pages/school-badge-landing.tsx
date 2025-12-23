@@ -41,6 +41,9 @@ import {
   ChevronDown,
 } from "lucide-react";
 import { MobileAppLayout, HapticButton, triggerHaptic } from "@/components/mobile-primitives";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import type { SchoolBadgeLanding } from "@shared/schema";
 
 const springConfig = { type: "spring" as const, stiffness: 400, damping: 30 };
@@ -89,6 +92,7 @@ type RequestFormData = z.infer<ReturnType<typeof createRequestSchema>>;
 export default function SchoolBadgeLanding() {
   const { slug } = useParams<{ slug: string }>();
   const { toast } = useToast();
+  const isMobile = useIsMobile();
   const [submitted, setSubmitted] = useState(false);
   const [termsOpen, setTermsOpen] = useState(false);
   const [privacyOpen, setPrivacyOpen] = useState(false);
@@ -161,6 +165,27 @@ export default function SchoolBadgeLanding() {
   };
 
   if (isLoading) {
+    if (!isMobile) {
+      return (
+        <div className="min-h-screen bg-background flex items-center justify-center p-6" data-testid="page-school-badge-landing-loading">
+          <Card className="w-full max-w-md">
+            <CardHeader className="text-center">
+              <div className="flex flex-col items-center">
+                <Skeleton className="h-20 w-20 rounded-2xl mb-4" />
+                <Skeleton className="h-6 w-40 mb-2" />
+                <Skeleton className="h-4 w-56" />
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {[1, 2, 3, 4].map((i) => (
+                <Skeleton key={i} className="h-10 w-full rounded-md" />
+              ))}
+              <Skeleton className="h-10 w-full rounded-md mt-4" />
+            </CardContent>
+          </Card>
+        </div>
+      );
+    }
     return (
       <MobileAppLayout className="bg-background">
         <div className="flex flex-col items-center justify-center min-h-full px-6 py-8">
@@ -188,6 +213,23 @@ export default function SchoolBadgeLanding() {
   }
 
   if (error || !landing) {
+    if (!isMobile) {
+      return (
+        <div className="min-h-screen bg-background flex items-center justify-center p-6" data-testid="page-school-badge-landing-error">
+          <Card className="w-full max-w-md text-center">
+            <CardHeader>
+              <div className="w-16 h-16 rounded-2xl bg-destructive/10 flex items-center justify-center mx-auto mb-4">
+                <AlertCircle className="h-8 w-8 text-destructive" />
+              </div>
+              <CardTitle>Pagina non trovata</CardTitle>
+              <CardDescription>
+                Questa pagina di richiesta badge non esiste o non è più attiva.
+              </CardDescription>
+            </CardHeader>
+          </Card>
+        </div>
+      );
+    }
     return (
       <MobileAppLayout className="bg-background">
         <div className="flex flex-col items-center justify-center min-h-full px-6 py-8">
@@ -216,6 +258,23 @@ export default function SchoolBadgeLanding() {
   }
 
   if (!landing.isActive) {
+    if (!isMobile) {
+      return (
+        <div className="min-h-screen bg-background flex items-center justify-center p-6" data-testid="page-school-badge-landing-inactive">
+          <Card className="w-full max-w-md text-center">
+            <CardHeader>
+              <div className="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center mx-auto mb-4">
+                <GraduationCap className="h-8 w-8 text-muted-foreground" />
+              </div>
+              <CardTitle>Richieste chiuse</CardTitle>
+              <CardDescription>
+                Le richieste di badge per questa scuola non sono attualmente aperte.
+              </CardDescription>
+            </CardHeader>
+          </Card>
+        </div>
+      );
+    }
     return (
       <MobileAppLayout className="bg-background">
         <div className="flex flex-col items-center justify-center min-h-full px-6 py-8">
@@ -244,6 +303,26 @@ export default function SchoolBadgeLanding() {
   }
 
   if (submitted) {
+    if (!isMobile) {
+      return (
+        <div className="min-h-screen bg-background flex items-center justify-center p-6" data-testid="page-school-badge-landing-submitted">
+          <Card className="w-full max-w-md text-center">
+            <CardHeader>
+              <div 
+                className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4"
+                style={{ backgroundColor: landing.primaryColor || "#3b82f6" }}
+              >
+                <CheckCircle2 className="h-8 w-8 text-white" />
+              </div>
+              <CardTitle>Richiesta inviata</CardTitle>
+              <CardDescription>
+                {landing.customThankYouText || "Grazie per la tua richiesta! Controlla la tua email per verificare il tuo indirizzo e completare la procedura."}
+              </CardDescription>
+            </CardHeader>
+          </Card>
+        </div>
+      );
+    }
     return (
       <MobileAppLayout className="bg-background">
         <div className="flex flex-col items-center justify-center min-h-full px-6 py-8">
@@ -287,6 +366,308 @@ export default function SchoolBadgeLanding() {
   const termsTextToShow = landing.termsText || DEFAULT_TERMS_TEXT;
   const privacyTextToShow = landing.privacyText || DEFAULT_PRIVACY_TEXT;
   const marketingTextToShow = landing.marketingText || DEFAULT_MARKETING_TEXT;
+
+  if (!isMobile) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-6" data-testid="page-school-badge-landing">
+        <div className="w-full max-w-md">
+          <div className="text-center mb-6">
+            <img 
+              src="/logo.png" 
+              alt="Event4U" 
+              className="h-8 w-auto mx-auto mb-4"
+              data-testid="img-event4u-logo-desktop"
+            />
+          </div>
+          
+          <Card>
+            <CardHeader className="text-center pb-4">
+              {landing.logoUrl ? (
+                <img 
+                  src={landing.logoUrl} 
+                  alt={landing.schoolName} 
+                  className="w-20 h-20 rounded-2xl object-cover mx-auto mb-4"
+                  data-testid="img-school-logo-desktop"
+                />
+              ) : (
+                <div 
+                  className="w-20 h-20 rounded-2xl flex items-center justify-center mx-auto mb-4"
+                  style={{ backgroundColor: landing.primaryColor || "#3b82f6" }}
+                >
+                  <GraduationCap className="h-10 w-10 text-white" />
+                </div>
+              )}
+              <CardTitle data-testid="text-school-name-desktop">{landing.schoolName}</CardTitle>
+              <CardDescription>
+                {landing.customWelcomeText || landing.description || "Richiedi il tuo badge digitale compilando il form sottostante."}
+              </CardDescription>
+              {landing.authorizedDomains && landing.authorizedDomains.length > 0 && (
+                <p className="text-xs text-muted-foreground mt-2">
+                  Email autorizzate: {landing.authorizedDomains.map(d => `@${d}`).join(", ")}
+                </p>
+              )}
+            </CardHeader>
+            <CardContent>
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                  <FormField
+                    control={form.control}
+                    name="firstName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Nome</FormLabel>
+                        <FormControl>
+                          <div className="relative">
+                            <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <Input 
+                              {...field} 
+                              className="pl-10" 
+                              placeholder="Mario" 
+                              data-testid="input-first-name-desktop"
+                            />
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="lastName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Cognome</FormLabel>
+                        <FormControl>
+                          <div className="relative">
+                            <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <Input 
+                              {...field} 
+                              className="pl-10" 
+                              placeholder="Rossi" 
+                              data-testid="input-last-name-desktop"
+                            />
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="email"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Email</FormLabel>
+                        <FormControl>
+                          <div className="relative">
+                            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <Input 
+                              {...field} 
+                              type="email" 
+                              className="pl-10" 
+                              placeholder="mario.rossi@scuola.edu.it" 
+                              data-testid="input-email-desktop"
+                            />
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormItem>
+                    <FormLabel>
+                      Telefono {!landing.requirePhone && "(opzionale)"}
+                    </FormLabel>
+                    <div className="flex gap-2">
+                      <FormField
+                        control={form.control}
+                        name="phonePrefix"
+                        render={({ field }) => (
+                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <FormControl>
+                              <SelectTrigger className="w-20" data-testid="select-phone-prefix-desktop">
+                                <SelectValue placeholder="+39" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {PHONE_PREFIXES.map((prefix) => (
+                                <SelectItem key={prefix.code} value={prefix.code}>
+                                  {prefix.code}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="phone"
+                        render={({ field }) => (
+                          <FormControl>
+                            <div className="relative flex-1">
+                              <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                              <Input 
+                                {...field} 
+                                type="tel" 
+                                className="pl-10" 
+                                placeholder="123 456 7890" 
+                                data-testid="input-phone-desktop"
+                              />
+                            </div>
+                          </FormControl>
+                        )}
+                      />
+                    </div>
+                    <FormMessage />
+                  </FormItem>
+
+                  {landing.requireTerms && (
+                    <div className="space-y-3 pt-2">
+                      <FormField
+                        control={form.control}
+                        name="acceptedTerms"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-row items-start space-x-3 space-y-0 p-3 bg-muted/30 rounded-lg">
+                            <FormControl>
+                              <Checkbox
+                                checked={field.value}
+                                onCheckedChange={field.onChange}
+                                data-testid="checkbox-terms-desktop"
+                              />
+                            </FormControl>
+                            <div className="space-y-1 leading-relaxed flex-1">
+                              <FormLabel className="text-sm font-normal cursor-pointer">
+                                Accetto i{" "}
+                                <span 
+                                  className="text-primary underline cursor-pointer" 
+                                  onClick={(e) => { e.preventDefault(); setTermsOpen(!termsOpen); }}
+                                >
+                                  termini e condizioni
+                                </span>{" "}
+                                e l'{" "}
+                                <span 
+                                  className="text-primary underline cursor-pointer" 
+                                  onClick={(e) => { e.preventDefault(); setPrivacyOpen(!privacyOpen); }}
+                                >
+                                  informativa sulla privacy
+                                </span>{" "}*
+                              </FormLabel>
+                              <FormMessage />
+                            </div>
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <Collapsible open={termsOpen} onOpenChange={setTermsOpen}>
+                        <CollapsibleTrigger asChild>
+                          <button 
+                            className="w-full flex items-center justify-between px-3 py-2 text-muted-foreground rounded-lg bg-muted/20 hover:bg-muted/40"
+                            type="button"
+                            data-testid="button-toggle-terms-desktop"
+                          >
+                            <span className="text-sm font-medium">Termini e condizioni</span>
+                            <ChevronDown className={`h-4 w-4 transition-transform ${termsOpen ? 'rotate-180' : ''}`} />
+                          </button>
+                        </CollapsibleTrigger>
+                        <CollapsibleContent>
+                          <div className="p-3 text-sm text-muted-foreground bg-muted/30 rounded-lg mt-2 leading-relaxed" data-testid="text-terms-content-desktop">
+                            {termsTextToShow}
+                          </div>
+                        </CollapsibleContent>
+                      </Collapsible>
+
+                      <Collapsible open={privacyOpen} onOpenChange={setPrivacyOpen}>
+                        <CollapsibleTrigger asChild>
+                          <button 
+                            className="w-full flex items-center justify-between px-3 py-2 text-muted-foreground rounded-lg bg-muted/20 hover:bg-muted/40"
+                            type="button"
+                            data-testid="button-toggle-privacy-desktop"
+                          >
+                            <span className="text-sm font-medium">Informativa sulla privacy</span>
+                            <ChevronDown className={`h-4 w-4 transition-transform ${privacyOpen ? 'rotate-180' : ''}`} />
+                          </button>
+                        </CollapsibleTrigger>
+                        <CollapsibleContent>
+                          <div className="p-3 text-sm text-muted-foreground bg-muted/30 rounded-lg mt-2 leading-relaxed" data-testid="text-privacy-content-desktop">
+                            {privacyTextToShow}
+                          </div>
+                        </CollapsibleContent>
+                      </Collapsible>
+                    </div>
+                  )}
+
+                  {landing.showMarketing && (
+                    <div className="space-y-3 pt-1">
+                      <FormField
+                        control={form.control}
+                        name="acceptedMarketing"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-row items-start space-x-3 space-y-0 p-3 bg-muted/30 rounded-lg">
+                            <FormControl>
+                              <Checkbox
+                                checked={field.value}
+                                onCheckedChange={field.onChange}
+                                data-testid="checkbox-marketing-desktop"
+                              />
+                            </FormControl>
+                            <div className="space-y-1 leading-relaxed flex-1">
+                              <FormLabel className="text-sm font-normal cursor-pointer">
+                                Acconsento a ricevere comunicazioni promozionali
+                              </FormLabel>
+                            </div>
+                          </FormItem>
+                        )}
+                      />
+
+                      <Collapsible open={marketingOpen} onOpenChange={setMarketingOpen}>
+                        <CollapsibleTrigger asChild>
+                          <button 
+                            className="w-full flex items-center justify-between px-3 py-2 text-muted-foreground rounded-lg bg-muted/20 hover:bg-muted/40"
+                            type="button"
+                            data-testid="button-toggle-marketing-desktop"
+                          >
+                            <span className="text-sm font-medium">Dettagli sul consenso marketing</span>
+                            <ChevronDown className={`h-4 w-4 transition-transform ${marketingOpen ? 'rotate-180' : ''}`} />
+                          </button>
+                        </CollapsibleTrigger>
+                        <CollapsibleContent>
+                          <div className="p-3 text-sm text-muted-foreground bg-muted/30 rounded-lg mt-2 leading-relaxed" data-testid="text-marketing-content-desktop">
+                            {marketingTextToShow}
+                          </div>
+                        </CollapsibleContent>
+                      </Collapsible>
+                    </div>
+                  )}
+
+                  <div className="pt-2">
+                    <Button 
+                      type="submit" 
+                      className="w-full"
+                      disabled={submitMutation.isPending}
+                      style={{ backgroundColor: landing.primaryColor || undefined }}
+                      data-testid="button-submit-request-desktop"
+                    >
+                      {submitMutation.isPending ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Invio in corso...
+                        </>
+                      ) : (
+                        "Richiedi Badge"
+                      )}
+                    </Button>
+                  </div>
+                </form>
+              </Form>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <MobileAppLayout 

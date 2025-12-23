@@ -2,7 +2,26 @@ import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useLocation } from "wouter";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { 
   Plus, 
   Calendar as CalendarIcon, 
@@ -16,6 +35,7 @@ import {
   ChevronRight,
   Sparkles,
   ListFilter,
+  Eye,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
@@ -328,7 +348,10 @@ export default function Events() {
   const [, navigate] = useLocation();
   const [searchQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState<FilterType>('all');
+  const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
+  const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
   const { user } = useAuth();
+  const isMobile = useIsMobile();
   
   const canCreateEvents = user?.role === 'super_admin' || user?.role === 'gestore';
 
@@ -407,6 +430,311 @@ export default function Events() {
     triggerHaptic('success');
     navigate('/events/wizard');
   };
+
+  const getStatusBadge = (status: string) => {
+    const config = statusConfig[status] || statusConfig.draft;
+    const StatusIcon = config.icon;
+    return (
+      <Badge className={`${config.bgColor} ${config.color} border-0`}>
+        <StatusIcon className="w-3 h-3 mr-1" />
+        {config.label}
+      </Badge>
+    );
+  };
+
+  if (!isMobile) {
+    return (
+      <div className="container mx-auto p-6 space-y-6" data-testid="page-events">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">Eventi</h1>
+            <p className="text-muted-foreground">Gestione degli eventi</p>
+          </div>
+          {canCreateEvents && (
+            <Button onClick={handleCreateEvent} data-testid="button-create-event">
+              <Plus className="w-4 h-4 mr-2" />
+              Nuovo Evento
+            </Button>
+          )}
+        </div>
+
+        <div className="grid grid-cols-4 gap-4">
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-2xl font-bold">{filterCounts.all}</div>
+              <p className="text-sm text-muted-foreground">Totale Eventi</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-2xl font-bold text-teal-500">
+                {events?.filter(e => e.status === 'ongoing').length || 0}
+              </div>
+              <p className="text-sm text-muted-foreground">In Corso</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-2xl font-bold text-blue-500">
+                {events?.filter(e => e.status === 'scheduled').length || 0}
+              </div>
+              <p className="text-sm text-muted-foreground">Programmati</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-2xl font-bold text-muted-foreground">
+                {events?.filter(e => e.status === 'draft').length || 0}
+              </div>
+              <p className="text-sm text-muted-foreground">Bozze</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle>Lista Eventi</CardTitle>
+              <div className="flex gap-2">
+                <Button
+                  variant={activeFilter === 'all' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setActiveFilter('all')}
+                  data-testid="filter-all-desktop"
+                >
+                  Tutti ({filterCounts.all})
+                </Button>
+                <Button
+                  variant={activeFilter === 'active' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setActiveFilter('active')}
+                  data-testid="filter-active-desktop"
+                >
+                  Attivi ({filterCounts.active})
+                </Button>
+                <Button
+                  variant={activeFilter === 'past' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setActiveFilter('past')}
+                  data-testid="filter-past-desktop"
+                >
+                  Passati ({filterCounts.past})
+                </Button>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {eventsLoading ? (
+              <div className="space-y-4">
+                {[1, 2, 3].map((i) => (
+                  <Skeleton key={i} className="h-16 w-full" />
+                ))}
+              </div>
+            ) : filteredEvents.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 text-center">
+                <CalendarIcon className="h-12 w-12 text-muted-foreground mb-4" />
+                <h3 className="text-lg font-semibold mb-2">Nessun evento trovato</h3>
+                <p className="text-muted-foreground mb-4">
+                  {activeFilter === 'all' 
+                    ? "Crea il tuo primo evento per iniziare" 
+                    : activeFilter === 'active' 
+                    ? "Nessun evento attivo al momento"
+                    : "Nessun evento passato"}
+                </p>
+                {canCreateEvents && activeFilter === 'all' && (
+                  <Button onClick={handleCreateEvent} data-testid="button-create-event-empty-desktop">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Crea Evento
+                  </Button>
+                )}
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Nome</TableHead>
+                    <TableHead>Data</TableHead>
+                    <TableHead>Orario</TableHead>
+                    <TableHead>Location</TableHead>
+                    <TableHead>Stato</TableHead>
+                    <TableHead>Formato</TableHead>
+                    <TableHead>Capacità</TableHead>
+                    <TableHead className="text-right">Azioni</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredEvents.map((event) => {
+                    const format = event.formatId ? formatsMap.get(event.formatId) : undefined;
+                    const location = event.locationId ? locationsMap.get(event.locationId) : undefined;
+                    return (
+                      <TableRow 
+                        key={event.id} 
+                        className="cursor-pointer hover-elevate"
+                        onClick={() => navigate(event.status === 'draft' ? `/events/wizard/${event.id}` : `/events/${event.id}/hub`)}
+                        data-testid={`row-event-${event.id}`}
+                      >
+                        <TableCell className="font-medium">
+                          <div className="flex items-center gap-2">
+                            {event.name}
+                            {event.seriesId && (
+                              <Repeat className="w-4 h-4 text-violet-400" />
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          {new Date(event.startDatetime).toLocaleDateString('it-IT', {
+                            day: 'numeric',
+                            month: 'short',
+                            year: 'numeric'
+                          })}
+                        </TableCell>
+                        <TableCell>
+                          {new Date(event.startDatetime).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}
+                          {' - '}
+                          {new Date(event.endDatetime).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}
+                        </TableCell>
+                        <TableCell>
+                          {location ? (
+                            <div className="flex items-center gap-1">
+                              <MapPin className="w-3 h-3 text-muted-foreground" />
+                              <span className="truncate max-w-[150px]">{location.name}</span>
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
+                        </TableCell>
+                        <TableCell>{getStatusBadge(event.status)}</TableCell>
+                        <TableCell>
+                          {format ? (
+                            <Badge 
+                              style={{ backgroundColor: format.color ?? '#3b82f6' }}
+                              className="text-white border-0"
+                            >
+                              {format.name}
+                            </Badge>
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {event.capacity ? (
+                            <div className="flex items-center gap-1">
+                              <Users className="w-3 h-3 text-muted-foreground" />
+                              {event.capacity}
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedEvent(event);
+                              setIsDetailDialogOpen(true);
+                            }}
+                            data-testid={`button-view-event-${event.id}`}
+                          >
+                            <Eye className="w-4 h-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+
+        <Dialog open={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle>{selectedEvent?.name}</DialogTitle>
+              <DialogDescription>
+                Dettagli dell'evento
+              </DialogDescription>
+            </DialogHeader>
+            {selectedEvent && (
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  {getStatusBadge(selectedEvent.status)}
+                  {selectedEvent.seriesId && (
+                    <Badge className="bg-violet-500/20 text-violet-400 border-0">
+                      <Repeat className="w-3 h-3 mr-1" />
+                      Ricorrente
+                    </Badge>
+                  )}
+                </div>
+                
+                <div className="grid gap-3">
+                  <div className="flex items-center gap-3">
+                    <CalendarIcon className="w-5 h-5 text-primary" />
+                    <div>
+                      <p className="font-medium">
+                        {new Date(selectedEvent.startDatetime).toLocaleDateString('it-IT', {
+                          weekday: 'long',
+                          day: 'numeric',
+                          month: 'long',
+                          year: 'numeric'
+                        })}
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        {new Date(selectedEvent.startDatetime).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}
+                        {' - '}
+                        {new Date(selectedEvent.endDatetime).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}
+                      </p>
+                    </div>
+                  </div>
+
+                  {selectedEvent.locationId && locationsMap.get(selectedEvent.locationId) && (
+                    <div className="flex items-center gap-3">
+                      <MapPin className="w-5 h-5 text-teal-500" />
+                      <span>{locationsMap.get(selectedEvent.locationId)?.name}</span>
+                    </div>
+                  )}
+
+                  {selectedEvent.capacity && (
+                    <div className="flex items-center gap-3">
+                      <Users className="w-5 h-5 text-muted-foreground" />
+                      <span>{selectedEvent.capacity} posti</span>
+                    </div>
+                  )}
+
+                  <div className="flex items-center gap-3">
+                    <ListFilter className="w-5 h-5 text-muted-foreground" />
+                    <span>{getEventStationCount(selectedEvent.id)} postazioni</span>
+                  </div>
+                </div>
+
+                <div className="flex gap-2 pt-4 border-t">
+                  <Button 
+                    className="flex-1"
+                    onClick={() => {
+                      setIsDetailDialogOpen(false);
+                      navigate(selectedEvent.status === 'draft' ? `/events/wizard/${selectedEvent.id}` : `/events/${selectedEvent.id}/hub`);
+                    }}
+                    data-testid="button-go-to-event"
+                  >
+                    {selectedEvent.status === 'draft' ? 'Continua Configurazione' : 'Vai all\'Evento'}
+                  </Button>
+                  <Button 
+                    variant="outline"
+                    onClick={() => setIsDetailDialogOpen(false)}
+                    data-testid="button-close-dialog"
+                  >
+                    Chiudi
+                  </Button>
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+      </div>
+    );
+  }
 
   return (
     <MobileAppLayout

@@ -2,14 +2,18 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { isUnauthorizedError } from "@/lib/authUtils";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Search, Plus, AlertTriangle, Package, ArrowLeft, Upload, Download, Warehouse, History, Check, Send } from "lucide-react";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Search, Plus, AlertTriangle, Package, ArrowLeft, Upload, Download, Warehouse, History, Check, Send, Loader2 } from "lucide-react";
 import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { MobileAppLayout, MobileHeader, HapticButton, triggerHaptic } from "@/components/mobile-primitives";
@@ -21,6 +25,7 @@ type TabValue = 'carico' | 'scarico' | 'storico';
 
 export default function ConsumptionTracking() {
   const [, setLocation] = useLocation();
+  const isMobile = useIsMobile();
   const [searchQuery, setSearchQuery] = useState("");
   const [loadQuantities, setLoadQuantities] = useState<Record<string, string>>({});
   const [remainingQuantities, setRemainingQuantities] = useState<Record<string, string>>({});
@@ -435,6 +440,388 @@ export default function ConsumptionTracking() {
     setActiveTab(tab);
   };
 
+  // Desktop Version
+  if (!isMobile) {
+    if (eventsLoading) {
+      return (
+        <div className="container mx-auto p-6 space-y-6" data-testid="page-consumption-tracking">
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" size="icon" onClick={() => setLocation('/beverage')} data-testid="button-back">
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <div>
+              <h1 className="text-3xl font-bold">Tracciamento Consumi</h1>
+              <p className="text-muted-foreground">Caricamento...</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-3 gap-4">
+            <Skeleton className="h-32" />
+            <Skeleton className="h-32" />
+            <Skeleton className="h-32" />
+          </div>
+        </div>
+      );
+    }
+
+    if (!selectedEvent) {
+      return (
+        <div className="container mx-auto p-6 space-y-6" data-testid="page-consumption-tracking">
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" size="icon" onClick={() => setLocation('/beverage')} data-testid="button-back">
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <div>
+              <h1 className="text-3xl font-bold">Tracciamento Consumi</h1>
+              <p className="text-muted-foreground">Gestione consumi evento</p>
+            </div>
+          </div>
+          <Card>
+            <CardContent className="p-12 text-center">
+              <AlertTriangle className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+              <h2 className="text-xl font-semibold mb-2">Nessun evento in corso</h2>
+              <p className="text-muted-foreground">Non ci sono eventi attivi al momento</p>
+            </CardContent>
+          </Card>
+        </div>
+      );
+    }
+
+    const productTotals = new Map<string, number>();
+    eventConsumptions.forEach(m => {
+      const current = productTotals.get(m.productId) || 0;
+      productTotals.set(m.productId, current + parseFloat(m.quantity));
+    });
+
+    return (
+      <div className="container mx-auto p-6 space-y-6" data-testid="page-consumption-tracking">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" size="icon" onClick={() => setLocation('/beverage')} data-testid="button-back">
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <div>
+              <h1 className="text-3xl font-bold">Tracciamento Consumi</h1>
+              <p className="text-muted-foreground">{selectedEvent?.name || "Gestione consumi evento"}</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          {!urlEventId && (
+            <div className="space-y-2">
+              <Label>Evento</Label>
+              <Select value={selectedEventId} onValueChange={setSelectedEventId}>
+                <SelectTrigger data-testid="select-event">
+                  <SelectValue placeholder="Seleziona evento" />
+                </SelectTrigger>
+                <SelectContent>
+                  {activeEvents.map(event => (
+                    <SelectItem key={event.id} value={event.id}>
+                      {event.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+          {!urlStationId && (
+            <div className="space-y-2">
+              <Label>Postazione</Label>
+              <Select value={selectedStationId} onValueChange={setSelectedStationId}>
+                <SelectTrigger data-testid="select-station">
+                  <SelectValue placeholder="Seleziona postazione" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="general">Inventario Generale</SelectItem>
+                  {stations && stations.length > 0 && (
+                    <>
+                      <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
+                        Postazioni
+                      </div>
+                      {stations.map(station => (
+                        <SelectItem key={station.id} value={station.id}>
+                          {station.name}
+                        </SelectItem>
+                      ))}
+                    </>
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+        </div>
+
+        <div className="relative max-w-md">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Cerca prodotto..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10"
+            data-testid="input-search-product"
+          />
+        </div>
+
+        {!selectedStationId ? (
+          <Card>
+            <CardContent className="p-12 text-center">
+              <AlertTriangle className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+              <h2 className="text-xl font-semibold mb-2">Seleziona una postazione</h2>
+              <p className="text-muted-foreground">Scegli evento e postazione per continuare</p>
+            </CardContent>
+          </Card>
+        ) : (
+          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabValue)}>
+            <TabsList className="grid w-full grid-cols-3 max-w-md">
+              <TabsTrigger value="carico" data-testid="tab-carico">
+                <Upload className="h-4 w-4 mr-2" />
+                Carico
+              </TabsTrigger>
+              <TabsTrigger value="scarico" data-testid="tab-scarico">
+                <Download className="h-4 w-4 mr-2" />
+                Scarico
+              </TabsTrigger>
+              <TabsTrigger value="storico" data-testid="tab-storico">
+                <History className="h-4 w-4 mr-2" />
+                Storico
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="carico" className="mt-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Warehouse className="h-5 w-5 text-green-500" />
+                    Carica dal Magazzino
+                  </CardTitle>
+                  <CardDescription>Trasferisci prodotti dal magazzino alla postazione</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {filteredProducts.filter(p => getGeneralStock(p.id) > 0).length === 0 ? (
+                    <div className="text-center py-8">
+                      <Package className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+                      <p className="text-muted-foreground">Nessun prodotto disponibile nel magazzino</p>
+                    </div>
+                  ) : (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Prodotto</TableHead>
+                          <TableHead>Codice</TableHead>
+                          <TableHead className="text-right">Magazzino</TableHead>
+                          <TableHead className="text-right">Postazione</TableHead>
+                          <TableHead className="text-right">Quantità</TableHead>
+                          <TableHead className="text-right">Azioni</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredProducts.filter(p => getGeneralStock(p.id) > 0).map(product => {
+                          const generalStock = getGeneralStock(product.id);
+                          const stationStock = getProductStock(product.id);
+                          return (
+                            <TableRow key={product.id} data-testid={`load-row-${product.id}`}>
+                              <TableCell className="font-medium">{product.name}</TableCell>
+                              <TableCell className="text-muted-foreground">{product.code}</TableCell>
+                              <TableCell className="text-right">
+                                <Badge variant="secondary" className="bg-green-500/10 text-green-500">
+                                  {generalStock.toFixed(0)}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="text-right">{stationStock.toFixed(0)}</TableCell>
+                              <TableCell className="text-right w-32">
+                                <Input
+                                  type="number"
+                                  min="0"
+                                  step="1"
+                                  placeholder="Qtà"
+                                  value={loadQuantities[product.id] || ""}
+                                  onChange={(e) => setLoadQuantities(prev => ({ ...prev, [product.id]: e.target.value }))}
+                                  className="w-24 text-center"
+                                  data-testid={`input-load-${product.id}`}
+                                />
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <Button
+                                  size="sm"
+                                  onClick={() => handleLoad(product.id)}
+                                  disabled={loadMutation.isPending}
+                                  data-testid={`button-load-${product.id}`}
+                                >
+                                  {loadMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="scarico" className="mt-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Package className="h-5 w-5 text-orange-500" />
+                    Chiudi Prodotti
+                  </CardTitle>
+                  <CardDescription>Inserisci la quantità rimasta per registrare i consumi</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {productsWithStock.length === 0 ? (
+                    <div className="text-center py-8">
+                      <Package className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+                      <p className="text-muted-foreground mb-1">Nessun prodotto caricato</p>
+                      <p className="text-sm text-muted-foreground">Vai in Carico per trasferire prodotti</p>
+                    </div>
+                  ) : (
+                    <>
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Prodotto</TableHead>
+                            <TableHead>Codice</TableHead>
+                            <TableHead className="text-right">Caricato</TableHead>
+                            <TableHead className="text-right">Rimasta</TableHead>
+                            <TableHead className="text-right">Consumato</TableHead>
+                            <TableHead className="text-right">Azioni</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {productsWithStock.map(product => {
+                            const stockValue = getProductStock(product.id);
+                            const remaining = parseFloat(remainingQuantities[product.id] || "");
+                            const consumed = !isNaN(remaining) ? stockValue - remaining : 0;
+                            const isLowStock = stockValue <= 5;
+                            return (
+                              <TableRow key={product.id} data-testid={`consume-row-${product.id}`}>
+                                <TableCell className="font-medium">{product.name}</TableCell>
+                                <TableCell className="text-muted-foreground">{product.code}</TableCell>
+                                <TableCell className="text-right">
+                                  <Badge variant={isLowStock ? "destructive" : "secondary"}>
+                                    {stockValue.toFixed(0)}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell className="text-right w-32">
+                                  <Input
+                                    type="number"
+                                    min="0"
+                                    max={stockValue}
+                                    step="1"
+                                    placeholder="0"
+                                    value={remainingQuantities[product.id] || ""}
+                                    onChange={(e) => setRemainingQuantities(prev => ({ ...prev, [product.id]: e.target.value }))}
+                                    className="w-24 text-center"
+                                    data-testid={`input-remaining-${product.id}`}
+                                  />
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  {!isNaN(remaining) && remaining >= 0 && (
+                                    <Badge className="bg-orange-500/10 text-orange-500 border-orange-500/30">
+                                      {consumed.toFixed(0)}
+                                    </Badge>
+                                  )}
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => handleConsumeAll(product.id)}
+                                    disabled={consumeMutation.isPending}
+                                    data-testid={`button-finish-${product.id}`}
+                                  >
+                                    {consumeMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                                  </Button>
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
+                      <div className="mt-6 flex justify-end">
+                        <Button
+                          onClick={handleSubmitAllConsume}
+                          disabled={isSubmittingAll || getFilledCount() === 0}
+                          className="bg-green-600 hover:bg-green-700"
+                          data-testid="button-submit-all-consume"
+                        >
+                          {isSubmittingAll ? (
+                            <>
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              Invio...
+                            </>
+                          ) : (
+                            <>
+                              <Send className="h-4 w-4 mr-2" />
+                              Invia Tutto ({getFilledCount()})
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="storico" className="mt-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <History className="h-5 w-5 text-blue-500" />
+                    Riepilogo Consumi
+                  </CardTitle>
+                  <CardDescription>Totale consumato per prodotto</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {eventConsumptions.length === 0 ? (
+                    <div className="text-center py-8">
+                      <History className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+                      <p className="text-muted-foreground">Nessun consumo registrato</p>
+                    </div>
+                  ) : (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Prodotto</TableHead>
+                          <TableHead>Codice</TableHead>
+                          <TableHead className="text-right">Totale Consumato</TableHead>
+                          <TableHead className="text-right">Unità</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {Array.from(productTotals.entries()).map(([productId, total]) => {
+                          const product = products?.find(p => p.id === productId);
+                          return (
+                            <TableRow key={productId} data-testid={`summary-row-${productId}`}>
+                              <TableCell className="font-medium">{product?.name || productId}</TableCell>
+                              <TableCell className="text-muted-foreground">{product?.code}</TableCell>
+                              <TableCell className="text-right">
+                                <Badge className="bg-orange-500/10 text-orange-500 border-orange-500/30 text-lg">
+                                  {total.toFixed(0)}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="text-right text-muted-foreground">
+                                {product?.unitOfMeasure || 'pz'}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
+        )}
+      </div>
+    );
+  }
+
+  // Mobile Version
   if (eventsLoading) {
     return (
       <MobileAppLayout

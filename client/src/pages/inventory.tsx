@@ -1,9 +1,34 @@
 import { useState, useMemo } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useQuery } from "@tanstack/react-query";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
 import {
   Package,
   AlertTriangle,
@@ -19,6 +44,7 @@ import {
   Box,
   TrendingDown,
   CheckCircle2,
+  Eye,
 } from "lucide-react";
 import { Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
@@ -257,7 +283,10 @@ function LoadingSkeleton() {
 export default function Inventory() {
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
   const { user } = useAuth();
+  const isMobile = useIsMobile();
 
   const { data: products, isLoading } = useQuery<Product[]>({
     queryKey: ['/api/products'],
@@ -313,6 +342,232 @@ export default function Inventory() {
       healthy: activeProducts.length - lowStock - critical,
     };
   }, [products]);
+
+  const getStockStatus = (stock: number, minThreshold: number) => {
+    const isLowStock = stock < minThreshold;
+    const isCritical = stock < minThreshold * 0.5;
+    if (isCritical) return { label: "Critico", color: "bg-red-500/20 text-red-400 border-red-500/30" };
+    if (isLowStock) return { label: "Basso", color: "bg-amber-500/20 text-amber-400 border-amber-500/30" };
+    return { label: "OK", color: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30" };
+  };
+
+  const openProductDetail = (product: Product) => {
+    setSelectedProduct(product);
+    setIsDetailDialogOpen(true);
+  };
+
+  if (!isMobile) {
+    return (
+      <div className="container mx-auto p-6 space-y-6" data-testid="page-inventory">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">Inventario</h1>
+            <p className="text-muted-foreground">Gestione stock e prodotti</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-4 gap-4">
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center">
+                  <Package className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <div className="text-2xl font-bold">{stats.total}</div>
+                  <p className="text-sm text-muted-foreground">Prodotti Totali</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-red-500/20 flex items-center justify-center">
+                  <AlertTriangle className="h-5 w-5 text-red-500" />
+                </div>
+                <div>
+                  <div className="text-2xl font-bold text-red-500">{stats.critical}</div>
+                  <p className="text-sm text-muted-foreground">Stock Critico</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-amber-500/20 flex items-center justify-center">
+                  <TrendingDown className="h-5 w-5 text-amber-500" />
+                </div>
+                <div>
+                  <div className="text-2xl font-bold text-amber-500">{stats.lowStock}</div>
+                  <p className="text-sm text-muted-foreground">Stock Basso</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-emerald-500/20 flex items-center justify-center">
+                  <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+                </div>
+                <div>
+                  <div className="text-2xl font-bold text-emerald-500">{stats.healthy}</div>
+                  <p className="text-sm text-muted-foreground">Stock OK</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+              <CardTitle>Elenco Prodotti</CardTitle>
+              <div className="flex items-center gap-3">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    type="text"
+                    placeholder="Cerca prodotti..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-10 w-[250px]"
+                    data-testid="input-search-inventory"
+                  />
+                </div>
+                <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                  <SelectTrigger className="w-[180px]" data-testid="select-category-filter">
+                    <SelectValue placeholder="Categoria" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categories.map((cat) => (
+                      <SelectItem key={cat.id} value={cat.id}>
+                        {cat.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <div className="space-y-3">
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <Skeleton key={i} className="h-12 w-full" />
+                ))}
+              </div>
+            ) : filteredProducts.length === 0 ? (
+              <div className="text-center py-12">
+                <Package className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <h3 className="font-semibold text-lg mb-2">Nessun prodotto trovato</h3>
+                <p className="text-sm text-muted-foreground">Prova a modificare i filtri di ricerca</p>
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Codice</TableHead>
+                    <TableHead>Nome</TableHead>
+                    <TableHead>Categoria</TableHead>
+                    <TableHead>Unità</TableHead>
+                    <TableHead>Stock</TableHead>
+                    <TableHead>Stato</TableHead>
+                    <TableHead className="text-right">Azioni</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredProducts.map((product) => {
+                    const stock = Math.floor(Math.random() * 100);
+                    const minThreshold = Number(product.minThreshold) || 10;
+                    const stockStatus = getStockStatus(stock, minThreshold);
+                    return (
+                      <TableRow key={product.id} data-testid={`row-product-${product.id}`}>
+                        <TableCell className="font-mono text-sm">{product.code}</TableCell>
+                        <TableCell className="font-medium">{product.name}</TableCell>
+                        <TableCell>{product.category || "-"}</TableCell>
+                        <TableCell>{product.unitOfMeasure}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <div className="w-16 h-2 bg-muted rounded-full overflow-hidden">
+                              <div
+                                className={`h-full rounded-full ${
+                                  stockStatus.label === "Critico" ? "bg-red-500" :
+                                  stockStatus.label === "Basso" ? "bg-amber-500" : "bg-emerald-500"
+                                }`}
+                                style={{ width: `${Math.min(stock, 100)}%` }}
+                              />
+                            </div>
+                            <span className="text-sm">{stock}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge className={stockStatus.color}>{stockStatus.label}</Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => openProductDetail(product)}
+                            data-testid={`button-view-${product.id}`}
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+
+        <Dialog open={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>{selectedProduct?.name}</DialogTitle>
+              <DialogDescription>Dettagli prodotto</DialogDescription>
+            </DialogHeader>
+            {selectedProduct && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Codice</p>
+                    <p className="font-medium">{selectedProduct.code}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Categoria</p>
+                    <p className="font-medium">{selectedProduct.category || "-"}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Unità di Misura</p>
+                    <p className="font-medium">{selectedProduct.unitOfMeasure}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Soglia Minima</p>
+                    <p className="font-medium">{selectedProduct.minThreshold || 10}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Prezzo Costo</p>
+                    <p className="font-medium">€{Number(selectedProduct.costPrice || 0).toFixed(2)}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Stato</p>
+                    <Badge className={selectedProduct.active ? "bg-emerald-500/20 text-emerald-400" : "bg-red-500/20 text-red-400"}>
+                      {selectedProduct.active ? "Attivo" : "Inattivo"}
+                    </Badge>
+                  </div>
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+      </div>
+    );
+  }
 
   const headerContent = (
     <MobileHeader

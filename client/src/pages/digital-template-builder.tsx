@@ -23,6 +23,7 @@ import {
   RotateCcw, Building2, FileText, Store
 } from 'lucide-react';
 import { MobileAppLayout, MobileHeader } from "@/components/mobile-primitives";
+import { useIsMobile } from "@/hooks/use-mobile";
 import type { DigitalTicketTemplate } from '@shared/schema';
 
 const DEFAULT_LOGO_URL = '/logo.png';
@@ -434,6 +435,7 @@ export default function DigitalTemplateBuilder() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const { user } = useAuth();
+  const isMobile = useIsMobile();
   const isEditing = !!id;
   const isSuperAdmin = user?.role === 'super_admin';
 
@@ -666,6 +668,886 @@ export default function DigitalTemplateBuilder() {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <Loader2 className="w-8 h-8 animate-spin" />
+      </div>
+    );
+  }
+
+  if (!isMobile) {
+    return (
+      <div className="container mx-auto p-6 space-y-6" data-testid="page-digital-template-builder">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold">
+              {isEditing ? 'Modifica Template Digitale' : 'Nuovo Template Digitale'}
+            </h1>
+            <p className="text-muted-foreground">
+              Personalizza l'aspetto del biglietto digitale per telefono e PDF
+            </p>
+          </div>
+          <Button
+            onClick={form.handleSubmit(onSubmit)}
+            disabled={isPending}
+            data-testid="button-save"
+          >
+            {isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
+            Salva Template
+          </Button>
+        </div>
+
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)}>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="space-y-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Informazioni Base</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <FormField
+                      control={form.control}
+                      name="name"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Nome Template</FormLabel>
+                          <FormControl>
+                            <Input {...field} placeholder="Es: Template Standard" data-testid="input-name" />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="description"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Descrizione</FormLabel>
+                          <FormControl>
+                            <Input {...field} placeholder="Descrizione opzionale" data-testid="input-description" />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+
+                    {isSuperAdmin && (
+                      <FormField
+                        control={form.control}
+                        name="companyId"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Azienda</FormLabel>
+                            <Select 
+                              onValueChange={(val) => field.onChange(val === '__global__' ? undefined : val)} 
+                              value={field.value || '__global__'}
+                            >
+                              <FormControl>
+                                <SelectTrigger data-testid="select-company">
+                                  <SelectValue placeholder="Seleziona azienda (globale se vuoto)" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="__global__">Template Globale</SelectItem>
+                                {companies.map((c) => (
+                                  <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </FormItem>
+                        )}
+                      />
+                    )}
+
+                    <div className="flex items-center gap-6">
+                      <FormField
+                        control={form.control}
+                        name="isDefault"
+                        render={({ field }) => (
+                          <FormItem className="flex items-center gap-2">
+                            <FormControl>
+                              <Switch
+                                checked={field.value}
+                                onCheckedChange={field.onChange}
+                                data-testid="switch-default"
+                              />
+                            </FormControl>
+                            <FormLabel className="!mt-0">Predefinito</FormLabel>
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="isActive"
+                        render={({ field }) => (
+                          <FormItem className="flex items-center gap-2">
+                            <FormControl>
+                              <Switch
+                                checked={field.value}
+                                onCheckedChange={field.onChange}
+                                data-testid="switch-active"
+                              />
+                            </FormControl>
+                            <FormLabel className="!mt-0">Attivo</FormLabel>
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Tabs defaultValue="colors" className="w-full">
+                  <TabsList className="grid grid-cols-4 w-full">
+                    <TabsTrigger value="colors" data-testid="tab-colors">
+                      <Palette className="w-4 h-4 mr-2" />
+                      Colori
+                    </TabsTrigger>
+                    <TabsTrigger value="logo" data-testid="tab-logo">
+                      <Image className="w-4 h-4 mr-2" />
+                      Logo
+                    </TabsTrigger>
+                    <TabsTrigger value="qr" data-testid="tab-qr">
+                      <QrCode className="w-4 h-4 mr-2" />
+                      QR Code
+                    </TabsTrigger>
+                    <TabsTrigger value="layout" data-testid="tab-layout">
+                      <Layout className="w-4 h-4 mr-2" />
+                      Layout
+                    </TabsTrigger>
+                  </TabsList>
+
+                  <TabsContent value="colors">
+                    <Card>
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-lg flex items-center gap-2">
+                          <Palette className="w-5 h-5" />
+                          Colori
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="grid grid-cols-2 gap-4">
+                        <FormField
+                          control={form.control}
+                          name="primaryColor"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Colore Primario</FormLabel>
+                              <FormControl>
+                                <div className="flex gap-2">
+                                  <Input 
+                                    type="color" 
+                                    {...field} 
+                                    className="w-12 h-10 p-1 cursor-pointer"
+                                    data-testid="input-primary-color"
+                                  />
+                                  <Input {...field} className="flex-1" />
+                                </div>
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={form.control}
+                          name="secondaryColor"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Colore Secondario</FormLabel>
+                              <FormControl>
+                                <div className="flex gap-2">
+                                  <Input 
+                                    type="color" 
+                                    {...field} 
+                                    className="w-12 h-10 p-1 cursor-pointer"
+                                    data-testid="input-secondary-color"
+                                  />
+                                  <Input {...field} className="flex-1" />
+                                </div>
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={form.control}
+                          name="backgroundColor"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Sfondo</FormLabel>
+                              <FormControl>
+                                <div className="flex gap-2">
+                                  <Input 
+                                    type="color" 
+                                    {...field} 
+                                    className="w-12 h-10 p-1 cursor-pointer"
+                                    data-testid="input-background-color"
+                                  />
+                                  <Input {...field} className="flex-1" />
+                                </div>
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={form.control}
+                          name="textColor"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Colore Testo</FormLabel>
+                              <FormControl>
+                                <div className="flex gap-2">
+                                  <Input 
+                                    type="color" 
+                                    {...field} 
+                                    className="w-12 h-10 p-1 cursor-pointer"
+                                    data-testid="input-text-color"
+                                  />
+                                  <Input {...field} className="flex-1" />
+                                </div>
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={form.control}
+                          name="accentColor"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Colore Accento</FormLabel>
+                              <FormControl>
+                                <div className="flex gap-2">
+                                  <Input 
+                                    type="color" 
+                                    {...field} 
+                                    className="w-12 h-10 p-1 cursor-pointer"
+                                    data-testid="input-accent-color"
+                                  />
+                                  <Input {...field} className="flex-1" />
+                                </div>
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={form.control}
+                          name="backgroundStyle"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Stile Sfondo</FormLabel>
+                              <Select onValueChange={field.onChange} value={field.value}>
+                                <FormControl>
+                                  <SelectTrigger data-testid="select-background-style">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  <SelectItem value="solid">Solido</SelectItem>
+                                  <SelectItem value="gradient">Gradiente</SelectItem>
+                                  <SelectItem value="pattern">Pattern</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </FormItem>
+                          )}
+                        />
+
+                        {watchedValues.backgroundStyle === 'gradient' && (
+                          <FormField
+                            control={form.control}
+                            name="gradientDirection"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Direzione Gradiente</FormLabel>
+                                <Select onValueChange={field.onChange} value={field.value}>
+                                  <FormControl>
+                                    <SelectTrigger data-testid="select-gradient-direction">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    <SelectItem value="to-bottom">Verso il Basso</SelectItem>
+                                    <SelectItem value="to-right">Verso Destra</SelectItem>
+                                    <SelectItem value="radial">Radiale</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </FormItem>
+                            )}
+                          />
+                        )}
+                      </CardContent>
+                    </Card>
+                  </TabsContent>
+
+                  <TabsContent value="logo">
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-lg flex items-center gap-2">
+                          <Image className="w-5 h-5" />
+                          Logo
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <div className="space-y-3">
+                          <FormLabel>Sorgente Logo</FormLabel>
+                          <RadioGroup
+                            value={logoSource}
+                            onValueChange={(value) => handleLogoSourceChange(value as LogoSourceType)}
+                            className="flex flex-wrap gap-3"
+                            data-testid="radio-logo-source"
+                          >
+                            <div className="flex items-center space-x-2 p-3 border rounded-lg hover-elevate cursor-pointer">
+                              <RadioGroupItem value="none" id="desktop-logo-none" />
+                              <Label htmlFor="desktop-logo-none" className="cursor-pointer">Nessun logo</Label>
+                            </div>
+                            <div className="flex items-center space-x-2 p-3 border rounded-lg hover-elevate cursor-pointer">
+                              <RadioGroupItem value="default" id="desktop-logo-default" />
+                              <Label htmlFor="desktop-logo-default" className="cursor-pointer">Event4U</Label>
+                            </div>
+                            <div className="flex items-center space-x-2 p-3 border rounded-lg hover-elevate cursor-pointer">
+                              <RadioGroupItem value="file" id="desktop-logo-file" />
+                              <Label htmlFor="desktop-logo-file" className="cursor-pointer">Carica file</Label>
+                            </div>
+                            <div className="flex items-center space-x-2 p-3 border rounded-lg hover-elevate cursor-pointer">
+                              <RadioGroupItem value="url" id="desktop-logo-url" />
+                              <Label htmlFor="desktop-logo-url" className="cursor-pointer">URL</Label>
+                            </div>
+                          </RadioGroup>
+                        </div>
+
+                        {logoSource === 'default' && (
+                          <div className="p-4 border rounded-lg bg-muted/30">
+                            <div className="flex items-center gap-3">
+                              <div className="w-16 h-16 flex items-center justify-center bg-background rounded-lg border">
+                                <img 
+                                  src={DEFAULT_LOGO_URL} 
+                                  alt="Event4U Logo" 
+                                  className="max-w-full max-h-full object-contain"
+                                />
+                              </div>
+                              <div>
+                                <p className="font-medium">Logo Event4U</p>
+                                <p className="text-sm text-muted-foreground">Logo predefinito dell'applicazione</p>
+                              </div>
+                              <Check className="w-5 h-5 text-green-500 ml-auto" />
+                            </div>
+                          </div>
+                        )}
+
+                        {logoSource === 'file' && (
+                          <div className="space-y-3">
+                            <input
+                              type="file"
+                              ref={fileInputRef}
+                              accept="image/*"
+                              onChange={handleFileUpload}
+                              className="hidden"
+                              data-testid="input-logo-file"
+                            />
+                            
+                            {watchedValues.logoUrl && watchedValues.logoUrl.startsWith('data:') ? (
+                              <div className="p-4 border rounded-lg bg-muted/30">
+                                <div className="flex items-center gap-3">
+                                  <div className="w-16 h-16 flex items-center justify-center bg-background rounded-lg border overflow-hidden">
+                                    <img 
+                                      src={watchedValues.logoUrl} 
+                                      alt="Logo caricato" 
+                                      className="max-w-full max-h-full object-contain"
+                                    />
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <p className="font-medium">Logo caricato</p>
+                                    <p className="text-sm text-muted-foreground truncate">Immagine in base64</p>
+                                  </div>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => fileInputRef.current?.click()}
+                                    data-testid="button-change-logo"
+                                  >
+                                    <Upload className="w-4 h-4" />
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={clearLogo}
+                                    data-testid="button-remove-logo"
+                                  >
+                                    <X className="w-4 h-4" />
+                                  </Button>
+                                </div>
+                              </div>
+                            ) : (
+                              <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => fileInputRef.current?.click()}
+                                disabled={isUploadingLogo}
+                                className="w-full h-24 flex flex-col gap-2"
+                                data-testid="button-upload-logo"
+                              >
+                                {isUploadingLogo ? (
+                                  <Loader2 className="w-6 h-6 animate-spin" />
+                                ) : (
+                                  <>
+                                    <Upload className="w-6 h-6" />
+                                    <span>Clicca per caricare un logo</span>
+                                    <span className="text-xs text-muted-foreground">PNG, JPG, SVG (max 2MB)</span>
+                                  </>
+                                )}
+                              </Button>
+                            )}
+                          </div>
+                        )}
+
+                        {logoSource === 'url' && (
+                          <FormField
+                            control={form.control}
+                            name="logoUrl"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>URL Logo</FormLabel>
+                                <FormControl>
+                                  <Input 
+                                    {...field}
+                                    value={field.value || ''}
+                                    placeholder="https://example.com/logo.png"
+                                    data-testid="input-logo-url"
+                                  />
+                                </FormControl>
+                                <FormDescription>
+                                  Inserisci l'URL di un'immagine logo
+                                </FormDescription>
+                              </FormItem>
+                            )}
+                          />
+                        )}
+
+                        {watchedValues.logoUrl && logoSource !== 'none' && (
+                          <>
+                            <Separator />
+                            <div className="grid grid-cols-2 gap-4">
+                              <FormField
+                                control={form.control}
+                                name="logoPosition"
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>Posizione Logo</FormLabel>
+                                    <Select onValueChange={field.onChange} value={field.value}>
+                                      <FormControl>
+                                        <SelectTrigger data-testid="select-logo-position">
+                                          <SelectValue />
+                                        </SelectTrigger>
+                                      </FormControl>
+                                      <SelectContent>
+                                        <SelectItem value="top-left">In alto a sinistra</SelectItem>
+                                        <SelectItem value="top-center">In alto al centro</SelectItem>
+                                        <SelectItem value="top-right">In alto a destra</SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                  </FormItem>
+                                )}
+                              />
+
+                              <FormField
+                                control={form.control}
+                                name="logoSize"
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>Dimensione Logo</FormLabel>
+                                    <Select onValueChange={field.onChange} value={field.value}>
+                                      <FormControl>
+                                        <SelectTrigger data-testid="select-logo-size">
+                                          <SelectValue />
+                                        </SelectTrigger>
+                                      </FormControl>
+                                      <SelectContent>
+                                        <SelectItem value="small">Piccolo</SelectItem>
+                                        <SelectItem value="medium">Medio</SelectItem>
+                                        <SelectItem value="large">Grande</SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                  </FormItem>
+                                )}
+                              />
+                            </div>
+                          </>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </TabsContent>
+
+                  <TabsContent value="qr">
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-lg flex items-center gap-2">
+                          <QrCode className="w-5 h-5" />
+                          QR Code
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <FormField
+                          control={form.control}
+                          name="qrSize"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Dimensione QR ({field.value}px)</FormLabel>
+                              <FormControl>
+                                <Slider
+                                  min={100}
+                                  max={400}
+                                  step={10}
+                                  value={[field.value]}
+                                  onValueChange={(v) => field.onChange(v[0])}
+                                  data-testid="slider-qr-size"
+                                />
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+
+                        <div className="grid grid-cols-2 gap-4">
+                          <FormField
+                            control={form.control}
+                            name="qrPosition"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Posizione QR</FormLabel>
+                                <Select onValueChange={field.onChange} value={field.value}>
+                                  <FormControl>
+                                    <SelectTrigger data-testid="select-qr-position">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    <SelectItem value="center">Centro</SelectItem>
+                                    <SelectItem value="bottom-center">In basso al centro</SelectItem>
+                                    <SelectItem value="bottom-left">In basso a sinistra</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            control={form.control}
+                            name="qrStyle"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Stile QR</FormLabel>
+                                <Select onValueChange={field.onChange} value={field.value}>
+                                  <FormControl>
+                                    <SelectTrigger data-testid="select-qr-style">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    <SelectItem value="square">Quadrato</SelectItem>
+                                    <SelectItem value="rounded">Arrotondato</SelectItem>
+                                    <SelectItem value="dots">Punti</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                          <FormField
+                            control={form.control}
+                            name="qrForegroundColor"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Colore QR</FormLabel>
+                                <FormControl>
+                                  <div className="flex gap-2">
+                                    <Input 
+                                      type="color" 
+                                      {...field} 
+                                      className="w-12 h-10 p-1 cursor-pointer"
+                                      data-testid="input-qr-foreground"
+                                    />
+                                    <Input {...field} className="flex-1" />
+                                  </div>
+                                </FormControl>
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            control={form.control}
+                            name="qrBackgroundColor"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Sfondo QR</FormLabel>
+                                <FormControl>
+                                  <div className="flex gap-2">
+                                    <Input 
+                                      type="color" 
+                                      value={field.value === 'transparent' ? '#ffffff' : field.value}
+                                      onChange={(e) => field.onChange(e.target.value)}
+                                      className="w-12 h-10 p-1 cursor-pointer"
+                                      data-testid="input-qr-background"
+                                    />
+                                    <Input {...field} className="flex-1" placeholder="transparent" />
+                                  </div>
+                                </FormControl>
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </TabsContent>
+
+                  <TabsContent value="layout">
+                    <Card>
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-lg flex items-center gap-2">
+                          <Layout className="w-5 h-5" />
+                          Layout e Campi
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-6">
+                        <div className="grid grid-cols-2 gap-4">
+                          <FormField
+                            control={form.control}
+                            name="showEventName"
+                            render={({ field }) => (
+                              <FormItem className="flex items-center justify-between p-3 border rounded-lg">
+                                <FormLabel className="!mt-0">Nome Evento</FormLabel>
+                                <FormControl>
+                                  <Switch checked={field.value} onCheckedChange={field.onChange} data-testid="switch-event-name" />
+                                </FormControl>
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            control={form.control}
+                            name="showEventDate"
+                            render={({ field }) => (
+                              <FormItem className="flex items-center justify-between p-3 border rounded-lg">
+                                <FormLabel className="!mt-0">Data Evento</FormLabel>
+                                <FormControl>
+                                  <Switch checked={field.value} onCheckedChange={field.onChange} data-testid="switch-event-date" />
+                                </FormControl>
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            control={form.control}
+                            name="showEventTime"
+                            render={({ field }) => (
+                              <FormItem className="flex items-center justify-between p-3 border rounded-lg">
+                                <FormLabel className="!mt-0">Ora Evento</FormLabel>
+                                <FormControl>
+                                  <Switch checked={field.value} onCheckedChange={field.onChange} data-testid="switch-event-time" />
+                                </FormControl>
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            control={form.control}
+                            name="showVenue"
+                            render={({ field }) => (
+                              <FormItem className="flex items-center justify-between p-3 border rounded-lg">
+                                <FormLabel className="!mt-0">Luogo</FormLabel>
+                                <FormControl>
+                                  <Switch checked={field.value} onCheckedChange={field.onChange} data-testid="switch-venue" />
+                                </FormControl>
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            control={form.control}
+                            name="showPrice"
+                            render={({ field }) => (
+                              <FormItem className="flex items-center justify-between p-3 border rounded-lg">
+                                <FormLabel className="!mt-0">Prezzo</FormLabel>
+                                <FormControl>
+                                  <Switch checked={field.value} onCheckedChange={field.onChange} data-testid="switch-price" />
+                                </FormControl>
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            control={form.control}
+                            name="showTicketType"
+                            render={({ field }) => (
+                              <FormItem className="flex items-center justify-between p-3 border rounded-lg">
+                                <FormLabel className="!mt-0">Tipo Biglietto</FormLabel>
+                                <FormControl>
+                                  <Switch checked={field.value} onCheckedChange={field.onChange} data-testid="switch-ticket-type" />
+                                </FormControl>
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            control={form.control}
+                            name="showSector"
+                            render={({ field }) => (
+                              <FormItem className="flex items-center justify-between p-3 border rounded-lg">
+                                <FormLabel className="!mt-0">Settore</FormLabel>
+                                <FormControl>
+                                  <Switch checked={field.value} onCheckedChange={field.onChange} data-testid="switch-sector" />
+                                </FormControl>
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            control={form.control}
+                            name="showSeat"
+                            render={({ field }) => (
+                              <FormItem className="flex items-center justify-between p-3 border rounded-lg">
+                                <FormLabel className="!mt-0">Posto</FormLabel>
+                                <FormControl>
+                                  <Switch checked={field.value} onCheckedChange={field.onChange} data-testid="switch-seat" />
+                                </FormControl>
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            control={form.control}
+                            name="showBuyerName"
+                            render={({ field }) => (
+                              <FormItem className="flex items-center justify-between p-3 border rounded-lg">
+                                <FormLabel className="!mt-0">Nome Acquirente</FormLabel>
+                                <FormControl>
+                                  <Switch checked={field.value} onCheckedChange={field.onChange} data-testid="switch-buyer-name" />
+                                </FormControl>
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            control={form.control}
+                            name="showFiscalSeal"
+                            render={({ field }) => (
+                              <FormItem className="flex items-center justify-between p-3 border rounded-lg">
+                                <FormLabel className="!mt-0">Sigillo Fiscale</FormLabel>
+                                <FormControl>
+                                  <Switch checked={field.value} onCheckedChange={field.onChange} data-testid="switch-fiscal-seal" />
+                                </FormControl>
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            control={form.control}
+                            name="showPerforatedEdge"
+                            render={({ field }) => (
+                              <FormItem className="flex items-center justify-between p-3 border rounded-lg">
+                                <FormLabel className="!mt-0">Bordo Perforato</FormLabel>
+                                <FormControl>
+                                  <Switch checked={field.value} onCheckedChange={field.onChange} data-testid="switch-perforated" />
+                                </FormControl>
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+
+                        <Separator />
+
+                        <div className="space-y-4">
+                          <h4 className="font-medium flex items-center gap-2">
+                            <Type className="w-4 h-4" />
+                            Tipografia
+                          </h4>
+
+                          <FormField
+                            control={form.control}
+                            name="fontFamily"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Font</FormLabel>
+                                <Select onValueChange={field.onChange} value={field.value}>
+                                  <FormControl>
+                                    <SelectTrigger data-testid="select-font">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    {FONT_OPTIONS.map((font) => (
+                                      <SelectItem key={font.value} value={font.value}>
+                                        {font.label}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </FormItem>
+                            )}
+                          />
+
+                          <div className="grid grid-cols-2 gap-4">
+                            <FormField
+                              control={form.control}
+                              name="titleFontSize"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Dimensione Titoli ({field.value}px)</FormLabel>
+                                  <FormControl>
+                                    <Slider
+                                      min={16}
+                                      max={48}
+                                      step={1}
+                                      value={[field.value]}
+                                      onValueChange={(v) => field.onChange(v[0])}
+                                      data-testid="slider-title-size"
+                                    />
+                                  </FormControl>
+                                </FormItem>
+                              )}
+                            />
+
+                            <FormField
+                              control={form.control}
+                              name="bodyFontSize"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Dimensione Testo ({field.value}px)</FormLabel>
+                                  <FormControl>
+                                    <Slider
+                                      min={10}
+                                      max={24}
+                                      step={1}
+                                      value={[field.value]}
+                                      onValueChange={(v) => field.onChange(v[0])}
+                                      data-testid="slider-body-size"
+                                    />
+                                  </FormControl>
+                                </FormItem>
+                              )}
+                            />
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </TabsContent>
+                </Tabs>
+              </div>
+
+              <div className="lg:sticky lg:top-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Anteprima Live</CardTitle>
+                  </CardHeader>
+                  <CardContent className="bg-muted/50 p-6 rounded-lg">
+                    <DigitalTicketPreview config={watchedValues} />
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+          </form>
+        </Form>
       </div>
     );
   }

@@ -6,6 +6,7 @@ import { z } from "zod";
 import { motion, AnimatePresence } from "framer-motion";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useIsMobile } from "@/hooks/use-mobile";
 import {
   MobileAppLayout,
   MobileHeader,
@@ -32,6 +33,23 @@ import {
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import {
   Plus,
   Search,
@@ -99,6 +117,7 @@ const staggerContainer = {
 
 export default function PrTablesPage() {
   const { toast } = useToast();
+  const isMobile = useIsMobile();
   const [selectedEventId, setSelectedEventId] = useState<string>("");
   const [isAddTableOpen, setIsAddTableOpen] = useState(false);
   const [isBookTableOpen, setIsBookTableOpen] = useState(false);
@@ -318,6 +337,559 @@ export default function PrTablesPage() {
     setSelectedTableId(table.id);
     setIsActionsOpen(true);
   };
+
+  // Desktop version
+  if (!isMobile) {
+    return (
+      <div className="container mx-auto p-6 space-y-6" data-testid="page-pr-tables">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">Gestione Tavoli</h1>
+            <p className="text-muted-foreground">
+              {selectedEvent ? format(new Date(selectedEvent.startDatetime), "d MMMM yyyy", { locale: it }) : "Seleziona un evento"}
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                refetchTables();
+                refetchBookings();
+              }}
+              data-testid="button-refresh"
+            >
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Aggiorna
+            </Button>
+            {selectedEventId && (
+              <Button onClick={() => setIsAddTableOpen(true)} data-testid="button-add-table">
+                <Plus className="w-4 h-4 mr-2" />
+                Nuovo Tavolo
+              </Button>
+            )}
+          </div>
+        </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Calendar className="w-5 h-5" />
+              Seleziona Evento
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Select value={selectedEventId} onValueChange={setSelectedEventId}>
+              <SelectTrigger data-testid="select-event">
+                <SelectValue placeholder="Seleziona un evento..." />
+              </SelectTrigger>
+              <SelectContent>
+                {events.map((event) => (
+                  <SelectItem key={event.id} value={event.id}>
+                    {event.name} - {format(new Date(event.startDatetime), "d MMM yyyy", { locale: it })}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </CardContent>
+        </Card>
+
+        {selectedEventId && (
+          <>
+            <div className="grid grid-cols-4 gap-4">
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="text-2xl font-bold">{stats.total}</div>
+                  <p className="text-sm text-muted-foreground">Totale Tavoli</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="text-2xl font-bold text-green-500">{stats.available}</div>
+                  <p className="text-sm text-muted-foreground">Liberi</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="text-2xl font-bold text-blue-500">{stats.reserved}</div>
+                  <p className="text-sm text-muted-foreground">Prenotati</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="text-2xl font-bold text-purple-500">{stats.capacity}</div>
+                  <p className="text-sm text-muted-foreground">Posti Totali</p>
+                </CardContent>
+              </Card>
+            </div>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between gap-2">
+                <CardTitle>Tavoli</CardTitle>
+                <div className="flex gap-2">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Cerca tavolo..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-9 w-64"
+                      data-testid="input-search"
+                    />
+                  </div>
+                  <Select value={zoneFilter} onValueChange={setZoneFilter}>
+                    <SelectTrigger className="w-40" data-testid="select-zone-filter">
+                      <SelectValue placeholder="Tutti i tipi" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">Tutti i tipi</SelectItem>
+                      {tableTypes.map((type) => (
+                        <SelectItem key={type} value={type}>
+                          {getTableTypeLabel(type)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {loadingTables ? (
+                  <div className="space-y-2">
+                    {[1, 2, 3].map((i) => (
+                      <Skeleton key={i} className="h-12 w-full" />
+                    ))}
+                  </div>
+                ) : filteredTables.length === 0 ? (
+                  <div className="text-center py-12">
+                    <Armchair className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                    <h3 className="text-lg font-semibold mb-2">Nessun tavolo</h3>
+                    <p className="text-muted-foreground">Aggiungi il primo tavolo per questo evento</p>
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Nome</TableHead>
+                        <TableHead>Tipo</TableHead>
+                        <TableHead>Posti</TableHead>
+                        <TableHead>Min. Spesa</TableHead>
+                        <TableHead>Stato</TableHead>
+                        <TableHead>Prenotazione</TableHead>
+                        <TableHead className="text-right">Azioni</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredTables.map((table) => {
+                        const booking = getTableBooking(table.id);
+                        const statusInfo = getStatusInfo(table.status);
+                        const StatusIcon = statusInfo.icon;
+
+                        return (
+                          <TableRow key={table.id} data-testid={`row-table-${table.id}`}>
+                            <TableCell className="font-semibold">{table.name}</TableCell>
+                            <TableCell>
+                              <Badge variant="secondary">{getTableTypeLabel(table.tableType)}</Badge>
+                            </TableCell>
+                            <TableCell>{table.capacity}</TableCell>
+                            <TableCell>{table.minSpend ? `€${table.minSpend}` : "-"}</TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className={`${statusInfo.color}/10 ${statusInfo.textColor} border-0`}>
+                                <StatusIcon className="w-3 h-3 mr-1" />
+                                {statusInfo.label}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              {booking ? (
+                                <div className="text-sm">
+                                  <p className="font-medium">{booking.customerName}</p>
+                                  <p className="text-muted-foreground">{booking.guestsCount} ospiti</p>
+                                </div>
+                              ) : (
+                                <span className="text-muted-foreground">-</span>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex gap-1 justify-end">
+                                {table.status === 'available' && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => {
+                                      setSelectedTableId(table.id);
+                                      setIsBookTableOpen(true);
+                                    }}
+                                    data-testid={`button-book-${table.id}`}
+                                  >
+                                    <Clock className="w-3 h-3 mr-1" />
+                                    Prenota
+                                  </Button>
+                                )}
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  onClick={() => {
+                                    setSelectedTableId(table.id);
+                                    setIsActionsOpen(true);
+                                  }}
+                                  data-testid={`button-actions-${table.id}`}
+                                >
+                                  <Edit className="w-4 h-4" />
+                                </Button>
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  className="text-red-500"
+                                  onClick={() => deleteTableMutation.mutate(table.id)}
+                                  data-testid={`button-delete-${table.id}`}
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
+          </>
+        )}
+
+        {!selectedEventId && (
+          <Card>
+            <CardContent className="py-12 text-center">
+              <Calendar className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+              <h3 className="text-lg font-semibold mb-2">Seleziona un evento</h3>
+              <p className="text-muted-foreground">Scegli un evento per gestire i tavoli</p>
+            </CardContent>
+          </Card>
+        )}
+
+        <Dialog open={isAddTableOpen} onOpenChange={setIsAddTableOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Nuovo Tavolo</DialogTitle>
+            </DialogHeader>
+            <Form {...tableForm}>
+              <form onSubmit={tableForm.handleSubmit((data) => createTableMutation.mutate(data))} className="space-y-4">
+                <FormField
+                  control={tableForm.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Nome Tavolo</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Es: Tavolo 1, VIP-1" {...field} data-testid="input-table-name" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={tableForm.control}
+                  name="tableType"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Tipo Tavolo</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger data-testid="input-table-type">
+                            <SelectValue placeholder="Seleziona tipo" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="standard">Standard</SelectItem>
+                          <SelectItem value="vip">VIP</SelectItem>
+                          <SelectItem value="prive">Privé</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={tableForm.control}
+                    name="capacity"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Posti</FormLabel>
+                        <FormControl>
+                          <Input type="number" min="1" {...field} data-testid="input-capacity" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={tableForm.control}
+                    name="minSpend"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Min. Spesa (€)</FormLabel>
+                        <FormControl>
+                          <Input type="number" min="0" placeholder="Opzionale" {...field} data-testid="input-minspend" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <FormField
+                  control={tableForm.control}
+                  name="notes"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Note</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Note aggiuntive" {...field} data-testid="input-notes" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <DialogFooter>
+                  <Button type="button" variant="outline" onClick={() => setIsAddTableOpen(false)}>
+                    Annulla
+                  </Button>
+                  <Button type="submit" disabled={createTableMutation.isPending} data-testid="button-submit-table">
+                    {createTableMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Plus className="w-4 h-4 mr-2" />}
+                    Crea Tavolo
+                  </Button>
+                </DialogFooter>
+              </form>
+            </Form>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={isActionsOpen} onOpenChange={(open) => {
+          setIsActionsOpen(open);
+          if (!open) setSelectedTableId("");
+        }}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>{selectedTable?.name || "Azioni Tavolo"}</DialogTitle>
+            </DialogHeader>
+            {selectedTable && (() => {
+              const booking = getTableBooking(selectedTable.id);
+              const statusInfo = getStatusInfo(selectedTable.status);
+
+              return (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-4 p-4 bg-muted/50 rounded-lg">
+                    <div className={`w-12 h-12 rounded-lg ${statusInfo.color}/10 flex items-center justify-center`}>
+                      <Armchair className={`w-6 h-6 ${statusInfo.textColor}`} />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold">{selectedTable.name}</h3>
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <span>{getTableTypeLabel(selectedTable.tableType)}</span>
+                        <span>•</span>
+                        <span>{selectedTable.capacity} posti</span>
+                      </div>
+                      <Badge variant="outline" className={`mt-2 ${statusInfo.color}/10 ${statusInfo.textColor} border-0`}>
+                        {statusInfo.label}
+                      </Badge>
+                    </div>
+                  </div>
+
+                  {booking && (
+                    <div className="p-4 bg-card border border-border rounded-lg space-y-2">
+                      <h4 className="font-semibold">Prenotazione</h4>
+                      <div className="flex items-center gap-2">
+                        <Users className="w-4 h-4 text-muted-foreground" />
+                        <span className="font-medium">{booking.customerName}</span>
+                        <span className="text-muted-foreground">({booking.guestsCount} ospiti)</span>
+                      </div>
+                      {booking.customerPhone && (
+                        <div className="flex items-center gap-2 text-sm">
+                          <Phone className="w-4 h-4 text-muted-foreground" />
+                          <span>{booking.customerPhone}</span>
+                        </div>
+                      )}
+                      {booking.customerEmail && (
+                        <div className="flex items-center gap-2 text-sm">
+                          <Mail className="w-4 h-4 text-muted-foreground" />
+                          <span>{booking.customerEmail}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="flex flex-col gap-2">
+                    {selectedTable.status === 'available' && (
+                      <>
+                        <Button
+                          variant="outline"
+                          onClick={() => {
+                            setIsActionsOpen(false);
+                            setIsBookTableOpen(true);
+                          }}
+                          data-testid={`action-book-${selectedTable.id}`}
+                        >
+                          <Clock className="w-4 h-4 mr-2" />
+                          Proponi Tavolo / Prenota
+                        </Button>
+                        <Button
+                          variant="outline"
+                          onClick={() => updateTableMutation.mutate({ id: selectedTable.id, data: { status: 'blocked' } })}
+                          data-testid={`action-block-${selectedTable.id}`}
+                        >
+                          <XCircle className="w-4 h-4 mr-2" />
+                          Blocca Tavolo
+                        </Button>
+                      </>
+                    )}
+
+                    {selectedTable.status === 'blocked' && (
+                      <Button
+                        variant="outline"
+                        onClick={() => updateTableMutation.mutate({ id: selectedTable.id, data: { status: 'available' } })}
+                        data-testid={`action-unblock-${selectedTable.id}`}
+                      >
+                        <CheckCircle2 className="w-4 h-4 mr-2 text-green-500" />
+                        Sblocca Tavolo
+                      </Button>
+                    )}
+
+                    {selectedTable.status === 'reserved' && booking && (
+                      <>
+                        <Button
+                          className="bg-green-500/10 text-green-500 hover:bg-green-500/20"
+                          variant="outline"
+                          onClick={() => updateBookingMutation.mutate({ id: booking.id, data: { status: 'arrived' } })}
+                          data-testid={`action-arrived-${selectedTable.id}`}
+                        >
+                          <CheckCircle2 className="w-4 h-4 mr-2" />
+                          Cliente Arrivato
+                        </Button>
+                        <Button
+                          variant="outline"
+                          className="text-red-500"
+                          onClick={() => deleteBookingMutation.mutate(booking.id)}
+                          data-testid={`action-cancel-booking-${selectedTable.id}`}
+                        >
+                          <Trash2 className="w-4 h-4 mr-2" />
+                          Cancella Prenotazione
+                        </Button>
+                      </>
+                    )}
+
+                    <Button variant="outline" data-testid={`action-edit-${selectedTable.id}`}>
+                      <Edit className="w-4 h-4 mr-2" />
+                      Modifica Tavolo
+                    </Button>
+
+                    <Button
+                      variant="outline"
+                      className="text-red-500"
+                      onClick={() => deleteTableMutation.mutate(selectedTable.id)}
+                      data-testid={`action-delete-${selectedTable.id}`}
+                    >
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      Elimina Tavolo
+                    </Button>
+                  </div>
+                </div>
+              );
+            })()}
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={isBookTableOpen} onOpenChange={(open) => {
+          setIsBookTableOpen(open);
+          if (!open) setSelectedTableId("");
+        }}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Prenota Tavolo</DialogTitle>
+            </DialogHeader>
+            <Form {...bookingForm}>
+              <form onSubmit={bookingForm.handleSubmit((data) => createBookingMutation.mutate(data))} className="space-y-4">
+                <FormField
+                  control={bookingForm.control}
+                  name="customerName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Nome Cliente</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Nome completo" {...field} data-testid="input-customer-name" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={bookingForm.control}
+                    name="customerPhone"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Telefono</FormLabel>
+                        <FormControl>
+                          <Input placeholder="+39 333..." {...field} data-testid="input-customer-phone" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={bookingForm.control}
+                    name="guestsCount"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Ospiti</FormLabel>
+                        <FormControl>
+                          <Input type="number" min="1" {...field} data-testid="input-guest-count" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <FormField
+                  control={bookingForm.control}
+                  name="customerEmail"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Email (opzionale)</FormLabel>
+                      <FormControl>
+                        <Input type="email" placeholder="email@esempio.com" {...field} data-testid="input-customer-email" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={bookingForm.control}
+                  name="notes"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Note</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Note aggiuntive" {...field} data-testid="input-booking-notes" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <DialogFooter>
+                  <Button type="button" variant="outline" onClick={() => setIsBookTableOpen(false)}>
+                    Annulla
+                  </Button>
+                  <Button type="submit" disabled={createBookingMutation.isPending} data-testid="button-submit-booking">
+                    {createBookingMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <CheckCircle2 className="w-4 h-4 mr-2" />}
+                    Conferma Prenotazione
+                  </Button>
+                </DialogFooter>
+              </form>
+            </Form>
+          </DialogContent>
+        </Dialog>
+      </div>
+    );
+  }
 
   if (loadingEvents) {
     return (

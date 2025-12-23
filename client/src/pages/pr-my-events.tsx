@@ -3,8 +3,26 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/hooks/useAuth";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { 
   HapticButton, 
   MobileAppLayout, 
@@ -26,6 +44,7 @@ import {
   CalendarClock,
   CheckCircle2,
   Sparkles,
+  Eye,
 } from "lucide-react";
 import { format, isAfter, isBefore, isToday } from "date-fns";
 import { it } from "date-fns/locale";
@@ -58,7 +77,10 @@ const cardVariants = {
 
 export default function PrMyEventsPage() {
   const { user } = useAuth();
+  const isMobile = useIsMobile();
   const [activeFilter, setActiveFilter] = useState<"upcoming" | "past">("upcoming");
+  const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
+  const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
 
   const { data: assignments = [], isLoading: loadingAssignments, refetch, isRefetching } = useQuery<EventStaffAssignment[]>({
     queryKey: ["/api/pr/my-assignments"],
@@ -312,6 +334,292 @@ export default function PrMyEventsPage() {
       className="border-b-0"
     />
   );
+
+  const openEventDetail = (event: Event) => {
+    setSelectedEvent(event);
+    setIsDetailDialogOpen(true);
+  };
+
+  // Desktop version
+  if (!isMobile) {
+    return (
+      <div className="container mx-auto p-6 space-y-6" data-testid="page-pr-my-events">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">I Miei Eventi</h1>
+            <p className="text-muted-foreground">Eventi a cui sei assegnato come PR</p>
+          </div>
+          <Button 
+            variant="outline" 
+            onClick={() => refetch()} 
+            disabled={isRefetching}
+            data-testid="button-refresh-desktop"
+          >
+            <RefreshCw className={`w-4 h-4 mr-2 ${isRefetching ? 'animate-spin' : ''}`} />
+            Aggiorna
+          </Button>
+        </div>
+
+        <div className="grid grid-cols-4 gap-4">
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+                  <Calendar className="w-6 h-6 text-primary" />
+                </div>
+                <div>
+                  <div className="text-2xl font-bold">{myEvents.length}</div>
+                  <p className="text-sm text-muted-foreground">Totali</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-full bg-emerald-500/10 flex items-center justify-center">
+                  <CalendarCheck className="w-6 h-6 text-emerald-400" />
+                </div>
+                <div>
+                  <div className="text-2xl font-bold text-emerald-400">{todayEvents.length}</div>
+                  <p className="text-sm text-muted-foreground">Oggi</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-full bg-blue-500/10 flex items-center justify-center">
+                  <CalendarClock className="w-6 h-6 text-blue-400" />
+                </div>
+                <div>
+                  <div className="text-2xl font-bold text-blue-400">{upcomingEvents.length}</div>
+                  <p className="text-sm text-muted-foreground">In Arrivo</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-full bg-purple-500/10 flex items-center justify-center">
+                  <CheckCircle2 className="w-6 h-6 text-purple-400" />
+                </div>
+                <div>
+                  <div className="text-2xl font-bold text-purple-400">{pastEvents.length}</div>
+                  <p className="text-sm text-muted-foreground">Passati</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="flex gap-2">
+          <Button
+            variant={activeFilter === "upcoming" ? "default" : "outline"}
+            onClick={() => setActiveFilter("upcoming")}
+            data-testid="filter-upcoming-desktop"
+          >
+            <CalendarClock className="w-4 h-4 mr-2" />
+            In Arrivo ({upcomingEvents.length})
+          </Button>
+          <Button
+            variant={activeFilter === "past" ? "default" : "outline"}
+            onClick={() => setActiveFilter("past")}
+            data-testid="filter-past-desktop"
+          >
+            <CheckCircle2 className="w-4 h-4 mr-2" />
+            Passati ({pastEvents.length})
+          </Button>
+        </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>
+              {activeFilter === "upcoming" ? "Eventi in Arrivo" : "Eventi Passati"}
+            </CardTitle>
+            <CardDescription>
+              {activeFilter === "upcoming" 
+                ? "Lista degli eventi programmati a cui sei assegnato" 
+                : "Storico degli eventi completati"
+              }
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <div className="space-y-4">
+                {[1, 2, 3].map((i) => (
+                  <Skeleton key={i} className="h-16 w-full" />
+                ))}
+              </div>
+            ) : displayedEvents.length === 0 ? (
+              <div className="text-center py-12 text-muted-foreground">
+                {myEvents.length === 0 
+                  ? "Non sei ancora assegnato a nessun evento. Contatta il tuo responsabile."
+                  : activeFilter === "upcoming" 
+                    ? "Nessun evento in arrivo"
+                    : "Nessun evento passato"
+                }
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Evento</TableHead>
+                    <TableHead>Data</TableHead>
+                    <TableHead>Orario</TableHead>
+                    <TableHead>Stato</TableHead>
+                    <TableHead>Ruolo</TableHead>
+                    <TableHead>Permessi</TableHead>
+                    <TableHead className="text-right">Azioni</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {displayedEvents.map((event) => {
+                    const assignment = getAssignmentForEvent(event.id);
+                    const eventDate = new Date(event.startDatetime);
+                    const isEventToday = isToday(eventDate);
+                    
+                    return (
+                      <TableRow 
+                        key={event.id} 
+                        className={isEventToday ? "bg-primary/5" : ""}
+                        data-testid={`row-event-${event.id}`}
+                      >
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium">{event.name}</span>
+                            {isEventToday && (
+                              <Badge className="bg-primary/20 text-primary border-primary/30">
+                                <Sparkles className="w-3 h-3 mr-1" />
+                                OGGI
+                              </Badge>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          {format(eventDate, "EEE d MMM yyyy", { locale: it })}
+                        </TableCell>
+                        <TableCell>{format(eventDate, "HH:mm", { locale: it })}</TableCell>
+                        <TableCell>{getStatusBadge(event.status)}</TableCell>
+                        <TableCell>{assignment && getRoleBadge(assignment.role)}</TableCell>
+                        <TableCell>
+                          <div className="flex gap-1">
+                            {assignment?.permissions?.includes('gestione_liste') && (
+                              <Badge variant="outline" className="text-xs">
+                                <ListChecks className="w-3 h-3 mr-1" />
+                                Liste
+                              </Badge>
+                            )}
+                            {assignment?.permissions?.includes('gestione_tavoli') && (
+                              <Badge variant="outline" className="text-xs">
+                                <Armchair className="w-3 h-3 mr-1" />
+                                Tavoli
+                              </Badge>
+                            )}
+                            {assignment?.permissions?.includes('check_in') && (
+                              <Badge variant="outline" className="text-xs">
+                                <QrCode className="w-3 h-3 mr-1" />
+                                Check-in
+                              </Badge>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex gap-2 justify-end">
+                            <Button 
+                              size="icon" 
+                              variant="ghost"
+                              onClick={() => openEventDetail(event)}
+                              data-testid={`button-view-${event.id}`}
+                            >
+                              <Eye className="w-4 h-4" />
+                            </Button>
+                            <Link href={`/pr/staff?event=${event.id}`}>
+                              <Button size="sm" data-testid={`button-open-${event.id}`}>
+                                Apri
+                                <ChevronRight className="w-4 h-4 ml-1" />
+                              </Button>
+                            </Link>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+
+        <Dialog open={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle>{selectedEvent?.name}</DialogTitle>
+              <DialogDescription>Dettagli evento</DialogDescription>
+            </DialogHeader>
+            {selectedEvent && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Data</p>
+                    <p className="font-medium">
+                      {format(new Date(selectedEvent.startDatetime), "EEEE d MMMM yyyy", { locale: it })}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Orario</p>
+                    <p className="font-medium">
+                      {format(new Date(selectedEvent.startDatetime), "HH:mm", { locale: it })}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Stato</p>
+                    <div className="mt-1">{getStatusBadge(selectedEvent.status)}</div>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Ruolo</p>
+                    <div className="mt-1">
+                      {getAssignmentForEvent(selectedEvent.id) && getRoleBadge(getAssignmentForEvent(selectedEvent.id)!.role)}
+                    </div>
+                  </div>
+                </div>
+                
+                {getAssignmentForEvent(selectedEvent.id)?.permissions && 
+                 getAssignmentForEvent(selectedEvent.id)!.permissions!.length > 0 && (
+                  <div>
+                    <p className="text-sm text-muted-foreground mb-2">Permessi</p>
+                    <div className="flex flex-wrap gap-2">
+                      {getAssignmentForEvent(selectedEvent.id)!.permissions!.map((perm) => (
+                        <Badge key={perm} variant="outline">
+                          {perm === 'gestione_liste' && <><ListChecks className="w-3 h-3 mr-1" />Gestione Liste</>}
+                          {perm === 'gestione_tavoli' && <><Armchair className="w-3 h-3 mr-1" />Gestione Tavoli</>}
+                          {perm === 'check_in' && <><QrCode className="w-3 h-3 mr-1" />Check-in</>}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="pt-4 border-t flex gap-2">
+                  <Button variant="outline" onClick={() => setIsDetailDialogOpen(false)}>
+                    Chiudi
+                  </Button>
+                  <Link href={`/pr/staff?event=${selectedEvent.id}`}>
+                    <Button>
+                      Apri Evento
+                      <ChevronRight className="w-4 h-4 ml-1" />
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (

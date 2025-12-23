@@ -6,7 +6,10 @@ import { z } from "zod";
 import { motion, AnimatePresence } from "framer-motion";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { MobileAppLayout, MobileHeader, HapticButton, triggerHaptic } from "@/components/mobile-primitives";
+import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Card,
   CardContent,
@@ -204,6 +207,7 @@ type SectionType = 'menu' | 'azienda' | 'captcha' | 'otp' | 'policy' | 'system';
 export default function SiaeSystemConfigPage() {
   const { toast } = useToast();
   const [, navigate] = useLocation();
+  const isMobile = useIsMobile();
   const [activeSection, setActiveSection] = useState<SectionType>('menu');
 
   const configQueryKey = ["/api/siae/config"] as const;
@@ -361,6 +365,731 @@ export default function SiaeSystemConfigPage() {
     );
   };
 
+  // Desktop version
+  if (!isMobile) {
+    if (configLoading) {
+      return (
+        <div className="container mx-auto p-6 flex items-center justify-center min-h-[400px]">
+          <Loader2 className="w-10 h-10 animate-spin text-primary" />
+        </div>
+      );
+    }
+
+    return (
+      <div className="container mx-auto p-6 space-y-6" data-testid="page-siae-system-config">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">Configurazione Sistema SIAE</h1>
+            <p className="text-muted-foreground">Gestisci CAPTCHA, OTP e policy biglietteria</p>
+          </div>
+          <Button 
+            onClick={form.handleSubmit(onSubmit)} 
+            disabled={saveMutation.isPending}
+            data-testid="button-save-config"
+          >
+            {saveMutation.isPending ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Salvataggio...
+              </>
+            ) : (
+              <>
+                <Save className="w-4 h-4 mr-2" />
+                Salva Configurazione
+              </>
+            )}
+          </Button>
+        </div>
+
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} data-testid="form-system-config">
+            <Tabs defaultValue="azienda" className="space-y-6">
+              <TabsList className="grid w-full grid-cols-5">
+                <TabsTrigger value="azienda" data-testid="tab-azienda">
+                  <Building2 className="w-4 h-4 mr-2" />
+                  Azienda
+                </TabsTrigger>
+                <TabsTrigger value="captcha" data-testid="tab-captcha">
+                  <Image className="w-4 h-4 mr-2" />
+                  CAPTCHA
+                </TabsTrigger>
+                <TabsTrigger value="otp" data-testid="tab-otp">
+                  <Smartphone className="w-4 h-4 mr-2" />
+                  OTP
+                </TabsTrigger>
+                <TabsTrigger value="policy" data-testid="tab-policy">
+                  <Shield className="w-4 h-4 mr-2" />
+                  Policy
+                </TabsTrigger>
+                <TabsTrigger value="system" data-testid="tab-system">
+                  <Lock className="w-4 h-4 mr-2" />
+                  Sistema
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="azienda" data-testid="tabcontent-azienda">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Dati Azienda</CardTitle>
+                    <CardDescription>Ragione sociale, P.IVA e contatti</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="businessName"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Ragione Sociale</FormLabel>
+                            <FormControl>
+                              <Input 
+                                placeholder="Es: Event4U S.r.l."
+                                {...field}
+                                value={field.value || ""}
+                                data-testid="input-business-name"
+                              />
+                            </FormControl>
+                            <FormDescription>Nome legale dell'azienda titolare</FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="systemCode"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Codice Sistema SIAE</FormLabel>
+                            <FormControl>
+                              <Input 
+                                placeholder="Es: SYS00001"
+                                maxLength={8}
+                                {...field}
+                                value={field.value || ""}
+                                data-testid="input-system-code"
+                              />
+                            </FormControl>
+                            <FormDescription>Codice univoco assegnato da SIAE (8 caratteri)</FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                    <FormField
+                      control={form.control}
+                      name="businessAddress"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Indirizzo Sede Legale</FormLabel>
+                          <FormControl>
+                            <Input 
+                              placeholder="Es: Via Roma 123, 20100 Milano (MI)"
+                              {...field}
+                              value={field.value || ""}
+                              data-testid="input-business-address"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <Separator className="my-4" />
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="taxId"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Codice Fiscale</FormLabel>
+                            <FormControl>
+                              <Input 
+                                placeholder="Es: 12345678901"
+                                maxLength={16}
+                                {...field}
+                                value={field.value || ""}
+                                data-testid="input-tax-id"
+                              />
+                            </FormControl>
+                            <FormDescription>Codice Fiscale del titolare (CFTitolare)</FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="vatNumber"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Partita IVA</FormLabel>
+                            <FormControl>
+                              <Input 
+                                placeholder="Es: IT12345678901"
+                                maxLength={13}
+                                {...field}
+                                value={field.value || ""}
+                                data-testid="input-vat-number"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                    <Separator className="my-4" />
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="pecEmail"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Email PEC</FormLabel>
+                            <FormControl>
+                              <Input 
+                                type="email"
+                                placeholder="azienda@pec.it"
+                                {...field}
+                                value={field.value || ""}
+                                data-testid="input-pec-email"
+                              />
+                            </FormControl>
+                            <FormDescription>PEC per comunicazioni ufficiali SIAE</FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="siaeEmail"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Email SIAE</FormLabel>
+                            <FormControl>
+                              <Input 
+                                type="email"
+                                placeholder="utente@siae.it"
+                                {...field}
+                                value={field.value || ""}
+                                data-testid="input-siae-email"
+                              />
+                            </FormControl>
+                            <FormDescription>Email registrata presso SIAE</FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="captcha" data-testid="tabcontent-captcha">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Configurazione CAPTCHA</CardTitle>
+                    <CardDescription>Protezione anti-bot per gli acquisti</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <FormField
+                      control={form.control}
+                      name="captchaEnabled"
+                      render={({ field }) => (
+                        <FormItem className="flex items-center justify-between rounded-lg border p-4">
+                          <div>
+                            <FormLabel>CAPTCHA Attivo</FormLabel>
+                            <FormDescription>Protezione anti-bot per acquisti</FormDescription>
+                          </div>
+                          <FormControl>
+                            <Switch
+                              checked={field.value ?? true}
+                              onCheckedChange={field.onChange}
+                              data-testid="switch-captcha-enabled"
+                            />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                    <div className="grid grid-cols-3 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="captchaMinChars"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Caratteri Minimi</FormLabel>
+                            <FormControl>
+                              <Input type="number" {...field} data-testid="input-captcha-min-chars" />
+                            </FormControl>
+                            <FormDescription>4-8 caratteri</FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="captchaImageWidth"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Larghezza (px)</FormLabel>
+                            <FormControl>
+                              <Input type="number" {...field} data-testid="input-captcha-width" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="captchaImageHeight"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Altezza (px)</FormLabel>
+                            <FormControl>
+                              <Input type="number" {...field} data-testid="input-captcha-height" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                    <FormField
+                      control={form.control}
+                      name="captchaDistortion"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Livello Distorsione</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value ?? undefined}>
+                            <FormControl>
+                              <SelectTrigger data-testid="select-captcha-distortion">
+                                <SelectValue />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="low">Basso - Facile da leggere</SelectItem>
+                              <SelectItem value="medium">Medio - Bilanciato</SelectItem>
+                              <SelectItem value="high">Alto - Massima sicurezza</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="captchaAudioEnabled"
+                      render={({ field }) => (
+                        <FormItem className="flex items-center justify-between rounded-lg border p-4">
+                          <div>
+                            <FormLabel>CAPTCHA Audio</FormLabel>
+                            <FormDescription>Versione audio per accessibilità</FormDescription>
+                          </div>
+                          <FormControl>
+                            <Switch
+                              checked={field.value ?? true}
+                              onCheckedChange={field.onChange}
+                              data-testid="switch-captcha-audio"
+                            />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="otp" data-testid="tabcontent-otp">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Configurazione OTP</CardTitle>
+                    <CardDescription>Verifica telefonica per clienti</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <FormField
+                      control={form.control}
+                      name="otpEnabled"
+                      render={({ field }) => (
+                        <FormItem className="flex items-center justify-between rounded-lg border p-4">
+                          <div>
+                            <FormLabel>OTP Attivo</FormLabel>
+                            <FormDescription>Verifica telefonica per clienti</FormDescription>
+                          </div>
+                          <FormControl>
+                            <Switch
+                              checked={field.value ?? true}
+                              onCheckedChange={field.onChange}
+                              data-testid="switch-otp-enabled"
+                            />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="otpDigits"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="flex items-center gap-2">
+                              <Hash className="w-4 h-4" />
+                              Cifre OTP
+                            </FormLabel>
+                            <FormControl>
+                              <Input type="number" {...field} data-testid="input-otp-digits" />
+                            </FormControl>
+                            <FormDescription>4-8 cifre</FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="otpTimeoutSeconds"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="flex items-center gap-2">
+                              <Clock className="w-4 h-4" />
+                              Timeout (sec)
+                            </FormLabel>
+                            <FormControl>
+                              <Input type="number" {...field} data-testid="input-otp-timeout" />
+                            </FormControl>
+                            <FormDescription>60-600 secondi</FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="otpMaxAttempts"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="flex items-center gap-2">
+                              <AlertTriangle className="w-4 h-4" />
+                              Tentativi Max
+                            </FormLabel>
+                            <FormControl>
+                              <Input type="number" {...field} data-testid="input-otp-max-attempts" />
+                            </FormControl>
+                            <FormDescription>1-10 tentativi</FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="otpCooldownSeconds"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Cooldown Reinvio (sec)</FormLabel>
+                            <FormControl>
+                              <Input type="number" {...field} data-testid="input-otp-cooldown" />
+                            </FormControl>
+                            <FormDescription>Attesa prima di poter richiedere nuovo OTP</FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                    <FormField
+                      control={form.control}
+                      name="otpProvider"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Provider SMS</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value ?? undefined}>
+                            <FormControl>
+                              <SelectTrigger data-testid="select-otp-provider">
+                                <SelectValue />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="twilio">Twilio</SelectItem>
+                              <SelectItem value="nexmo">Nexmo (Vonage)</SelectItem>
+                              <SelectItem value="custom">Provider Personalizzato</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="otpVoiceEnabled"
+                      render={({ field }) => (
+                        <FormItem className="flex items-center justify-between rounded-lg border p-4">
+                          <div>
+                            <FormLabel>OTP Vocale</FormLabel>
+                            <FormDescription>Invio OTP tramite chiamata vocale</FormDescription>
+                          </div>
+                          <FormControl>
+                            <Switch
+                              checked={field.value ?? true}
+                              onCheckedChange={field.onChange}
+                              data-testid="switch-otp-voice"
+                            />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="policy" data-testid="tabcontent-policy">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Policy Biglietteria</CardTitle>
+                    <CardDescription>Limiti e regole di vendita</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="maxTicketsPerEvent"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Max Biglietti per Evento</FormLabel>
+                            <FormControl>
+                              <Input type="number" {...field} data-testid="input-max-tickets" />
+                            </FormControl>
+                            <FormDescription>Limite acquisto per singolo utente</FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="capacityThreshold"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Soglia Capienza</FormLabel>
+                            <FormControl>
+                              <Input type="number" {...field} data-testid="input-capacity-threshold" />
+                            </FormControl>
+                            <FormDescription>Oltre questa soglia: biglietti nominativi obbligatori</FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                    <Separator className="my-4" />
+                    <div className="space-y-4">
+                      <FormField
+                        control={form.control}
+                        name="nominativeTicketsEnabled"
+                        render={({ field }) => (
+                          <FormItem className="flex items-center justify-between rounded-lg border p-4">
+                            <div>
+                              <FormLabel>Biglietti Nominativi</FormLabel>
+                              <FormDescription>Abilita vendita biglietti nominativi</FormDescription>
+                            </div>
+                            <FormControl>
+                              <Switch
+                                checked={field.value ?? true}
+                                onCheckedChange={field.onChange}
+                                data-testid="switch-nominative-tickets"
+                              />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="changeNameEnabled"
+                        render={({ field }) => (
+                          <FormItem className="flex items-center justify-between rounded-lg border p-4">
+                            <div>
+                              <FormLabel>Cambio Nominativo</FormLabel>
+                              <FormDescription>Consenti cambio nome su biglietti</FormDescription>
+                            </div>
+                            <FormControl>
+                              <Switch
+                                checked={field.value ?? true}
+                                onCheckedChange={field.onChange}
+                                data-testid="switch-change-name"
+                              />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="resaleEnabled"
+                        render={({ field }) => (
+                          <FormItem className="flex items-center justify-between rounded-lg border p-4">
+                            <div>
+                              <FormLabel>Rimessa in Vendita</FormLabel>
+                              <FormDescription>Consenti secondary ticketing</FormDescription>
+                            </div>
+                            <FormControl>
+                              <Switch
+                                checked={field.value ?? true}
+                                onCheckedChange={field.onChange}
+                                data-testid="switch-resale"
+                              />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="system" data-testid="tabcontent-system">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Sistema SIAE</CardTitle>
+                    <CardDescription>Credenziali e trasmissioni</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="systemCode"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Codice Sistema SIAE</FormLabel>
+                            <FormControl>
+                              <Input
+                                {...field}
+                                value={field.value || ""}
+                                placeholder="ES: 12345678"
+                                data-testid="input-system-code-system"
+                              />
+                            </FormControl>
+                            <FormDescription>Codice assegnato da SIAE</FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="taxId"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Codice Fiscale Titolare</FormLabel>
+                            <FormControl>
+                              <Input
+                                {...field}
+                                value={field.value || ""}
+                                placeholder="RSSMRA80A01H501X"
+                                data-testid="input-tax-id-system"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="vatNumber"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Partita IVA</FormLabel>
+                            <FormControl>
+                              <Input
+                                {...field}
+                                value={field.value || ""}
+                                placeholder="12345678901"
+                                data-testid="input-vat-number-system"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="pecEmail"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Email PEC</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="email"
+                                {...field}
+                                value={field.value || ""}
+                                placeholder="azienda@pec.it"
+                                data-testid="input-pec-email-system"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                    <FormField
+                      control={form.control}
+                      name="siaeEmail"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Email SIAE</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="email"
+                              {...field}
+                              value={field.value || ""}
+                              placeholder="Email assegnata da SIAE"
+                              data-testid="input-siae-email-system"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <Separator className="my-4" />
+                    <FormField
+                      control={form.control}
+                      name="transmissionPecAddress"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>PEC Agenzia Entrate</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="email"
+                              {...field}
+                              value={field.value || ""}
+                              data-testid="input-transmission-pec"
+                            />
+                          </FormControl>
+                          <FormDescription>Indirizzo PEC per invio report XML</FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="autoTransmitDaily"
+                      render={({ field }) => (
+                        <FormItem className="flex items-center justify-between rounded-lg border p-4">
+                          <div>
+                            <FormLabel>Trasmissione Automatica</FormLabel>
+                            <FormDescription>Invia report giornalieri automaticamente</FormDescription>
+                          </div>
+                          <FormControl>
+                            <Switch
+                              checked={field.value ?? false}
+                              onCheckedChange={field.onChange}
+                              data-testid="switch-auto-transmit"
+                            />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            </Tabs>
+          </form>
+        </Form>
+      </div>
+    );
+  }
+
+  // Mobile version
   if (configLoading) {
     return (
       <MobileAppLayout header={renderHeader()}>

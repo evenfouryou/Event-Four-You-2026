@@ -1,9 +1,26 @@
 import { useParams, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
-import { Card, CardContent } from "@/components/ui/card";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
+import { Button } from "@/components/ui/button";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { motion } from "framer-motion";
 import {
   ArrowLeft,
@@ -19,6 +36,7 @@ import {
   Activity,
   RefreshCw,
   ChevronRight,
+  Eye,
 } from "lucide-react";
 import { queryClient } from "@/lib/queryClient";
 import { MobileAppLayout, MobileHeader, HapticButton, triggerHaptic } from "@/components/mobile-primitives";
@@ -74,6 +92,7 @@ const staggerItem = {
 export default function ScannerStatsPage() {
   const { eventId } = useParams<{ eventId?: string }>();
   const { user } = useAuth();
+  const isMobile = useIsMobile();
 
   const { data: event, isLoading: eventLoading } = useQuery<Event>({
     queryKey: ['/api/events', eventId],
@@ -103,6 +122,327 @@ export default function ScannerStatsPage() {
       queryClient.invalidateQueries({ queryKey: ['/api/e4u/scanner/total-stats'] });
     }
   };
+
+  const handleDesktopRefresh = () => {
+    if (eventId) {
+      queryClient.invalidateQueries({ queryKey: ['/api/e4u/events', eventId, 'scan-stats'] });
+    } else {
+      queryClient.invalidateQueries({ queryKey: ['/api/e4u/scanner/total-stats'] });
+    }
+  };
+
+  if (!isMobile) {
+    if (eventId) {
+      const totalAll = (stats?.totalLists || 0) + (stats?.totalTables || 0) + (stats?.totalTickets || 0);
+      const checkedAll = (stats?.checkedInLists || 0) + (stats?.checkedInTables || 0) + (stats?.checkedInTickets || 0);
+      const overallProgress = calcProgress(checkedAll, totalAll);
+
+      const statsData = [
+        {
+          label: "Liste Invitati",
+          icon: Users,
+          iconColor: "text-purple-400",
+          bgColor: "bg-purple-500/20",
+          checked: stats?.checkedInLists || 0,
+          total: stats?.totalLists || 0,
+        },
+        {
+          label: "Tavoli / Prenotazioni",
+          icon: Armchair,
+          iconColor: "text-amber-400",
+          bgColor: "bg-amber-500/20",
+          checked: stats?.checkedInTables || 0,
+          total: stats?.totalTables || 0,
+        },
+        {
+          label: "Biglietti SIAE",
+          icon: Ticket,
+          iconColor: "text-emerald-400",
+          bgColor: "bg-emerald-500/20",
+          checked: stats?.checkedInTickets || 0,
+          total: stats?.totalTickets || 0,
+        },
+      ];
+
+      return (
+        <div className="container mx-auto p-6 space-y-6" data-testid="page-scanner-stats">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <Link href={`/scanner/scan/${eventId}`}>
+                <Button variant="ghost" size="icon" data-testid="button-back">
+                  <ArrowLeft className="h-5 w-5" />
+                </Button>
+              </Link>
+              <div>
+                <h1 className="text-3xl font-bold flex items-center gap-2">
+                  <Activity className="h-7 w-7 text-blue-400" />
+                  Statistiche Evento
+                </h1>
+                {event && (
+                  <p className="text-muted-foreground">{event.name}</p>
+                )}
+              </div>
+            </div>
+            <Button variant="outline" onClick={handleDesktopRefresh} data-testid="button-refresh">
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Aggiorna
+            </Button>
+          </div>
+
+          <div className="grid grid-cols-4 gap-4">
+            <Card className="col-span-1">
+              <CardContent className="pt-6">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-xl bg-blue-500/20 flex items-center justify-center">
+                    <Target className="w-6 h-6 text-blue-400" />
+                  </div>
+                  <div>
+                    <div className="text-3xl font-bold text-blue-400">{overallProgress}%</div>
+                    <p className="text-sm text-muted-foreground">Progresso Totale</p>
+                  </div>
+                </div>
+                <Progress value={overallProgress} className="h-2 mt-4" />
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6">
+                <div className="text-2xl font-bold">{checkedAll}</div>
+                <p className="text-sm text-muted-foreground">Ingressi Registrati</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6">
+                <div className="text-2xl font-bold">{totalAll}</div>
+                <p className="text-sm text-muted-foreground">Totale Previsti</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6">
+                <div className="text-2xl font-bold">{totalAll - checkedAll}</div>
+                <p className="text-sm text-muted-foreground">In Attesa</p>
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Dettaglio per Categoria</CardTitle>
+              <CardDescription>Statistiche di ingresso suddivise per tipologia</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {statsLoading ? (
+                <div className="space-y-4">
+                  {[1, 2, 3].map(i => (
+                    <Skeleton key={i} className="h-16 w-full" />
+                  ))}
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Categoria</TableHead>
+                      <TableHead className="text-right">Entrati</TableHead>
+                      <TableHead className="text-right">Totale</TableHead>
+                      <TableHead className="text-right">Percentuale</TableHead>
+                      <TableHead className="w-[200px]">Progresso</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {statsData.map((item) => {
+                      const Icon = item.icon;
+                      const progress = calcProgress(item.checked, item.total);
+                      return (
+                        <TableRow key={item.label} data-testid={`row-stat-${item.label}`}>
+                          <TableCell>
+                            <div className="flex items-center gap-3">
+                              <div className={`w-10 h-10 rounded-lg ${item.bgColor} flex items-center justify-center`}>
+                                <Icon className={`w-5 h-5 ${item.iconColor}`} />
+                              </div>
+                              <span className="font-medium">{item.label}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-right font-semibold">{item.checked}</TableCell>
+                          <TableCell className="text-right">{item.total}</TableCell>
+                          <TableCell className="text-right">{progress}%</TableCell>
+                          <TableCell>
+                            <Progress value={progress} className="h-2" />
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="hover-elevate">
+            <Link href={`/scanner/scanned/${eventId}`}>
+              <CardContent className="py-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center">
+                      <CheckCircle2 className="w-6 h-6 text-primary" />
+                    </div>
+                    <div>
+                      <p className="text-lg font-semibold">Vedi Lista Entrati</p>
+                      <p className="text-sm text-muted-foreground">{checkedAll} persone registrate</p>
+                    </div>
+                  </div>
+                  <Button variant="outline" data-testid="button-view-list">
+                    <Eye className="w-4 h-4 mr-2" />
+                    Visualizza
+                  </Button>
+                </div>
+              </CardContent>
+            </Link>
+          </Card>
+        </div>
+      );
+    }
+
+    return (
+      <div className="container mx-auto p-6 space-y-6" data-testid="page-scanner-stats">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Link href="/scanner">
+              <Button variant="ghost" size="icon" data-testid="button-back">
+                <ArrowLeft className="h-5 w-5" />
+              </Button>
+            </Link>
+            <div>
+              <h1 className="text-3xl font-bold flex items-center gap-2">
+                <BarChart3 className="h-7 w-7 text-blue-400" />
+                Statistiche Generali
+              </h1>
+              <p className="text-muted-foreground">Panoramica delle scansioni complessive</p>
+            </div>
+          </div>
+          <Button variant="outline" onClick={handleDesktopRefresh} data-testid="button-refresh">
+            <RefreshCw className="w-4 h-4 mr-2" />
+            Aggiorna
+          </Button>
+        </div>
+
+        {totalStatsLoading ? (
+          <div className="grid grid-cols-3 gap-4">
+            {[1, 2, 3].map(i => (
+              <Card key={i}>
+                <CardContent className="pt-6">
+                  <Skeleton className="h-8 w-20 mb-2" />
+                  <Skeleton className="h-4 w-32" />
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-3 gap-6">
+              <Card className="bg-gradient-to-br from-emerald-500/10 to-emerald-600/5">
+                <CardContent className="pt-6">
+                  <div className="flex items-center gap-4">
+                    <div className="w-14 h-14 rounded-xl bg-emerald-500/20 flex items-center justify-center">
+                      <Zap className="w-7 h-7 text-emerald-400" />
+                    </div>
+                    <div>
+                      <div className="text-4xl font-bold text-emerald-400 tabular-nums">
+                        {totalStats?.totalScans || 0}
+                      </div>
+                      <p className="text-sm text-muted-foreground">Scansioni Totali</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-gradient-to-br from-blue-500/10 to-blue-600/5">
+                <CardContent className="pt-6">
+                  <div className="flex items-center gap-4">
+                    <div className="w-14 h-14 rounded-xl bg-blue-500/20 flex items-center justify-center">
+                      <Clock className="w-7 h-7 text-blue-400" />
+                    </div>
+                    <div>
+                      <div className="text-4xl font-bold text-blue-400 tabular-nums">
+                        {totalStats?.todayScans || 0}
+                      </div>
+                      <p className="text-sm text-muted-foreground">Scansioni Oggi</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-gradient-to-br from-purple-500/10 to-purple-600/5">
+                <CardContent className="pt-6">
+                  <div className="flex items-center gap-4">
+                    <div className="w-14 h-14 rounded-xl bg-purple-500/20 flex items-center justify-center">
+                      <CalendarDays className="w-7 h-7 text-purple-400" />
+                    </div>
+                    <div>
+                      <div className="text-4xl font-bold text-purple-400 tabular-nums">
+                        {totalStats?.totalEventsScanned || 0}
+                      </div>
+                      <p className="text-sm text-muted-foreground">Eventi Scansionati</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Riepilogo Attività</CardTitle>
+                <CardDescription>Panoramica delle statistiche di scansione</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Metrica</TableHead>
+                      <TableHead className="text-right">Valore</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    <TableRow>
+                      <TableCell className="font-medium">
+                        <div className="flex items-center gap-3">
+                          <Zap className="w-5 h-5 text-emerald-400" />
+                          Scansioni Totali
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right text-lg font-semibold tabular-nums">
+                        {totalStats?.totalScans || 0}
+                      </TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell className="font-medium">
+                        <div className="flex items-center gap-3">
+                          <Clock className="w-5 h-5 text-blue-400" />
+                          Scansioni Oggi
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right text-lg font-semibold tabular-nums">
+                        {totalStats?.todayScans || 0}
+                      </TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell className="font-medium">
+                        <div className="flex items-center gap-3">
+                          <CalendarDays className="w-5 h-5 text-purple-400" />
+                          Eventi Scansionati
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right text-lg font-semibold tabular-nums">
+                        {totalStats?.totalEventsScanned || 0}
+                      </TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </>
+        )}
+      </div>
+    );
+  }
 
   if (eventId) {
     const totalAll = (stats?.totalLists || 0) + (stats?.totalTables || 0) + (stats?.totalTickets || 0);

@@ -21,7 +21,9 @@ import { Progress } from "@/components/ui/progress";
 import { Label } from "@/components/ui/label";
 import { motion, AnimatePresence } from "framer-motion";
 import { MobileAppLayout, MobileHeader, HapticButton, triggerHaptic } from "@/components/mobile-primitives";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface TicketConfig {
   id: string;
@@ -121,6 +123,7 @@ export default function EventWizard() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const { user } = useAuth();
+  const isMobile = useIsMobile();
   const [currentStep, setCurrentStep] = useState(1);
   const [direction, setDirection] = useState(0);
   const [draftId, setDraftId] = useState<string | null>(params?.id || null);
@@ -1767,6 +1770,1003 @@ export default function EventWizard() {
     );
   };
 
+  // Desktop version
+  if (!isMobile) {
+    return (
+      <div className="container mx-auto p-6 space-y-6" data-testid="page-event-wizard">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => navigate('/events')}
+              data-testid="button-back"
+            >
+              <ChevronLeft className="h-5 w-5" />
+            </Button>
+            <div>
+              <h1 className="text-3xl font-bold">{draftId ? 'Modifica Evento' : 'Nuovo Evento'}</h1>
+              <p className="text-muted-foreground">Step {currentStep} di {STEPS.length} - {currentStepData?.fullTitle}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            {lastSaved && (
+              <span className="text-sm text-muted-foreground">
+                Salvato alle {lastSaved.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}
+              </span>
+            )}
+            <Button
+              variant="outline"
+              onClick={saveDraft}
+              disabled={saveDraftMutation.isPending}
+              data-testid="button-save-draft"
+            >
+              {saveDraftMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : (
+                <Save className="h-4 w-4 mr-2" />
+              )}
+              Salva Bozza
+            </Button>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-center gap-2 mb-6">
+          {STEPS.map((step, index) => {
+            const Icon = step.icon;
+            const isActive = currentStep === step.id;
+            const isCompleted = currentStep > step.id;
+            
+            return (
+              <div key={step.id} className="flex items-center">
+                <button
+                  type="button"
+                  className={cn(
+                    "flex items-center gap-2 px-4 py-2 rounded-lg transition-all",
+                    isActive && "bg-primary text-primary-foreground",
+                    isCompleted && "bg-green-600 text-white",
+                    !isActive && !isCompleted && "bg-muted text-muted-foreground"
+                  )}
+                  onClick={() => {
+                    if (isCompleted || isActive) {
+                      setDirection(step.id > currentStep ? 1 : -1);
+                      setCurrentStep(step.id);
+                    }
+                  }}
+                  data-testid={`step-indicator-${step.id}`}
+                >
+                  {isCompleted ? (
+                    <CheckCircle2 className="h-4 w-4" />
+                  ) : (
+                    <Icon className="h-4 w-4" />
+                  )}
+                  <span className="text-sm font-medium">{step.title}</span>
+                </button>
+                {index < STEPS.length - 1 && (
+                  <div className={cn(
+                    "w-8 h-0.5 mx-2",
+                    currentStep > step.id ? "bg-green-600" : "bg-muted"
+                  )} />
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        <Progress value={progress} className="h-2 rounded-full mb-6" />
+
+        <Card className="p-6">
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)}>
+              {currentStep === 1 && (
+                <div className="space-y-6">
+                  <div className="grid grid-cols-2 gap-6">
+                    <FormField
+                      control={form.control}
+                      name="name"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Nome Evento</FormLabel>
+                          <FormControl>
+                            <Input 
+                              placeholder="es. Matrimonio Rossi-Bianchi" 
+                              {...field} 
+                              className="h-11"
+                              data-testid="input-event-name"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="locationId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Location</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value || ''}>
+                            <FormControl>
+                              <SelectTrigger className="h-11" data-testid="select-location">
+                                <SelectValue placeholder="Seleziona location" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {locations?.map((loc) => (
+                                <SelectItem key={loc.id} value={loc.id}>
+                                  {loc.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-6">
+                    <FormField
+                      control={form.control}
+                      name="formatId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Formato Evento</FormLabel>
+                          <Select 
+                            onValueChange={(value) => field.onChange(value === 'none' ? undefined : value)} 
+                            value={field.value || 'none'}
+                          >
+                            <FormControl>
+                              <SelectTrigger className="h-11" data-testid="select-format">
+                                <SelectValue placeholder="Seleziona formato" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="none">Nessun formato</SelectItem>
+                              {formats?.map((format) => (
+                                <SelectItem key={format.id} value={format.id}>
+                                  {format.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="capacity"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Capienza</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              placeholder="es. 100"
+                              className="h-11"
+                              value={field.value || ''}
+                              onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : undefined)}
+                              data-testid="input-capacity"
+                            />
+                          </FormControl>
+                          <FormDescription>Numero massimo di partecipanti</FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between rounded-lg border p-4">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-lg bg-muted">
+                        <Ticket className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <Label className="font-medium">Abilita Biglietteria SIAE</Label>
+                        <p className="text-sm text-muted-foreground">
+                          Gestisci la biglietteria secondo la normativa SIAE
+                        </p>
+                      </div>
+                    </div>
+                    <Switch
+                      checked={siaeEnabled}
+                      onCheckedChange={setSiaeEnabled}
+                      data-testid="switch-siae-enabled"
+                    />
+                  </div>
+
+                  <FormField
+                    control={form.control}
+                    name="imageUrl"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Immagine Evento</FormLabel>
+                        <FormControl>
+                          <div className="space-y-3">
+                            {field.value ? (
+                              <div className="relative rounded-lg overflow-hidden">
+                                <img
+                                  src={field.value}
+                                  alt="Event"
+                                  className="w-full h-48 object-cover"
+                                />
+                                <Button
+                                  type="button"
+                                  variant="destructive"
+                                  size="icon"
+                                  className="absolute top-2 right-2"
+                                  onClick={() => field.onChange('')}
+                                  data-testid="button-remove-image"
+                                >
+                                  <X className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            ) : (
+                              <div
+                                className="border-2 border-dashed rounded-lg p-8 text-center cursor-pointer hover-elevate"
+                                onClick={() => imageInputRef.current?.click()}
+                              >
+                                <ImageIcon className="h-10 w-10 text-muted-foreground mx-auto mb-2" />
+                                <p className="text-muted-foreground">Clicca per caricare un'immagine</p>
+                              </div>
+                            )}
+                            <input
+                              ref={imageInputRef}
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={async (e) => {
+                                const file = e.target.files?.[0];
+                                if (file) {
+                                  setIsUploadingImage(true);
+                                  try {
+                                    const formData = new FormData();
+                                    formData.append('file', file);
+                                    const response = await fetch('/api/upload', {
+                                      method: 'POST',
+                                      body: formData,
+                                    });
+                                    if (response.ok) {
+                                      const data = await response.json();
+                                      field.onChange(data.url);
+                                    }
+                                  } catch (error) {
+                                    console.error('Upload error:', error);
+                                  } finally {
+                                    setIsUploadingImage(false);
+                                  }
+                                }
+                              }}
+                            />
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              )}
+
+              {currentStep === 2 && (
+                <div className="space-y-6">
+                  <div className="grid grid-cols-2 gap-6">
+                    <FormField
+                      control={form.control}
+                      name="startDatetime"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Data e Ora Inizio</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="datetime-local"
+                              className="h-11"
+                              value={field.value ? new Date(field.value.getTime() - field.value.getTimezoneOffset() * 60000).toISOString().slice(0, 16) : ''}
+                              onChange={(e) => field.onChange(e.target.value ? new Date(e.target.value) : undefined)}
+                              data-testid="input-start-datetime"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="endDatetime"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Data e Ora Fine</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="datetime-local"
+                              className="h-11"
+                              value={field.value ? new Date(field.value.getTime() - field.value.getTimezoneOffset() * 60000).toISOString().slice(0, 16) : ''}
+                              onChange={(e) => field.onChange(e.target.value ? new Date(e.target.value) : undefined)}
+                              data-testid="input-end-datetime"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {currentStep === 3 && (
+                <div className="space-y-6">
+                  <div className="flex items-center justify-between rounded-lg border p-4">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-lg bg-muted">
+                        <Repeat className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <Label className="font-medium">Evento Ricorrente</Label>
+                        <p className="text-sm text-muted-foreground">L'evento si ripete periodicamente</p>
+                      </div>
+                    </div>
+                    <FormField
+                      control={form.control}
+                      name="isRecurring"
+                      render={({ field }) => (
+                        <Switch
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                          data-testid="checkbox-recurring"
+                        />
+                      )}
+                    />
+                  </div>
+
+                  {form.watch('isRecurring') && (
+                    <div className="space-y-6 p-4 border rounded-lg bg-muted/30">
+                      <div className="grid grid-cols-2 gap-6">
+                        <FormField
+                          control={form.control}
+                          name="recurrencePattern"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Frequenza</FormLabel>
+                              <Select onValueChange={field.onChange} value={field.value || 'none'}>
+                                <FormControl>
+                                  <SelectTrigger className="h-11" data-testid="select-recurrence-pattern">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  <SelectItem value="daily">Giornaliero</SelectItem>
+                                  <SelectItem value="weekly">Settimanale</SelectItem>
+                                  <SelectItem value="monthly">Mensile</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={form.control}
+                          name="recurrenceInterval"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Intervallo</FormLabel>
+                              <FormControl>
+                                <Input
+                                  type="number"
+                                  min="1"
+                                  className="h-11"
+                                  value={field.value || 1}
+                                  onChange={(e) => field.onChange(parseInt(e.target.value))}
+                                  data-testid="input-recurrence-interval"
+                                />
+                              </FormControl>
+                              <FormDescription>Ogni quanti giorni/settimane/mesi</FormDescription>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+
+                      <FormField
+                        control={form.control}
+                        name="recurrenceCount"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Numero di occorrenze</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                min="1"
+                                placeholder="es. 5"
+                                className="h-11 max-w-xs"
+                                value={field.value || ''}
+                                onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : undefined)}
+                                data-testid="input-recurrence-count"
+                              />
+                            </FormControl>
+                            <FormDescription>Lascia vuoto per specificare una data di fine</FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      {previewDates.length > 0 && (
+                        <div className="space-y-3 p-4 bg-background rounded-lg border">
+                          <div className="flex items-center justify-between">
+                            <Label className="font-medium">Date Ricorrenti ({previewDates.length})</Label>
+                            <div className="flex gap-2">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  const allDatesSet = new Set(previewDates.map(d => d.toISOString()));
+                                  setSelectedDates(allDatesSet);
+                                  setUserEditedSelection(true);
+                                }}
+                                data-testid="button-select-all-dates"
+                              >
+                                Tutte
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  setSelectedDates(new Set());
+                                  setUserEditedSelection(true);
+                                }}
+                                data-testid="button-deselect-all-dates"
+                              >
+                                Nessuna
+                              </Button>
+                            </div>
+                          </div>
+                          <div className="max-h-48 overflow-y-auto space-y-2">
+                            {previewDates.map((date, index) => {
+                              const dateKey = date.toISOString();
+                              const isSelected = selectedDates.has(dateKey);
+                              return (
+                                <div
+                                  key={dateKey}
+                                  className={cn(
+                                    "flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors",
+                                    isSelected ? "border-primary bg-primary/5" : "border-transparent hover:bg-muted"
+                                  )}
+                                  onClick={() => {
+                                    const newSet = new Set(selectedDates);
+                                    if (isSelected) {
+                                      newSet.delete(dateKey);
+                                    } else {
+                                      newSet.add(dateKey);
+                                    }
+                                    setSelectedDates(newSet);
+                                    setUserEditedSelection(true);
+                                  }}
+                                  data-testid={`date-preview-${index}`}
+                                >
+                                  <Checkbox checked={isSelected} className="h-5 w-5" />
+                                  <span className="flex-1">
+                                    {date.toLocaleDateString('it-IT', {
+                                      weekday: 'short',
+                                      day: 'numeric',
+                                      month: 'long',
+                                      hour: '2-digit',
+                                      minute: '2-digit'
+                                    })}
+                                  </span>
+                                  <Badge variant="outline">#{index + 1}</Badge>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {currentStep === 4 && siaeEnabled && (
+                <div className="space-y-6">
+                  <div className="grid grid-cols-2 gap-6">
+                    <div className="space-y-3">
+                      <Label>Genere Evento (TAB.1 SIAE)</Label>
+                      <Select 
+                        value={siaeGenreCode} 
+                        onValueChange={(code) => {
+                          setSiaeGenreCode(code);
+                          const selectedGenre = siaeGenres?.find(g => g.code === code);
+                          if (selectedGenre) {
+                            setSiaeTaxType(selectedGenre.taxType || 'S');
+                          }
+                        }}
+                      >
+                        <SelectTrigger className="h-11" data-testid="select-siae-genre">
+                          <SelectValue placeholder="Seleziona genere evento" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {siaeGenres?.filter(g => g.active).map((genre) => (
+                            <SelectItem key={genre.id} value={genre.code}>
+                              <div className="flex items-center gap-2">
+                                <span className="font-mono">{genre.code}</span>
+                                <span>{genre.name}</span>
+                                {genre.vatRate !== null && genre.vatRate !== undefined && (
+                                  <Badge variant="outline" className="ml-2">IVA {Number(genre.vatRate)}%</Badge>
+                                )}
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-3">
+                      <Label>Tipo Imposta</Label>
+                      <Select value={siaeTaxType} onValueChange={setSiaeTaxType}>
+                        <SelectTrigger className="h-11" data-testid="select-siae-tax-type">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="S">Spettacolo</SelectItem>
+                          <SelectItem value="I">Intrattenimento</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <p className="text-sm text-muted-foreground">
+                        {siaeTaxType === 'S' ? 'IVA detraibile per lo spettatore' : 'IVA non detraibile'}
+                      </p>
+                    </div>
+                  </div>
+
+                  {siaeGenreCode && (
+                    <div className="rounded-lg border bg-muted/30 p-4 flex items-center justify-between">
+                      <div>
+                        <Label className="font-medium">Aliquota IVA</Label>
+                        <p className="text-sm text-muted-foreground">Determinata dal genere selezionato</p>
+                      </div>
+                      <Badge className="text-lg px-4 py-1.5" data-testid="badge-vat-rate">
+                        {(() => {
+                          const rate = siaeGenres?.find(g => g.code === siaeGenreCode)?.vatRate;
+                          return rate !== null && rate !== undefined ? `${Number(rate)}%` : 'N/D';
+                        })()}
+                      </Badge>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-2 gap-6">
+                    <div className="flex items-center justify-between rounded-lg border p-4">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 rounded-lg bg-muted">
+                          <Users className="h-5 w-5" />
+                        </div>
+                        <div>
+                          <Label className="font-medium">Biglietti Nominativi</Label>
+                          <p className="text-sm text-muted-foreground">Obbligatorio per eventi &gt;5000</p>
+                        </div>
+                      </div>
+                      <Switch
+                        checked={siaeRequiresNominative}
+                        onCheckedChange={setSiaeRequiresNominative}
+                        data-testid="switch-nominative"
+                      />
+                    </div>
+
+                    <div className="space-y-3">
+                      <Label>Max Biglietti per Utente</Label>
+                      <Input
+                        type="number"
+                        min={1}
+                        max={50}
+                        className="h-11"
+                        value={siaeMaxTicketsPerUser}
+                        onChange={(e) => setSiaeMaxTicketsPerUser(parseInt(e.target.value) || 10)}
+                        data-testid="input-max-tickets"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between rounded-lg border p-4">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-lg bg-muted">
+                        <Ticket className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <Label className="font-medium">Vendita Abbonamenti</Label>
+                        <p className="text-sm text-muted-foreground">Dalla cassa</p>
+                      </div>
+                    </div>
+                    <Switch
+                      checked={siaeSubscriptionsEnabled}
+                      onCheckedChange={setSiaeSubscriptionsEnabled}
+                      data-testid="switch-subscriptions-enabled"
+                    />
+                  </div>
+
+                  {siaeSubscriptionsEnabled && (
+                    <div className="space-y-4 rounded-lg border bg-muted/30 p-4">
+                      <div className="grid grid-cols-3 gap-4">
+                        <div className="space-y-2">
+                          <Label>Tipo Turno</Label>
+                          <Select 
+                            value={siaeSubscriptionTurnType} 
+                            onValueChange={(v) => setSiaeSubscriptionTurnType(v as 'F' | 'L')}
+                          >
+                            <SelectTrigger className="h-11" data-testid="select-subscription-turn-type">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="F">Fisso (F)</SelectItem>
+                              <SelectItem value="L">Libero (L)</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label>Numero Eventi Inclusi</Label>
+                          <Input
+                            type="number"
+                            min={1}
+                            max={100}
+                            className="h-11"
+                            value={siaeSubscriptionEventsCount}
+                            onChange={(e) => setSiaeSubscriptionEventsCount(parseInt(e.target.value) || 5)}
+                            data-testid="input-subscription-events-count"
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label>Prezzo Abbonamento (€)</Label>
+                          <Input
+                            type="number"
+                            min={0}
+                            step="0.01"
+                            className="h-11"
+                            value={siaeSubscriptionPrice}
+                            onChange={(e) => setSiaeSubscriptionPrice(e.target.value)}
+                            data-testid="input-subscription-price"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {currentStep === 5 && siaeEnabled && (
+                <div className="space-y-6">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-lg font-semibold">Configurazione Biglietti</h3>
+                    <Button
+                      type="button"
+                      onClick={() => {
+                        const newTicket: TicketConfig = {
+                          id: Date.now().toString(),
+                          name: '',
+                          ticketType: 'INT',
+                          price: '20.00',
+                          ddp: '2.00',
+                          sectorCode: '',
+                          isNumbered: false,
+                          quantity: 100,
+                        };
+                        setSiaeSectors([...siaeSectors, newTicket]);
+                      }}
+                      data-testid="button-add-sector"
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Aggiungi Biglietto
+                    </Button>
+                  </div>
+
+                  {siaeSectors.length === 0 ? (
+                    <div className="text-center py-12 border-2 border-dashed rounded-lg">
+                      <Ticket className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+                      <p className="text-muted-foreground">Nessun biglietto configurato</p>
+                      <p className="text-sm text-muted-foreground mb-4">Clicca su "Aggiungi Biglietto" per iniziare</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {siaeSectors.map((ticket, index) => (
+                        <Card key={ticket.id} className="p-4">
+                          <div className="flex items-center justify-between mb-4">
+                            <h4 className="font-semibold">Biglietto {index + 1}</h4>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => setSiaeSectors(siaeSectors.filter(s => s.id !== ticket.id))}
+                              data-testid={`button-remove-sector-${index}`}
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </div>
+                          
+                          <div className="grid grid-cols-4 gap-4">
+                            <div className="space-y-2">
+                              <Label>Nome Biglietto</Label>
+                              <Input
+                                value={ticket.name}
+                                className="h-11"
+                                placeholder="es. Ingresso Standard"
+                                onChange={(e) => {
+                                  const updated = siaeSectors.map(s => 
+                                    s.id === ticket.id ? { ...s, name: e.target.value } : s
+                                  );
+                                  setSiaeSectors(updated);
+                                }}
+                                data-testid={`input-sector-name-${index}`}
+                              />
+                            </div>
+
+                            <div className="space-y-2">
+                              <Label>Tipo</Label>
+                              <Select
+                                value={ticket.ticketType}
+                                onValueChange={(value: 'INT' | 'RID' | 'OMA') => {
+                                  const updated = siaeSectors.map(s => 
+                                    s.id === ticket.id ? { ...s, ticketType: value } : s
+                                  );
+                                  setSiaeSectors(updated);
+                                }}
+                              >
+                                <SelectTrigger className="h-11" data-testid={`select-sector-type-${index}`}>
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="INT">Intero</SelectItem>
+                                  <SelectItem value="RID">Ridotto</SelectItem>
+                                  <SelectItem value="OMA">Omaggio</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+
+                            <div className="space-y-2">
+                              <Label>Prezzo (€)</Label>
+                              <Input
+                                type="number"
+                                min={0}
+                                step="0.01"
+                                className="h-11"
+                                value={ticket.price}
+                                onChange={(e) => {
+                                  const updated = siaeSectors.map(s => 
+                                    s.id === ticket.id ? { ...s, price: e.target.value } : s
+                                  );
+                                  setSiaeSectors(updated);
+                                }}
+                                data-testid={`input-sector-price-${index}`}
+                              />
+                            </div>
+
+                            <div className="space-y-2">
+                              <Label>Quantità</Label>
+                              <Input
+                                type="number"
+                                min={1}
+                                className="h-11"
+                                value={ticket.quantity}
+                                onChange={(e) => {
+                                  const updated = siaeSectors.map(s => 
+                                    s.id === ticket.id ? { ...s, quantity: parseInt(e.target.value) || 0 } : s
+                                  );
+                                  setSiaeSectors(updated);
+                                }}
+                                data-testid={`input-sector-quantity-${index}`}
+                              />
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-3 gap-4 mt-4">
+                            <div className="space-y-2">
+                              <Label>DDP Prevendita (€)</Label>
+                              <Input
+                                type="number"
+                                min={0}
+                                step="0.01"
+                                className="h-11"
+                                value={ticket.ddp}
+                                onChange={(e) => {
+                                  const updated = siaeSectors.map(s => 
+                                    s.id === ticket.id ? { ...s, ddp: e.target.value } : s
+                                  );
+                                  setSiaeSectors(updated);
+                                }}
+                                data-testid={`input-sector-ddp-${index}`}
+                              />
+                            </div>
+
+                            <div className="space-y-2">
+                              <Label>Codice Settore</Label>
+                              <Select
+                                value={ticket.sectorCode}
+                                onValueChange={(value) => {
+                                  const updated = siaeSectors.map(s => 
+                                    s.id === ticket.id ? { ...s, sectorCode: value } : s
+                                  );
+                                  setSiaeSectors(updated);
+                                }}
+                              >
+                                <SelectTrigger className="h-11" data-testid={`select-sector-code-${index}`}>
+                                  <SelectValue placeholder="Seleziona" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {siaeSectorCodes?.filter(s => s.active).map((sector) => (
+                                    <SelectItem key={sector.id} value={sector.code}>
+                                      {sector.code} - {sector.name}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+
+                            <div className="flex items-center justify-between rounded-lg border p-3 mt-auto">
+                              <Label>Posti Numerati</Label>
+                              <Switch
+                                checked={ticket.isNumbered}
+                                onCheckedChange={(checked) => {
+                                  const updated = siaeSectors.map(s => 
+                                    s.id === ticket.id ? { ...s, isNumbered: checked } : s
+                                  );
+                                  setSiaeSectors(updated);
+                                }}
+                                data-testid={`switch-sector-numbered-${index}`}
+                              />
+                            </div>
+                          </div>
+                        </Card>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {((currentStep === 4 && !siaeEnabled) || (currentStep === 6 && siaeEnabled)) && (
+                <div className="space-y-6">
+                  <h3 className="text-xl font-semibold">Riepilogo Evento</h3>
+                  
+                  <div className="grid grid-cols-2 gap-6">
+                    <Card className="p-4 space-y-3">
+                      <h4 className="font-semibold flex items-center gap-2">
+                        <FileText className="h-4 w-4" />
+                        Informazioni Base
+                      </h4>
+                      <div className="space-y-2 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Nome:</span>
+                          <span>{form.watch('name') || '-'}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Location:</span>
+                          <span>{locations?.find(l => l.id === form.watch('locationId'))?.name || '-'}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Inizio:</span>
+                          <span>{form.watch('startDatetime')?.toLocaleString('it-IT') || '-'}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Fine:</span>
+                          <span>{form.watch('endDatetime')?.toLocaleString('it-IT') || '-'}</span>
+                        </div>
+                        {form.watch('isRecurring') && (
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Ricorrenza:</span>
+                            <span>{form.watch('recurrencePattern')} x{form.watch('recurrenceCount')}</span>
+                          </div>
+                        )}
+                      </div>
+                    </Card>
+
+                    {siaeEnabled && (
+                      <Card className="p-4 space-y-3 border-primary/20 bg-primary/5">
+                        <h4 className="font-semibold flex items-center gap-2">
+                          <Ticket className="h-4 w-4" />
+                          Biglietteria SIAE
+                        </h4>
+                        <div className="space-y-2 text-sm">
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Genere:</span>
+                            <span>{siaeGenres?.find(g => g.code === siaeGenreCode)?.name || '-'}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Tipo Imposta:</span>
+                            <span>{siaeTaxType === 'S' ? 'Spettacolo' : 'Intrattenimento'}</span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-muted-foreground">Aliquota IVA:</span>
+                            <Badge variant="secondary">
+                              {(() => {
+                                const rate = siaeGenres?.find(g => g.code === siaeGenreCode)?.vatRate;
+                                return rate !== null && rate !== undefined ? `${Number(rate)}%` : 'N/D';
+                              })()}
+                            </Badge>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Nominativi:</span>
+                            <span>{siaeRequiresNominative ? 'Sì' : 'No'}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Biglietti:</span>
+                            <span>{siaeSectors.length}</span>
+                          </div>
+                          <div className="flex justify-between font-semibold">
+                            <span className="text-muted-foreground">Quantità Totale:</span>
+                            <span>{siaeSectors.reduce((sum, s) => sum + s.quantity, 0)} biglietti</span>
+                          </div>
+                        </div>
+                      </Card>
+                    )}
+                  </div>
+
+                  <FormField
+                    control={form.control}
+                    name="notes"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Note (opzionale)</FormLabel>
+                        <FormControl>
+                          <Textarea
+                            placeholder="Inserisci eventuali note..."
+                            className="min-h-[100px]"
+                            {...field}
+                            value={field.value || ''}
+                            data-testid="input-notes"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              )}
+            </form>
+          </Form>
+        </Card>
+
+        <div className="flex justify-between pt-4">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={prevStep}
+            disabled={currentStep === 1}
+            data-testid="button-prev-step"
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Indietro
+          </Button>
+
+          {currentStep < STEPS.length ? (
+            <Button
+              type="button"
+              onClick={nextStep}
+              data-testid="button-next-step"
+            >
+              Avanti
+              <ArrowRight className="h-4 w-4 ml-2" />
+            </Button>
+          ) : (
+            <Button
+              type="button"
+              disabled={publishMutation.isPending}
+              onClick={form.handleSubmit(onSubmit)}
+              data-testid="button-publish-event"
+            >
+              {publishMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : (
+                <CheckCircle2 className="h-4 w-4 mr-2" />
+              )}
+              Pubblica Evento
+            </Button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // Mobile version
   return (
     <MobileAppLayout
       header={

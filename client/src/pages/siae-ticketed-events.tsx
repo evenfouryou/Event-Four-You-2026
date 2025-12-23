@@ -8,6 +8,7 @@ import { it } from "date-fns/locale";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { useIsMobile } from "@/hooks/use-mobile";
 import {
   insertSiaeTicketedEventSchema,
   insertSiaeEventSectorSchema,
@@ -129,6 +130,7 @@ type SectorFormData = z.infer<typeof sectorFormSchema>;
 export default function SiaeTicketedEventsPage() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const isMobile = useIsMobile();
   const [, params] = useRoute("/siae/ticketed-events/:id");
   const urlEventId = params?.id;
   
@@ -430,6 +432,1024 @@ export default function SiaeTicketedEventsPage() {
     );
   }
 
+  // Desktop version
+  if (!isMobile) {
+    return (
+      <div className="container mx-auto p-6 space-y-6" data-testid="page-siae-ticketed-events">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">Eventi Biglietteria</h1>
+            <p className="text-muted-foreground">
+              {isSuperAdmin 
+                ? "Visualizza tutti gli eventi biglietteria SIAE di tutti gli organizzatori"
+                : "Gestisci la biglietteria SIAE per i tuoi eventi"}
+            </p>
+          </div>
+          {!isSuperAdmin && (
+            <Button
+              onClick={() => setIsCreateDialogOpen(true)}
+              disabled={!eventsWithoutTicketing?.length}
+              data-testid="button-activate-ticketing"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Attiva Biglietteria
+            </Button>
+          )}
+        </div>
+
+        {/* Stats Cards */}
+        <div className="grid grid-cols-4 gap-4">
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-2xl font-bold">{ticketedEvents?.length || 0}</div>
+              <p className="text-sm text-muted-foreground">Eventi Totali</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-2xl font-bold text-emerald-500">
+                {ticketedEvents?.filter(e => e.ticketingStatus === 'active').length || 0}
+              </div>
+              <p className="text-sm text-muted-foreground">Attivi</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-2xl font-bold text-[#FFD700]">
+                {ticketedEvents?.reduce((sum, e) => sum + (e.ticketsSold || 0), 0) || 0}
+              </div>
+              <p className="text-sm text-muted-foreground">Biglietti Venduti</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-2xl font-bold text-[#FFD700] flex items-center gap-1">
+                <Euro className="w-5 h-5" />
+                {ticketedEvents?.reduce((sum, e) => sum + Number(e.totalRevenue || 0), 0).toFixed(2) || '0.00'}
+              </div>
+              <p className="text-sm text-muted-foreground">Incasso Totale</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {ticketedEvents?.length === 0 ? (
+          <Card data-testid="card-empty-state">
+            <CardContent className="p-12 text-center">
+              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-[#FFD700]/10 flex items-center justify-center">
+                <Ticket className="w-8 h-8 text-[#FFD700]" />
+              </div>
+              <h3 className="text-lg font-semibold mb-2">Nessun Evento con Biglietteria</h3>
+              <p className="text-muted-foreground mb-4">
+                Attiva la biglietteria SIAE su uno dei tuoi eventi per iniziare a vendere biglietti.
+              </p>
+              <Button onClick={() => setIsCreateDialogOpen(true)} disabled={!eventsWithoutTicketing?.length}>
+                <Plus className="w-4 h-4 mr-2" />
+                Attiva Biglietteria
+              </Button>
+            </CardContent>
+          </Card>
+        ) : isSuperAdmin && eventsGroupedByCompany ? (
+          <Card>
+            <CardHeader>
+              <CardTitle>Eventi per Organizzatore</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Accordion type="multiple" className="space-y-2" data-testid="accordion-companies">
+                {Object.entries(eventsGroupedByCompany).map(([companyName, companyEvents]) => (
+                  <AccordionItem 
+                    key={companyName} 
+                    value={companyName}
+                    className="border rounded-lg"
+                    data-testid={`accordion-company-${companyName}`}
+                  >
+                    <AccordionTrigger className="px-4 py-3 hover:no-underline">
+                      <div className="flex items-center gap-3">
+                        <Building2 className="w-5 h-5 text-[#FFD700]" />
+                        <span className="font-semibold">{companyName}</span>
+                        <Badge variant="outline" className="ml-2">
+                          {companyEvents.length} {companyEvents.length === 1 ? 'evento' : 'eventi'}
+                        </Badge>
+                      </div>
+                    </AccordionTrigger>
+                    <AccordionContent className="px-4 pb-4">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Evento</TableHead>
+                            <TableHead>Data</TableHead>
+                            <TableHead>Stato</TableHead>
+                            <TableHead>Capienza</TableHead>
+                            <TableHead>Venduti</TableHead>
+                            <TableHead>Incasso</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {companyEvents.map((event) => {
+                            const displayEventName = event.eventName || "Evento";
+                            const displayEventDate = event.eventDate;
+                            return (
+                              <TableRow key={event.id} data-testid={`row-event-${event.id}`}>
+                                <TableCell className="font-medium">{displayEventName}</TableCell>
+                                <TableCell>
+                                  {displayEventDate && format(new Date(displayEventDate), "d MMM yyyy", { locale: it })}
+                                </TableCell>
+                                <TableCell>{getStatusBadge(event.ticketingStatus)}</TableCell>
+                                <TableCell>{event.totalCapacity}</TableCell>
+                                <TableCell>{event.ticketsSold}</TableCell>
+                                <TableCell>€{Number(event.totalRevenue || 0).toFixed(2)}</TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
+                    </AccordionContent>
+                  </AccordionItem>
+                ))}
+              </Accordion>
+            </CardContent>
+          </Card>
+        ) : (
+          <Card>
+            <CardHeader>
+              <CardTitle>Elenco Eventi</CardTitle>
+              <CardDescription>Tutti gli eventi con biglietteria SIAE attiva</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Evento</TableHead>
+                    <TableHead>Data</TableHead>
+                    <TableHead>Stato</TableHead>
+                    <TableHead>Capienza</TableHead>
+                    <TableHead>Venduti</TableHead>
+                    <TableHead>Disponibili</TableHead>
+                    <TableHead>Incasso</TableHead>
+                    <TableHead className="text-right">Azioni</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {ticketedEvents?.map((ticketedEvent) => {
+                    const eventInfo = getEventInfo(ticketedEvent.eventId);
+                    const isExpanded = expandedEventId === ticketedEvent.id;
+                    return (
+                      <TableRow 
+                        key={ticketedEvent.id} 
+                        className="cursor-pointer hover:bg-muted/50"
+                        data-testid={`row-event-${ticketedEvent.id}`}
+                      >
+                        <TableCell>
+                          <div>
+                            <div className="font-medium" data-testid={`title-event-${ticketedEvent.id}`}>
+                              {eventInfo?.name || "Evento"}
+                            </div>
+                            <div className="text-xs text-muted-foreground flex items-center gap-2">
+                              {ticketedEvent.requiresNominative && (
+                                <Badge variant="outline" className="text-xs">Nominativo</Badge>
+                              )}
+                              <span>{genres?.find((g) => g.code === ticketedEvent.genreCode)?.description || ticketedEvent.genreCode}</span>
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          {eventInfo?.startDatetime && (
+                            <span className="flex items-center gap-1">
+                              <Calendar className="w-4 h-4" />
+                              {format(new Date(eventInfo.startDatetime), "d MMM yyyy", { locale: it })}
+                            </span>
+                          )}
+                        </TableCell>
+                        <TableCell>{getStatusBadge(ticketedEvent.ticketingStatus)}</TableCell>
+                        <TableCell>{ticketedEvent.totalCapacity}</TableCell>
+                        <TableCell data-testid={`stat-sold-${ticketedEvent.id}`}>
+                          <span className="text-[#FFD700] font-semibold">{ticketedEvent.ticketsSold}</span>
+                        </TableCell>
+                        <TableCell data-testid={`stat-available-${ticketedEvent.id}`}>
+                          <span className="text-emerald-400">{ticketedEvent.totalCapacity - ticketedEvent.ticketsSold}</span>
+                        </TableCell>
+                        <TableCell data-testid={`stat-revenue-${ticketedEvent.id}`}>
+                          <span className="text-[#FFD700] font-semibold">€{Number(ticketedEvent.totalRevenue || 0).toFixed(2)}</span>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => setExpandedEventId(isExpanded ? null : ticketedEvent.id)}
+                              data-testid={`button-details-${ticketedEvent.id}`}
+                            >
+                              <Settings className="w-4 h-4 mr-1" />
+                              Dettagli
+                            </Button>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon" data-testid={`button-menu-${ticketedEvent.id}`}>
+                                  <MoreHorizontal className="w-4 h-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                {ticketedEvent.ticketingStatus === "draft" && (
+                                  <DropdownMenuItem
+                                    onClick={() => updateStatusMutation.mutate({ id: ticketedEvent.id, status: "active" })}
+                                    data-testid={`menu-activate-${ticketedEvent.id}`}
+                                  >
+                                    <Play className="w-4 h-4 mr-2" />
+                                    Attiva Vendite
+                                  </DropdownMenuItem>
+                                )}
+                                {ticketedEvent.ticketingStatus === "active" && (
+                                  <DropdownMenuItem
+                                    onClick={() => updateStatusMutation.mutate({ id: ticketedEvent.id, status: "suspended" })}
+                                    data-testid={`menu-suspend-${ticketedEvent.id}`}
+                                  >
+                                    <Pause className="w-4 h-4 mr-2" />
+                                    Sospendi Vendite
+                                  </DropdownMenuItem>
+                                )}
+                                {ticketedEvent.ticketingStatus === "suspended" && (
+                                  <DropdownMenuItem
+                                    onClick={() => updateStatusMutation.mutate({ id: ticketedEvent.id, status: "active" })}
+                                    data-testid={`menu-resume-${ticketedEvent.id}`}
+                                  >
+                                    <Play className="w-4 h-4 mr-2" />
+                                    Riprendi Vendite
+                                  </DropdownMenuItem>
+                                )}
+                                {ticketedEvent.ticketingStatus !== "closed" && (
+                                  <DropdownMenuItem
+                                    onClick={() => updateStatusMutation.mutate({ id: ticketedEvent.id, status: "closed" })}
+                                    className="text-destructive"
+                                    data-testid={`menu-close-${ticketedEvent.id}`}
+                                  >
+                                    <XCircle className="w-4 h-4 mr-2" />
+                                    Chiudi Vendite
+                                  </DropdownMenuItem>
+                                )}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Event Detail Dialog for Desktop */}
+        <Dialog open={!!expandedEventId && !isMobile} onOpenChange={(open) => !open && setExpandedEventId(null)}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto" data-testid="dialog-event-detail">
+            {expandedEventId && (() => {
+              const ticketedEvent = ticketedEvents?.find(e => e.id === expandedEventId);
+              const eventInfo = ticketedEvent ? getEventInfo(ticketedEvent.eventId) : null;
+              if (!ticketedEvent) return null;
+              
+              return (
+                <>
+                  <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2">
+                      <Ticket className="w-5 h-5 text-[#FFD700]" />
+                      {eventInfo?.name || "Dettagli Evento"}
+                    </DialogTitle>
+                    <DialogDescription className="flex items-center gap-4">
+                      {eventInfo?.startDatetime && (
+                        <span className="flex items-center gap-1">
+                          <Calendar className="w-4 h-4" />
+                          {format(new Date(eventInfo.startDatetime), "d MMMM yyyy", { locale: it })}
+                        </span>
+                      )}
+                      {getStatusBadge(ticketedEvent.ticketingStatus)}
+                    </DialogDescription>
+                  </DialogHeader>
+
+                  {/* Stats */}
+                  <div className="grid grid-cols-4 gap-4 my-4">
+                    <div className="p-3 rounded-lg bg-background/50 border border-border/50">
+                      <div className="text-xs text-muted-foreground mb-1">Biglietti Venduti</div>
+                      <div className="text-2xl font-bold text-[#FFD700]">{ticketedEvent.ticketsSold}</div>
+                    </div>
+                    <div className="p-3 rounded-lg bg-background/50 border border-border/50">
+                      <div className="text-xs text-muted-foreground mb-1">Disponibili</div>
+                      <div className="text-2xl font-bold text-emerald-400">
+                        {ticketedEvent.totalCapacity - ticketedEvent.ticketsSold}
+                      </div>
+                    </div>
+                    <div className="p-3 rounded-lg bg-background/50 border border-border/50">
+                      <div className="text-xs text-muted-foreground mb-1">Annullati</div>
+                      <div className="text-2xl font-bold text-destructive">{ticketedEvent.ticketsCancelled}</div>
+                    </div>
+                    <div className="p-3 rounded-lg bg-background/50 border border-border/50">
+                      <div className="text-xs text-muted-foreground mb-1">Incasso</div>
+                      <div className="text-2xl font-bold text-[#FFD700] flex items-center gap-1">
+                        <Euro className="w-5 h-5" />
+                        {Number(ticketedEvent.totalRevenue || 0).toFixed(2)}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Public Link */}
+                  {ticketedEvent.ticketingStatus === "active" && (
+                    <div className="mb-4 p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30">
+                      <div className="flex items-center justify-between gap-4">
+                        <div className="flex items-center gap-2 text-sm">
+                          <ExternalLink className="w-4 h-4 text-emerald-400" />
+                          <span className="text-muted-foreground">Link Pubblico:</span>
+                          <code className="px-2 py-1 rounded bg-background/50 text-emerald-400 text-xs">
+                            {window.location.origin}/acquista/{ticketedEvent.eventId}
+                          </code>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => {
+                              navigator.clipboard.writeText(`${window.location.origin}/acquista/${ticketedEvent.eventId}`);
+                              toast({
+                                title: "Link Copiato",
+                                description: "Il link è stato copiato negli appunti.",
+                              });
+                            }}
+                            data-testid={`button-copy-link-${ticketedEvent.id}`}
+                          >
+                            <Copy className="w-4 h-4 mr-1" />
+                            Copia
+                          </Button>
+                          <a
+                            href={`/acquista/${ticketedEvent.eventId}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            <Button size="sm" variant="outline" data-testid={`button-open-link-${ticketedEvent.id}`}>
+                              <ExternalLink className="w-4 h-4 mr-1" />
+                              Apri
+                            </Button>
+                          </a>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Sectors Table */}
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-medium flex items-center gap-2">
+                        <Ticket className="w-4 h-4" />
+                        Biglietti Configurati
+                      </h4>
+                      <Button
+                        size="sm"
+                        onClick={() => {
+                          setSelectedEvent(ticketedEvent);
+                          setIsSectorDialogOpen(true);
+                        }}
+                        data-testid={`button-add-sector-${ticketedEvent.id}`}
+                      >
+                        <Plus className="w-4 h-4 mr-2" />
+                        Crea Biglietto
+                      </Button>
+                    </div>
+
+                    {sectorsLoading ? (
+                      <div className="space-y-2">
+                        {[1, 2].map((i) => (
+                          <Skeleton key={i} className="h-12 w-full" />
+                        ))}
+                      </div>
+                    ) : selectedEventSectors?.length === 0 ? (
+                      <div className="p-4 text-center text-muted-foreground bg-background/50 rounded-lg border border-dashed">
+                        <AlertTriangle className="w-6 h-6 mx-auto mb-2 text-amber-500" />
+                        Nessun biglietto configurato. Crea almeno un biglietto per iniziare a vendere.
+                      </div>
+                    ) : (
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Biglietto</TableHead>
+                            <TableHead>Quantità</TableHead>
+                            <TableHead>Disponibili</TableHead>
+                            <TableHead>Intero</TableHead>
+                            <TableHead>Ridotto</TableHead>
+                            <TableHead>DDP</TableHead>
+                            <TableHead>Stato</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {selectedEventSectors?.map((sector) => (
+                            <TableRow key={sector.id} data-testid={`row-sector-${sector.id}`}>
+                              <TableCell>
+                                <div>
+                                  <div className="font-medium">{sector.name}</div>
+                                  <div className="text-xs text-muted-foreground">
+                                    {sectorCodes?.find((s) => s.code === sector.sectorCode)?.description || sector.sectorCode}
+                                    {sector.isNumbered && " (Numerato)"}
+                                  </div>
+                                </div>
+                              </TableCell>
+                              <TableCell>{sector.capacity}</TableCell>
+                              <TableCell>
+                                <span className={sector.availableSeats < 10 ? "text-amber-500" : ""}>
+                                  {sector.availableSeats}
+                                </span>
+                              </TableCell>
+                              <TableCell>€{Number(sector.priceIntero).toFixed(2)}</TableCell>
+                              <TableCell>
+                                {sector.priceRidotto ? `€${Number(sector.priceRidotto).toFixed(2)}` : "-"}
+                              </TableCell>
+                              <TableCell>€{Number(sector.prevendita || 0).toFixed(2)}</TableCell>
+                              <TableCell>
+                                {sector.active ? (
+                                  <Badge className="bg-emerald-500/20 text-emerald-400">Attivo</Badge>
+                                ) : (
+                                  <Badge variant="secondary">Inattivo</Badge>
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    )}
+                  </div>
+
+                  {/* Public Info Section */}
+                  <div className="mt-6 p-4 rounded-lg bg-background/50 border border-border/50" data-testid={`section-public-info-${ticketedEvent.id}`}>
+                    <h4 className="font-medium mb-4 flex items-center gap-2">
+                      <Image className="w-4 h-4" />
+                      Informazioni Pubbliche
+                    </h4>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor={`image-url-${ticketedEvent.id}`}>URL Immagine</Label>
+                        <Input
+                          id={`image-url-${ticketedEvent.id}`}
+                          placeholder="https://esempio.com/immagine.jpg"
+                          value={publicInfoImageUrl}
+                          onChange={(e) => setPublicInfoImageUrl(e.target.value)}
+                          data-testid={`input-image-url-${ticketedEvent.id}`}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor={`description-${ticketedEvent.id}`}>Descrizione</Label>
+                        <Textarea
+                          id={`description-${ticketedEvent.id}`}
+                          placeholder="Descrizione dell'evento..."
+                          value={publicInfoDescription}
+                          onChange={(e) => setPublicInfoDescription(e.target.value)}
+                          rows={3}
+                          data-testid={`input-description-${ticketedEvent.id}`}
+                        />
+                      </div>
+                    </div>
+                    <Button
+                      size="sm"
+                      className="mt-4"
+                      onClick={() => {
+                        updatePublicInfoMutation.mutate({
+                          id: ticketedEvent.id,
+                          description: publicInfoDescription,
+                          imageUrl: publicInfoImageUrl,
+                        });
+                      }}
+                      disabled={updatePublicInfoMutation.isPending}
+                      data-testid={`button-save-public-info-${ticketedEvent.id}`}
+                    >
+                      {updatePublicInfoMutation.isPending ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Salvataggio...
+                        </>
+                      ) : (
+                        "Salva Informazioni"
+                      )}
+                    </Button>
+                  </div>
+                </>
+              );
+            })()}
+          </DialogContent>
+        </Dialog>
+
+        {/* Create Event Dialog */}
+        <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto" data-testid="dialog-create">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Ticket className="w-5 h-5 text-[#FFD700]" />
+                Attiva Biglietteria SIAE
+              </DialogTitle>
+              <DialogDescription>
+                Configura la biglietteria SIAE per un evento esistente
+              </DialogDescription>
+            </DialogHeader>
+
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6" data-testid="form-create">
+                <FormField
+                  control={form.control}
+                  name="eventId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Evento</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-event">
+                            <SelectValue placeholder="Seleziona evento" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {eventsWithoutTicketing?.map((event) => (
+                            <SelectItem key={event.id} value={event.id}>
+                              {event.name} - {event.startDatetime && format(new Date(event.startDatetime), "d MMM yyyy", { locale: it })}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="genreCode"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Genere Evento (TAB.1)</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-genre">
+                              <SelectValue placeholder="Seleziona genere" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {genres?.map((genre) => (
+                              <SelectItem key={genre.code} value={genre.code}>
+                                {genre.code} - {genre.description}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="taxType"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Tipo Fiscale</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-tax-type">
+                              <SelectValue />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="S">Spettacolo</SelectItem>
+                            <SelectItem value="I">Intrattenimento</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="totalCapacity"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Capienza Totale</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            {...field}
+                            onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                            data-testid="input-capacity"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="maxTicketsPerUser"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Max Biglietti per Utente</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            {...field}
+                            onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                            data-testid="input-max-tickets"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <FormField
+                  control={form.control}
+                  name="ivaPreassolta"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>IVA Preassolta</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-iva">
+                            <SelectValue />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="N">No</SelectItem>
+                          <SelectItem value="B">Base</SelectItem>
+                          <SelectItem value="F">Forfait</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <div className="space-y-4 rounded-lg border p-4 bg-muted/30">
+                  <h4 className="font-medium">Opzioni Nominatività</h4>
+                  
+                  <FormField
+                    control={form.control}
+                    name="requiresNominative"
+                    render={({ field }) => (
+                      <FormItem className="flex items-center justify-between">
+                        <div>
+                          <FormLabel className="text-sm">Biglietti Nominativi</FormLabel>
+                          <FormDescription className="text-xs">
+                            I biglietti saranno associati al nome dell'acquirente
+                          </FormDescription>
+                        </div>
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                            data-testid="switch-nominative"
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="allowsChangeName"
+                    render={({ field }) => (
+                      <FormItem className="flex items-center justify-between">
+                        <div>
+                          <FormLabel className="text-sm">Consenti Cambio Nome</FormLabel>
+                          <FormDescription className="text-xs">
+                            Solo per eventi con capienza {">"} 5000
+                          </FormDescription>
+                        </div>
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                            data-testid="switch-change-name"
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="allowsResale"
+                    render={({ field }) => (
+                      <FormItem className="flex items-center justify-between">
+                        <div>
+                          <FormLabel className="text-sm">Consenti Rivendita</FormLabel>
+                          <FormDescription className="text-xs">
+                            Solo per eventi con capienza {">"} 5000
+                          </FormDescription>
+                        </div>
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                            data-testid="switch-resale"
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <DialogFooter>
+                  <Button type="button" variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
+                    Annulla
+                  </Button>
+                  <Button type="submit" disabled={createMutation.isPending} data-testid="button-submit">
+                    {createMutation.isPending ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Creazione...
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle2 className="w-4 h-4 mr-2" />
+                        Attiva Biglietteria
+                      </>
+                    )}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </Form>
+          </DialogContent>
+        </Dialog>
+
+        {/* Sector Dialog */}
+        <Dialog open={isSectorDialogOpen} onOpenChange={setIsSectorDialogOpen}>
+          <DialogContent className="max-w-xl" data-testid="dialog-sector">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-full bg-[#FFD700]/20 flex items-center justify-center">
+                  <Ticket className="w-4 h-4 text-[#FFD700]" />
+                </div>
+                Nuovo Biglietto
+              </DialogTitle>
+              <DialogDescription>
+                Configura un nuovo tipo di biglietto per l'evento
+              </DialogDescription>
+            </DialogHeader>
+
+            <Form {...sectorForm}>
+              <form onSubmit={sectorForm.handleSubmit(onSubmitSector)} className="space-y-5" data-testid="form-sector">
+                <div className="p-4 rounded-lg bg-background/50 border border-border/50 space-y-4">
+                  <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                    <Settings className="w-4 h-4" />
+                    Informazioni Base
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={sectorForm.control}
+                      name="name"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Nome Biglietto</FormLabel>
+                          <FormControl>
+                            <Input {...field} placeholder="es. Ingresso Standard" data-testid="input-sector-name" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={sectorForm.control}
+                      name="sectorCode"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Codice Settore SIAE</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl>
+                              <SelectTrigger data-testid="select-sector-code">
+                                <SelectValue placeholder="Seleziona" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {sectorCodes?.map((code) => (
+                                <SelectItem key={code.code} value={code.code}>
+                                  {code.code} - {code.description}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={sectorForm.control}
+                      name="capacity"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Quantità Disponibile</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              {...field}
+                              onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                              data-testid="input-sector-capacity"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={sectorForm.control}
+                      name="isNumbered"
+                      render={({ field }) => (
+                        <FormItem className="flex items-center justify-between pt-7">
+                          <FormLabel className="text-sm">Posti Numerati</FormLabel>
+                          <FormControl>
+                            <Switch
+                              checked={field.value}
+                              onCheckedChange={field.onChange}
+                              data-testid="switch-numbered"
+                            />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </div>
+
+                <div className="p-4 rounded-lg bg-background/50 border border-border/50 space-y-4">
+                  <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                    <Ticket className="w-4 h-4" />
+                    Tipo Biglietto
+                  </div>
+                  <FormField
+                    control={sectorForm.control}
+                    name="ticketType"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormControl>
+                          <div className="grid grid-cols-3 gap-3">
+                            <div
+                              onClick={() => field.onChange('INT')}
+                              className={`p-4 rounded-lg border-2 cursor-pointer transition-all ${
+                                field.value === 'INT'
+                                  ? 'border-[#FFD700] bg-[#FFD700]/10'
+                                  : 'border-border hover:border-[#FFD700]/50'
+                              }`}
+                              data-testid="option-ticket-intero"
+                            >
+                              <div className="text-center">
+                                <Badge className={`mb-2 ${field.value === 'INT' ? 'bg-[#FFD700] text-black' : 'bg-muted'}`}>INT</Badge>
+                                <div className="font-medium text-sm">Intero</div>
+                                <div className="text-xs text-muted-foreground">Prezzo pieno</div>
+                              </div>
+                            </div>
+                            <div
+                              onClick={() => field.onChange('RID')}
+                              className={`p-4 rounded-lg border-2 cursor-pointer transition-all ${
+                                field.value === 'RID'
+                                  ? 'border-blue-400 bg-blue-400/10'
+                                  : 'border-border hover:border-blue-400/50'
+                              }`}
+                              data-testid="option-ticket-ridotto"
+                            >
+                              <div className="text-center">
+                                <Badge className={`mb-2 ${field.value === 'RID' ? 'bg-blue-400 text-white' : 'bg-muted'}`}>RID</Badge>
+                                <div className="font-medium text-sm">Ridotto</div>
+                                <div className="text-xs text-muted-foreground">Prezzo ridotto</div>
+                              </div>
+                            </div>
+                            <div
+                              onClick={() => field.onChange('OMA')}
+                              className={`p-4 rounded-lg border-2 cursor-pointer transition-all ${
+                                field.value === 'OMA'
+                                  ? 'border-emerald-400 bg-emerald-400/10'
+                                  : 'border-border hover:border-emerald-400/50'
+                              }`}
+                              data-testid="option-ticket-omaggio"
+                            >
+                              <div className="text-center">
+                                <Badge className={`mb-2 ${field.value === 'OMA' ? 'bg-emerald-400 text-white' : 'bg-muted'}`}>OMA</Badge>
+                                <div className="font-medium text-sm">Omaggio</div>
+                                <div className="text-xs text-muted-foreground">Gratuito</div>
+                              </div>
+                            </div>
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <div className="p-4 rounded-lg bg-background/50 border border-border/50 space-y-4">
+                  <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                    <Euro className="w-4 h-4" />
+                    Prezzo e IVA
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={sectorForm.control}
+                      name="price"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Prezzo Biglietto</FormLabel>
+                          <FormControl>
+                            <div className="relative">
+                              <Euro className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                              <Input
+                                {...field}
+                                type="number"
+                                step="0.01"
+                                className="pl-9"
+                                disabled={watchedTicketType === 'OMA'}
+                                data-testid="input-price"
+                              />
+                            </div>
+                          </FormControl>
+                          {watchedTicketType === 'OMA' && (
+                            <p className="text-xs text-muted-foreground">Biglietto omaggio - prezzo gratuito</p>
+                          )}
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={sectorForm.control}
+                      name="ddp"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="flex items-center gap-2">
+                            DDP
+                            <Badge variant="secondary" className="text-xs">Prevendita</Badge>
+                          </FormLabel>
+                          <FormControl>
+                            <div className="relative">
+                              <Euro className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                              <Input
+                                {...field}
+                                value={field.value ?? ""}
+                                type="number"
+                                step="0.01"
+                                className="pl-9"
+                                data-testid="input-ddp"
+                              />
+                            </div>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  <FormField
+                    control={sectorForm.control}
+                    name="ivaRate"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Aliquota IVA</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value ?? "22"}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-iva-rate" className="w-48">
+                              <SelectValue />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="22">22% - Standard</SelectItem>
+                            <SelectItem value="10">10% - Ridotta (Teatro/Circo)</SelectItem>
+                            <SelectItem value="4">4% - Super Ridotta</SelectItem>
+                            <SelectItem value="0">Esente IVA</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <DialogFooter className="gap-2">
+                  <Button type="button" variant="outline" onClick={() => setIsSectorDialogOpen(false)}>
+                    Annulla
+                  </Button>
+                  <Button type="submit" disabled={createSectorMutation.isPending} data-testid="button-submit-sector">
+                    {createSectorMutation.isPending ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Creazione...
+                      </>
+                    ) : (
+                      <>
+                        <Plus className="w-4 h-4 mr-2" />
+                        Crea Biglietto
+                      </>
+                    )}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </Form>
+          </DialogContent>
+        </Dialog>
+      </div>
+    );
+  }
+
+  // Mobile version
   return (
     <MobileAppLayout
       header={<MobileHeader title="Eventi Biglietteria" showBackButton showMenuButton showUserMenu />}

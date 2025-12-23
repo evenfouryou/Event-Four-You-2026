@@ -9,9 +9,27 @@ import { motion, AnimatePresence } from "framer-motion";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { type SiaeSubscription, type SiaeCustomer } from "@shared/schema";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import {
   Form,
   FormControl,
@@ -73,9 +91,12 @@ type SubscriptionFormData = z.infer<typeof subscriptionFormSchema>;
 export default function SiaeSubscriptionsPage() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const isMobile = useIsMobile();
   const [selectedSubscription, setSelectedSubscription] = useState<SiaeSubscription | null>(null);
   const [isDetailSheetOpen, setIsDetailSheetOpen] = useState(false);
   const [isCreateSheetOpen, setIsCreateSheetOpen] = useState(false);
+  const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -215,6 +236,353 @@ export default function SiaeSubscriptionsPage() {
       }
     />
   );
+
+  if (!isMobile) {
+    return (
+      <div className="container mx-auto p-6 space-y-6" data-testid="page-siae-subscriptions">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">Abbonamenti SIAE</h1>
+            <p className="text-muted-foreground">Gestione abbonamenti clienti</p>
+          </div>
+          <Button onClick={() => setIsCreateDialogOpen(true)} data-testid="button-create">
+            <Plus className="w-4 h-4 mr-2" />
+            Nuovo Abbonamento
+          </Button>
+        </div>
+
+        <div className="grid grid-cols-5 gap-4">
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-2xl font-bold">{stats.total}</div>
+              <p className="text-sm text-muted-foreground">Totale</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-2xl font-bold text-emerald-500">{stats.active}</div>
+              <p className="text-sm text-muted-foreground">Attivi</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-2xl font-bold text-gray-500">{stats.expired}</div>
+              <p className="text-sm text-muted-foreground">Scaduti</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-2xl font-bold">{stats.totalEvents}</div>
+              <p className="text-sm text-muted-foreground">Eventi Totali</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-2xl font-bold text-[#FFD700]">€{stats.totalValue.toFixed(0)}</div>
+              <p className="text-sm text-muted-foreground">Valore Totale</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <CardTitle>Elenco Abbonamenti</CardTitle>
+                <CardDescription>Gestisci tutti gli abbonamenti registrati</CardDescription>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                  <Input
+                    placeholder="Cerca..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-9 w-64"
+                    data-testid="input-search"
+                  />
+                </div>
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger className="w-40" data-testid="filter-status">
+                    <SelectValue placeholder="Stato" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Tutti</SelectItem>
+                    <SelectItem value="active">Attivi</SelectItem>
+                    <SelectItem value="expired">Scaduti</SelectItem>
+                    <SelectItem value="cancelled">Annullati</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <div className="space-y-2">
+                {[1, 2, 3].map((i) => (
+                  <Skeleton key={i} className="h-12 w-full" />
+                ))}
+              </div>
+            ) : filteredSubscriptions?.length === 0 ? (
+              <div className="text-center py-12">
+                <CreditCard className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+                <h3 className="text-lg font-medium mb-2">Nessun Abbonamento</h3>
+                <p className="text-muted-foreground mb-4">Non ci sono abbonamenti registrati</p>
+                <Button onClick={() => setIsCreateDialogOpen(true)}>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Crea Abbonamento
+                </Button>
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Codice</TableHead>
+                    <TableHead>Intestatario</TableHead>
+                    <TableHead>Tipo</TableHead>
+                    <TableHead>Eventi</TableHead>
+                    <TableHead>Validità</TableHead>
+                    <TableHead>Importo</TableHead>
+                    <TableHead>Stato</TableHead>
+                    <TableHead className="w-[100px]">Azioni</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredSubscriptions?.map((subscription) => (
+                    <TableRow key={subscription.id} data-testid={`row-subscription-${subscription.id}`}>
+                      <TableCell className="font-mono">{subscription.subscriptionCode}</TableCell>
+                      <TableCell className="font-medium">
+                        {subscription.holderFirstName} {subscription.holderLastName}
+                      </TableCell>
+                      <TableCell>{subscription.turnType === "F" ? "Fisso" : "Libero"}</TableCell>
+                      <TableCell>{subscription.eventsUsed}/{subscription.eventsCount}</TableCell>
+                      <TableCell>
+                        {subscription.validFrom && format(new Date(subscription.validFrom), "dd/MM/yy", { locale: it })} - {subscription.validTo && format(new Date(subscription.validTo), "dd/MM/yy", { locale: it })}
+                      </TableCell>
+                      <TableCell className="text-[#FFD700] font-semibold">€{Number(subscription.totalAmount).toFixed(2)}</TableCell>
+                      <TableCell>{getStatusBadge(subscription.status)}</TableCell>
+                      <TableCell>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => {
+                            setSelectedSubscription(subscription);
+                            setIsDetailDialogOpen(true);
+                          }}
+                          data-testid={`button-view-${subscription.id}`}
+                        >
+                          <Eye className="w-4 h-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+
+        <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Nuovo Abbonamento</DialogTitle>
+              <DialogDescription>Crea un nuovo abbonamento SIAE</DialogDescription>
+            </DialogHeader>
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                <FormField
+                  control={form.control}
+                  name="customerId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Cliente</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-customer">
+                            <SelectValue placeholder="Seleziona cliente" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {customers?.map((customer) => (
+                            <SelectItem key={customer.id} value={customer.id}>
+                              {customer.uniqueCode}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="holderFirstName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Nome</FormLabel>
+                        <FormControl>
+                          <Input {...field} data-testid="input-first-name" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="holderLastName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Cognome</FormLabel>
+                        <FormControl>
+                          <Input {...field} data-testid="input-last-name" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="turnType"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Tipo Turno</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-turn-type">
+                              <SelectValue />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="F">Fisso</SelectItem>
+                            <SelectItem value="L">Libero</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="eventsCount"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>N. Eventi</FormLabel>
+                        <FormControl>
+                          <Input type="number" {...field} data-testid="input-events-count" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="validFrom"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Data Inizio</FormLabel>
+                        <FormControl>
+                          <Input type="date" {...field} data-testid="input-valid-from" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="validTo"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Data Fine</FormLabel>
+                        <FormControl>
+                          <Input type="date" {...field} data-testid="input-valid-to" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <FormField
+                  control={form.control}
+                  name="totalAmount"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Importo Totale (€)</FormLabel>
+                      <FormControl>
+                        <Input type="number" step="0.01" {...field} data-testid="input-amount" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <DialogFooter>
+                  <Button type="button" variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
+                    Annulla
+                  </Button>
+                  <Button type="submit" disabled={createSubscriptionMutation.isPending} data-testid="button-submit">
+                    {createSubscriptionMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                    Crea Abbonamento
+                  </Button>
+                </DialogFooter>
+              </form>
+            </Form>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Dettaglio Abbonamento</DialogTitle>
+              <DialogDescription>Informazioni complete sull'abbonamento</DialogDescription>
+            </DialogHeader>
+            {selectedSubscription && (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Codice</span>
+                  <span className="font-mono font-medium">{selectedSubscription.subscriptionCode}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Intestatario</span>
+                  <span className="font-medium">{selectedSubscription.holderFirstName} {selectedSubscription.holderLastName}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Tipo Turno</span>
+                  <span>{selectedSubscription.turnType === "F" ? "Fisso" : "Libero"}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Eventi</span>
+                  <span>{selectedSubscription.eventsUsed}/{selectedSubscription.eventsCount}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Validità</span>
+                  <span>
+                    {selectedSubscription.validFrom && format(new Date(selectedSubscription.validFrom), "dd/MM/yyyy", { locale: it })} - {selectedSubscription.validTo && format(new Date(selectedSubscription.validTo), "dd/MM/yyyy", { locale: it })}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Importo</span>
+                  <span className="text-[#FFD700] font-semibold">€{Number(selectedSubscription.totalAmount).toFixed(2)}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Stato</span>
+                  {getStatusBadge(selectedSubscription.status)}
+                </div>
+              </div>
+            )}
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsDetailDialogOpen(false)}>
+                Chiudi
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+    );
+  }
 
   return (
     <MobileAppLayout

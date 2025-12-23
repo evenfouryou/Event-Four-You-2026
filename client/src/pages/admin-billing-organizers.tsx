@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/table";
 import { Building2, Search, ExternalLink, AlertTriangle, CheckCircle, XCircle, Clock } from "lucide-react";
 import { MobileAppLayout, MobileHeader } from "@/components/mobile-primitives";
+import { useIsMobile } from "@/hooks/use-mobile";
 import type { Company, OrganizerSubscription, OrganizerWallet, OrganizerCommissionProfile } from "@shared/schema";
 
 interface OrganizerBillingData {
@@ -38,6 +39,7 @@ interface OrganizerBillingData {
 }
 
 export default function AdminBillingOrganizers() {
+  const isMobile = useIsMobile();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
 
@@ -110,6 +112,125 @@ export default function AdminBillingOrganizers() {
           <Skeleton className="h-4 w-96" />
         </div>
         <Skeleton className="h-[500px] w-full" />
+      </div>
+    );
+  }
+
+  // Desktop version
+  if (!isMobile) {
+    return (
+      <div className="container mx-auto p-6 space-y-6" data-testid="page-admin-billing-organizers">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">Organizzatori Billing</h1>
+            <p className="text-muted-foreground">
+              Gestisci abbonamenti, commissioni e fatturazione per gli organizzatori
+            </p>
+          </div>
+        </div>
+
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <CardTitle>Elenco Organizzatori</CardTitle>
+                <CardDescription>
+                  {filteredOrganizers?.length || 0} organizzatori trovati
+                </CardDescription>
+              </div>
+              <div className="flex gap-3">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Cerca organizzatore..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-9 w-64"
+                    data-testid="input-search-organizer"
+                  />
+                </div>
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger className="w-48" data-testid="select-status-filter">
+                    <SelectValue placeholder="Filtra per stato" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Tutti</SelectItem>
+                    <SelectItem value="active">Abbonamento Attivo</SelectItem>
+                    <SelectItem value="expired">Scaduto</SelectItem>
+                    <SelectItem value="suspended">Sospeso</SelectItem>
+                    <SelectItem value="none">Senza Abbonamento</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Azienda</TableHead>
+                  <TableHead>Stato Abbonamento</TableHead>
+                  <TableHead>Saldo Wallet</TableHead>
+                  <TableHead>Soglia</TableHead>
+                  <TableHead>Stato</TableHead>
+                  <TableHead className="text-right">Azioni</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredOrganizers?.map((org) => {
+                  const status = getSubscriptionStatus(org.subscription);
+                  const invoiceNeeded = needsInvoicing(org.wallet);
+                  const balance = parseFloat(org.wallet.balance);
+
+                  return (
+                    <TableRow key={org.company.id} data-testid={`row-organizer-${org.company.id}`}>
+                      <TableCell>
+                        <div>
+                          <p className="font-medium">{org.company.name}</p>
+                          {org.company.taxId && (
+                            <p className="text-sm text-muted-foreground">{org.company.taxId}</p>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>{getSubscriptionBadge(status)}</TableCell>
+                      <TableCell>
+                        <span className={balance < 0 ? "text-destructive font-medium" : "text-green-500"}>
+                          {formatCurrency(org.wallet.balance)}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {formatCurrency(org.wallet.thresholdAmount)}
+                      </TableCell>
+                      <TableCell>
+                        {invoiceNeeded && (
+                          <Badge variant="destructive" className="gap-1">
+                            <AlertTriangle className="w-3 h-3" />
+                            Da Fatturare
+                          </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Link href={`/admin/billing/organizers/${org.company.id}`}>
+                          <Button variant="ghost" size="sm" data-testid={`button-view-organizer-${org.company.id}`}>
+                            Dettagli
+                            <ExternalLink className="w-4 h-4 ml-2" />
+                          </Button>
+                        </Link>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+                {(!filteredOrganizers || filteredOrganizers.length === 0) && (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                      Nessun organizzatore trovato
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
       </div>
     );
   }

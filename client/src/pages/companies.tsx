@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import {
   AlertDialog,
@@ -13,6 +14,25 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
   Form,
   FormControl,
@@ -64,6 +84,7 @@ export default function Companies() {
   const [editingCompany, setEditingCompany] = useState<Company | null>(null);
   const [deleteCompanyId, setDeleteCompanyId] = useState<string | null>(null);
   const { toast } = useToast();
+  const isMobile = useIsMobile();
 
   const { data: companies, isLoading } = useQuery<Company[]>({
     queryKey: ['/api/companies'],
@@ -230,6 +251,243 @@ export default function Companies() {
       }
     />
   );
+
+  if (!isMobile) {
+    return (
+      <div className="container mx-auto p-6 space-y-6" data-testid="page-companies">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">Aziende</h1>
+            <p className="text-muted-foreground">Gestione delle aziende nel sistema</p>
+          </div>
+          <Button onClick={handleFabClick} data-testid="button-create-company">
+            <Plus className="w-4 h-4 mr-2" />
+            Nuova Azienda
+          </Button>
+        </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Elenco Aziende</CardTitle>
+            <CardDescription>
+              {companies?.length || 0} aziende registrate
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <div className="space-y-3">
+                {[1, 2, 3].map((i) => (
+                  <Skeleton key={i} className="h-16 w-full" />
+                ))}
+              </div>
+            ) : companies && companies.length > 0 ? (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Nome</TableHead>
+                    <TableHead>P.IVA</TableHead>
+                    <TableHead>Indirizzo</TableHead>
+                    <TableHead>Stato</TableHead>
+                    <TableHead className="text-right">Azioni</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {companies.map((company) => (
+                    <TableRow key={company.id} data-testid={`row-company-${company.id}`}>
+                      <TableCell className="font-medium">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
+                            <Building2 className="h-5 w-5 text-white" />
+                          </div>
+                          {company.name}
+                        </div>
+                      </TableCell>
+                      <TableCell data-testid={`text-taxid-${company.id}`}>
+                        {company.taxId || '-'}
+                      </TableCell>
+                      <TableCell data-testid={`text-address-${company.id}`}>
+                        <div className="flex items-center gap-2 max-w-xs">
+                          {company.address ? (
+                            <>
+                              <MapPin className="h-4 w-4 text-muted-foreground shrink-0" />
+                              <span className="truncate">{company.address}</span>
+                            </>
+                          ) : '-'}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        {company.active ? (
+                          <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30">
+                            Attiva
+                          </Badge>
+                        ) : (
+                          <Badge variant="secondary">Inattiva</Badge>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleEdit(company)}
+                            data-testid={`button-edit-company-${company.id}`}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleDeleteClick(company.id)}
+                            className="text-destructive hover:text-destructive"
+                            data-testid={`button-delete-company-${company.id}`}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            ) : (
+              <div className="text-center py-12">
+                <div className="w-16 h-16 rounded-2xl bg-muted/50 flex items-center justify-center mx-auto mb-4">
+                  <Building2 className="h-8 w-8 text-muted-foreground" />
+                </div>
+                <p className="text-muted-foreground mb-4">Nessuna azienda presente</p>
+                <Button onClick={handleFabClick} data-testid="button-create-first-company">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Crea Prima Azienda
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Dialog open={dialogOpen} onOpenChange={(open) => !open && handleDialogClose()}>
+          <DialogContent className="sm:max-w-[500px]">
+            <DialogHeader>
+              <DialogTitle>{editingCompany ? 'Modifica Azienda' : 'Nuova Azienda'}</DialogTitle>
+              <DialogDescription>
+                {editingCompany ? 'Modifica i dettagli dell\'azienda' : 'Inserisci i dettagli della nuova azienda'}
+              </DialogDescription>
+            </DialogHeader>
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+                <FormField
+                  control={form.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Nome Azienda</FormLabel>
+                      <FormControl>
+                        <Input {...field} data-testid="input-company-name" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="taxId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>P.IVA / Codice Fiscale</FormLabel>
+                      <FormControl>
+                        <Input {...field} value={field.value ?? ''} data-testid="input-company-taxid" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="address"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Indirizzo</FormLabel>
+                      <FormControl>
+                        <Textarea
+                          {...field}
+                          value={field.value ?? ''}
+                          className="resize-none"
+                          data-testid="input-company-address"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="active"
+                  render={({ field }) => (
+                    <FormItem className="flex items-center justify-between gap-4 rounded-lg border p-4">
+                      <div className="space-y-0.5">
+                        <FormLabel>Attiva</FormLabel>
+                        <p className="text-sm text-muted-foreground">
+                          L'azienda può operare nel sistema
+                        </p>
+                      </div>
+                      <FormControl>
+                        <Switch
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                          data-testid="switch-company-active"
+                        />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+                <DialogFooter>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleDialogClose}
+                    data-testid="button-cancel-company"
+                  >
+                    Annulla
+                  </Button>
+                  <Button
+                    type="submit"
+                    disabled={createMutation.isPending || updateMutation.isPending}
+                    data-testid="button-submit-company"
+                  >
+                    {editingCompany ? 'Aggiorna' : 'Crea'}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </Form>
+          </DialogContent>
+        </Dialog>
+
+        <AlertDialog open={!!deleteCompanyId} onOpenChange={(open) => !open && setDeleteCompanyId(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Conferma eliminazione</AlertDialogTitle>
+              <AlertDialogDescription>
+                Sei sicuro di voler eliminare questa azienda? Questa azione non può essere annullata.
+                Se l'azienda ha dati collegati (utenti, eventi, etc.), l'eliminazione non sarà possibile.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel data-testid="button-cancel-delete-company">
+                Annulla
+              </AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleDeleteConfirm}
+                disabled={deleteMutation.isPending}
+                className="bg-destructive hover:bg-destructive/90"
+                data-testid="button-confirm-delete-company"
+              >
+                {deleteMutation.isPending ? 'Eliminazione...' : 'Elimina'}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </div>
+    );
+  }
 
   return (
     <MobileAppLayout header={headerContent} contentClassName="pb-24">

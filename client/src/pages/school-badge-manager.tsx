@@ -5,6 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useIsMobile } from "@/hooks/use-mobile";
 import {
   MobileAppLayout,
   MobileHeader,
@@ -31,6 +32,24 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
@@ -90,6 +109,7 @@ const statusConfig: Record<string, { label: string; variant: "default" | "second
 
 export default function SchoolBadgeManager() {
   const { toast } = useToast();
+  const isMobile = useIsMobile();
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingLanding, setEditingLanding] = useState<SchoolBadgeLanding | null>(null);
   const [viewingLanding, setViewingLanding] = useState<SchoolBadgeLanding | null>(null);
@@ -98,6 +118,8 @@ export default function SchoolBadgeManager() {
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [isUploadingLogo, setIsUploadingLogo] = useState(false);
   const [showPrivacySection, setShowPrivacySection] = useState(false);
+  const [isFormDialogOpen, setIsFormDialogOpen] = useState(false);
+  const [isRequestsDialogOpen, setIsRequestsDialogOpen] = useState(false);
 
   const handleLogoFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -348,6 +370,23 @@ export default function SchoolBadgeManager() {
   );
 
   if (isLoading) {
+    if (!isMobile) {
+      return (
+        <div className="container mx-auto p-6 space-y-6" data-testid="page-school-badge-manager">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold">Badge Scuole</h1>
+              <p className="text-muted-foreground">Gestione landing page per badge scolastici</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {[1, 2, 3].map((i) => (
+              <Skeleton key={i} className="h-48 rounded-xl" />
+            ))}
+          </div>
+        </div>
+      );
+    }
     return (
       <MobileAppLayout header={header}>
         <div className="py-6 pb-24 space-y-4">
@@ -356,6 +395,618 @@ export default function SchoolBadgeManager() {
           ))}
         </div>
       </MobileAppLayout>
+    );
+  }
+
+  const openCreateFormDesktop = () => {
+    setEditingLanding(null);
+    setLogoPreview(null);
+    setShowPrivacySection(false);
+    form.reset({
+      schoolName: "",
+      slug: "",
+      logoUrl: "",
+      description: "",
+      authorizedDomains: "",
+      primaryColor: "#3b82f6",
+      customWelcomeText: "",
+      customThankYouText: "",
+      termsText: "",
+      privacyText: "",
+      marketingText: "",
+      requireTerms: false,
+      showMarketing: true,
+    });
+    setIsFormDialogOpen(true);
+  };
+
+  const openEditFormDesktop = (landing: SchoolBadgeLanding) => {
+    setEditingLanding(landing);
+    setLogoPreview(landing.logoUrl || null);
+    setShowPrivacySection(false);
+    form.reset({
+      schoolName: landing.schoolName,
+      slug: landing.slug,
+      logoUrl: landing.logoUrl || "",
+      description: landing.description || "",
+      authorizedDomains: landing.authorizedDomains?.join(", ") || "",
+      primaryColor: landing.primaryColor || "#3b82f6",
+      customWelcomeText: landing.customWelcomeText || "",
+      customThankYouText: landing.customThankYouText || "",
+      termsText: landing.termsText || "",
+      privacyText: landing.privacyText || "",
+      marketingText: landing.marketingText || "",
+      requireTerms: landing.requireTerms ?? false,
+      showMarketing: landing.showMarketing ?? true,
+    });
+    setIsFormDialogOpen(true);
+  };
+
+  const openRequestsDialogDesktop = (landing: SchoolBadgeLanding) => {
+    setViewingLanding(landing);
+    setIsRequestsDialogOpen(true);
+  };
+
+  if (!isMobile) {
+    return (
+      <div className="container mx-auto p-6 space-y-6" data-testid="page-school-badge-manager">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold">Badge Scuole</h1>
+            <p className="text-muted-foreground">Gestione landing page per badge scolastici</p>
+          </div>
+          <Button onClick={openCreateFormDesktop} data-testid="button-create-landing">
+            <Plus className="w-4 h-4 mr-2" />
+            Nuova Landing
+          </Button>
+        </div>
+
+        <div className="grid grid-cols-4 gap-4">
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-2xl font-bold">{landings.length}</div>
+              <p className="text-sm text-muted-foreground">Totale Landing</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-2xl font-bold text-green-500">{landings.filter(l => l.isActive).length}</div>
+              <p className="text-sm text-muted-foreground">Attive</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-2xl font-bold text-muted-foreground">{landings.filter(l => !l.isActive).length}</div>
+              <p className="text-sm text-muted-foreground">Inattive</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-2xl font-bold text-blue-500">{landings.reduce((sum, l) => sum + (l.authorizedDomains?.length || 0), 0)}</div>
+              <p className="text-sm text-muted-foreground">Domini Autorizzati</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Landing Pages</CardTitle>
+            <CardDescription>Gestisci le landing page per le richieste badge</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {landings.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12">
+                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center mb-4">
+                  <GraduationCap className="h-8 w-8 text-white" />
+                </div>
+                <h3 className="text-lg font-semibold mb-2">Nessuna landing page</h3>
+                <p className="text-muted-foreground text-center mb-4">
+                  Crea la tua prima landing page per permettere agli studenti di richiedere i badge
+                </p>
+                <Button onClick={openCreateFormDesktop} data-testid="button-create-first-landing">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Crea Landing
+                </Button>
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Scuola</TableHead>
+                    <TableHead>Slug</TableHead>
+                    <TableHead>Domini</TableHead>
+                    <TableHead>Stato</TableHead>
+                    <TableHead className="text-right">Azioni</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {landings.map((landing) => (
+                    <TableRow key={landing.id} data-testid={`row-landing-${landing.id}`}>
+                      <TableCell>
+                        <div className="flex items-center gap-3">
+                          {landing.logoUrl ? (
+                            <img 
+                              src={landing.logoUrl} 
+                              alt={landing.schoolName} 
+                              className="w-10 h-10 rounded-lg object-cover" 
+                            />
+                          ) : (
+                            <div 
+                              className="w-10 h-10 rounded-lg flex items-center justify-center"
+                              style={{ backgroundColor: landing.primaryColor || "#3b82f6" }}
+                            >
+                              <GraduationCap className="h-5 w-5 text-white" />
+                            </div>
+                          )}
+                          <div>
+                            <p className="font-medium">{landing.schoolName}</p>
+                            {landing.description && (
+                              <p className="text-sm text-muted-foreground line-clamp-1">{landing.description}</p>
+                            )}
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <code className="text-sm bg-muted px-2 py-1 rounded">/{landing.slug}</code>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap gap-1">
+                          {landing.authorizedDomains?.slice(0, 2).map((domain, i) => (
+                            <Badge key={i} variant="outline" className="text-xs">@{domain}</Badge>
+                          ))}
+                          {(landing.authorizedDomains?.length || 0) > 2 && (
+                            <Badge variant="outline" className="text-xs">+{(landing.authorizedDomains?.length || 0) - 2}</Badge>
+                          )}
+                          {(!landing.authorizedDomains || landing.authorizedDomains.length === 0) && (
+                            <span className="text-sm text-muted-foreground">Nessuno</span>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Switch
+                            checked={landing.isActive}
+                            onCheckedChange={(checked) => {
+                              toggleActiveMutation.mutate({ id: landing.id, isActive: checked });
+                            }}
+                            disabled={toggleActiveMutation.isPending}
+                            data-testid={`switch-active-${landing.id}`}
+                          />
+                          <Badge variant={landing.isActive ? "default" : "secondary"}>
+                            {landing.isActive ? "Attiva" : "Inattiva"}
+                          </Badge>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => copyLandingUrl(landing.slug)}
+                            data-testid={`button-copy-url-${landing.id}`}
+                          >
+                            <Copy className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => window.open(`/badge/${landing.slug}`, "_blank")}
+                            data-testid={`button-preview-${landing.id}`}
+                          >
+                            <ExternalLink className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => openRequestsDialogDesktop(landing)}
+                            data-testid={`button-view-requests-${landing.id}`}
+                          >
+                            <Users className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => openEditFormDesktop(landing)}
+                            data-testid={`button-edit-${landing.id}`}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => setDeletingLanding(landing)}
+                            className="text-destructive hover:text-destructive"
+                            data-testid={`button-delete-${landing.id}`}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+
+        <Dialog open={isFormDialogOpen} onOpenChange={setIsFormDialogOpen}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>{editingLanding ? "Modifica Landing" : "Nuova Landing"}</DialogTitle>
+              <DialogDescription>
+                {editingLanding ? "Modifica i dettagli della landing page" : "Crea una nuova landing page per le richieste badge"}
+              </DialogDescription>
+            </DialogHeader>
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="schoolName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Nome Scuola</FormLabel>
+                        <FormControl>
+                          <Input {...field} placeholder="Liceo Scientifico Einstein" data-testid="input-school-name" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="slug"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Slug URL</FormLabel>
+                        <FormControl>
+                          <Input {...field} placeholder="liceo-einstein" data-testid="input-slug" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <FormField
+                  control={form.control}
+                  name="logoUrl"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Logo (opzionale)</FormLabel>
+                      <FormControl>
+                        <div className="space-y-3">
+                          {(logoPreview || field.value) && (
+                            <div className="relative inline-block">
+                              <img 
+                                src={logoPreview || field.value} 
+                                alt="Anteprima logo" 
+                                className="w-20 h-20 rounded-lg object-cover border"
+                              />
+                              <Button
+                                type="button"
+                                size="icon"
+                                variant="destructive"
+                                className="absolute -top-2 -right-2 h-6 w-6 rounded-full"
+                                onClick={clearLogo}
+                              >
+                                <XCircle className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          )}
+                          <label className="flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed rounded-lg cursor-pointer hover:bg-muted/50 transition-colors">
+                            {isUploadingLogo ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Upload className="h-4 w-4" />
+                            )}
+                            <span className="text-sm">Carica immagine</span>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={handleLogoFileChange}
+                              disabled={isUploadingLogo}
+                              data-testid="input-logo-file"
+                            />
+                          </label>
+                        </div>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="description"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Descrizione (opzionale)</FormLabel>
+                      <FormControl>
+                        <Textarea {...field} placeholder="Descrizione della scuola..." data-testid="input-description" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="authorizedDomains"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Domini email autorizzati</FormLabel>
+                        <FormControl>
+                          <Input {...field} placeholder="scuola.edu.it, liceo.it" data-testid="input-domains" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="primaryColor"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Colore primario</FormLabel>
+                        <FormControl>
+                          <div className="flex gap-2 items-center">
+                            <Input {...field} placeholder="#3b82f6" data-testid="input-primary-color" />
+                            <div 
+                              className="w-9 h-9 rounded-lg border flex-shrink-0" 
+                              style={{ backgroundColor: field.value }} 
+                            />
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <FormField
+                  control={form.control}
+                  name="customWelcomeText"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Testo di benvenuto (opzionale)</FormLabel>
+                      <FormControl>
+                        <Textarea {...field} placeholder="Benvenuto! Compila il form..." data-testid="input-welcome-text" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="customThankYouText"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Testo di ringraziamento (opzionale)</FormLabel>
+                      <FormControl>
+                        <Textarea {...field} placeholder="Grazie per la richiesta..." data-testid="input-thankyou-text" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <div className="border rounded-lg p-4 space-y-4">
+                  <div className="flex items-center gap-2">
+                    <Shield className="h-4 w-4 text-muted-foreground" />
+                    <span className="font-medium text-sm">Termini e Privacy</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="termsText"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Termini e Condizioni</FormLabel>
+                          <FormControl>
+                            <Textarea {...field} placeholder="Inserisci il testo dei termini..." className="min-h-[80px]" data-testid="input-terms-text" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="privacyText"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Privacy Policy</FormLabel>
+                          <FormControl>
+                            <Textarea {...field} placeholder="Inserisci l'informativa privacy..." className="min-h-[80px]" data-testid="input-privacy-text" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  <FormField
+                    control={form.control}
+                    name="marketingText"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Consenso Marketing</FormLabel>
+                        <FormControl>
+                          <Textarea {...field} placeholder="Inserisci il testo per il consenso marketing..." data-testid="input-marketing-text" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <div className="flex gap-6">
+                    <FormField
+                      control={form.control}
+                      name="requireTerms"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-center gap-2 space-y-0">
+                          <FormControl>
+                            <Checkbox
+                              checked={field.value}
+                              onCheckedChange={field.onChange}
+                              data-testid="checkbox-require-terms"
+                            />
+                          </FormControl>
+                          <FormLabel className="font-normal cursor-pointer text-sm">
+                            Richiedi accettazione termini
+                          </FormLabel>
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="showMarketing"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-center gap-2 space-y-0">
+                          <FormControl>
+                            <Checkbox
+                              checked={field.value}
+                              onCheckedChange={field.onChange}
+                              data-testid="checkbox-show-marketing"
+                            />
+                          </FormControl>
+                          <FormLabel className="font-normal cursor-pointer text-sm">
+                            Mostra opzione consenso marketing
+                          </FormLabel>
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </div>
+
+                <DialogFooter>
+                  <Button type="button" variant="outline" onClick={() => setIsFormDialogOpen(false)}>
+                    Annulla
+                  </Button>
+                  <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending} data-testid="button-submit-landing">
+                    {(createMutation.isPending || updateMutation.isPending) && (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    )}
+                    {editingLanding ? "Salva" : "Crea"}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </Form>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={isRequestsDialogOpen} onOpenChange={setIsRequestsDialogOpen}>
+          <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Richieste - {viewingLanding?.schoolName}</DialogTitle>
+              <DialogDescription>Gestisci le richieste di badge per questa scuola</DialogDescription>
+            </DialogHeader>
+            {isLoadingRequests ? (
+              <div className="space-y-3 py-4">
+                {[1, 2, 3].map((i) => (
+                  <Skeleton key={i} className="h-16 rounded-lg" />
+                ))}
+              </div>
+            ) : requests.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-8">
+                <Users className="h-10 w-10 text-muted-foreground mb-3" />
+                <p className="text-muted-foreground">Nessuna richiesta ricevuta</p>
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Nome</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Telefono</TableHead>
+                    <TableHead>Stato</TableHead>
+                    <TableHead>Data</TableHead>
+                    <TableHead className="text-right">Azioni</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {requests.map((request) => {
+                    const status = statusConfig[request.status] || statusConfig.pending;
+                    const StatusIcon = status.icon;
+                    return (
+                      <TableRow key={request.id} data-testid={`row-request-${request.id}`}>
+                        <TableCell className="font-medium">
+                          {request.firstName} {request.lastName}
+                        </TableCell>
+                        <TableCell>{request.email}</TableCell>
+                        <TableCell>{request.phone || "-"}</TableCell>
+                        <TableCell>
+                          <Badge variant={status.variant} className="gap-1">
+                            <StatusIcon className="h-3 w-3" />
+                            {status.label}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {request.createdAt && format(new Date(request.createdAt), "dd/MM/yy HH:mm", { locale: it })}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {request.status !== "revoked" && (
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => setRevokingRequest(request)}
+                              className="text-destructive hover:text-destructive"
+                              data-testid={`button-revoke-${request.id}`}
+                            >
+                              <XCircle className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            )}
+          </DialogContent>
+        </Dialog>
+
+        <AlertDialog open={!!deletingLanding} onOpenChange={(open) => !open && setDeletingLanding(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Eliminare questa landing?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Questa azione non può essere annullata. Verranno eliminate anche tutte le richieste e i badge associati.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Annulla</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => deletingLanding && deleteMutation.mutate(deletingLanding.id)}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                data-testid="button-confirm-delete"
+              >
+                {deleteMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                Elimina
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        <AlertDialog open={!!revokingRequest} onOpenChange={(open) => !open && setRevokingRequest(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Revocare questo badge?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Il badge di {revokingRequest?.firstName} {revokingRequest?.lastName} verrà revocato e non sarà più valido.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Annulla</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => revokingRequest && revokeMutation.mutate(revokingRequest.id)}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                data-testid="button-confirm-revoke"
+              >
+                {revokeMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                Revoca
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </div>
     );
   }
 
