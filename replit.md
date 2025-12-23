@@ -8,6 +8,39 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes (2025-12-23)
 
+### Stripe Mode Detection Dinamica
+**Feature**: La pagina Stripe Admin ora rileva automaticamente la modalità (production/sandbox) basandosi sulle chiavi API configurate.
+
+**Problema Risolto**: `isProduction` era hardcoded a `false`, quindi mostrava sempre "Modalità Sandbox" anche con chiavi live.
+
+**Implementazione:**
+- Nuovo endpoint `GET /api/public/stripe-mode` che verifica il prefisso della publishable key (`pk_live_` = production)
+- `stripe-admin.tsx` usa useQuery per ottenere il modo dinamicamente
+- Badge e URL dashboard si aggiornano automaticamente in base al modo rilevato
+
+**Files Modificati:**
+- `server/public-routes.ts` - Nuovo endpoint stripe-mode
+- `client/src/pages/stripe-admin.tsx` - Query dinamica invece di valore hardcoded
+
+---
+
+### Mappa Posti Interattiva - Fix Visibilità e Click
+**Feature**: Corretta la visualizzazione e interazione con i posti numerati sulla mappa venue.
+
+**Problema Risolto**: I posti apparivano come "maschera grande" invece di singoli puntini cliccabili.
+
+**Implementazione:**
+- Aumentato raggio posti da `r=1.2` a `r=2.5` per maggiore visibilità
+- Cambiato `preserveAspectRatio` da "none" a "xMidYMid meet" per proporzioni corrette
+- Aggiunto stroke bianco ai posti per contrasto migliore
+- Separati layer SVG (zones-layer e seats-layer) per gestione z-index corretta
+- I posti ora intercettano correttamente i click con `stopPropagation`
+
+**Files Modificati:**
+- `client/src/pages/public-event-detail.tsx` - Rendering SVG migliorato
+
+---
+
 ### Super Admin Company Selector for SIAE Pages
 **Feature**: Added company selector dropdown for super_admin users in SIAE Audit Logs and SIAE Transmissions pages.
 
