@@ -4,13 +4,14 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { AlertCircle, Mail, Sparkles } from "lucide-react";
+import { AlertCircle, Mail } from "lucide-react";
 import { Link, useSearch } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { motion } from "framer-motion";
 import { triggerHaptic, HapticButton, SafeArea } from "@/components/mobile-primitives";
+import { BrandLogo } from "@/components/brand-logo";
 
 const springConfig = { type: "spring" as const, stiffness: 400, damping: 30 };
 
@@ -116,12 +117,7 @@ export default function Login() {
         <Card className="w-full max-w-md relative z-10">
           <CardHeader className="text-center space-y-4">
             <Link href="/" className="flex flex-col items-center gap-3">
-              <img 
-                src="/logos/logo-vertical-blue.svg" 
-                alt="EventFourYou" 
-                className="h-24 w-auto"
-                data-testid="logo-login"
-              />
+              <BrandLogo variant="vertical" className="h-24 w-auto" />
             </Link>
             <div>
               <CardTitle className="text-2xl">Bentornato</CardTitle>
@@ -286,14 +282,7 @@ export default function Login() {
           className="flex flex-col items-center mb-10"
         >
           <Link href="/" className="flex flex-col items-center gap-3 min-h-[44px]">
-            <motion.img 
-              src="/logos/logo-vertical-blue.svg"
-              alt="EventFourYou"
-              className="h-28 w-auto"
-              whileTap={{ scale: 0.95 }}
-              transition={springConfig}
-              data-testid="logo-login-mobile"
-            />
+            <BrandLogo variant="vertical" className="h-28 w-auto" />
           </Link>
         </motion.div>
 

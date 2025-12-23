@@ -53,6 +53,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
+import { BrandLogo } from "@/components/brand-logo";
 import { cn } from "@/lib/utils";
 import type { UserFeatures } from "@shared/schema";
 
@@ -712,12 +713,7 @@ export function AppSidebar() {
         {/* Logo */}
         <div className="mb-8 px-2">
           <Link href="/" className="block">
-            <img 
-              src="/logos/logo-horizontal.svg" 
-              alt="EventFourYou" 
-              className="h-10 w-auto"
-              data-testid="logo-sidebar"
-            />
+            <BrandLogo variant="horizontal" className="h-10 w-auto" />
           </Link>
         </div>
 

@@ -35,6 +35,7 @@ import {
   InputOTPSlot,
 } from "@/components/ui/input-otp";
 import { triggerHaptic } from "@/components/mobile-primitives";
+import { BrandLogo } from "@/components/brand-logo";
 
 type AccountType = "cliente" | "gestore" | null;
 
@@ -485,12 +486,7 @@ export default function Register() {
         <div className="min-h-screen bg-background flex items-center justify-center p-6" data-testid="page-register-select">
           <Card className="w-full max-w-lg">
             <CardHeader className="text-center pb-2">
-              <img 
-                src="/logos/logo-vertical-blue.svg" 
-                alt="EventFourYou" 
-                className="h-20 w-auto mx-auto mb-4"
-                data-testid="logo-register-desktop"
-              />
+              <BrandLogo variant="vertical" className="h-20 w-auto mx-auto mb-4" />
               <CardTitle className="text-2xl">Crea Account</CardTitle>
               <CardDescription>Scegli il tipo di account</CardDescription>
             </CardHeader>
@@ -613,12 +609,7 @@ export default function Register() {
             transition={{ duration: 0.4, delay: 0.1 }}
             className="flex flex-col items-center mb-10"
           >
-            <img 
-              src="/logos/logo-vertical-blue.svg" 
-              alt="EventFourYou" 
-              className="h-24 w-auto mb-4"
-              data-testid="logo-register-mobile"
-            />
+            <BrandLogo variant="vertical" className="h-24 w-auto mb-4" />
             <h1 className="text-2xl font-bold text-foreground">Crea Account</h1>
             <p className="text-muted-foreground text-center mt-2">
               Scegli il tipo di account

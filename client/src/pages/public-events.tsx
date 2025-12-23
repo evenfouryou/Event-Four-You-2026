@@ -12,6 +12,7 @@ import { motion } from "framer-motion";
 import { useState, useRef } from "react";
 import { useCustomerAuth } from "@/hooks/useCustomerAuth";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { BrandLogo } from "@/components/brand-logo";
 
 interface PublicEvent {
   id: string;
@@ -299,12 +300,7 @@ export default function PublicEventsPage() {
           <div className="container mx-auto px-6 py-4">
             <div className="flex items-center justify-between gap-6">
               <Link href="/">
-                <img 
-                  src="/logos/logo-horizontal.svg" 
-                  alt="EventFourYou" 
-                  className="h-10 w-auto"
-                  data-testid="logo-events-header"
-                />
+                <BrandLogo variant="horizontal" className="h-10 w-auto" />
               </Link>
 
               <div className="flex-1 max-w-xl">
@@ -466,13 +462,7 @@ export default function PublicEventsPage() {
         <div className="px-4 py-4 space-y-4">
           <div className="flex items-center justify-between gap-3">
             <Link href="/">
-              <motion.img 
-                src="/logos/logo-horizontal.svg" 
-                alt="EventFourYou" 
-                className="h-10 w-auto"
-                whileTap={{ scale: 0.95 }}
-                data-testid="logo-events-header-mobile"
-              />
+              <BrandLogo variant="horizontal" className="h-10 w-auto" />
             </Link>
             
             <div className="flex items-center gap-2">
