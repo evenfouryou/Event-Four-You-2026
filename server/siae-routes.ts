@@ -3158,7 +3158,7 @@ router.get('/smart-card/verify-emission', requireAuth, async (req: Request, res:
 // ==================== SIAE Reports ====================
 
 // C1 Report - Daily/Monthly Register (Registro Giornaliero/Mensile)
-// Uses ALL tickets (including cashier-emitted tickets without transactions)
+// VERSIONE SEMPLIFICATA - senza campi 2025 problematici
 // Query param: type=giornaliero (default) or type=mensile
 router.get('/api/siae/ticketed-events/:id/reports/c1', requireAuth, async (req: Request, res: Response) => {
   try {
@@ -3192,7 +3192,6 @@ router.get('/api/siae/ticketed-events/:id/reports/c1', requireAuth, async (req: 
       // Also filter cancelled tickets for today
       cancelledTickets = allTickets.filter(t => {
         if (t.status !== 'cancelled') return false;
-        // Check if cancelled today
         if (t.cancellationDate) {
           const cancelDate = new Date(t.cancellationDate).toISOString().split('T')[0];
           return cancelDate === today;
@@ -3218,11 +3217,10 @@ router.get('/api/siae/ticketed-events/:id/reports/c1', requireAuth, async (req: 
     // Helper function to derive ticketType with fallback from ticketTypeCode
     const getTicketType = (t: typeof activeTickets[0]) => {
       if (t.ticketType) return t.ticketType;
-      // Fallback from ticketTypeCode
       if (t.ticketTypeCode === 'INT') return 'intero';
       if (t.ticketTypeCode === 'RID') return 'ridotto';
       if (t.ticketTypeCode === 'OMG' || t.ticketTypeCode === 'OMA') return 'omaggio';
-      return 'intero'; // default
+      return 'intero';
     };
 
     // Process ALL tickets (including those without transactions - cashier tickets)
@@ -3245,7 +3243,6 @@ router.get('/api/siae/ticketed-events/:id/reports/c1', requireAuth, async (req: 
       salesByDate[dateStr].ticketsSold += 1;
       salesByDate[dateStr].totalAmount += price;
 
-      // Aggregate by ticket type
       const ticketType = getTicketType(ticket);
       if (!salesByDate[dateStr].byTicketType[ticketType]) {
         salesByDate[dateStr].byTicketType[ticketType] = { 
@@ -3257,7 +3254,6 @@ router.get('/api/siae/ticketed-events/:id/reports/c1', requireAuth, async (req: 
       salesByDate[dateStr].byTicketType[ticketType].quantity += 1;
       salesByDate[dateStr].byTicketType[ticketType].amount += price;
 
-      // Aggregate by sector
       const sector = sectors.find(s => s.id === ticket.sectorId);
       const sectorName = sector?.name || 'Sconosciuto';
       if (!salesByDate[dateStr].bySector[sectorName]) {
@@ -3269,7 +3265,7 @@ router.get('/api/siae/ticketed-events/:id/reports/c1', requireAuth, async (req: 
 
     const dailySales = Object.values(salesByDate).sort((a, b) => a.date.localeCompare(b.date));
     
-    // Calculate totals using helper function for fallback
+    // Calculate totals
     const totalTicketsSold = activeTickets.length;
     const totalRevenue = activeTickets.reduce((sum, t) => sum + getTicketPrice(t), 0);
     
@@ -3278,85 +3274,7 @@ router.get('/api/siae/ticketed-events/:id/reports/c1', requireAuth, async (req: 
     const vatAmount = totalRevenue * (vatRate / (100 + vatRate));
     const netRevenue = totalRevenue - vatAmount;
 
-    // === NUOVI CAMPI 2025: Recupera dati organizzatore ===
-    // Recupera la company associata all'evento per CF e ragione sociale
-    let company = event.companyId ? await db.select().from(companies).where(eq(companies.id, event.companyId)).then(rows => rows[0]) : null;
-    
-    // Se l'evento non ha companyId, recupera la company principale del sistema
-    if (!company) {
-      company = await db.select().from(companies).limit(1).then(rows => rows[0]);
-    }
-    
-    // Recupera il canale di emissione per matricola misuratore
-    let emissionChannel = event.emissionChannelId ? await db.select().from(siaeEmissionChannels).where(eq(siaeEmissionChannels.id, event.emissionChannelId)).then(rows => rows[0]) : null;
-    
-    // Se l'evento non ha emissionChannelId, prova a recuperare il canale attivo
-    if (!emissionChannel) {
-      emissionChannel = await db.select().from(siaeEmissionChannels).where(eq(siaeEmissionChannels.status, 'active')).limit(1).then(rows => rows[0]);
-    }
-    
-    // Calcola progressivo fiscale dal numero di trasmissioni già effettuate oggi
-    // Filtrato per: company + matricola misuratore fiscale (dispositivo) secondo normativa
-    const companyIdForQuery = event.companyId || company?.id;
-    const matricolaDispositivo = emissionChannel?.fiscalDeviceId;
-    let progressivoFiscale = 1;
-    if (companyIdForQuery) {
-      // Costruisci query dinamicamente in base a campi disponibili
-      const conditions = [
-        eq(siaeTransmissions.companyId, companyIdForQuery),
-        sql`DATE(${siaeTransmissions.periodDate}) = CURRENT_DATE`,
-        eq(siaeTransmissions.transmissionType, 'daily')
-      ];
-      // Se abbiamo matricola dispositivo, filtra anche per quella (più preciso)
-      if (matricolaDispositivo) {
-        conditions.push(eq(siaeTransmissions.matricolaMisuratoreFiscale, matricolaDispositivo));
-      }
-      const todayTransmissions = await db.select().from(siaeTransmissions)
-        .where(and(...conditions))
-        .then(rows => rows.length);
-      progressivoFiscale = todayTransmissions + 1;
-    }
-    
-    // Calcola annullamenti per causale
-    const annullamentiPerCausale: Array<{causale: string; causaleDescrizione: string; count: number; importoTotale: number}> = [];
-    const causaleMap: Record<string, {desc: string; count: number; amount: number}> = {};
-    
-    for (const ticket of cancelledTickets) {
-      const causale = ticket.cancellationReason?.startsWith('ANN') ? 'ANN' :
-                      ticket.cancellationReason?.startsWith('ERR') ? 'ERR' :
-                      ticket.cancellationReason?.startsWith('RIM') ? 'RIM' :
-                      ticket.cancellationReason?.startsWith('DUP') ? 'DUP' : 'ANN';
-      const price = getTicketPrice(ticket);
-      if (!causaleMap[causale]) {
-        causaleMap[causale] = { 
-          desc: causale === 'ANN' ? 'Annullamento' : 
-                causale === 'ERR' ? 'Errore emissione' : 
-                causale === 'RIM' ? 'Rimborso' : 
-                causale === 'DUP' ? 'Duplicato' : 'Annullamento',
-          count: 0, 
-          amount: 0 
-        };
-      }
-      causaleMap[causale].count += 1;
-      causaleMap[causale].amount += price;
-    }
-    for (const [causale, data] of Object.entries(causaleMap)) {
-      annullamentiPerCausale.push({causale, causaleDescrizione: data.desc, count: data.count, importoTotale: data.amount});
-    }
-    
-    // Recupera rivendite secondary ticketing per l'evento
-    const resales = await db.select().from(siaeResales).where(eq(siaeResales.ticketedEventId, id));
-    const completedResales = resales.filter(r => r.status === 'completed' || r.status === 'approved');
-    const rivenditeCount = completedResales.length;
-    const rivenditeImporto = completedResales.reduce((sum, r) => sum + Number(r.newPrice || 0), 0);
-    
-    // Conta cambi nominativo
-    const cambiNominativoCount = allTickets.filter(t => t.nominativoModificato === true).length;
-    
-    // Calcola corrispettivi esenti (omaggi) e soggetti IVA
-    const corrispettiviEsenti = activeTickets.filter(t => getTicketType(t) === 'omaggio').reduce((s, t) => s + getTicketPrice(t), 0);
-    const corrispettiviSoggetti = totalRevenue - corrispettiviEsenti;
-
+    // Risposta semplificata senza campi 2025 problematici
     res.json({
       reportType: isMonthly ? 'mensile' : 'giornaliero',
       reportName: isMonthly ? 'Riepilogo Mensile' : 'Registro Giornaliero',
@@ -3375,31 +3293,6 @@ router.get('/api/siae/ticketed-events/:id/reports/c1', requireAuth, async (req: 
       netRevenue,
       cancelledTicketsCount: cancelledTickets.length,
       dailySales,
-      // === NUOVI CAMPI NORMATIVI 2025 ===
-      cfOrganizzatore: company?.taxCode || company?.vatNumber || null,
-      cfTitolare: company?.taxCode || company?.vatNumber || null,
-      ragioneSocialeOrganizzatore: company?.name || null,
-      ragioneSocialeTitolare: company?.name || null,
-      matricolaMisuratoreFiscale: emissionChannel?.fiscalDeviceId || null,
-      progressivoFiscale, // Progressivo del giorno calcolato da trasmissioni
-      provincia: event.venueProvince || null,
-      comune: event.venueCity || null,
-      // Imposta intrattenimento: 10% solo per eventi di intrattenimento (non musica/teatro)
-      impostaIntrattenimento: event.eventCategory === 'intrattenimento' ? (totalRevenue * 0.10) : 0,
-      corrispettiviEsenti,
-      corrispettiviSoggetti,
-      annullamentiPerCausale: annullamentiPerCausale.length > 0 ? annullamentiPerCausale : undefined,
-      rivenditeCount: rivenditeCount > 0 ? rivenditeCount : undefined,
-      rivenditeImporto: rivenditeImporto > 0 ? rivenditeImporto : undefined,
-      cambiNominativoCount: cambiNominativoCount > 0 ? cambiNominativoCount : undefined,
-      // Dati incompleti: segnala se mancano dati normativi obbligatori
-      datiIncompleti: (!company?.taxCode && !company?.vatNumber) || !emissionChannel?.fiscalDeviceId ? true : undefined,
-      datiMancanti: [
-        !company?.taxCode && !company?.vatNumber ? 'CF/P.IVA Organizzatore' : null,
-        !emissionChannel?.fiscalDeviceId ? 'Matricola Misuratore Fiscale' : null,
-        !event.venueProvince ? 'Provincia' : null,
-      ].filter(Boolean),
-      // Fine campi 2025
       sectors: sectors.map(s => {
         const sectorActiveTickets = activeTickets.filter(t => t.sectorId === s.id);
         const sectorCancelledTickets = cancelledTickets.filter(t => t.sectorId === s.id);
@@ -3433,6 +3326,116 @@ router.get('/api/siae/ticketed-events/:id/reports/c1', requireAuth, async (req: 
     });
   } catch (error: any) {
     console.error('[C1 Report] Error:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// C1 Report - Send to SIAE Transmissions
+router.post('/api/siae/ticketed-events/:id/reports/c1/send', requireAuth, requireGestore, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { toEmail, reportType: reqReportType } = req.body;
+    const isMonthly = reqReportType === 'mensile';
+    
+    // Get event data
+    const event = await siaeStorage.getSiaeTicketedEvent(id);
+    if (!event) {
+      return res.status(404).json({ message: "Evento non trovato" });
+    }
+
+    // Get tickets and sectors for C1 report data
+    const tickets = await siaeStorage.getSiaeTickets(id);
+    const sectors = await siaeStorage.getSiaeEventSectors(id);
+    
+    const activeTickets = tickets.filter(t => t.status !== 'cancelled');
+    const cancelledTickets = tickets.filter(t => t.status === 'cancelled');
+
+    const getTicketPrice = (t: any) => Number(t.ticketPrice) || Number(t.priceAtPurchase) || 0;
+    const totalRevenue = activeTickets.reduce((sum, t) => sum + getTicketPrice(t), 0);
+    const vatRate = event.vatRate || 10;
+
+    // Build C1 XML content
+    const eventDate = event.eventDate ? new Date(event.eventDate) : new Date();
+    const dateStr = eventDate.toISOString().split('T')[0].replace(/-/g, '');
+    const fileName = `C1_${event.code || id}_${dateStr}.xml`;
+    
+    const xmlContent = `<?xml version="1.0" encoding="UTF-8"?>
+<ReportC1>
+  <Intestazione>
+    <TipoReport>C1</TipoReport>
+    <DataGenerazione>${new Date().toISOString()}</DataGenerazione>
+    <VersioneTracciato>2025.1</VersioneTracciato>
+  </Intestazione>
+  <Evento>
+    <DenominazioneEvento>${event.name || 'N/D'}</DenominazioneEvento>
+    <CodiceEvento>${event.code || 'N/D'}</CodiceEvento>
+    <DataEvento>${eventDate.toISOString().split('T')[0]}</DataEvento>
+    <Location>${event.venueName || 'N/D'}</Location>
+  </Evento>
+  <Riepilogo>
+    <TotaleBigliettiVenduti>${activeTickets.length}</TotaleBigliettiVenduti>
+    <TotaleBigliettiAnnullati>${cancelledTickets.length}</TotaleBigliettiAnnullati>
+    <TotaleIncassoLordo>${totalRevenue.toFixed(2)}</TotaleIncassoLordo>
+    <AliquotaIVA>${vatRate}</AliquotaIVA>
+  </Riepilogo>
+  <Settori>
+${sectors.map(s => {
+  const sectorActiveTickets = activeTickets.filter(t => t.sectorId === s.id);
+  const sectorCancelledTickets = cancelledTickets.filter(t => t.sectorId === s.id);
+  const sectorRevenue = sectorActiveTickets.reduce((sum, t) => sum + getTicketPrice(t), 0);
+  return `    <Settore>
+      <Nome>${s.name}</Nome>
+      <Codice>${s.sectorCode || 'N/D'}</Codice>
+      <BigliettiVenduti>${sectorActiveTickets.length}</BigliettiVenduti>
+      <BigliettiAnnullati>${sectorCancelledTickets.length}</BigliettiAnnullati>
+      <IncassoLordo>${sectorRevenue.toFixed(2)}</IncassoLordo>
+    </Settore>`;
+}).join('\n')}
+  </Settori>
+</ReportC1>`;
+
+    // Create transmission record - pass periodDate as ISO string for schema compatibility
+    const transmission = await siaeStorage.createSiaeTransmission({
+      companyId: event.companyId,
+      transmissionType: isMonthly ? 'monthly' : 'daily',
+      periodDate: eventDate.toISOString(),
+      fileName: fileName,
+      fileContent: xmlContent,
+      status: 'pending',
+      ticketsCount: activeTickets.length,
+      ticketsCancelled: cancelledTickets.length,
+      totalAmount: totalRevenue.toFixed(2),
+    });
+
+    // Optionally send email
+    if (toEmail) {
+      const { sendSiaeTransmissionEmail } = await import('./email-service');
+      const company = await storage.getCompany(event.companyId);
+      
+      await sendSiaeTransmissionEmail({
+        to: toEmail,
+        companyName: company?.name || 'N/A',
+        transmissionType: 'daily',
+        periodDate: eventDate,
+        ticketsCount: activeTickets.length,
+        totalAmount: totalRevenue.toFixed(2),
+        xmlContent: xmlContent,
+        transmissionId: transmission.id,
+      });
+
+      await siaeStorage.updateSiaeTransmission(transmission.id, {
+        status: 'sent',
+        sentAt: new Date(),
+      });
+    }
+
+    res.status(201).json({ 
+      success: true, 
+      transmissionId: transmission.id,
+      message: toEmail ? "Report C1 inviato con successo" : "Report C1 salvato come trasmissione"
+    });
+  } catch (error: any) {
+    console.error('[C1 Send] Error:', error);
     res.status(500).json({ message: error.message });
   }
 });
