@@ -710,17 +710,14 @@ export function AppSidebar() {
     <Sidebar className="border-r border-white/5">
       <SidebarContent className="p-4 bg-sidebar">
         {/* Logo */}
-        <div className="mb-8 flex items-center gap-3 px-2">
-          <Link href="/" className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-yellow-400 to-amber-500 flex items-center justify-center glow-golden">
-              <Sparkles className="h-5 w-5 text-black" />
-            </div>
-            <div>
-              <span className="text-lg font-bold">
-                Event<span className="text-primary">4</span>U
-              </span>
-              <p className="text-[10px] text-muted-foreground -mt-1">Management System</p>
-            </div>
+        <div className="mb-8 px-2">
+          <Link href="/" className="block">
+            <img 
+              src="/logos/logo-horizontal.svg" 
+              alt="EventFourYou" 
+              className="h-10 w-auto"
+              data-testid="logo-sidebar"
+            />
           </Link>
         </div>
 

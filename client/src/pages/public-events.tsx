@@ -299,12 +299,12 @@ export default function PublicEventsPage() {
           <div className="container mx-auto px-6 py-4">
             <div className="flex items-center justify-between gap-6">
               <Link href="/">
-                <div className="flex items-center gap-3 cursor-pointer">
-                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-yellow-400 to-yellow-600 flex items-center justify-center shadow-lg shadow-yellow-500/20">
-                    <Sparkles className="w-5 h-5 text-black" />
-                  </div>
-                  <span className="text-xl font-bold text-foreground">Event4U</span>
-                </div>
+                <img 
+                  src="/logos/logo-horizontal.svg" 
+                  alt="EventFourYou" 
+                  className="h-10 w-auto"
+                  data-testid="logo-events-header"
+                />
               </Link>
 
               <div className="flex-1 max-w-xl">
@@ -466,15 +466,13 @@ export default function PublicEventsPage() {
         <div className="px-4 py-4 space-y-4">
           <div className="flex items-center justify-between gap-3">
             <Link href="/">
-              <motion.div 
+              <motion.img 
+                src="/logos/logo-horizontal.svg" 
+                alt="EventFourYou" 
+                className="h-10 w-auto"
                 whileTap={{ scale: 0.95 }}
-                className="flex items-center gap-3 cursor-pointer min-h-[48px]"
-              >
-                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-yellow-400 to-yellow-600 flex items-center justify-center shadow-lg shadow-yellow-500/20">
-                  <Sparkles className="w-6 h-6 text-black" />
-                </div>
-                <span className="text-2xl font-bold text-foreground">Event4U</span>
-              </motion.div>
+                data-testid="logo-events-header-mobile"
+              />
             </Link>
             
             <div className="flex items-center gap-2">

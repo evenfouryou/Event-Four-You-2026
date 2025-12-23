@@ -101,13 +101,13 @@ export default function Landing() {
         <header className="relative z-10 border-b border-white/10">
           <div className="container mx-auto px-6 py-4">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-yellow-400 to-amber-500 flex items-center justify-center shadow-lg shadow-amber-500/25">
-                  <Sparkles className="h-6 w-6 text-black" />
-                </div>
-                <span className="text-2xl font-bold">
-                  Event<span className="text-primary">4</span>U
-                </span>
+              <div className="flex items-center">
+                <img 
+                  src="/logos/logo-horizontal.svg" 
+                  alt="EventFourYou" 
+                  className="h-10 w-auto"
+                  data-testid="logo-landing-header"
+                />
               </div>
               
               <nav className="flex items-center gap-6">
@@ -273,9 +273,12 @@ export default function Landing() {
               <Card className="glass-card overflow-hidden">
                 <div className="absolute inset-0 bg-gradient-to-r from-primary/15 via-transparent to-teal-500/15 pointer-events-none" />
                 <CardContent className="p-12 text-center relative z-10">
-                  <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-yellow-400 to-amber-500 flex items-center justify-center mx-auto mb-8 shadow-xl shadow-amber-500/30">
-                    <Sparkles className="h-10 w-10 text-black" />
-                  </div>
+                  <img 
+                    src="/logos/logo-monogram-blue.svg" 
+                    alt="EventFourYou" 
+                    className="h-20 w-auto mx-auto mb-8"
+                    data-testid="logo-cta-desktop"
+                  />
                   
                   <h2 className="text-4xl font-bold mb-4">Pronto per la serata?</h2>
                   <p className="text-lg text-muted-foreground mb-10 max-w-xl mx-auto">
@@ -316,12 +319,12 @@ export default function Landing() {
         <footer className="relative z-10 border-t border-white/10 mt-12">
           <div className="container mx-auto px-6 py-12">
             <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-yellow-400 to-amber-500 flex items-center justify-center">
-                  <Sparkles className="h-5 w-5 text-black" />
-                </div>
-                <span className="text-lg font-semibold">Event<span className="text-primary">4</span>U</span>
-              </div>
+              <img 
+                src="/logos/logo-horizontal.svg" 
+                alt="EventFourYou" 
+                className="h-8 w-auto"
+                data-testid="logo-footer-desktop"
+              />
               
               <div className="flex items-center gap-8">
                 <Link href="/acquista" className="text-muted-foreground hover:text-foreground transition-colors" data-testid="link-footer-events-desktop">
@@ -397,18 +400,14 @@ export default function Landing() {
           className="relative z-20 px-6 py-5"
         >
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <motion.div 
-                className="w-14 h-14 rounded-2xl bg-gradient-to-br from-yellow-400 to-amber-500 flex items-center justify-center shadow-xl shadow-amber-500/30"
-                whileTap={{ scale: 0.95 }}
-                transition={springConfig}
-              >
-                <Sparkles className="h-7 w-7 text-black" />
-              </motion.div>
-              <span className="text-2xl font-bold">
-                Event<span className="text-primary">4</span>U
-              </span>
-            </div>
+            <motion.img 
+              src="/logos/logo-horizontal.svg" 
+              alt="EventFourYou" 
+              className="h-10 w-auto"
+              whileTap={{ scale: 0.95 }}
+              transition={springConfig}
+              data-testid="logo-header-mobile"
+            />
             
             {isAuthenticated ? (
               <Link href="/account" onClick={handleLinkPress}>
@@ -573,13 +572,14 @@ export default function Landing() {
           <div className="absolute inset-0 bg-gradient-to-br from-primary/15 via-transparent to-teal-500/15 pointer-events-none" />
           
           <div className="relative z-10">
-            <motion.div 
-              className="w-20 h-20 rounded-3xl bg-gradient-to-br from-yellow-400 to-amber-500 flex items-center justify-center mx-auto mb-8 shadow-xl shadow-amber-500/30"
+            <motion.img 
+              src="/logos/logo-monogram-blue.svg" 
+              alt="EventFourYou" 
+              className="h-20 w-auto mx-auto mb-8"
               whileTap={{ scale: 0.95 }}
               transition={springConfig}
-            >
-              <Sparkles className="h-10 w-10 text-black" />
-            </motion.div>
+              data-testid="logo-cta-mobile"
+            />
             
             <h2 className="text-3xl font-bold mb-4">
               Pronto per la serata?
@@ -633,12 +633,12 @@ export default function Landing() {
         className="relative z-10 border-t border-white/10 px-6 py-10 mt-auto"
       >
         <div className="flex flex-col items-center gap-8">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-yellow-400 to-amber-500 flex items-center justify-center">
-              <Sparkles className="h-5 w-5 text-black" />
-            </div>
-            <span className="text-lg font-semibold">Event<span className="text-primary">4</span>U</span>
-          </div>
+          <img 
+            src="/logos/logo-horizontal.svg" 
+            alt="EventFourYou" 
+            className="h-8 w-auto"
+            data-testid="logo-footer-mobile"
+          />
           
           <div className="flex items-center gap-8">
             <Link 

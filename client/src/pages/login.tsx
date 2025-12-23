@@ -116,12 +116,12 @@ export default function Login() {
         <Card className="w-full max-w-md relative z-10">
           <CardHeader className="text-center space-y-4">
             <Link href="/" className="flex flex-col items-center gap-3">
-              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-yellow-400 to-amber-500 flex items-center justify-center shadow-lg">
-                <Sparkles className="h-8 w-8 text-black" />
-              </div>
-              <span className="text-2xl font-bold">
-                Event<span className="text-primary">4</span>U
-              </span>
+              <img 
+                src="/logos/logo-vertical-blue.svg" 
+                alt="EventFourYou" 
+                className="h-24 w-auto"
+                data-testid="logo-login"
+              />
             </Link>
             <div>
               <CardTitle className="text-2xl">Bentornato</CardTitle>
@@ -286,16 +286,14 @@ export default function Login() {
           className="flex flex-col items-center mb-10"
         >
           <Link href="/" className="flex flex-col items-center gap-3 min-h-[44px]">
-            <motion.div 
-              className="w-20 h-20 rounded-2xl bg-gradient-to-br from-yellow-400 to-amber-500 flex items-center justify-center shadow-lg"
+            <motion.img 
+              src="/logos/logo-vertical-blue.svg"
+              alt="EventFourYou"
+              className="h-28 w-auto"
               whileTap={{ scale: 0.95 }}
               transition={springConfig}
-            >
-              <Sparkles className="h-10 w-10 text-black" />
-            </motion.div>
-            <span className="text-2xl font-bold">
-              Event<span className="text-primary">4</span>U
-            </span>
+              data-testid="logo-login-mobile"
+            />
           </Link>
         </motion.div>
 
