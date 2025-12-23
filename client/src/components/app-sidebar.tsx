@@ -143,15 +143,9 @@ export function AppSidebar() {
         group: "Biglietteria SIAE",
       },
       {
-        title: "Biglietti",
+        title: "Biglietteria",
         icon: Ticket,
-        url: "/siae/tickets",
-        group: "Biglietteria SIAE",
-      },
-      {
-        title: "Transazioni",
-        icon: Receipt,
-        url: "/siae/transactions",
+        url: "/siae/biglietteria",
         group: "Biglietteria SIAE",
       },
       {
@@ -316,12 +310,6 @@ export function AppSidebar() {
 
     menuItems.push(
       {
-        title: "Cassa Biglietti",
-        icon: Store,
-        url: "/cassa-biglietti",
-        group: "Gestione",
-      },
-      {
         title: "Gestione Cassieri",
         icon: UserPlus,
         url: "/cashier/management",
@@ -393,15 +381,9 @@ export function AppSidebar() {
             group: "Biglietteria SIAE",
           },
           {
-            title: "Biglietti",
+            title: "Biglietteria",
             icon: Ticket,
-            url: "/siae/tickets",
-            group: "Biglietteria SIAE",
-          },
-          {
-            title: "Transazioni",
-            icon: Receipt,
-            url: "/siae/transactions",
+            url: "/siae/biglietteria",
             group: "Biglietteria SIAE",
           },
           {
@@ -628,7 +610,7 @@ export function AppSidebar() {
       {
         title: "Emetti Biglietti",
         icon: Ticket,
-        url: "/cassa-biglietti",
+        url: "/siae/biglietteria",
         group: "Operazioni",
       }
     );
