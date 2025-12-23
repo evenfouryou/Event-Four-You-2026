@@ -673,6 +673,11 @@ export default function EventHub() {
   const [transactionStatusFilter, setTransactionStatusFilter] = useState<string>("all");
   const [transactionsDisplayLimit, setTransactionsDisplayLimit] = useState(20);
 
+  // Reset pagination when transaction filters change
+  useEffect(() => {
+    setTransactionsDisplayLimit(20);
+  }, [transactionPaymentMethodFilter, transactionStatusFilter]);
+
   const { data: event, isLoading: eventLoading } = useQuery<Event>({
     queryKey: ['/api/events', id],
   });
@@ -876,44 +881,43 @@ export default function EventHub() {
   // Online Visibility Mutations
   const togglePublicMutation = useMutation({
     mutationFn: async (isPublic: boolean) => {
-      await apiRequest('PATCH', `/api/events/${id}`, { isPublic });
+      if (!event) throw new Error("Event not found");
+      return apiRequest('PATCH', `/api/events/${id}`, {
+        ...event,
+        isPublic,
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/events', id] });
       queryClient.invalidateQueries({ queryKey: ['/api/events'] });
-      toast({
-        title: event?.isPublic ? "Evento nascosto" : "Evento pubblicato",
-        description: event?.isPublic 
-          ? "L'evento non è più visibile al pubblico."
-          : "L'evento è ora visibile al pubblico.",
-      });
+      toast({ title: "Visibilità aggiornata" });
     },
     onError: (error: any) => {
       toast({
         title: "Errore",
-        description: error?.message || "Impossibile aggiornare la visibilità dell'evento.",
+        description: error?.message || "Impossibile aggiornare la visibilità",
         variant: "destructive",
       });
     },
   });
 
   const toggleTicketingStatusMutation = useMutation({
-    mutationFn: async (ticketingStatus: string) => {
-      await apiRequest('PATCH', `/api/siae/ticketed-events/${ticketedEvent?.id}`, { ticketingStatus });
+    mutationFn: async (active: boolean) => {
+      if (!ticketedEvent) throw new Error("Ticketed event not found");
+      return apiRequest('PATCH', `/api/siae/ticketed-events/${ticketedEvent.id}`, {
+        ...ticketedEvent,
+        ticketingStatus: active ? 'active' : 'suspended',
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/siae/events', id, 'ticketing'] });
-      toast({
-        title: ticketedEvent?.ticketingStatus === 'active' ? "Vendita sospesa" : "Vendita attivata",
-        description: ticketedEvent?.ticketingStatus === 'active'
-          ? "La vendita online è stata sospesa."
-          : "La vendita online è ora attiva.",
-      });
+      queryClient.invalidateQueries({ queryKey: ['/api/siae/ticketed-events'] });
+      toast({ title: "Stato vendita aggiornato" });
     },
     onError: (error: any) => {
       toast({
         title: "Errore",
-        description: error?.message || "Impossibile aggiornare lo stato della vendita.",
+        description: error?.message || "Impossibile aggiornare lo stato vendita",
         variant: "destructive",
       });
     },
@@ -2253,9 +2257,9 @@ export default function EventHub() {
                           </div>
                         </div>
                         <Switch
-                          checked={event?.isPublic || false}
+                          checked={event?.isPublic ?? false}
                           onCheckedChange={(checked) => togglePublicMutation.mutate(checked)}
-                          disabled={togglePublicMutation.isPending}
+                          disabled={!event || event.status === 'closed' || togglePublicMutation.isPending}
                           data-testid="switch-public"
                         />
                       </div>
@@ -2272,10 +2276,8 @@ export default function EventHub() {
                           </div>
                           <Switch
                             checked={ticketedEvent.ticketingStatus === 'active'}
-                            onCheckedChange={(checked) => 
-                              toggleTicketingStatusMutation.mutate(checked ? 'active' : 'suspended')
-                            }
-                            disabled={toggleTicketingStatusMutation.isPending}
+                            onCheckedChange={(checked) => toggleTicketingStatusMutation.mutate(checked)}
+                            disabled={!ticketedEvent || event?.status === 'closed' || toggleTicketingStatusMutation.isPending}
                             data-testid="switch-ticketing-active"
                           />
                         </div>
@@ -2349,25 +2351,47 @@ export default function EventHub() {
                       )}
 
                       {ticketedEvent && ticketedEvent.ticketingStatus === 'active' && (
-                        <Button
-                          variant="outline"
-                          className="w-full text-amber-600 border-amber-500/50 hover:bg-amber-500/10"
-                          onClick={() => toggleTicketingStatusMutation.mutate('suspended')}
-                          disabled={toggleTicketingStatusMutation.isPending}
-                          data-testid="button-suspend-ticketing"
-                        >
-                          {toggleTicketingStatusMutation.isPending ? (
-                            <>
-                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                              Sospensione...
-                            </>
-                          ) : (
-                            <>
-                              <Pause className="h-4 w-4 mr-2" />
-                              Sospendi Vendita
-                            </>
-                          )}
-                        </Button>
+                        <AlertDialog open={pauseTicketingDialogOpen} onOpenChange={setPauseTicketingDialogOpen}>
+                          <Button
+                            variant="outline"
+                            className="w-full text-amber-600 border-amber-500/50 hover:bg-amber-500/10"
+                            onClick={() => setPauseTicketingDialogOpen(true)}
+                            disabled={toggleTicketingStatusMutation.isPending || event?.status === 'closed'}
+                            data-testid="button-suspend-ticketing"
+                          >
+                            {toggleTicketingStatusMutation.isPending ? (
+                              <>
+                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                Sospensione...
+                              </>
+                            ) : (
+                              <>
+                                <Pause className="h-4 w-4 mr-2" />
+                                Sospendi Vendita
+                              </>
+                            )}
+                          </Button>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Sospendere la vendita online?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                I biglietti non saranno più acquistabili online. Potrai riattivare la vendita in qualsiasi momento.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Annulla</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => {
+                                  toggleTicketingStatusMutation.mutate(false);
+                                  setPauseTicketingDialogOpen(false);
+                                }}
+                                className="bg-amber-600 hover:bg-amber-700"
+                              >
+                                Sospendi Vendita
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
                       )}
                     </CardContent>
                   </Card>
@@ -4155,12 +4179,12 @@ export default function EventHub() {
                           </div>
                         </div>
                         <Switch
-                          checked={event?.isPublic || false}
+                          checked={event?.isPublic ?? false}
                           onCheckedChange={(checked) => {
                             triggerHaptic('light');
                             togglePublicMutation.mutate(checked);
                           }}
-                          disabled={togglePublicMutation.isPending}
+                          disabled={!event || event.status === 'closed' || togglePublicMutation.isPending}
                           data-testid="switch-public"
                         />
                       </div>
@@ -4179,9 +4203,9 @@ export default function EventHub() {
                             checked={ticketedEvent.ticketingStatus === 'active'}
                             onCheckedChange={(checked) => {
                               triggerHaptic('light');
-                              toggleTicketingStatusMutation.mutate(checked ? 'active' : 'suspended');
+                              toggleTicketingStatusMutation.mutate(checked);
                             }}
-                            disabled={toggleTicketingStatusMutation.isPending}
+                            disabled={!ticketedEvent || event?.status === 'closed' || toggleTicketingStatusMutation.isPending}
                             data-testid="switch-ticketing-active"
                           />
                         </div>
@@ -4255,25 +4279,48 @@ export default function EventHub() {
                       )}
 
                       {ticketedEvent && ticketedEvent.ticketingStatus === 'active' && (
-                        <HapticButton
-                          variant="outline"
-                          className="w-full min-h-[44px] text-amber-400 border-amber-500/50"
-                          onClick={() => toggleTicketingStatusMutation.mutate('suspended')}
-                          disabled={toggleTicketingStatusMutation.isPending}
-                          data-testid="button-suspend-ticketing"
-                        >
-                          {toggleTicketingStatusMutation.isPending ? (
-                            <>
-                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                              Sospensione...
-                            </>
-                          ) : (
-                            <>
-                              <Pause className="h-4 w-4 mr-2" />
-                              Sospendi Vendita
-                            </>
-                          )}
-                        </HapticButton>
+                        <AlertDialog open={pauseTicketingDialogOpen} onOpenChange={setPauseTicketingDialogOpen}>
+                          <HapticButton
+                            variant="outline"
+                            className="w-full min-h-[44px] text-amber-400 border-amber-500/50"
+                            onClick={() => setPauseTicketingDialogOpen(true)}
+                            disabled={toggleTicketingStatusMutation.isPending || event?.status === 'closed'}
+                            data-testid="button-suspend-ticketing"
+                          >
+                            {toggleTicketingStatusMutation.isPending ? (
+                              <>
+                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                Sospensione...
+                              </>
+                            ) : (
+                              <>
+                                <Pause className="h-4 w-4 mr-2" />
+                                Sospendi Vendita
+                              </>
+                            )}
+                          </HapticButton>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Sospendere la vendita online?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                I biglietti non saranno più acquistabili online. Potrai riattivare la vendita in qualsiasi momento.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Annulla</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => {
+                                  triggerHaptic('medium');
+                                  toggleTicketingStatusMutation.mutate(false);
+                                  setPauseTicketingDialogOpen(false);
+                                }}
+                                className="bg-amber-600 hover:bg-amber-700"
+                              >
+                                Sospendi Vendita
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
                       )}
                     </CardContent>
                   </Card>
