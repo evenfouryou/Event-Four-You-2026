@@ -638,7 +638,7 @@ export default function Events() {
 
   return (
     <MobileAppLayout
-      header={<MobileHeader title="Eventi" showBackButton showMenuButton />}
+      header={<MobileHeader title="Eventi" showBackButton onBack={() => navigate('/')} showMenuButton />}
       noPadding
       contentClassName="pb-24"
     >
