@@ -1354,6 +1354,21 @@ router.get("/api/public/stripe-key", async (req, res) => {
   }
 });
 
+// Ottieni Stripe mode (production/sandbox) basato sulle chiavi
+router.get("/api/public/stripe-mode", async (req, res) => {
+  try {
+    const publishableKey = await getStripePublishableKey();
+    const isProduction = publishableKey.startsWith('pk_live_');
+    res.json({ 
+      mode: isProduction ? 'production' : 'sandbox',
+      isProduction 
+    });
+  } catch (error: any) {
+    console.error("[PUBLIC] Stripe mode error:", error);
+    res.json({ mode: 'sandbox', isProduction: false });
+  }
+});
+
 // Crea payment intent per checkout personalizzato
 router.post("/api/public/checkout/create-payment-intent", async (req, res) => {
   try {

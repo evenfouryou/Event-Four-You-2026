@@ -61,12 +61,16 @@ export default function StripeAdminPage() {
     enabled: !!companyId,
   });
 
+  const { data: stripeModeData } = useQuery<{ mode: string; isProduction: boolean }>({
+    queryKey: ['/api/public/stripe-mode'],
+  });
+
   const filteredTransactions = allTransactions?.filter(t => 
     selectedEventId === "all" || t.ticketedEventId === selectedEventId
   );
 
-  const isProduction = false;
-  const stripeMode = isProduction ? "production" : "sandbox";
+  const isProduction = stripeModeData?.isProduction ?? false;
+  const stripeMode = stripeModeData?.mode ?? "sandbox";
 
   const getStatusBadge = (status: string) => {
     switch (status) {

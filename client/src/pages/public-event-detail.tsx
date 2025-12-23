@@ -163,15 +163,15 @@ function FloorPlanViewer({
     const isAvailable = seat.status === 'available';
     
     return (
-      <g key={seat.id}>
+      <g key={seat.id} style={{ pointerEvents: 'auto' }}>
         <circle
           cx={x}
           cy={y}
-          r={1.2}
+          r={2.5}
           fill={getSeatColor(seat.status, isSelected, seat.isAccessible)}
-          stroke={isSelected ? '#16a34a' : 'rgba(0,0,0,0.3)'}
-          strokeWidth={isSelected ? 0.4 : 0.15}
-          className={`transition-all duration-150 ${isAvailable ? 'cursor-pointer' : 'cursor-not-allowed'}`}
+          stroke={isSelected ? '#16a34a' : 'rgba(255,255,255,0.6)'}
+          strokeWidth={isSelected ? 0.6 : 0.3}
+          style={{ cursor: isAvailable ? 'pointer' : 'not-allowed', pointerEvents: 'auto' }}
           onClick={(e) => {
             e.stopPropagation();
             if (isAvailable) {
@@ -185,10 +185,10 @@ function FloorPlanViewer({
           <circle
             cx={x}
             cy={y}
-            r={1.8}
+            r={3.5}
             fill="none"
             stroke="#22c55e"
-            strokeWidth={0.2}
+            strokeWidth={0.4}
             className="pointer-events-none animate-pulse"
           />
         )}
@@ -221,11 +221,10 @@ function FloorPlanViewer({
           stroke={isSelected ? '#16a34a' : (zone.strokeColor || '#1d4ed8')}
           strokeWidth="2"
           opacity={isSelected ? 0.7 : (Number(zone.opacity) || 0.4)}
-          className={`transition-all duration-200 ${
-            zone.isSelectable && isAvailable 
-              ? 'cursor-pointer' 
-              : isAvailable ? 'cursor-default' : 'cursor-not-allowed opacity-20'
-          }`}
+          style={{ 
+            cursor: zone.isSelectable && isAvailable ? 'pointer' : isAvailable ? 'default' : 'not-allowed'
+          }}
+          className={`transition-all duration-200 ${!isAvailable ? 'opacity-20' : ''}`}
           onClick={() => {
             if (zone.isSelectable && isAvailable && linkedSector) {
               triggerHaptic('medium');
@@ -292,13 +291,17 @@ function FloorPlanViewer({
           <svg
             className="absolute inset-0 w-full h-full"
             viewBox="0 0 100 100"
-            preserveAspectRatio="none"
+            preserveAspectRatio="xMidYMid meet"
             style={{ zIndex: 10 }}
           >
-            {floorPlan.zones.map(zone => renderZonePolygon(zone))}
-            {sectors.filter(s => s.isNumbered && s.seats?.length > 0).map(sector => 
-              sector.seats.map(seat => renderSeat(seat, sector.sectorCode))
-            )}
+            <g className="zones-layer">
+              {floorPlan.zones.map(zone => renderZonePolygon(zone))}
+            </g>
+            <g className="seats-layer" style={{ pointerEvents: 'auto' }}>
+              {sectors.filter(s => s.isNumbered && s.seats?.length > 0).map(sector => 
+                sector.seats.map(seat => renderSeat(seat, sector.sectorCode))
+              )}
+            </g>
           </svg>
         </div>
 
