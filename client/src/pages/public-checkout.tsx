@@ -102,6 +102,62 @@ const springConfig = {
   damping: 30,
 };
 
+function CheckoutProgressIndicator({ currentStep }: { currentStep: number }) {
+  const steps = [
+    { label: "Carrello", icon: Ticket },
+    { label: "Pagamento", icon: CreditCard },
+    { label: "Conferma", icon: Check },
+  ];
+
+  return (
+    <div className="flex items-center justify-center gap-2 py-4">
+      {steps.map((step, index) => {
+        const StepIcon = step.icon;
+        const isCompleted = index < currentStep;
+        const isCurrent = index === currentStep;
+        
+        return (
+          <div key={step.label} className="flex items-center">
+            <div className="flex flex-col items-center">
+              <motion.div
+                initial={{ scale: 0.8 }}
+                animate={{ scale: isCurrent ? 1.1 : 1 }}
+                transition={springConfig}
+                className={cn(
+                  "w-10 h-10 rounded-full flex items-center justify-center transition-colors",
+                  isCompleted ? "bg-teal-500 text-white" :
+                  isCurrent ? "bg-primary text-primary-foreground" :
+                  "bg-muted text-muted-foreground"
+                )}
+              >
+                {isCompleted ? (
+                  <Check className="w-5 h-5" />
+                ) : (
+                  <StepIcon className="w-5 h-5" />
+                )}
+              </motion.div>
+              <span className={cn(
+                "text-xs mt-1.5 font-medium",
+                isCurrent ? "text-primary" : 
+                isCompleted ? "text-teal-500" : 
+                "text-muted-foreground"
+              )}>
+                {step.label}
+              </span>
+            </div>
+            {index < steps.length - 1 && (
+              <div className={cn(
+                "w-12 h-0.5 mx-2 transition-colors",
+                isCompleted ? "bg-teal-500" : "bg-muted"
+              )} />
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 const staggerContainer = {
   hidden: { opacity: 0 },
   show: {
@@ -557,6 +613,10 @@ function CheckoutContent() {
         animate="show"
         className="space-y-4 pb-32"
       >
+        <motion.div variants={fadeInUp}>
+          <CheckoutProgressIndicator currentStep={1} />
+        </motion.div>
+
         <motion.div variants={fadeInUp} className="bg-card rounded-2xl border border-border overflow-hidden">
           <div className="px-4 py-3 border-b border-border bg-muted/30">
             <h2 className="font-semibold text-foreground flex items-center gap-2">
@@ -1156,15 +1216,18 @@ function DesktopCheckoutContent() {
     : null;
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      <div className="lg:col-span-2 space-y-6">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Ticket className="w-5 h-5 text-primary" />
-              Riepilogo Ordine
-            </CardTitle>
-          </CardHeader>
+    <div className="space-y-6">
+      <CheckoutProgressIndicator currentStep={1} />
+      
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Ticket className="w-5 h-5 text-primary" />
+                Riepilogo Ordine
+              </CardTitle>
+            </CardHeader>
           <CardContent>
             <Table>
               <TableHeader>
@@ -1433,6 +1496,7 @@ function DesktopCheckoutContent() {
             </div>
           </CardContent>
         </Card>
+      </div>
       </div>
     </div>
   );

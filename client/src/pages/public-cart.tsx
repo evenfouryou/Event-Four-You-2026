@@ -42,6 +42,10 @@ import {
   MapPin,
   Minus,
   Plus,
+  ShieldCheck,
+  Lock,
+  CreditCard,
+  Undo2,
 } from "lucide-react";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
@@ -427,35 +431,51 @@ export default function PublicCartPage() {
   );
 
   const footer = hasItems ? (
-    <div className="bg-card/95 backdrop-blur-xl border-t border-border px-4 py-3">
-      <div className="flex items-center justify-between mb-3">
-        <div>
-          <p className="text-sm text-muted-foreground">
-            {cart.itemsCount} {cart.itemsCount === 1 ? "biglietto" : "biglietti"}
-          </p>
-          <p className="text-xs text-muted-foreground">Commissioni gratuite</p>
+    <div className="bg-card/95 backdrop-blur-xl border-t border-border">
+      <div className="px-4 py-2 border-b border-border/50 flex items-center justify-center gap-4">
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <ShieldCheck className="w-3.5 h-3.5 text-teal-500" />
+          <span>Sicuro</span>
         </div>
-        <motion.div
-          key={cart.total}
-          initial={{ scale: 1.1 }}
-          animate={{ scale: 1 }}
-          transition={springConfig}
-        >
-          <p className="text-2xl font-bold text-primary tabular-nums" data-testid="text-total">
-            €{cart.total.toFixed(2)}
-          </p>
-        </motion.div>
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <Lock className="w-3.5 h-3.5 text-primary" />
+          <span>Crittografato</span>
+        </div>
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <CreditCard className="w-3.5 h-3.5 text-blue-500" />
+          <span>Multi-pay</span>
+        </div>
       </div>
-      
-      <HapticButton
-        onClick={handleCheckout}
-        className="w-full h-14 text-base font-semibold"
-        hapticType="medium"
-        data-testid="button-checkout"
-      >
-        Vai al Checkout
-        <ArrowRight className="w-5 h-5 ml-2" />
-      </HapticButton>
+      <div className="px-4 py-3">
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <p className="text-sm text-muted-foreground">
+              {cart.itemsCount} {cart.itemsCount === 1 ? "biglietto" : "biglietti"}
+            </p>
+            <p className="text-xs text-teal-500 font-medium">Commissioni gratuite</p>
+          </div>
+          <motion.div
+            key={cart.total}
+            initial={{ scale: 1.1 }}
+            animate={{ scale: 1 }}
+            transition={springConfig}
+          >
+            <p className="text-2xl font-bold text-primary tabular-nums" data-testid="text-total">
+              €{cart.total.toFixed(2)}
+            </p>
+          </motion.div>
+        </div>
+        
+        <HapticButton
+          onClick={handleCheckout}
+          className="w-full h-14 text-base font-semibold"
+          hapticType="medium"
+          data-testid="button-checkout"
+        >
+          Procedi al Checkout
+          <ArrowRight className="w-5 h-5 ml-2" />
+        </HapticButton>
+      </div>
     </div>
   ) : null;
 
@@ -668,36 +688,88 @@ export default function PublicCartPage() {
             </div>
 
             <div className="lg:col-span-1">
-              <Card className="sticky top-6">
-                <CardHeader>
-                  <CardTitle>Riepilogo Ordine</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Subtotale</span>
-                    <span className="tabular-nums">€{cart.total.toFixed(2)}</span>
+              <div className="sticky top-6 space-y-4">
+                <Card className="overflow-hidden">
+                  <div className="bg-gradient-to-r from-primary/10 to-primary/5 px-6 py-4 border-b border-border">
+                    <CardTitle className="flex items-center gap-2">
+                      <ShoppingCart className="w-5 h-5 text-primary" />
+                      Riepilogo Ordine
+                    </CardTitle>
                   </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Commissioni</span>
-                    <span className="text-green-500">Gratuite</span>
-                  </div>
-                  <div className="border-t pt-4">
-                    <div className="flex justify-between text-lg font-semibold">
-                      <span>Totale</span>
-                      <span className="text-primary tabular-nums" data-testid="text-total">€{cart.total.toFixed(2)}</span>
+                  <CardContent className="p-6 space-y-4">
+                    <div className="space-y-3">
+                      <div className="flex justify-between items-center">
+                        <span className="text-muted-foreground">
+                          {cart.itemsCount} {cart.itemsCount === 1 ? "biglietto" : "biglietti"}
+                        </span>
+                        <span className="font-medium tabular-nums">€{cart.total.toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-muted-foreground">Commissioni</span>
+                        <span className="text-teal-500 font-medium">Gratuite</span>
+                      </div>
                     </div>
-                  </div>
-                  <Button
-                    onClick={handleCheckout}
-                    className="w-full"
-                    size="lg"
-                    data-testid="button-checkout"
-                  >
-                    Vai al Checkout
-                    <ArrowRight className="w-4 h-4 ml-2" />
-                  </Button>
-                </CardContent>
-              </Card>
+                    
+                    <div className="border-t border-border pt-4">
+                      <div className="flex justify-between items-center">
+                        <span className="text-lg font-semibold">Totale</span>
+                        <span className="text-2xl font-bold text-primary tabular-nums" data-testid="text-total">
+                          €{cart.total.toFixed(2)}
+                        </span>
+                      </div>
+                    </div>
+                    
+                    <Button
+                      onClick={handleCheckout}
+                      className="w-full h-12 text-base font-semibold"
+                      size="lg"
+                      data-testid="button-checkout"
+                    >
+                      Procedi al Checkout
+                      <ArrowRight className="w-5 h-5 ml-2" />
+                    </Button>
+                    
+                    <Link href="/acquista" className="block">
+                      <Button variant="ghost" className="w-full text-muted-foreground" data-testid="button-continue-shopping">
+                        <Undo2 className="w-4 h-4 mr-2" />
+                        Continua lo shopping
+                      </Button>
+                    </Link>
+                  </CardContent>
+                </Card>
+                
+                <Card className="bg-muted/30">
+                  <CardContent className="p-4 space-y-3">
+                    <div className="flex items-center gap-3 text-sm">
+                      <div className="w-8 h-8 rounded-full bg-teal-500/10 flex items-center justify-center flex-shrink-0">
+                        <ShieldCheck className="w-4 h-4 text-teal-500" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-foreground">Acquisto Sicuro</p>
+                        <p className="text-xs text-muted-foreground">Protezione dati garantita</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3 text-sm">
+                      <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                        <Lock className="w-4 h-4 text-primary" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-foreground">Pagamento Crittografato</p>
+                        <p className="text-xs text-muted-foreground">SSL 256-bit encryption</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3 text-sm">
+                      <div className="w-8 h-8 rounded-full bg-blue-500/10 flex items-center justify-center flex-shrink-0">
+                        <CreditCard className="w-4 h-4 text-blue-500" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-foreground">Metodi di Pagamento</p>
+                        <p className="text-xs text-muted-foreground">Carta, Apple Pay, Google Pay</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
             </div>
           </div>
         ) : (
