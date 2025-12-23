@@ -31,6 +31,9 @@ import {
   stockMovements,
   priceListItems,
   type Stock,
+  userCompanies,
+  insertUserCompanySchema,
+  users,
   // New module schemas
   insertFixedCostSchema,
   updateFixedCostSchema,
@@ -1181,6 +1184,227 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       res.status(500).json({ message: "Failed to delete company" });
+    }
+  });
+
+  // ===== USER COMPANIES (Many-to-many user-company associations) =====
+
+  // Get companies for the logged-in user
+  app.get('/api/companies/my-companies', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = getCurrentUserId(req);
+      const associations = await db.select({
+        id: userCompanies.id,
+        userId: userCompanies.userId,
+        companyId: userCompanies.companyId,
+        role: userCompanies.role,
+        isDefault: userCompanies.isDefault,
+        createdAt: userCompanies.createdAt,
+        companyName: companies.name,
+        companyVatNumber: companies.vatNumber,
+      })
+        .from(userCompanies)
+        .leftJoin(companies, eq(userCompanies.companyId, companies.id))
+        .where(eq(userCompanies.userId, userId));
+      res.json(associations);
+    } catch (error) {
+      console.error("Error fetching user companies:", error);
+      res.status(500).json({ message: "Failed to fetch user companies" });
+    }
+  });
+
+  // Get all user-company associations (super_admin sees all, gestore sees own company's associations)
+  app.get('/api/user-companies', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = getCurrentUserId(req);
+      const currentUser = await storage.getUser(userId);
+      
+      if (!currentUser || (currentUser.role !== 'super_admin' && currentUser.role !== 'gestore')) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+
+      let associations;
+      if (currentUser.role === 'super_admin') {
+        associations = await db.select({
+          id: userCompanies.id,
+          userId: userCompanies.userId,
+          companyId: userCompanies.companyId,
+          role: userCompanies.role,
+          isDefault: userCompanies.isDefault,
+          createdAt: userCompanies.createdAt,
+          userName: users.firstName,
+          userLastName: users.lastName,
+          userEmail: users.email,
+          companyName: companies.name,
+        })
+          .from(userCompanies)
+          .leftJoin(users, eq(userCompanies.userId, users.id))
+          .leftJoin(companies, eq(userCompanies.companyId, companies.id));
+      } else {
+        // Gestore sees only their own associations
+        associations = await db.select({
+          id: userCompanies.id,
+          userId: userCompanies.userId,
+          companyId: userCompanies.companyId,
+          role: userCompanies.role,
+          isDefault: userCompanies.isDefault,
+          createdAt: userCompanies.createdAt,
+          companyName: companies.name,
+        })
+          .from(userCompanies)
+          .leftJoin(companies, eq(userCompanies.companyId, companies.id))
+          .where(eq(userCompanies.userId, userId));
+      }
+      
+      res.json(associations);
+    } catch (error) {
+      console.error("Error fetching user-company associations:", error);
+      res.status(500).json({ message: "Failed to fetch associations" });
+    }
+  });
+
+  // Get all companies for a specific user
+  app.get('/api/users/:userId/companies', isAuthenticated, async (req: any, res) => {
+    try {
+      const currentUserId = getCurrentUserId(req);
+      const currentUser = await storage.getUser(currentUserId);
+      const targetUserId = req.params.userId;
+      
+      // Only super_admin can view other users' companies, gestore can only view their own
+      if (!currentUser || (currentUser.role !== 'super_admin' && currentUserId !== targetUserId)) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+
+      const associations = await db.select({
+        id: userCompanies.id,
+        userId: userCompanies.userId,
+        companyId: userCompanies.companyId,
+        role: userCompanies.role,
+        isDefault: userCompanies.isDefault,
+        createdAt: userCompanies.createdAt,
+        companyName: companies.name,
+        companyVatNumber: companies.vatNumber,
+      })
+        .from(userCompanies)
+        .leftJoin(companies, eq(userCompanies.companyId, companies.id))
+        .where(eq(userCompanies.userId, targetUserId));
+      
+      res.json(associations);
+    } catch (error) {
+      console.error("Error fetching user companies:", error);
+      res.status(500).json({ message: "Failed to fetch user companies" });
+    }
+  });
+
+  // Create a new user-company association
+  app.post('/api/user-companies', isAuthenticated, async (req: any, res) => {
+    try {
+      const currentUserId = getCurrentUserId(req);
+      const currentUser = await storage.getUser(currentUserId);
+      
+      if (!currentUser || currentUser.role !== 'super_admin') {
+        return res.status(403).json({ message: "Only super admin can create associations" });
+      }
+
+      const validated = insertUserCompanySchema.parse(req.body);
+      
+      // Check if association already exists
+      const existing = await db.select()
+        .from(userCompanies)
+        .where(and(
+          eq(userCompanies.userId, validated.userId),
+          eq(userCompanies.companyId, validated.companyId)
+        ));
+      
+      if (existing.length > 0) {
+        return res.status(400).json({ message: "Association already exists" });
+      }
+
+      // If this is set as default, unset other defaults for this user
+      if (validated.isDefault) {
+        await db.update(userCompanies)
+          .set({ isDefault: false })
+          .where(eq(userCompanies.userId, validated.userId));
+      }
+
+      const [association] = await db.insert(userCompanies)
+        .values(validated)
+        .returning();
+      
+      res.json(association);
+    } catch (error: any) {
+      console.error("Error creating user-company association:", error);
+      res.status(400).json({ message: error.message || "Failed to create association" });
+    }
+  });
+
+  // Update a user-company association
+  app.patch('/api/user-companies/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const currentUserId = getCurrentUserId(req);
+      const currentUser = await storage.getUser(currentUserId);
+      
+      if (!currentUser || currentUser.role !== 'super_admin') {
+        return res.status(403).json({ message: "Only super admin can update associations" });
+      }
+
+      const { role, isDefault } = req.body;
+      const associationId = req.params.id;
+      
+      // Get the existing association
+      const [existing] = await db.select()
+        .from(userCompanies)
+        .where(eq(userCompanies.id, associationId));
+      
+      if (!existing) {
+        return res.status(404).json({ message: "Association not found" });
+      }
+
+      // If setting as default, unset other defaults for this user
+      if (isDefault) {
+        await db.update(userCompanies)
+          .set({ isDefault: false })
+          .where(eq(userCompanies.userId, existing.userId));
+      }
+
+      const [updated] = await db.update(userCompanies)
+        .set({ 
+          role: role || existing.role, 
+          isDefault: isDefault !== undefined ? isDefault : existing.isDefault,
+          updatedAt: new Date()
+        })
+        .where(eq(userCompanies.id, associationId))
+        .returning();
+      
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating user-company association:", error);
+      res.status(500).json({ message: "Failed to update association" });
+    }
+  });
+
+  // Delete a user-company association
+  app.delete('/api/user-companies/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const currentUserId = getCurrentUserId(req);
+      const currentUser = await storage.getUser(currentUserId);
+      
+      if (!currentUser || currentUser.role !== 'super_admin') {
+        return res.status(403).json({ message: "Only super admin can delete associations" });
+      }
+
+      const [deleted] = await db.delete(userCompanies)
+        .where(eq(userCompanies.id, req.params.id))
+        .returning();
+      
+      if (!deleted) {
+        return res.status(404).json({ message: "Association not found" });
+      }
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting user-company association:", error);
+      res.status(500).json({ message: "Failed to delete association" });
     }
   });
 

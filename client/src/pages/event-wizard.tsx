@@ -36,6 +36,15 @@ interface TicketConfig {
   quantity: number;
 }
 
+interface UserCompanyAssociation {
+  id: string;
+  userId: string;
+  companyId: string;
+  role: string | null;
+  isDefault: boolean;
+  companyName: string;
+}
+
 type SectorConfig = TicketConfig;
 
 const BASE_STEPS = [
@@ -147,6 +156,7 @@ export default function EventWizard() {
   const [siaeSubscriptionEventsCount, setSiaeSubscriptionEventsCount] = useState(5);
   const [siaeSubscriptionPrice, setSiaeSubscriptionPrice] = useState('100.00');
   const [siaeSectors, setSiaeSectors] = useState<SectorConfig[]>([]);
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(null);
   
   const STEPS = getSteps(siaeEnabled);
   
@@ -168,6 +178,10 @@ export default function EventWizard() {
 
   const { data: siaeSectorCodes } = useQuery<SiaeSectorCode[]>({
     queryKey: ['/api/siae/sector-codes'],
+  });
+
+  const { data: userCompanies } = useQuery<UserCompanyAssociation[]>({
+    queryKey: ['/api/companies/my-companies'],
   });
 
   const { data: existingEvent, isLoading: isLoadingEvent } = useQuery<any>({
@@ -256,6 +270,25 @@ export default function EventWizard() {
       }
     }
   }, [existingSiaeData]);
+
+  useEffect(() => {
+    if (userCompanies && userCompanies.length > 0 && !selectedCompanyId) {
+      const defaultCompany = userCompanies.find(uc => uc.isDefault);
+      if (defaultCompany) {
+        setSelectedCompanyId(defaultCompany.companyId);
+        form.setValue('companyId', defaultCompany.companyId);
+      } else {
+        setSelectedCompanyId(userCompanies[0].companyId);
+        form.setValue('companyId', userCompanies[0].companyId);
+      }
+    }
+  }, [userCompanies, selectedCompanyId]);
+
+  useEffect(() => {
+    if (existingEvent?.companyId) {
+      setSelectedCompanyId(existingEvent.companyId);
+    }
+  }, [existingEvent]);
 
   useEffect(() => {
     const subscription = form.watch((values) => {
@@ -359,7 +392,7 @@ export default function EventWizard() {
         try {
           const siaeEventData = {
             eventId: savedEvent.id,
-            companyId: user?.companyId,
+            companyId: selectedCompanyId || user?.companyId,
             genreCode: siaeGenreCode,
             taxType: siaeTaxType,
             totalCapacity: siaeSectors.reduce((sum, s) => sum + s.quantity, 0),
@@ -626,6 +659,32 @@ export default function EventWizard() {
                   </FormItem>
                 )}
               />
+
+              {userCompanies && userCompanies.length > 1 && (
+                <FormItem>
+                  <FormLabel className="text-base">Azienda</FormLabel>
+                  <Select
+                    value={selectedCompanyId || ''}
+                    onValueChange={(value) => {
+                      setSelectedCompanyId(value);
+                      form.setValue('companyId', value);
+                    }}
+                    data-testid="select-company"
+                  >
+                    <SelectTrigger className="h-12">
+                      <SelectValue placeholder="Seleziona azienda" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {userCompanies.map((uc) => (
+                        <SelectItem key={uc.companyId} value={uc.companyId}>
+                          {uc.companyName} {uc.isDefault && '(Default)'}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
 
               <FormField
                 control={form.control}

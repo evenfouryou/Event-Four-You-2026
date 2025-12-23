@@ -2,6 +2,7 @@ import { sql } from 'drizzle-orm';
 import { relations } from 'drizzle-orm';
 import {
   index,
+  uniqueIndex,
   jsonb,
   pgTable,
   timestamp,
@@ -151,6 +152,7 @@ export const userCompanies = pgTable("user_companies", {
 }, (table) => [
   index("idx_user_companies_user").on(table.userId),
   index("idx_user_companies_company").on(table.companyId),
+  uniqueIndex("idx_user_companies_unique").on(table.userId, table.companyId),
 ]);
 
 export const userCompaniesRelations = relations(userCompanies, ({ one }) => ({
