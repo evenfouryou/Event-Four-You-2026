@@ -110,7 +110,7 @@ export default function SiaeReportC1() {
         title: "Report inviato",
         description: data.message || "Il report C1 è stato salvato come trasmissione SIAE",
       });
-      queryClient.invalidateQueries({ queryKey: ['/api/siae/companies'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/siae'] });
     },
     onError: (error: any) => {
       toast({
