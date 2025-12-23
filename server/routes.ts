@@ -1275,6 +1275,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Forbidden" });
       }
 
+      // First check if there are any associations
+      const userAssociations = await db.select()
+        .from(userCompanies)
+        .where(eq(userCompanies.userId, targetUserId));
+      
+      if (userAssociations.length === 0) {
+        return res.json([]);
+      }
+
+      // Get associations with company details
       const associations = await db.select({
         id: userCompanies.id,
         userId: userCompanies.userId,
