@@ -131,15 +131,9 @@ export function AppSidebar() {
         group: "Biglietteria SIAE",
       },
       {
-        title: "Eventi Biglietteria",
+        title: "Console Biglietteria",
         icon: Ticket,
-        url: "/siae/ticketed-events",
-        group: "Biglietteria SIAE",
-      },
-      {
-        title: "Biglietti",
-        icon: Ticket,
-        url: "/siae/tickets",
+        url: "/siae/ticketing-console",
         group: "Biglietteria SIAE",
       },
       {

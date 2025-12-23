@@ -120,6 +120,7 @@ import AdminBillingOrganizerDetail from "@/pages/admin-billing-organizer-detail"
 import AdminBillingInvoices from "@/pages/admin-billing-invoices";
 import AdminBillingReports from "@/pages/admin-billing-reports";
 import AdminGestori from "@/pages/admin-gestori";
+import SiaeTicketingConsole from "@/pages/siae-ticketing-console";
 import OrganizerBilling from "@/pages/organizer-billing";
 import { CookieConsent } from "@/components/cookie-consent";
 
@@ -332,6 +333,7 @@ function Router() {
               <Route path="/admin/billing/invoices" component={AdminBillingInvoices} />
               <Route path="/admin/billing/reports" component={AdminBillingReports} />
               <Route path="/admin/gestori" component={AdminGestori} />
+              <Route path="/siae/ticketing-console" component={SiaeTicketingConsole} />
               <Route path="/organizer/billing" component={OrganizerBilling} />
               <Route path="/billing" component={OrganizerBilling} />
               <Route path="/scanner/scan/:eventId" component={ScannerScan} />
