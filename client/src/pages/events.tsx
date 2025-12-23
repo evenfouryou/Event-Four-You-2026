@@ -348,8 +348,6 @@ export default function Events() {
   const [, navigate] = useLocation();
   const [searchQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState<FilterType>('all');
-  const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
-  const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
   const { user } = useAuth();
   const isMobile = useIsMobile();
   
@@ -559,7 +557,6 @@ export default function Events() {
                     <TableHead>Stato</TableHead>
                     <TableHead>Formato</TableHead>
                     <TableHead>Capacità</TableHead>
-                    <TableHead className="text-right">Azioni</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -626,20 +623,6 @@ export default function Events() {
                             <span className="text-muted-foreground">-</span>
                           )}
                         </TableCell>
-                        <TableCell className="text-right">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSelectedEvent(event);
-                              setIsDetailDialogOpen(true);
-                            }}
-                            data-testid={`button-view-event-${event.id}`}
-                          >
-                            <Eye className="w-4 h-4" />
-                          </Button>
-                        </TableCell>
                       </TableRow>
                     );
                   })}
@@ -649,89 +632,6 @@ export default function Events() {
           </CardContent>
         </Card>
 
-        <Dialog open={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen}>
-          <DialogContent className="max-w-lg">
-            <DialogHeader>
-              <DialogTitle>{selectedEvent?.name}</DialogTitle>
-              <DialogDescription>
-                Dettagli dell'evento
-              </DialogDescription>
-            </DialogHeader>
-            {selectedEvent && (
-              <div className="space-y-4">
-                <div className="flex items-center gap-2">
-                  {getStatusBadge(selectedEvent.status)}
-                  {selectedEvent.seriesId && (
-                    <Badge className="bg-violet-500/20 text-violet-400 border-0">
-                      <Repeat className="w-3 h-3 mr-1" />
-                      Ricorrente
-                    </Badge>
-                  )}
-                </div>
-                
-                <div className="grid gap-3">
-                  <div className="flex items-center gap-3">
-                    <CalendarIcon className="w-5 h-5 text-primary" />
-                    <div>
-                      <p className="font-medium">
-                        {new Date(selectedEvent.startDatetime).toLocaleDateString('it-IT', {
-                          weekday: 'long',
-                          day: 'numeric',
-                          month: 'long',
-                          year: 'numeric'
-                        })}
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        {new Date(selectedEvent.startDatetime).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}
-                        {' - '}
-                        {new Date(selectedEvent.endDatetime).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}
-                      </p>
-                    </div>
-                  </div>
-
-                  {selectedEvent.locationId && locationsMap.get(selectedEvent.locationId) && (
-                    <div className="flex items-center gap-3">
-                      <MapPin className="w-5 h-5 text-teal-500" />
-                      <span>{locationsMap.get(selectedEvent.locationId)?.name}</span>
-                    </div>
-                  )}
-
-                  {selectedEvent.capacity && (
-                    <div className="flex items-center gap-3">
-                      <Users className="w-5 h-5 text-muted-foreground" />
-                      <span>{selectedEvent.capacity} posti</span>
-                    </div>
-                  )}
-
-                  <div className="flex items-center gap-3">
-                    <ListFilter className="w-5 h-5 text-muted-foreground" />
-                    <span>{getEventStationCount(selectedEvent.id)} postazioni</span>
-                  </div>
-                </div>
-
-                <div className="flex gap-2 pt-4 border-t">
-                  <Button 
-                    className="flex-1"
-                    onClick={() => {
-                      setIsDetailDialogOpen(false);
-                      navigate(selectedEvent.status === 'draft' ? `/events/wizard/${selectedEvent.id}` : `/events/${selectedEvent.id}/hub`);
-                    }}
-                    data-testid="button-go-to-event"
-                  >
-                    {selectedEvent.status === 'draft' ? 'Continua Configurazione' : 'Vai all\'Evento'}
-                  </Button>
-                  <Button 
-                    variant="outline"
-                    onClick={() => setIsDetailDialogOpen(false)}
-                    data-testid="button-close-dialog"
-                  >
-                    Chiudi
-                  </Button>
-                </div>
-              </div>
-            )}
-          </DialogContent>
-        </Dialog>
       </div>
     );
   }
