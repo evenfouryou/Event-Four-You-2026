@@ -226,7 +226,7 @@ router.post("/api/reservations/pr-profiles", requireAuth, requireGestore, async 
     const baseUrl = process.env.CUSTOM_DOMAIN 
       ? `https://${process.env.CUSTOM_DOMAIN}` 
       : process.env.PUBLIC_URL || 'https://eventfouryou.com';
-    const accessLink = `${baseUrl}/pr/login`;
+    const accessLink = `${baseUrl}/login`;
     
     // Send SMS with credentials
     const smsResult = await sendPrCredentialsSMS(
@@ -325,7 +325,7 @@ router.post("/api/reservations/pr-profiles/:id/resend-sms", requireAuth, require
     const baseUrl = process.env.CUSTOM_DOMAIN 
       ? `https://${process.env.CUSTOM_DOMAIN}` 
       : process.env.PUBLIC_URL || 'https://eventfouryou.com';
-    const accessLink = `${baseUrl}/pr/login`;
+    const accessLink = `${baseUrl}/login`;
     
     // Send SMS
     const smsResult = await sendPrCredentialsSMS(

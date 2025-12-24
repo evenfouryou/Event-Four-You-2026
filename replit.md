@@ -47,13 +47,14 @@ A comprehensive reservation system for event lists and tables with PR (promoter)
 - `eventReservationSettings`: Per-event settings for list/table reservation fees and access disclaimers
 
 **PR Registration Flow**:
-1. Gestore creates PR via `/api/reservations/profiles` with name, surname, phone (email optional)
+1. Gestore creates PR via `/api/reservations/pr-profiles` with firstName, lastName, phone only
 2. System generates random password and stores bcrypt hash in `prProfiles.passwordHash`
 3. SMS sent via MSG91 template 64c4bc88d6fc05193a102042 with ##name##, ##password##, ##access## variables
-4. PR logs in at `/pr/login` with phone + password
-5. PR can add email and change password via their wallet dashboard
+4. PR logs in at `/login` (unified login) with phone + password - automatically detected as phone number
+5. PR can add email and change password via their wallet dashboard at `/pr/wallet`
 
 **PR Authentication (separate from main auth)**:
+- Unified login page `/login` detects phone numbers and routes to PR auth automatically
 - Dedicated session: `req.session.prProfile` (not Passport-based)
 - Session regeneration on login/logout for security (prevents session fixation)
 - PR-specific endpoints: `/api/pr/login`, `/api/pr/me`, `/api/pr/logout`, `/api/pr/change-password`
@@ -74,7 +75,7 @@ A comprehensive reservation system for event lists and tables with PR (promoter)
 
 **Frontend Components**:
 - `pr-wallet.tsx`: PR dashboard showing earnings, reservation history, payout requests (uses `/api/pr/*` endpoints)
-- `pr-login.tsx`: Phone + password login for PRs
+- `login.tsx`: Unified login page - automatically detects phone numbers for PR authentication
 - `pr-management.tsx`: Gestore interface for creating/managing PRs with SMS credential delivery
 - `public-reservation-section.tsx`: Public booking form with QR code generation and legal disclaimers
 

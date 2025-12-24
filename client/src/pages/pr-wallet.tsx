@@ -117,7 +117,7 @@ export default function PrWalletPage() {
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
-      setLocation("/pr/login");
+      setLocation("/login");
     }
   }, [authLoading, isAuthenticated, setLocation]);
 

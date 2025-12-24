@@ -34,7 +34,7 @@ export function usePrAuth() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/pr/me"] });
-      window.location.href = "/pr/login";
+      window.location.href = "/login";
     },
   });
 
