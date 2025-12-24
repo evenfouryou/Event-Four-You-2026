@@ -31,7 +31,16 @@ export function MobileBottomNav() {
     enabled: !!user && isAdmin,
   });
 
-  if (!user) return null;
+  // Hide mobile bottom nav on pages that have their own mobile footer navigation
+  const hiddenPaths = [
+    '/events/wizard',
+    '/events/new',
+    '/scanner',
+    '/cassa-biglietti',
+  ];
+  const shouldHide = hiddenPaths.some(path => location.startsWith(path));
+  
+  if (!user || shouldHide) return null;
 
   let navItems: NavItem[] = [];
 
