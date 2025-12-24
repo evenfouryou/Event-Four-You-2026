@@ -47,8 +47,9 @@ import { sendTicketEmail, sendPasswordResetEmail } from "./email-service";
 import { ticketTemplates, ticketTemplateElements } from "@shared/schema";
 import { sendOTP as sendMSG91OTP, verifyOTP as verifyMSG91OTP, resendOTP as resendMSG91OTP, isMSG91Configured } from "./msg91-service";
 import { siaeStorage } from "./siae-storage";
-import { siaeNameChanges, siaeResales, siaeWalletTransactions } from "@shared/schema";
+import { siaeNameChanges, siaeResales, siaeWalletTransactions, eventReservationSettings, eventLists, listEntries, tableTypes, tableReservations, reservationPayments, prProfiles } from "@shared/schema";
 import svgCaptcha from "svg-captcha";
+import QRCode from "qrcode";
 
 const router = Router();
 
@@ -3588,6 +3589,231 @@ router.get("/api/public/account/name-changes", async (req, res) => {
   } catch (error: any) {
     console.error("[PUBLIC] Get name changes error:", error);
     res.status(500).json({ message: "Errore nel caricamento richieste" });
+  }
+});
+
+// ==================== PUBLIC RESERVATION ROUTES ====================
+// Sistema di Prenotazione Liste/Tavoli (NON biglietteria SIAE)
+
+function generateReservationQrToken(eventId: string): string {
+  const random = crypto.randomBytes(8).toString('hex').toUpperCase();
+  return `RES-${eventId.slice(0, 6).toUpperCase()}-${random}`;
+}
+
+async function generateReservationQrCodeDataUrl(token: string): Promise<string> {
+  try {
+    return await QRCode.toDataURL(token, {
+      width: 300,
+      margin: 2,
+      color: { dark: '#000000', light: '#ffffff' }
+    });
+  } catch {
+    return '';
+  }
+}
+
+// GET /api/public/events/:eventId/reservation-settings - Get public reservation settings
+router.get("/api/public/events/:eventId/reservation-settings", async (req, res) => {
+  try {
+    const { eventId } = req.params;
+    
+    const [settings] = await db.select()
+      .from(eventReservationSettings)
+      .where(eq(eventReservationSettings.eventId, eventId));
+    
+    if (!settings) {
+      return res.json({
+        eventId,
+        listsEnabled: false,
+        tablesEnabled: false,
+        paidReservationsEnabled: false,
+        listReservationFee: '0',
+        listReservationFeeDescription: '',
+        accessDisclaimer: "L'accesso è subordinato al rispetto delle condizioni del locale e alla verifica in fase di accreditamento.",
+      });
+    }
+    
+    res.json({
+      eventId: settings.eventId,
+      listsEnabled: settings.listsEnabled,
+      tablesEnabled: settings.tablesEnabled,
+      paidReservationsEnabled: settings.paidReservationsEnabled,
+      listReservationFee: settings.listReservationFee,
+      listReservationFeeDescription: settings.listReservationFeeDescription,
+      accessDisclaimer: settings.accessDisclaimer || "L'accesso è subordinato al rispetto delle condizioni del locale e alla verifica in fase di accreditamento.",
+    });
+  } catch (error: any) {
+    console.error("[PUBLIC] Get reservation settings error:", error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// GET /api/public/events/:eventId/lists - Get available lists for public booking
+router.get("/api/public/events/:eventId/lists", async (req, res) => {
+  try {
+    const { eventId } = req.params;
+    
+    const lists = await db.select({
+      id: eventLists.id,
+      name: eventLists.name,
+      price: eventLists.price,
+      maxCapacity: eventLists.maxCapacity,
+      isActive: eventLists.isActive,
+    })
+      .from(eventLists)
+      .where(and(
+        eq(eventLists.eventId, eventId),
+        eq(eventLists.isActive, true)
+      ));
+    
+    const listsWithCounts = await Promise.all(lists.map(async (list) => {
+      const [countResult] = await db.select({ count: sql<number>`count(*)` })
+        .from(listEntries)
+        .where(eq(listEntries.listId, list.id));
+      
+      return {
+        ...list,
+        entriesCount: countResult?.count || 0,
+      };
+    }));
+    
+    res.json(listsWithCounts);
+  } catch (error: any) {
+    console.error("[PUBLIC] Get lists error:", error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// GET /api/public/events/:eventId/table-types - Get available table types for public booking
+router.get("/api/public/events/:eventId/table-types", async (req, res) => {
+  try {
+    const { eventId } = req.params;
+    
+    const tables = await db.select({
+      id: tableTypes.id,
+      name: tableTypes.name,
+      price: tableTypes.price,
+      maxGuests: tableTypes.maxGuests,
+      totalQuantity: tableTypes.totalQuantity,
+      description: tableTypes.description,
+      isActive: tableTypes.isActive,
+    })
+      .from(tableTypes)
+      .where(and(
+        eq(tableTypes.eventId, eventId),
+        eq(tableTypes.isActive, true)
+      ));
+    
+    const tablesWithCounts = await Promise.all(tables.map(async (table) => {
+      const [countResult] = await db.select({ count: sql<number>`count(*)` })
+        .from(tableReservations)
+        .where(and(
+          eq(tableReservations.tableTypeId, table.id),
+          or(
+            eq(tableReservations.status, 'approved'),
+            eq(tableReservations.status, 'pending')
+          )
+        ));
+      
+      return {
+        ...table,
+        reservedCount: countResult?.count || 0,
+      };
+    }));
+    
+    res.json(tablesWithCounts);
+  } catch (error: any) {
+    console.error("[PUBLIC] Get table types error:", error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// POST /api/public/reservations - Create a public reservation (no auth required)
+router.post("/api/public/reservations", async (req, res) => {
+  try {
+    const {
+      eventId,
+      reservationType,
+      customerFirstName,
+      customerLastName,
+      customerPhone,
+      customerEmail,
+      prCode,
+      listId,
+      tableTypeId,
+      guestCount,
+      amount,
+    } = req.body;
+    
+    if (!eventId || !reservationType || !customerFirstName || !customerLastName || !customerPhone) {
+      return res.status(400).json({ message: "Dati mancanti" });
+    }
+    
+    const [event] = await db.select({ id: events.id, companyId: events.companyId })
+      .from(events)
+      .where(eq(events.id, eventId));
+    
+    if (!event) {
+      return res.status(404).json({ message: "Evento non trovato" });
+    }
+    
+    const qrToken = generateReservationQrToken(eventId);
+    const qrCodeUrl = await generateReservationQrCodeDataUrl(qrToken);
+    
+    let prProfileId: string | null = null;
+    let prCommissionAmount = '0';
+    
+    if (prCode) {
+      const [prProfile] = await db.select()
+        .from(prProfiles)
+        .where(and(
+          eq(prProfiles.prCode, prCode),
+          eq(prProfiles.isActive, true)
+        ));
+      
+      if (prProfile) {
+        prProfileId = prProfile.id;
+        const amountNum = parseFloat(amount || '0');
+        if (prProfile.commissionType === 'percentage') {
+          prCommissionAmount = ((amountNum * parseFloat(prProfile.commissionValue || '0')) / 100).toFixed(2);
+        } else {
+          prCommissionAmount = prProfile.commissionValue || '0';
+        }
+      }
+    }
+    
+    const [reservation] = await db.insert(reservationPayments).values({
+      eventId,
+      companyId: event.companyId,
+      reservationType,
+      customerFirstName,
+      customerLastName,
+      customerPhone,
+      customerEmail: customerEmail || null,
+      prCode: prCode || null,
+      prProfileId,
+      prCommissionAmount,
+      listId: listId || null,
+      tableTypeId: tableTypeId || null,
+      guestCount: guestCount || null,
+      amount: amount || '0',
+      currency: 'EUR',
+      paymentStatus: 'pending',
+      qrToken,
+      qrCodeUrl,
+    }).returning();
+    
+    res.status(201).json({
+      id: reservation.id,
+      qrToken: reservation.qrToken,
+      qrCodeUrl: reservation.qrCodeUrl,
+      customerFirstName: reservation.customerFirstName,
+      customerLastName: reservation.customerLastName,
+      reservationType: reservation.reservationType,
+    });
+  } catch (error: any) {
+    console.error("[PUBLIC] Create reservation error:", error);
+    res.status(500).json({ message: error.message });
   }
 });
 

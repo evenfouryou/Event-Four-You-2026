@@ -18,6 +18,7 @@ import {
   siaeTickets,
   siaeTicketedEvents,
   siaeEventSectors,
+  reservationPayments,
   insertEventListSchema,
   insertListEntrySchema,
   insertTableTypeSchema,
@@ -1707,9 +1708,96 @@ router.post("/api/e4u/scan", requireAuth, async (req: Request, res: Response) =>
       });
     }
     
+    // Check if it's a paid reservation QR code (format: RES-{eventId}-{random})
+    if (parts[0] === 'RES' && parts.length >= 2) {
+      // Find reservation by QR code
+      const [reservation] = await db.select()
+        .from(reservationPayments)
+        .where(eq(reservationPayments.qrCode, qrCode));
+      
+      if (!reservation) {
+        return res.status(404).json({ message: "Prenotazione non trovata" });
+      }
+      
+      if (eventId && reservation.eventId !== eventId) {
+        return res.status(400).json({ message: "QR code non valido per questo evento" });
+      }
+      
+      // SECURITY: Verify scanner permissions for this event
+      const isGestore = await isGestoreForEvent(user, reservation.eventId);
+      if (!isGestore) {
+        // For reservations, check if user has scanner permission for lists or tables
+        const listPermResult = await checkScannerPermissionGranular(getUserId(user), reservation.eventId, 'lists');
+        const tablePermResult = await checkScannerPermissionGranular(getUserId(user), reservation.eventId, 'tables');
+        if (!listPermResult.allowed && !tablePermResult.allowed) {
+          return res.status(403).json({ 
+            message: "Non hai i permessi di scansione per questo evento. Contatta l'organizzatore.",
+            errorCode: "SCANNER_PERMISSION_DENIED"
+          });
+        }
+      }
+      
+      // Check payment status
+      if (reservation.paymentStatus !== 'completed') {
+        return res.status(400).json({ 
+          message: `Pagamento non completato. Stato: ${reservation.paymentStatus === 'pending' ? 'In attesa' : 'Fallito'}`,
+          reservation: {
+            id: reservation.id,
+            customerName: reservation.customerName,
+            paymentStatus: reservation.paymentStatus,
+          },
+        });
+      }
+      
+      // Check if already checked in
+      if (reservation.checkedIn) {
+        return res.status(400).json({ 
+          message: "Prenotazione già verificata",
+          success: false,
+          person: {
+            firstName: reservation.customerName.split(' ')[0] || '',
+            lastName: reservation.customerName.split(' ').slice(1).join(' ') || '',
+            type: reservation.reservationType === 'list' ? 'prenotazione_lista' : 'prenotazione_tavolo',
+            reservationType: reservation.reservationType,
+            listName: reservation.listName || undefined,
+            tableTypeName: reservation.tableTypeName || undefined,
+          },
+          alreadyCheckedIn: true,
+          checkedInAt: reservation.checkedInAt,
+        });
+      }
+      
+      // Check in the reservation
+      const [updated] = await db.update(reservationPayments)
+        .set({
+          checkedIn: true,
+          checkedInAt: new Date(),
+          checkedInBy: getUserId(user),
+        })
+        .where(eq(reservationPayments.id, reservation.id))
+        .returning();
+      
+      return res.json({
+        success: true,
+        type: 'reservation',
+        message: "Prenotazione verificata con successo",
+        person: {
+          firstName: updated.customerName.split(' ')[0] || '',
+          lastName: updated.customerName.split(' ').slice(1).join(' ') || '',
+          type: updated.reservationType === 'list' ? 'prenotazione_lista' : 'prenotazione_tavolo',
+          phone: updated.customerPhone || undefined,
+          reservationType: updated.reservationType,
+          listName: updated.listName || undefined,
+          tableTypeName: updated.tableTypeName || undefined,
+          guestCount: updated.guestCount || undefined,
+          amount: updated.amount,
+        },
+      });
+    }
+    
     // Original E4U format: E4U-{type}-{id}-{random}
     if (parts.length !== 4 || parts[0] !== 'E4U') {
-      return res.status(400).json({ message: "Formato codice QR non valido. Formati supportati: E4U-LST-*, E4U-TBL-*, SIAE-TKT-*" });
+      return res.status(400).json({ message: "Formato codice QR non valido. Formati supportati: E4U-LST-*, E4U-TBL-*, SIAE-TKT-*, RES-*" });
     }
     
     const type = parts[1]; // LST or TBL

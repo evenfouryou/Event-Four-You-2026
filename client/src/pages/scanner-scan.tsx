@@ -42,20 +42,24 @@ interface ScanResult {
   success: boolean;
   message?: string;
   error?: string;
-  type?: 'list' | 'table' | 'ticket';
+  type?: 'list' | 'table' | 'ticket' | 'reservation';
   person?: {
     firstName: string;
     lastName: string;
     phone?: string;
-    type: 'lista' | 'tavolo' | 'biglietto';
+    type: 'lista' | 'tavolo' | 'biglietto' | 'prenotazione_lista' | 'prenotazione_tavolo';
     listName?: string;
     tableName?: string;
+    tableTypeName?: string;
     status?: string;
     plusOnes?: number;
+    guestCount?: number;
     ticketType?: string;
     ticketCode?: string;
     sector?: string;
     price?: string;
+    amount?: string;
+    reservationType?: 'list' | 'table';
   };
   alreadyCheckedIn?: boolean;
   checkedInAt?: string;
@@ -512,8 +516,24 @@ export default function ScannerScanPage() {
                                     <Armchair className="w-3 h-3 mr-1" /> {scanResult.person.tableName}
                                   </Badge>
                                 )}
+                                {scanResult.person.type === 'prenotazione_lista' && (
+                                  <Badge variant="secondary" className="bg-purple-500/20 text-purple-400">
+                                    <Users className="w-3 h-3 mr-1" /> Prenotazione: {scanResult.person.listName}
+                                  </Badge>
+                                )}
+                                {scanResult.person.type === 'prenotazione_tavolo' && (
+                                  <Badge variant="secondary" className="bg-purple-500/20 text-purple-400">
+                                    <Armchair className="w-3 h-3 mr-1" /> Prenotazione: {scanResult.person.tableTypeName}
+                                  </Badge>
+                                )}
                                 {scanResult.person.plusOnes !== undefined && scanResult.person.plusOnes > 0 && (
                                   <Badge variant="secondary">+{scanResult.person.plusOnes}</Badge>
+                                )}
+                                {scanResult.person.guestCount !== undefined && scanResult.person.guestCount > 0 && (
+                                  <Badge variant="secondary">Ospiti: {scanResult.person.guestCount}</Badge>
+                                )}
+                                {scanResult.person.amount && (
+                                  <Badge variant="outline">€{scanResult.person.amount}</Badge>
                                 )}
                               </div>
                             </>
@@ -884,9 +904,29 @@ export default function ScannerScanPage() {
                           <Armchair className="w-4 h-4 mr-1.5" /> {scanResult.person.tableName}
                         </Badge>
                       )}
+                      {scanResult.person.type === 'prenotazione_lista' && (
+                        <Badge className="bg-purple-400/30 text-white border-0 px-3 py-1">
+                          <Users className="w-4 h-4 mr-1.5" /> Prenotazione: {scanResult.person.listName}
+                        </Badge>
+                      )}
+                      {scanResult.person.type === 'prenotazione_tavolo' && (
+                        <Badge className="bg-purple-400/30 text-white border-0 px-3 py-1">
+                          <Armchair className="w-4 h-4 mr-1.5" /> Prenotazione: {scanResult.person.tableTypeName}
+                        </Badge>
+                      )}
                       {scanResult.person.plusOnes !== undefined && scanResult.person.plusOnes > 0 && (
                         <Badge className="bg-white/20 text-white border-0 px-3 py-1">
                           +{scanResult.person.plusOnes}
+                        </Badge>
+                      )}
+                      {scanResult.person.guestCount !== undefined && scanResult.person.guestCount > 0 && (
+                        <Badge className="bg-white/20 text-white border-0 px-3 py-1">
+                          Ospiti: {scanResult.person.guestCount}
+                        </Badge>
+                      )}
+                      {scanResult.person.amount && (
+                        <Badge className="bg-white/30 text-white border-0 px-3 py-1">
+                          €{scanResult.person.amount}
                         </Badge>
                       )}
                     </div>

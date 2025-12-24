@@ -40,6 +40,7 @@ import { format } from "date-fns";
 import { it } from "date-fns/locale";
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useRef } from "react";
+import { PublicReservationSection } from "@/components/public-reservation-section";
 
 interface Seat {
   id: string;
@@ -1060,6 +1061,10 @@ export default function PublicEventDetailPage() {
                     )}
                   </CardContent>
                 </Card>
+
+                {event && (
+                  <PublicReservationSection eventId={event.id} />
+                )}
               </div>
 
               {/* Sidebar - right side */}
@@ -1383,6 +1388,10 @@ export default function PublicEventDetailPage() {
                     </p>
                   </div>
                 </motion.div>
+              )}
+
+              {event && (
+                <PublicReservationSection eventId={event.id} />
               )}
             </div>
           </>
