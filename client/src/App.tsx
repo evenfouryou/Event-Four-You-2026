@@ -88,7 +88,6 @@ import PrStaff from "@/pages/pr-staff";
 import PrMyEvents from "@/pages/pr-my-events";
 import PrEvents from "@/pages/pr-events";
 import PrWallet from "@/pages/pr-wallet";
-import PrLogin from "@/pages/pr-login";
 import DownloadSmartCardApp from "@/pages/download-smart-card-app";
 import SchoolBadgeManager from "@/pages/school-badge-manager";
 import SchoolBadgeLanding from "@/pages/school-badge-landing";
@@ -173,7 +172,6 @@ function Router() {
         <Route path="/locali/:id" component={PublicVenueDetail} />
         <Route path="/locali" component={PublicVenues} />
         <Route path="/download-smart-card" component={DownloadSmartCardApp} />
-        <Route path="/pr/login" component={PrLogin} />
         <Route path="/pr/wallet" component={PrWallet} />
         <Route path="/badge-error" component={SchoolBadgeError} />
         <Route path="/badge/verify" component={SchoolBadgeVerify} />
