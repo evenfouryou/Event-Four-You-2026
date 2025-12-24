@@ -220,28 +220,33 @@ function FloorPlanViewer({
       <g key={zone.id} className="zone-group">
         <polygon
           points={points}
-          fill={isSelected ? 'rgba(34, 197, 94, 0.25)' : 'transparent'}
-          stroke={isSelected ? '#22c55e' : (isAvailable ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.15)')}
-          strokeWidth={isSelected ? 1.5 : 0.8}
-          strokeDasharray={isSelected ? 'none' : '2,1'}
+          fill={isSelected ? 'rgba(34, 197, 94, 0.3)' : 'rgba(255, 255, 255, 0.05)'}
+          stroke={isSelected ? '#22c55e' : (isAvailable ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.2)')}
+          strokeWidth={isSelected ? 2 : 1}
+          strokeDasharray={isSelected ? 'none' : '4,2'}
           style={{ 
             cursor: isAvailable && linkedSector ? 'pointer' : 'not-allowed',
-            pointerEvents: 'all',
+            pointerEvents: 'painted',
             touchAction: 'manipulation',
-            filter: isSelected ? 'drop-shadow(0 0 4px rgba(34, 197, 94, 0.5))' : 'none'
+            filter: isSelected ? 'drop-shadow(0 0 6px rgba(34, 197, 94, 0.6))' : 'none'
           }}
-          className={`transition-all duration-300 ${!isAvailable ? 'opacity-30' : 'hover:stroke-white/60'}`}
+          className={`transition-all duration-300 ${!isAvailable ? 'opacity-30' : ''}`}
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
+            console.log('[FloorPlan] Zone clicked:', zone.id, 'linkedSector:', linkedSector?.sectorCode, 'isAvailable:', isAvailable);
             if (isAvailable && linkedSector) {
               triggerHaptic('medium');
               onZoneClick(zone.id, linkedSector.sectorCode);
             }
           }}
+          onTouchStart={(e) => {
+            e.stopPropagation();
+          }}
           onTouchEnd={(e) => {
             e.preventDefault();
             e.stopPropagation();
+            console.log('[FloorPlan] Zone touch:', zone.id, 'linkedSector:', linkedSector?.sectorCode, 'isAvailable:', isAvailable);
             if (isAvailable && linkedSector) {
               triggerHaptic('medium');
               onZoneClick(zone.id, linkedSector.sectorCode);
