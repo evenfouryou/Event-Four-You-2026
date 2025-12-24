@@ -106,6 +106,11 @@ export const companyFeatures = pgTable("company_features", {
   cassaEnabled: boolean("cassa_enabled").notNull().default(false),
   nightFileEnabled: boolean("night_file_enabled").notNull().default(false),
   siaeEnabled: boolean("siae_enabled").notNull().default(false),
+  scannerEnabled: boolean("scanner_enabled").notNull().default(true), // Gestione Scanner e Scanner QR
+  prEnabled: boolean("pr_enabled").notNull().default(true), // Gestione PR
+  badgesEnabled: boolean("badges_enabled").notNull().default(true), // Badge Scuola
+  cassaBigliettiEnabled: boolean("cassa_biglietti_enabled").notNull().default(true), // Cassa Biglietti
+  templateEnabled: boolean("template_enabled").notNull().default(true), // Template Digitali
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -127,6 +132,11 @@ export const userFeatures = pgTable("user_features", {
   cassaEnabled: boolean("cassa_enabled").notNull().default(false),
   nightFileEnabled: boolean("night_file_enabled").notNull().default(false),
   siaeEnabled: boolean("siae_enabled").notNull().default(false),
+  scannerEnabled: boolean("scanner_enabled").notNull().default(true), // Gestione Scanner e Scanner QR
+  prEnabled: boolean("pr_enabled").notNull().default(true), // Gestione PR
+  badgesEnabled: boolean("badges_enabled").notNull().default(true), // Badge Scuola
+  cassaBigliettiEnabled: boolean("cassa_biglietti_enabled").notNull().default(true), // Cassa Biglietti
+  templateEnabled: boolean("template_enabled").notNull().default(true), // Template Digitali
   canCreateProducts: boolean("can_create_products").notNull().default(false), // Warehouse permission to create products
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
