@@ -4,7 +4,9 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { AlertCircle, Mail } from "lucide-react";
+import { AlertCircle, Mail, Phone, User, AtSign } from "lucide-react";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Link, useSearch } from "wouter";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -13,12 +15,19 @@ import { motion } from "framer-motion";
 import { triggerHaptic, HapticButton, SafeArea } from "@/components/mobile-primitives";
 import { BrandLogo } from "@/components/brand-logo";
 
-// Helper to detect if input looks like a phone number
-const isPhoneNumber = (input: string): boolean => {
-  const cleaned = input.replace(/[\s\-\(\)]/g, '');
-  // Starts with + or is all digits (min 8 chars)
-  return cleaned.startsWith('+') || (/^\d{8,}$/.test(cleaned));
-};
+// Login method types
+type LoginMethod = 'email' | 'username' | 'phone';
+
+// Common international phone prefixes
+const PHONE_PREFIXES = [
+  { value: '+39', label: '+39 (IT)' },
+  { value: '+1', label: '+1 (US)' },
+  { value: '+44', label: '+44 (UK)' },
+  { value: '+33', label: '+33 (FR)' },
+  { value: '+49', label: '+49 (DE)' },
+  { value: '+34', label: '+34 (ES)' },
+  { value: '+41', label: '+41 (CH)' },
+];
 
 const springConfig = { type: "spring" as const, stiffness: 400, damping: 30 };
 
@@ -28,7 +37,11 @@ export default function Login() {
   const redirectTo = params.get("redirect");
   const isMobile = useIsMobile();
   
+  const [loginMethod, setLoginMethod] = useState<LoginMethod>('email');
   const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
+  const [phonePrefix, setPhonePrefix] = useState("+39");
+  const [phoneNumber, setPhoneNumber] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -44,24 +57,28 @@ export default function Login() {
     triggerHaptic('medium');
 
     try {
-      // Check if input is a phone number for PR login
-      if (isPhoneNumber(email)) {
-        try {
-          await apiRequest('POST', '/api/pr/login', { phone: email, password });
-          triggerHaptic('success');
-          queryClient.invalidateQueries({ queryKey: ["/api/pr/me"] });
-          window.location.href = '/pr/wallet';
-          return;
-        } catch (prErr: any) {
-          // If PR login fails, continue to try other login methods
-          // Only throw if it's a specific auth error
-          if (prErr.message && !prErr.message.includes("non valide")) {
-            throw prErr;
-          }
-        }
-      }
-
-      try {
+      // Route to appropriate login method based on selected tab
+      if (loginMethod === 'phone') {
+        // PR login with phone + prefix
+        const fullPhone = `${phonePrefix}${phoneNumber}`;
+        await apiRequest('POST', '/api/pr/login', { 
+          phone: fullPhone, 
+          phonePrefix,
+          phoneNumber,
+          password 
+        });
+        triggerHaptic('success');
+        queryClient.invalidateQueries({ queryKey: ["/api/pr/me"] });
+        window.location.href = '/pr/wallet';
+        return;
+      } else if (loginMethod === 'username') {
+        // Cashier/operator login with username
+        await apiRequest('POST', '/api/cashiers/login', { username, password });
+        triggerHaptic('success');
+        window.location.href = '/cashier/dashboard';
+        return;
+      } else {
+        // Email login (default)
         const response: any = await apiRequest('POST', '/api/auth/login', { email, password });
         
         triggerHaptic('success');
@@ -73,19 +90,6 @@ export default function Login() {
           window.location.href = redirectTo || '/';
         }
         return;
-      } catch (loginErr: any) {
-        const isEmail = email.includes('@');
-        if (!isEmail) {
-          try {
-            await apiRequest('POST', '/api/cashiers/login', { username: email, password });
-            triggerHaptic('success');
-            window.location.href = '/cashier/dashboard';
-            return;
-          } catch (cashierErr: any) {
-            throw loginErr;
-          }
-        }
-        throw loginErr;
       }
     } catch (err: any) {
       triggerHaptic('error');
@@ -178,18 +182,85 @@ export default function Login() {
                 </Alert>
               )}
 
-              <div className="space-y-2">
-                <Label htmlFor="email">Email, Telefono o Username</Label>
-                <Input
-                  id="email"
-                  type="text"
-                  placeholder="email, +39 3XX... o username"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  data-testid="input-email"
-                />
-              </div>
+              <Tabs value={loginMethod} onValueChange={(v) => setLoginMethod(v as LoginMethod)} className="w-full">
+                <TabsList className="grid w-full grid-cols-3 mb-4">
+                  <TabsTrigger value="email" className="flex items-center gap-1.5" data-testid="tab-email">
+                    <AtSign className="h-4 w-4" />
+                    <span className="hidden sm:inline">Email</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="username" className="flex items-center gap-1.5" data-testid="tab-username">
+                    <User className="h-4 w-4" />
+                    <span className="hidden sm:inline">Username</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="phone" className="flex items-center gap-1.5" data-testid="tab-phone">
+                    <Phone className="h-4 w-4" />
+                    <span className="hidden sm:inline">Telefono</span>
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
+
+              {loginMethod === 'email' && (
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="nome@esempio.it"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    data-testid="input-email"
+                  />
+                </div>
+              )}
+
+              {loginMethod === 'username' && (
+                <div className="space-y-2">
+                  <Label htmlFor="username">Username</Label>
+                  <Input
+                    id="username"
+                    type="text"
+                    placeholder="il_tuo_username"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    required
+                    data-testid="input-username"
+                  />
+                </div>
+              )}
+
+              {loginMethod === 'phone' && (
+                <div className="space-y-2">
+                  <Label>Telefono (per PR)</Label>
+                  <div className="flex gap-2">
+                    <Select value={phonePrefix} onValueChange={setPhonePrefix}>
+                      <SelectTrigger className="w-[100px]" data-testid="select-phone-prefix">
+                        <SelectValue placeholder="+39" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {PHONE_PREFIXES.map((p) => (
+                          <SelectItem key={p.value} value={p.value}>
+                            {p.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Input
+                      id="phone"
+                      type="tel"
+                      placeholder="3381234567"
+                      value={phoneNumber}
+                      onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, ''))}
+                      required
+                      className="flex-1"
+                      data-testid="input-phone"
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Questo metodo è riservato ai PR registrati dal gestore
+                  </p>
+                </div>
+              )}
 
               <div className="space-y-2">
                 <Label htmlFor="password">Password</Label>
@@ -366,23 +437,107 @@ export default function Login() {
             )}
 
             <motion.div 
-              className="space-y-2"
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ ...springConfig, delay: 0.15 }}
             >
-              <Label htmlFor="email" className="text-base font-medium">Email, Telefono o Username</Label>
-              <Input
-                id="email"
-                type="text"
-                placeholder="email, +39 3XX... o username"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                className="h-14 text-lg bg-background/50 border-white/10 focus:border-primary px-4 rounded-xl"
-                data-testid="input-email"
-              />
+              <Tabs value={loginMethod} onValueChange={(v) => setLoginMethod(v as LoginMethod)} className="w-full">
+                <TabsList className="grid w-full grid-cols-3 h-12 mb-4">
+                  <TabsTrigger value="email" className="flex items-center justify-center gap-1.5 h-10" data-testid="tab-email-mobile">
+                    <AtSign className="h-4 w-4" />
+                    <span className="text-xs">Email</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="username" className="flex items-center justify-center gap-1.5 h-10" data-testid="tab-username-mobile">
+                    <User className="h-4 w-4" />
+                    <span className="text-xs">Username</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="phone" className="flex items-center justify-center gap-1.5 h-10" data-testid="tab-phone-mobile">
+                    <Phone className="h-4 w-4" />
+                    <span className="text-xs">Telefono</span>
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
             </motion.div>
+
+            {loginMethod === 'email' && (
+              <motion.div 
+                className="space-y-2"
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ ...springConfig, delay: 0.18 }}
+              >
+                <Label htmlFor="email-mobile" className="text-base font-medium">Email</Label>
+                <Input
+                  id="email-mobile"
+                  type="email"
+                  placeholder="nome@esempio.it"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  className="h-14 text-lg bg-background/50 border-white/10 focus:border-primary px-4 rounded-xl"
+                  data-testid="input-email-mobile"
+                />
+              </motion.div>
+            )}
+
+            {loginMethod === 'username' && (
+              <motion.div 
+                className="space-y-2"
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ ...springConfig, delay: 0.18 }}
+              >
+                <Label htmlFor="username-mobile" className="text-base font-medium">Username</Label>
+                <Input
+                  id="username-mobile"
+                  type="text"
+                  placeholder="il_tuo_username"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  required
+                  className="h-14 text-lg bg-background/50 border-white/10 focus:border-primary px-4 rounded-xl"
+                  data-testid="input-username-mobile"
+                />
+              </motion.div>
+            )}
+
+            {loginMethod === 'phone' && (
+              <motion.div 
+                className="space-y-2"
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ ...springConfig, delay: 0.18 }}
+              >
+                <Label className="text-base font-medium">Telefono (per PR)</Label>
+                <div className="flex gap-2">
+                  <Select value={phonePrefix} onValueChange={setPhonePrefix}>
+                    <SelectTrigger className="w-[90px] h-14 bg-background/50 border-white/10 rounded-xl" data-testid="select-phone-prefix-mobile">
+                      <SelectValue placeholder="+39" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {PHONE_PREFIXES.map((p) => (
+                        <SelectItem key={p.value} value={p.value}>
+                          {p.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Input
+                    id="phone-mobile"
+                    type="tel"
+                    placeholder="3381234567"
+                    value={phoneNumber}
+                    onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, ''))}
+                    required
+                    className="flex-1 h-14 text-lg bg-background/50 border-white/10 focus:border-primary px-4 rounded-xl"
+                    data-testid="input-phone-mobile"
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Questo metodo è riservato ai PR registrati dal gestore
+                </p>
+              </motion.div>
+            )}
 
             <motion.div 
               className="space-y-2"

@@ -181,11 +181,13 @@ router.post("/api/reservations/pr-profiles", requireAuth, requireGestore, async 
     // Validate input with gestore schema
     const validated = createPrByGestoreSchema.parse(req.body);
     
-    // Check if phone already exists
+    // Check if phone already exists (check full phone = prefix + number)
+    const fullPhone = `${validated.phonePrefix || '+39'}${validated.phone}`;
     const [existingPhone] = await db.select()
       .from(prProfiles)
       .where(and(
         eq(prProfiles.phone, validated.phone),
+        eq(prProfiles.phonePrefix, validated.phonePrefix || '+39'),
         eq(prProfiles.companyId, user.companyId)
       ));
     
@@ -212,6 +214,7 @@ router.post("/api/reservations/pr-profiles", requireAuth, requireGestore, async 
       companyId: user.companyId,
       firstName: validated.firstName,
       lastName: validated.lastName,
+      phonePrefix: validated.phonePrefix || '+39',
       phone: validated.phone,
       displayName: `${validated.firstName} ${validated.lastName}`,
       prCode,
@@ -228,9 +231,9 @@ router.post("/api/reservations/pr-profiles", requireAuth, requireGestore, async 
       : process.env.PUBLIC_URL || 'https://eventfouryou.com';
     const accessLink = `${baseUrl}/login`;
     
-    // Send SMS with credentials
+    // Send SMS with credentials (use full phone with prefix)
     const smsResult = await sendPrCredentialsSMS(
-      validated.phone,
+      fullPhone,
       validated.firstName,
       password,
       accessLink
@@ -327,9 +330,10 @@ router.post("/api/reservations/pr-profiles/:id/resend-sms", requireAuth, require
       : process.env.PUBLIC_URL || 'https://eventfouryou.com';
     const accessLink = `${baseUrl}/login`;
     
-    // Send SMS
+    // Send SMS (use full phone with prefix)
+    const fullPhone = `${profile.phonePrefix || '+39'}${profile.phone}`;
     const smsResult = await sendPrCredentialsSMS(
-      profile.phone,
+      fullPhone,
       profile.firstName,
       password,
       accessLink
@@ -436,16 +440,71 @@ router.post("/api/reservations/pr-profiles/:id/impersonate", requireAuth, requir
 // PR Login via phone + password
 router.post("/api/pr/login", async (req: Request, res: Response) => {
   try {
-    const { phone, password } = req.body;
+    const { phone, phonePrefix, phoneNumber, password } = req.body;
     
-    if (!phone || !password) {
+    if ((!phone && !phoneNumber) || !password) {
       return res.status(400).json({ error: "Telefono e password richiesti" });
     }
     
-    // Find PR by phone
-    const [profile] = await db.select()
-      .from(prProfiles)
-      .where(eq(prProfiles.phone, phone));
+    // Build search criteria based on input format
+    // New format: phonePrefix + phoneNumber (from structured login form)
+    // Old format: phone (full phone string)
+    let profile;
+    
+    if (phonePrefix && phoneNumber) {
+      // New structured format: search by prefix + number
+      [profile] = await db.select()
+        .from(prProfiles)
+        .where(and(
+          eq(prProfiles.phonePrefix, phonePrefix),
+          eq(prProfiles.phone, phoneNumber)
+        ));
+      
+      // If not found, try just the number (for legacy data)
+      if (!profile) {
+        [profile] = await db.select()
+          .from(prProfiles)
+          .where(eq(prProfiles.phone, phoneNumber));
+      }
+    } else {
+      // Legacy format: normalize phone and search
+      const cleanPhone = phone.replace(/\D/g, '');
+      
+      // Extract the number part by removing common country code prefixes
+      let numberPart = cleanPhone;
+      
+      // Remove Italian prefix
+      if (cleanPhone.startsWith('39') && cleanPhone.length >= 12) {
+        numberPart = cleanPhone.substring(2);
+      } 
+      // Remove US/Canada prefix  
+      else if (cleanPhone.startsWith('1') && cleanPhone.length >= 11) {
+        numberPart = cleanPhone.substring(1);
+      }
+      // Remove other common European prefixes
+      else if (['44', '33', '49', '34', '41', '43', '32', '31'].some(c => 
+        cleanPhone.startsWith(c) && cleanPhone.length >= 10 + c.length
+      )) {
+        const prefix = ['44', '33', '49', '34', '41', '43', '32', '31'].find(c => 
+          cleanPhone.startsWith(c)
+        );
+        if (prefix) {
+          numberPart = cleanPhone.substring(prefix.length);
+        }
+      }
+      
+      // Search by normalized number (without country code)
+      [profile] = await db.select()
+        .from(prProfiles)
+        .where(eq(prProfiles.phone, numberPart));
+      
+      // If still not found, try the raw cleaned phone (for truly legacy data)
+      if (!profile) {
+        [profile] = await db.select()
+          .from(prProfiles)
+          .where(eq(prProfiles.phone, cleanPhone));
+      }
+    }
     
     if (!profile) {
       return res.status(401).json({ error: "Credenziali non valide" });

@@ -5040,7 +5040,7 @@ export const createPrByGestoreSchema = z.object({
   firstName: z.string().min(1, "Nome richiesto"),
   lastName: z.string().min(1, "Cognome richiesto"),
   phonePrefix: z.string().min(2).max(6).default('+39'), // Prefisso internazionale
-  phone: z.string().min(6, "Telefono non valido").max(15), // Numero senza prefisso
+  phone: z.string().min(9, "Numero troppo corto (min 9 cifre)").max(15), // Numero senza prefisso
   commissionType: z.enum(['percentage', 'fixed']).default('percentage'),
   commissionValue: z.string().default('10'),
   defaultListCommission: z.string().optional(),

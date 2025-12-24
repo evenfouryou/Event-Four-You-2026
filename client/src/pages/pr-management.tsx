@@ -111,10 +111,25 @@ const toNumber = (value: string | number | undefined | null): number => {
   return isNaN(parsed) ? 0 : parsed;
 };
 
+// Common international phone prefixes
+const PHONE_PREFIXES = [
+  { value: '+39', label: '+39 (Italia)' },
+  { value: '+1', label: '+1 (USA/Canada)' },
+  { value: '+44', label: '+44 (UK)' },
+  { value: '+33', label: '+33 (Francia)' },
+  { value: '+49', label: '+49 (Germania)' },
+  { value: '+34', label: '+34 (Spagna)' },
+  { value: '+41', label: '+41 (Svizzera)' },
+  { value: '+43', label: '+43 (Austria)' },
+  { value: '+32', label: '+32 (Belgio)' },
+  { value: '+31', label: '+31 (Olanda)' },
+];
+
 const createPrFormSchema = z.object({
   firstName: z.string().min(1, "Nome richiesto"),
   lastName: z.string().min(1, "Cognome richiesto"),
-  phone: z.string().min(10, "Telefono non valido").regex(/^\+?[0-9]+$/, "Formato telefono non valido"),
+  phonePrefix: z.string().min(2, "Prefisso richiesto").default('+39'),
+  phone: z.string().min(9, "Numero troppo corto (min 9 cifre)").max(15).regex(/^[0-9]+$/, "Solo numeri, senza prefisso"),
 });
 
 const editPrFormSchema = z.object({
@@ -157,6 +172,7 @@ export default function PrManagement() {
     defaultValues: {
       firstName: "",
       lastName: "",
+      phonePrefix: "+39",
       phone: "",
     },
   });
@@ -757,19 +773,45 @@ export default function PrManagement() {
                   )}
                 />
               </div>
-              <FormField
-                control={createForm.control}
-                name="phone"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Telefono</FormLabel>
-                    <FormControl>
-                      <Input placeholder="+39 333 1234567" {...field} data-testid="input-pr-phone" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              <div className="grid grid-cols-3 gap-2">
+                <FormField
+                  control={createForm.control}
+                  name="phonePrefix"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Prefisso</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-pr-phone-prefix">
+                            <SelectValue placeholder="+39" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {PHONE_PREFIXES.map((prefix) => (
+                            <SelectItem key={prefix.value} value={prefix.value}>
+                              {prefix.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={createForm.control}
+                  name="phone"
+                  render={({ field }) => (
+                    <FormItem className="col-span-2">
+                      <FormLabel>Numero</FormLabel>
+                      <FormControl>
+                        <Input placeholder="3381234567" {...field} data-testid="input-pr-phone" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
               <p className="text-sm text-muted-foreground">
                 Le commissioni possono essere configurate successivamente modificando il profilo PR.
               </p>
