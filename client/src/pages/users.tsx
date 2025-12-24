@@ -125,6 +125,11 @@ const roleLabels: Record<string, string> = {
   bartender: 'Bartender',
   cassiere: 'Cassiere',
   scanner: 'Scanner',
+  pr: 'PR', // Legacy - PRs are now managed in Gestione PR
+};
+
+const getRoleLabel = (role: string): string => {
+  return roleLabels[role] || role;
 };
 
 const roleGradients: Record<string, string> = {
@@ -136,6 +141,11 @@ const roleGradients: Record<string, string> = {
   bartender: 'from-teal-500 to-emerald-600',
   cassiere: 'from-green-500 to-emerald-600',
   scanner: 'from-emerald-500 to-green-600',
+  pr: 'from-pink-500 to-rose-600', // Legacy
+};
+
+const getRoleGradient = (role: string): string => {
+  return roleGradients[role] || 'from-gray-500 to-gray-600';
 };
 
 interface FeatureConfig {
@@ -227,7 +237,7 @@ function MobileUserCard({
 
       <div className="flex items-center gap-2 flex-wrap mb-4">
         <Badge variant="outline" className="shrink-0 text-sm py-1" data-testid={`badge-role-${user.id}`}>
-          {roleLabels[user.role]}
+          {getRoleLabel(user.role)}
         </Badge>
         {user.isActive ? (
           <Badge variant="outline" className="text-teal border-teal/30 text-sm py-1" data-testid={`badge-active-${user.id}`}>
@@ -414,7 +424,7 @@ export default function UsersPage() {
   const availableRoles = useMemo(() => {
     if (!users) return [];
     const roles = new Set(users.map(u => u.role));
-    const roleOrder = ['super_admin', 'gestore', 'gestore_covisione', 'capo_staff', 'warehouse', 'bartender', 'cassiere', 'scanner'];
+    const roleOrder = ['super_admin', 'gestore', 'gestore_covisione', 'capo_staff', 'warehouse', 'bartender', 'cassiere', 'scanner', 'pr'];
     return roleOrder.filter(role => roles.has(role));
   }, [users]);
 
@@ -803,7 +813,7 @@ export default function UsersPage() {
                 <SelectContent>
                   <SelectItem value="all">Tutti i ruoli</SelectItem>
                   {availableRoles.map((role) => (
-                    <SelectItem key={role} value={role}>{roleLabels[role]}</SelectItem>
+                    <SelectItem key={role} value={role}>{getRoleLabel(role)}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -850,7 +860,7 @@ export default function UsersPage() {
                         <TableCell className="text-muted-foreground">{user.email}</TableCell>
                         <TableCell>
                           <Badge variant="outline" data-testid={`badge-role-${user.id}`}>
-                            {roleLabels[user.role]}
+                            {getRoleLabel(user.role)}
                           </Badge>
                         </TableCell>
                         {isSuperAdmin && (
@@ -1285,7 +1295,7 @@ export default function UsersPage() {
                   }`}
                   data-testid={`button-filter-${role}`}
                 >
-                  {roleLabels[role]} ({count})
+                  {getRoleLabel(role)} ({count})
                 </button>
               );
             })}
