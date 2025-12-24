@@ -4815,7 +4815,8 @@ export const prProfiles = pgTable("pr_profiles", {
   // Dati anagrafici PR (registrazione via gestore)
   firstName: varchar("first_name", { length: 100 }).notNull(),
   lastName: varchar("last_name", { length: 100 }).notNull(),
-  phone: varchar("phone", { length: 20 }).notNull(),
+  phonePrefix: varchar("phone_prefix", { length: 6 }).notNull().default('+39'), // Prefisso internazionale
+  phone: varchar("phone", { length: 20 }).notNull(), // Numero senza prefisso
   email: varchar("email", { length: 255 }), // Opzionale - aggiunto dal PR dopo login
   
   // Autenticazione PR (login via telefono + password)
@@ -5032,13 +5033,14 @@ export const insertPrProfileSchema = createInsertSchema(prProfiles).omit({
   createdAt: true,
   updatedAt: true,
 });
-export const updatePrProfileSchema = insertPrProfileSchema.partial().omit({ userId: true, companyId: true, phone: true });
+export const updatePrProfileSchema = insertPrProfileSchema.partial().omit({ userId: true, companyId: true, phone: true, phonePrefix: true });
 
 // Schema specifico per creazione PR da gestore (solo campi essenziali)
 export const createPrByGestoreSchema = z.object({
   firstName: z.string().min(1, "Nome richiesto"),
   lastName: z.string().min(1, "Cognome richiesto"),
-  phone: z.string().min(10, "Telefono non valido"),
+  phonePrefix: z.string().min(2).max(6).default('+39'), // Prefisso internazionale
+  phone: z.string().min(6, "Telefono non valido").max(15), // Numero senza prefisso
   commissionType: z.enum(['percentage', 'fixed']).default('percentage'),
   commissionValue: z.string().default('10'),
   defaultListCommission: z.string().optional(),
