@@ -85,9 +85,10 @@ interface PrProfile {
   firstName?: string;
   lastName?: string;
   commissionType: string;
-  commissionValue: number;
-  totalEarnings: number;
-  pendingPayout: number;
+  commissionValue: string | number; // Decimal comes as string from DB
+  totalEarnings: string | number;
+  pendingEarnings: string | number;
+  paidEarnings: string | number;
   isActive: boolean;
   createdAt: string;
   user?: {
@@ -98,6 +99,14 @@ interface PrProfile {
     phone?: string;
   };
 }
+
+// Helper to safely convert decimal strings to numbers
+const toNumber = (value: string | number | undefined | null): number => {
+  if (value === undefined || value === null) return 0;
+  if (typeof value === 'number') return value;
+  const parsed = parseFloat(value);
+  return isNaN(parsed) ? 0 : parsed;
+};
 
 const createPrFormSchema = z.object({
   firstName: z.string().min(1, "Nome richiesto"),
@@ -247,7 +256,7 @@ export default function PrManagement() {
     setSelectedPr(pr);
     editForm.reset({
       commissionType: pr.commissionType as "percentage" | "fixed",
-      commissionValue: pr.commissionValue,
+      commissionValue: toNumber(pr.commissionValue),
     });
     setIsEditDialogOpen(true);
   };
@@ -258,11 +267,12 @@ export default function PrManagement() {
     return `${firstName} ${lastName}`.trim() || 'N/A';
   };
 
-  const getCommissionLabel = (type: string, value: number) => {
+  const getCommissionLabel = (type: string, value: string | number) => {
+    const numValue = toNumber(value);
     if (type === 'percentage') {
-      return `${value}%`;
+      return `${numValue}%`;
     }
-    return `€${value.toFixed(2)}`;
+    return `€${numValue.toFixed(2)}`;
   };
 
   if (!canManagePr) {
@@ -296,8 +306,8 @@ export default function PrManagement() {
   }
 
   const activeCount = prProfiles.filter(p => p.isActive).length;
-  const totalEarnings = prProfiles.reduce((sum, p) => sum + (p.totalEarnings || 0), 0);
-  const pendingPayouts = prProfiles.reduce((sum, p) => sum + (p.pendingPayout || 0), 0);
+  const totalEarnings = prProfiles.reduce((sum, p) => sum + toNumber(p.totalEarnings), 0);
+  const pendingPayouts = prProfiles.reduce((sum, p) => sum + toNumber(p.pendingEarnings), 0);
 
   const content = (
     <>
@@ -436,7 +446,7 @@ export default function PrManagement() {
                         </div>
                       </TableCell>
                       <TableCell className="text-right font-medium">
-                        €{(pr.totalEarnings || 0).toFixed(2)}
+                        €{toNumber(pr.totalEarnings).toFixed(2)}
                       </TableCell>
                       <TableCell className="text-center">
                         {pr.isActive ? (
