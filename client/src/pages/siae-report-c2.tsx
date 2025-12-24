@@ -34,12 +34,15 @@ interface SubscriptionData {
   validTo: string;
 }
 
+// Interfaccia conforme Allegato 4 G.U. n.188 12/08/2004
 interface SubscriptionSummary {
-  turnType: string;
-  eventsCount: number;
-  count: number;
-  totalAmount: number;
-  cancelled: number;
+  turnType: string;      // F = Fisso, L = Libero
+  eventsCount: number;   // Numero eventi inclusi
+  count: number;         // Numero abbonamenti venduti
+  totalAmount: number;   // Importo lordo incassato
+  cancelled: number;     // Abbonamenti annullati
+  tipoTitolo?: string;   // Codice TAB.3: A1, AX, etc.
+  tipoSpettacolo?: string; // I = Intrattenimento, S = Spettacolo
 }
 
 interface C2ReportData {
@@ -51,6 +54,59 @@ interface C2ReportData {
   eventGenre: string;
   eventLocation: string;
   generatedAt: string;
+  
+  // QUADRO A - Dati Identificativi (conforme Allegato 4)
+  quadroA?: {
+    // Dati Organizzatore
+    denominazioneOrganizzatore: string;
+    codiceFiscaleOrganizzatore: string;
+    partitaIvaOrganizzatore: string;
+    indirizzoOrganizzatore: string;
+    comuneOrganizzatore: string;
+    provinciaOrganizzatore: string;
+    capOrganizzatore: string;
+    
+    // Titolare Sistema di Emissione
+    titolareSistemaEmissione: string;
+    codiceFiscaleTitolareSistema: string;
+    codiceSistemaEmissione: string;
+    
+    // Dati Locale
+    codiceLocale: string;
+    denominazioneLocale: string;
+    indirizzoLocale: string;
+    comuneLocale: string;
+    provinciaLocale: string;
+    capLocale: string;
+    capienza: number;
+    
+    // Periodo riferimento
+    periodoRiferimento: string;
+    dataRiferimento: string | null;
+  };
+  
+  // QUADRO B - Dettaglio Abbonamenti (conforme Allegato 4)
+  quadroB?: {
+    // Righe dettaglio conformi al modello ufficiale
+    // Colonne: Tipo titolo (2), Codice abb., I/S, F/L, Venduti, Importo lordo, Annullati, N° eventi
+    righeDettaglio: Array<{
+      tipoTitolo: string;           // Codice TAB.3: A1, AX, etc.
+      tipoTitoloDescrizione: string;
+      codiceAbbonamento: string;
+      tipoSpettacolo: string;       // I = Intrattenimento, S = Spettacolo
+      turnoAbbonamento: string;     // F = Fisso, L = Libero
+      numeroVenduti: number;
+      importoLordoIncassato: number;
+      numeroAnnullati: number;
+      numeroEventi: number;
+    }>;
+    
+    // Totali
+    totaleAbbonamenti: number;
+    totaleAnnullati: number;
+    totaleImportoLordo: number;
+  };
+  
   summary: {
     totalCapacity: number;
     ticketsSold: number;
@@ -196,26 +252,44 @@ export default function SiaeReportC2() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Dati Anagrafici - Quadro A</CardTitle>
+            <CardTitle>Dati Anagrafici - Quadro A (Allegato 4 G.U. n.188 12/08/2004)</CardTitle>
           </CardHeader>
           <CardContent>
             <Table>
               <TableBody>
                 <TableRow>
                   <TableCell className="font-medium w-1/4">Organizzatore</TableCell>
-                  <TableCell>Event4U S.r.l.</TableCell>
+                  <TableCell>{report.quadroA?.denominazioneOrganizzatore || 'N/D'}</TableCell>
                   <TableCell className="font-medium w-1/4">Codice Fiscale</TableCell>
-                  <TableCell>12345678901</TableCell>
+                  <TableCell>{report.quadroA?.codiceFiscaleOrganizzatore || 'N/D'}</TableCell>
                 </TableRow>
                 <TableRow>
+                  <TableCell className="font-medium">Indirizzo</TableCell>
+                  <TableCell>{report.quadroA?.indirizzoOrganizzatore || 'N/D'}</TableCell>
+                  <TableCell className="font-medium">Comune</TableCell>
+                  <TableCell>{report.quadroA?.comuneOrganizzatore || 'N/D'} ({report.quadroA?.provinciaOrganizzatore || ''}) - {report.quadroA?.capOrganizzatore || ''}</TableCell>
+                </TableRow>
+                <TableRow className="bg-muted/30">
                   <TableCell className="font-medium">Titolare Sistema di Emissione</TableCell>
-                  <TableCell>Event4U S.r.l.</TableCell>
-                  <TableCell className="font-medium">Codice Fiscale</TableCell>
-                  <TableCell>12345678901</TableCell>
+                  <TableCell>{report.quadroA?.titolareSistemaEmissione || 'N/D'}</TableCell>
+                  <TableCell className="font-medium">Codice Fiscale Titolare</TableCell>
+                  <TableCell>{report.quadroA?.codiceFiscaleTitolareSistema || 'N/D'}</TableCell>
                 </TableRow>
                 <TableRow>
                   <TableCell className="font-medium">Codice Sistema di Emissione</TableCell>
-                  <TableCell colSpan={3}>E4U-{report.eventId?.substring(0, 8).toUpperCase()}</TableCell>
+                  <TableCell>{report.quadroA?.codiceSistemaEmissione || `E4U-${report.eventId?.substring(0, 8).toUpperCase()}`}</TableCell>
+                  <TableCell className="font-medium">Codice Locale (BA)</TableCell>
+                  <TableCell>{report.quadroA?.codiceLocale || 'N/D'}</TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell className="font-medium">Locale</TableCell>
+                  <TableCell>{report.quadroA?.denominazioneLocale || 'N/D'}</TableCell>
+                  <TableCell className="font-medium">Capienza</TableCell>
+                  <TableCell>{report.quadroA?.capienza || 0}</TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell className="font-medium">Periodo Riferimento</TableCell>
+                  <TableCell colSpan={3}>{report.quadroA?.periodoRiferimento || 'Mensile'} - {report.quadroA?.dataRiferimento || reportDate}</TableCell>
                 </TableRow>
               </TableBody>
             </Table>
@@ -224,16 +298,19 @@ export default function SiaeReportC2() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Abbonamenti - Quadro B</CardTitle>
+            <CardTitle>Abbonamenti - Quadro B (Allegato 4 G.U. n.188 12/08/2004)</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Colonne: Tipo Titolo (TAB.3), Codice, I/S (Intrattenimento/Spettacolo), F/L (Fisso/Libero)
+            </p>
           </CardHeader>
           <CardContent>
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Tipo Titolo</TableHead>
-                  <TableHead>Codice Abbonamento</TableHead>
-                  <TableHead className="text-center">Spettacolo</TableHead>
-                  <TableHead className="text-center">Tipo Turno</TableHead>
+                  <TableHead>Tipo Titolo<br/><span className="text-xs font-normal">(TAB.3)</span></TableHead>
+                  <TableHead>Codice Abb.</TableHead>
+                  <TableHead className="text-center">I/S</TableHead>
+                  <TableHead className="text-center">F/L</TableHead>
                   <TableHead className="text-right">Venduti</TableHead>
                   <TableHead className="text-right">Importo Lordo</TableHead>
                   <TableHead className="text-center">Annullati</TableHead>
@@ -242,15 +319,39 @@ export default function SiaeReportC2() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {report.subscriptions && report.subscriptions.length > 0 ? (
+                {report.quadroB?.righeDettaglio && report.quadroB.righeDettaglio.length > 0 ? (
+                  report.quadroB.righeDettaglio.map((riga, index) => (
+                    <TableRow key={`riga-${index}`}>
+                      <TableCell>
+                        <Badge variant="outline" title={riga.tipoTitoloDescrizione}>{riga.tipoTitolo}</Badge>
+                      </TableCell>
+                      <TableCell className="font-mono text-sm">{riga.codiceAbbonamento}</TableCell>
+                      <TableCell className="text-center" title={riga.tipoSpettacolo === 'I' ? 'Intrattenimento' : 'Spettacolo'}>
+                        <Badge variant={riga.tipoSpettacolo === 'I' ? 'secondary' : 'outline'}>{riga.tipoSpettacolo}</Badge>
+                      </TableCell>
+                      <TableCell className="text-center" title={riga.turnoAbbonamento === 'F' ? 'Fisso' : 'Libero'}>
+                        <Badge variant="outline">{riga.turnoAbbonamento}</Badge>
+                      </TableCell>
+                      <TableCell className="text-right font-medium">{riga.numeroVenduti}</TableCell>
+                      <TableCell className="text-right font-medium">€{riga.importoLordoIncassato.toFixed(2)}</TableCell>
+                      <TableCell className="text-center">
+                        {riga.numeroAnnullati > 0 ? (
+                          <Badge variant="destructive">{riga.numeroAnnullati}</Badge>
+                        ) : '-'}
+                      </TableCell>
+                      <TableCell className="text-center">{riga.numeroEventi}</TableCell>
+                      <TableCell className="text-center">-</TableCell>
+                    </TableRow>
+                  ))
+                ) : report.subscriptions && report.subscriptions.length > 0 ? (
                   report.subscriptions.map((sub, index) => (
                     <TableRow key={sub.id || index}>
                       <TableCell>
-                        <Badge variant="outline">ABBONAMENTO TURNO {sub.turnType || 'F'}</Badge>
+                        <Badge variant="outline">A1</Badge>
                       </TableCell>
                       <TableCell className="font-mono text-sm">{sub.subscriptionCode}</TableCell>
                       <TableCell className="text-center">S</TableCell>
-                      <TableCell className="text-center">{sub.turnType}</TableCell>
+                      <TableCell className="text-center">{sub.turnType || 'F'}</TableCell>
                       <TableCell className="text-right">{sub.status !== 'cancelled' ? 1 : '-'}</TableCell>
                       <TableCell className="text-right">€{sub.totalAmount.toFixed(2)}</TableCell>
                       <TableCell className="text-center">
@@ -292,14 +393,19 @@ export default function SiaeReportC2() {
               <TableBody>
                 <TableRow className="bg-muted/50 font-bold">
                   <TableCell colSpan={4} className="text-center">TOTALE</TableCell>
-                  <TableCell className="text-right">{report.summary.subscriptionsSold || 0}</TableCell>
-                  <TableCell className="text-right">€{(report.summary.subscriptionRevenue || 0).toFixed(2)}</TableCell>
-                  <TableCell className="text-center">{report.summary.subscriptionsCancelled || 0}</TableCell>
+                  <TableCell className="text-right">{report.quadroB?.totaleAbbonamenti || report.summary.subscriptionsSold || 0}</TableCell>
+                  <TableCell className="text-right">€{(report.quadroB?.totaleImportoLordo || report.summary.subscriptionRevenue || 0).toFixed(2)}</TableCell>
+                  <TableCell className="text-center">{report.quadroB?.totaleAnnullati || report.summary.subscriptionsCancelled || 0}</TableCell>
                   <TableCell className="text-center">-</TableCell>
                   <TableCell></TableCell>
                 </TableRow>
               </TableBody>
             </Table>
+            <div className="mt-4 p-3 bg-muted/30 rounded text-sm">
+              <strong>Legenda TAB.3:</strong> A1 = Abbonamento generico • 
+              <strong> I/S:</strong> I = Intrattenimento, S = Spettacolo • 
+              <strong> F/L:</strong> F = Turno Fisso, L = Turno Libero
+            </div>
           </CardContent>
         </Card>
 

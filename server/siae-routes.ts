@@ -3309,9 +3309,10 @@ function buildC1ReportData(
   // Capienza totale
   const capienzaTotale = sectors.reduce((sum, s) => sum + (s.capacity || 0), 0);
 
-  // QUADRO A - Dati Identificativi (conforme normativa SIAE)
+  // QUADRO A - Dati Identificativi (conforme Allegato 3 G.U. n.188 12/08/2004)
+  // Include: Organizzatore, Titolare Sistema Emissione, Dati Locale, Dati Evento
   const quadroA = {
-    // Dati Organizzatore
+    // === DATI ORGANIZZATORE ===
     denominazioneOrganizzatore: company?.name || 'N/D',
     codiceFiscaleOrganizzatore: company?.fiscalCode || company?.vatNumber || company?.taxCode || 'N/D',
     partitaIvaOrganizzatore: company?.vatNumber || 'N/D',
@@ -3320,8 +3321,22 @@ function buildC1ReportData(
     provinciaOrganizzatore: company?.province || 'N/D',
     capOrganizzatore: company?.postalCode || company?.cap || 'N/D',
     
-    // Dati Locale/Venue
-    codiceLocale: event.siaeLocationCode || event.venueCode || 'N/D', // Codice BA
+    // === TITOLARE SISTEMA DI EMISSIONE (Allegato 3 - campo obbligatorio) ===
+    // Può essere diverso dall'organizzatore (es. società che gestisce biglietteria)
+    titolareSistemaEmissione: company?.name || 'N/D',
+    codiceFiscaleTitolareSistema: company?.fiscalCode || company?.vatNumber || company?.taxCode || 'N/D',
+    codiceSistemaEmissione: event.emissionSystemCode || `E4U-${event.companyId?.substring(0, 8).toUpperCase() || 'SYS'}`,
+    
+    // === MANCATO FUNZIONAMENTO SISTEMA (Allegato 3 - sezione opzionale) ===
+    // Da compilare solo in caso di malfunzionamento del sistema automatizzato
+    sistemaFunzionante: true, // default: sistema funziona
+    dataInizioMalfunzionamento: null as string | null,
+    oraInizioMalfunzionamento: null as string | null,
+    dataFineMalfunzionamento: null as string | null,
+    oraFineMalfunzionamento: null as string | null,
+    
+    // === DATI LOCALE/VENUE ===
+    codiceLocale: event.siaeLocationCode || event.venueCode || 'N/D', // Codice BA (Biglietteria Automatizzata)
     denominazioneLocale: event.venueName || 'N/D',
     indirizzoLocale: event.venueAddress || 'N/D',
     comuneLocale: event.venueCity || 'N/D',
@@ -3329,13 +3344,18 @@ function buildC1ReportData(
     capLocale: event.venuePostalCode || event.venueCap || 'N/D',
     capienza: capienzaTotale,
     
-    // Dati Evento
+    // === DATI EVENTO ===
     denominazioneEvento: event.eventName || event.name || 'N/D',
     codiceEvento: event.eventCode || event.code || 'N/D',
     genereEvento: event.genreCode || event.genre || 'N/D',
     dataEvento: event.eventDate,
     oraEvento: event.eventTime || 'N/D',
+    oraFineEvento: event.eventEndTime || '06:00', // Ora fine evento (default 06:00 per discoteche)
     tipologiaEvento: event.eventType || 'spettacolo', // spettacolo o intrattenimento
+    
+    // === PERIODO DI RIFERIMENTO (per riepilogo giornaliero/mensile) ===
+    periodoRiferimento: reportType,
+    dataRiferimento: today,
   };
 
   // Progressivo emissione globale per questo report
@@ -3400,26 +3420,111 @@ function buildC1ReportData(
   const totaleInteriGlobale = ticketsByType.intero.reduce((s, t) => s + getTicketPrice(t), 0);
   const totaleRidottiGlobale = ticketsByType.ridotto.reduce((s, t) => s + getTicketPrice(t), 0);
   
+  // QUADRO B - Struttura conforme Allegato 3 G.U. n.188 12/08/2004
+  // Colonne: (1) Ordine del posto, (2) Settore, (3) Capienza, (4) Tipo titolo (TAB.3), 
+  // (5) Prezzo unitario, N° titoli emessi, (6) Ricavo lordo, Imposta intratt., 
+  // Imponibile IVA, N° titoli annullati, IVA lorda
+  
+  // Costruisci righe dettagliate per ogni combinazione settore/tipo titolo
+  // secondo il formato ufficiale SIAE (ogni riga = 1 tipo titolo per settore)
+  const righeDettaglio: Array<{
+    ordinePosto: number;
+    settore: string;
+    capienza: number;
+    tipoTitolo: string;           // Codice TAB.3: I1, RX, O1, etc.
+    tipoTitoloDescrizione: string; // Descrizione: "Intero", "Ridotto generico", etc.
+    prezzoUnitario: number;
+    numeroTitoliEmessi: number;
+    ricavoLordo: number;
+    impostaIntrattenimenti: number;
+    imponibileIva: number;
+    numeroTitoliAnnullati: number;
+    ivaLorda: number;
+  }> = [];
+  
+  // Genera righe per ogni settore e tipo titolo
+  let rigaOrdine = 1;
+  for (const s of sectors) {
+    const sectorActiveTickets = activeTickets.filter(t => t.sectorId === s.id);
+    const sectorCancelledTickets = cancelledTickets.filter(t => t.sectorId === s.id);
+    
+    // Raggruppa ticket per tipo (usando codici TAB.3 ufficiali)
+    const tipiTitolo = ['intero', 'ridotto', 'omaggio'] as const;
+    const codiciTab3: Record<string, { codice: string; descrizione: string }> = {
+      'intero': { codice: 'I1', descrizione: 'Intero' },
+      'ridotto': { codice: 'RX', descrizione: 'Ridotto generico' },
+      'omaggio': { codice: 'OX', descrizione: 'Omaggio generico' },
+    };
+    
+    for (const tipo of tipiTitolo) {
+      const ticketsTipo = sectorActiveTickets.filter(t => getTicketType(t) === tipo);
+      const ticketsCancelledTipo = sectorCancelledTickets.filter(t => getTicketType(t) === tipo);
+      
+      if (ticketsTipo.length > 0 || ticketsCancelledTipo.length > 0) {
+        const ricavoLordo = ticketsTipo.reduce((sum, t) => sum + getTicketPrice(t), 0);
+        const prezzoUnitario = ticketsTipo.length > 0 
+          ? ricavoLordo / ticketsTipo.length 
+          : 0;
+        
+        // Calcola IVA su ricavo lordo
+        const ivaLorda = ricavoLordo * (vatRate / (100 + vatRate));
+        const imponibileIva = ricavoLordo - ivaLorda;
+        
+        // Imposta intrattenimenti (solo se evento è intrattenimento)
+        const impostaIntratt = isIntrattenimento 
+          ? imponibileIva * (impostaIntrattenimentiRate / 100) 
+          : 0;
+        
+        righeDettaglio.push({
+          ordinePosto: rigaOrdine,
+          settore: s.name,
+          capienza: s.capacity || 0,
+          tipoTitolo: codiciTab3[tipo].codice,
+          tipoTitoloDescrizione: codiciTab3[tipo].descrizione,
+          prezzoUnitario: Math.round(prezzoUnitario * 100) / 100,
+          numeroTitoliEmessi: ticketsTipo.length,
+          ricavoLordo: Math.round(ricavoLordo * 100) / 100,
+          impostaIntrattenimenti: Math.round(impostaIntratt * 100) / 100,
+          imponibileIva: Math.round(imponibileIva * 100) / 100,
+          numeroTitoliAnnullati: ticketsCancelledTipo.length,
+          ivaLorda: Math.round(ivaLorda * 100) / 100,
+        });
+        
+        rigaOrdine++;
+      }
+    }
+  }
+  
   const quadroB = {
+    // Righe dettaglio conformi al modello ufficiale
+    righeDettaglio,
+    
+    // Settori aggregati (legacy - per compatibilità)
     settori,
     
-    // Riepilogo per tipologia biglietto con progressivo emissione
+    // Riepilogo per tipologia biglietto (TAB.3 codici)
     riepilogoTipologie: {
       interi: {
+        codice: 'I1',
+        descrizione: 'Intero',
         quantita: ticketsByType.intero.length,
         prezzoUnitario: ticketsByType.intero.length > 0 
           ? Math.round((totaleInteriGlobale / ticketsByType.intero.length) * 100) / 100 
           : 0,
-        totale: totaleInteriGlobale
+        totale: Math.round(totaleInteriGlobale * 100) / 100
       },
       ridotti: {
+        codice: 'RX',
+        descrizione: 'Ridotto generico',
         quantita: ticketsByType.ridotto.length,
         prezzoUnitario: ticketsByType.ridotto.length > 0 
           ? Math.round((totaleRidottiGlobale / ticketsByType.ridotto.length) * 100) / 100 
           : 0,
-        totale: totaleRidottiGlobale
+        totale: Math.round(totaleRidottiGlobale * 100) / 100
       },
       omaggi: {
+        codice: 'OX',
+        descrizione: 'Omaggio generico',
         quantita: ticketsByType.omaggio.length,
         prezzoUnitario: 0,
         totale: 0
@@ -3429,10 +3534,15 @@ function buildC1ReportData(
     // Progressivo emissione totale per questo report
     progressivoEmissione: progressivoGlobale,
     
-    // Totali generali QUADRO B
-    totaleBigliettiVenduti: totalTicketsSold,
+    // Totali generali QUADRO B (conformi al modello ufficiale)
+    totaleBigliettiEmessi: totalTicketsSold,
+    totaleBigliettiVenduti: totalTicketsSold, // alias
     totaleBigliettiAnnullati: cancelledTickets.length,
-    totaleIncassoLordo: totalRevenue
+    totaleRicavoLordo: Math.round(totalRevenue * 100) / 100,
+    totaleIncassoLordo: Math.round(totalRevenue * 100) / 100, // alias
+    totaleImpostaIntrattenimenti: Math.round(impostaIntrattenimenti * 100) / 100,
+    totaleImponibileIva: Math.round(netRevenue * 100) / 100,
+    totaleIvaLorda: Math.round(vatAmount * 100) / 100,
   };
 
   // QUADRO C - Riepilogo Imposte e Contributi
@@ -3726,7 +3836,7 @@ router.get('/api/siae/ticketed-events/:id/transmissions', requireAuth, requireOr
   }
 });
 
-// C2 Report - Event Summary (Riepilogo Abbonamenti)
+// C2 Report - Riepilogo Abbonamenti (conforme Allegato 4 G.U. n.188 12/08/2004)
 router.get('/api/siae/ticketed-events/:id/reports/c2', requireAuth, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
@@ -3735,6 +3845,8 @@ router.get('/api/siae/ticketed-events/:id/reports/c2', requireAuth, async (req: 
       return res.status(404).json({ message: "Evento non trovato" });
     }
 
+    // Ottieni company per QUADRO A
+    const company = event.companyId ? await storage.getCompany(event.companyId) : null;
     const sectors = await siaeStorage.getSiaeEventSectors(id);
     const transactions = await siaeStorage.getSiaeTransactionsByEvent(id);
     
@@ -3786,7 +3898,42 @@ router.get('/api/siae/ticketed-events/:id/reports/c2', requireAuth, async (req: 
     const subscriptionRevenue = soldSubscriptions.reduce((sum, s) => sum + (Number(s.totalAmount) || 0), 0);
     const cancelledAmount = cancelledSubscriptions.reduce((sum, s) => sum + (Number(s.totalAmount) || 0), 0);
 
-    // Raggruppa abbonamenti per tipo
+    // Capienza totale
+    const capienzaTotale = sectors.reduce((sum, s) => sum + (s.capacity || 0), 0);
+    const today = new Date().toISOString().split('T')[0];
+    const isIntrattenimento = event.eventType === 'intrattenimento';
+
+    // QUADRO A - Dati Identificativi (conforme Allegato 4 G.U. n.188 12/08/2004)
+    const quadroA = {
+      // Dati Organizzatore
+      denominazioneOrganizzatore: company?.name || 'N/D',
+      codiceFiscaleOrganizzatore: company?.fiscalCode || company?.vatNumber || company?.taxCode || 'N/D',
+      partitaIvaOrganizzatore: company?.vatNumber || 'N/D',
+      indirizzoOrganizzatore: company?.address || 'N/D',
+      comuneOrganizzatore: company?.city || 'N/D',
+      provinciaOrganizzatore: company?.province || 'N/D',
+      capOrganizzatore: company?.postalCode || company?.cap || 'N/D',
+      
+      // Titolare Sistema di Emissione
+      titolareSistemaEmissione: company?.name || 'N/D',
+      codiceFiscaleTitolareSistema: company?.fiscalCode || company?.vatNumber || company?.taxCode || 'N/D',
+      codiceSistemaEmissione: event.emissionSystemCode || `E4U-${event.companyId?.substring(0, 8).toUpperCase() || 'SYS'}`,
+      
+      // Dati Locale
+      codiceLocale: event.siaeLocationCode || event.venueCode || 'N/D',
+      denominazioneLocale: event.venueName || 'N/D',
+      indirizzoLocale: event.venueAddress || 'N/D',
+      comuneLocale: event.venueCity || 'N/D',
+      provinciaLocale: event.venueProvince || 'N/D',
+      capLocale: event.venuePostalCode || event.venueCap || 'N/D',
+      capienza: capienzaTotale,
+      
+      // Periodo riferimento
+      periodoRiferimento: 'mensile',
+      dataRiferimento: today,
+    };
+
+    // Raggruppa abbonamenti per tipo per QUADRO B
     const subscriptionsByType = soldSubscriptions.reduce((acc, sub) => {
       const key = `${sub.turnType || 'F'}-${sub.eventsCount || 1}`;
       if (!acc[key]) {
@@ -3811,17 +3958,43 @@ router.get('/api/siae/ticketed-events/:id/reports/c2', requireAuth, async (req: 
       }
     });
 
+    // QUADRO B - Dettaglio Abbonamenti (conforme Allegato 4)
+    // Colonne: Tipo titolo (TAB.3), Codice abb., I/S, F/L, Venduti, Importo lordo, Annullati, N° eventi
+    const righeDettaglio = Object.values(subscriptionsByType).map((s: any) => ({
+      tipoTitolo: 'A1', // Codice TAB.3 per abbonamento
+      tipoTitoloDescrizione: 'Abbonamento',
+      codiceAbbonamento: `ABB-${s.turnType}${s.eventsCount}`,
+      tipoSpettacolo: isIntrattenimento ? 'I' : 'S', // I = Intrattenimento, S = Spettacolo
+      turnoAbbonamento: s.turnType, // F = Fisso, L = Libero
+      numeroVenduti: s.count,
+      importoLordoIncassato: Math.round(s.totalAmount * 100) / 100,
+      numeroAnnullati: s.cancelled,
+      numeroEventi: s.eventsCount,
+    }));
+
+    const quadroB = {
+      righeDettaglio,
+      totaleAbbonamenti: soldSubscriptions.length,
+      totaleAnnullati: cancelledSubscriptions.length,
+      totaleImportoLordo: Math.round(subscriptionRevenue * 100) / 100,
+    };
+
     res.json({
       reportType: 'C2',
-      reportName: 'Riepilogo Abbonamenti',
+      reportName: 'MODELLO C.2 - Riepilogo Abbonamenti',
       eventId: id,
       eventName: event.eventName,
       eventDate: event.eventDate,
       eventGenre: event.eventGenre,
       eventLocation: event.eventLocation,
       generatedAt: new Date().toISOString(),
+      
+      // QUADRO A e B conformi al modello ufficiale
+      quadroA,
+      quadroB,
+      
       summary: {
-        totalCapacity: event.totalCapacity || 0,
+        totalCapacity: event.totalCapacity || capienzaTotale,
         ticketsSold,
         ticketsCancelled: event.ticketsCancelled || 0,
         occupancyRate: event.totalCapacity ? ((ticketsSold / event.totalCapacity) * 100).toFixed(2) : 0,
@@ -3851,7 +4024,11 @@ router.get('/api/siae/ticketed-events/:id/reports/c2', requireAuth, async (req: 
         validFrom: s.validFrom,
         validTo: s.validTo,
       })),
-      subscriptionSummary: Object.values(subscriptionsByType),
+      subscriptionSummary: Object.values(subscriptionsByType).map((s: any) => ({
+        ...s,
+        tipoTitolo: 'A1',
+        tipoSpettacolo: isIntrattenimento ? 'I' : 'S',
+      })),
     });
   } catch (error: any) {
     res.status(500).json({ message: error.message });
