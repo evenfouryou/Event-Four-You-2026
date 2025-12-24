@@ -6,12 +6,19 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { AlertCircle, Mail } from "lucide-react";
 import { Link, useSearch } from "wouter";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { motion } from "framer-motion";
 import { triggerHaptic, HapticButton, SafeArea } from "@/components/mobile-primitives";
 import { BrandLogo } from "@/components/brand-logo";
+
+// Helper to detect if input looks like a phone number
+const isPhoneNumber = (input: string): boolean => {
+  const cleaned = input.replace(/[\s\-\(\)]/g, '');
+  // Starts with + or is all digits (min 8 chars)
+  return cleaned.startsWith('+') || (/^\d{8,}$/.test(cleaned));
+};
 
 const springConfig = { type: "spring" as const, stiffness: 400, damping: 30 };
 
@@ -37,6 +44,23 @@ export default function Login() {
     triggerHaptic('medium');
 
     try {
+      // Check if input is a phone number for PR login
+      if (isPhoneNumber(email)) {
+        try {
+          await apiRequest('POST', '/api/pr/login', { phone: email, password });
+          triggerHaptic('success');
+          queryClient.invalidateQueries({ queryKey: ["/api/pr/me"] });
+          window.location.href = '/pr/wallet';
+          return;
+        } catch (prErr: any) {
+          // If PR login fails, continue to try other login methods
+          // Only throw if it's a specific auth error
+          if (prErr.message && !prErr.message.includes("non valide")) {
+            throw prErr;
+          }
+        }
+      }
+
       try {
         const response: any = await apiRequest('POST', '/api/auth/login', { email, password });
         
@@ -155,11 +179,11 @@ export default function Login() {
               )}
 
               <div className="space-y-2">
-                <Label htmlFor="email">Email o Username</Label>
+                <Label htmlFor="email">Email, Telefono o Username</Label>
                 <Input
                   id="email"
                   type="text"
-                  placeholder="tua@email.com o username"
+                  placeholder="email, +39 3XX... o username"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
@@ -347,11 +371,11 @@ export default function Login() {
               animate={{ opacity: 1, x: 0 }}
               transition={{ ...springConfig, delay: 0.15 }}
             >
-              <Label htmlFor="email" className="text-base font-medium">Email o Username</Label>
+              <Label htmlFor="email" className="text-base font-medium">Email, Telefono o Username</Label>
               <Input
                 id="email"
                 type="text"
-                placeholder="tua@email.com o username"
+                placeholder="email, +39 3XX... o username"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
