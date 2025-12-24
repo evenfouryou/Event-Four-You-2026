@@ -53,16 +53,20 @@ export function MobileBottomNav() {
       { icon: User, label: "Profilo", href: "/settings" },
     ];
   } else if (isAdmin) {
-    // Build nav items based on enabled features
+    // Build nav items based on enabled features - always 5 items for balanced layout
     navItems = [
       { icon: Home, label: "Home", href: "/" },
       { icon: Calendar, label: "Eventi", href: "/events" },
       { icon: Plus, label: "Evento", href: "/events/wizard", isFab: true },
     ];
     
-    // Add Beverage if enabled (default true)
+    // Add Beverage if enabled, otherwise add Scanner or Prodotti as fallback
     if (userFeatures?.beverageEnabled !== false) {
       navItems.push({ icon: Wine, label: "Beverage", href: "/beverage" });
+    } else if (userFeatures?.scannerEnabled !== false) {
+      navItems.push({ icon: ScanLine, label: "Scanner", href: "/scanner" });
+    } else {
+      navItems.push({ icon: Package, label: "Prodotti", href: "/products" });
     }
     
     navItems.push({ icon: User, label: "Profilo", href: "/settings" });
@@ -117,15 +121,20 @@ export function MobileBottomNav() {
       { icon: User, label: "Profilo", href: "/settings" },
     ];
   } else {
-    // Default organizer view
+    // Default organizer view - always 5 items for balanced layout
     navItems = [
       { icon: Home, label: "Home", href: "/" },
       { icon: Calendar, label: "Eventi", href: "/events" },
       { icon: Plus, label: "Evento", href: "/events/wizard", isFab: true },
     ];
     
+    // Add Beverage if enabled, otherwise add Scanner or Prodotti as fallback
     if (userFeatures?.beverageEnabled !== false) {
       navItems.push({ icon: Wine, label: "Beverage", href: "/beverage" });
+    } else if (userFeatures?.scannerEnabled !== false) {
+      navItems.push({ icon: ScanLine, label: "Scanner", href: "/scanner" });
+    } else {
+      navItems.push({ icon: Package, label: "Prodotti", href: "/products" });
     }
     
     navItems.push({ icon: User, label: "Profilo", href: "/settings" });
