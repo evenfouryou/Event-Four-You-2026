@@ -3533,7 +3533,8 @@ router.get('/api/siae/ticketed-events/:id/reports/c1', requireAuth, async (req: 
 
 // C1 Report - Send to SIAE Transmissions (Struttura Quadri A/B/C conforme normativa SIAE)
 // Usa la stessa funzione helper buildC1ReportData per garantire consistenza con l'endpoint GET
-router.post('/api/siae/ticketed-events/:id/reports/c1/send', requireAuth, requireGestore, async (req: Request, res: Response) => {
+// Usa requireOrganizer per permettere a gestore, organizer e super_admin di inviare report
+router.post('/api/siae/ticketed-events/:id/reports/c1/send', requireAuth, requireOrganizer, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const { toEmail, reportType: reqReportType } = req.body;
@@ -3643,13 +3644,13 @@ ${settoriXml}
   </QuadroC>
 </ModelloC1>`;
 
-    // Create transmission record - pass periodDate as ISO string for schema compatibility
+    // Create transmission record - pass periodDate as Date object
     // Include ticketedEventId to link transmission to event
     const transmission = await siaeStorage.createSiaeTransmission({
       companyId: event.companyId,
       ticketedEventId: id, // Collegamento all'evento SIAE
       transmissionType: isMonthly ? 'monthly' : 'daily',
-      periodDate: eventDate.toISOString(),
+      periodDate: eventDate,
       fileName: fileName,
       fileContent: xmlContent,
       status: 'pending',

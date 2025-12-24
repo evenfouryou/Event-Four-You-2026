@@ -161,13 +161,13 @@ export default function SiaeReportC1() {
 
   const sendToSiaeMutation = useMutation({
     mutationFn: async () => {
-      const res = await apiRequest(`/api/siae/ticketed-events/${id}/reports/c1/send`, {
-        method: 'POST',
-        body: JSON.stringify({ reportType }),
-      });
-      return res;
+      console.log('[SIAE C1] Invio report in corso...', { id, reportType });
+      const res = await apiRequest('POST', `/api/siae/ticketed-events/${id}/reports/c1/send`, { reportType });
+      console.log('[SIAE C1] Risposta ricevuta:', res);
+      return res.json();
     },
     onSuccess: (data: any) => {
+      console.log('[SIAE C1] Invio completato con successo:', data);
       toast({
         title: "Report inviato",
         description: data.message || "Il report C1 è stato salvato come trasmissione SIAE",
@@ -176,6 +176,13 @@ export default function SiaeReportC1() {
       queryClient.invalidateQueries({ queryKey: ['/api/siae/ticketed-events', id, 'transmissions'] });
     },
     onError: (error: any) => {
+      console.error('[SIAE C1] Errore invio SIAE:', error);
+      console.error('[SIAE C1] Dettagli errore:', { 
+        message: error.message, 
+        status: error.status,
+        id,
+        reportType 
+      });
       toast({
         title: "Errore",
         description: error.message || "Errore durante l'invio del report",
