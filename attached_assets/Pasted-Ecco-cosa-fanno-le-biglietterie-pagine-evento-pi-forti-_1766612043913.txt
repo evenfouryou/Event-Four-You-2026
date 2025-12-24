@@ -1,0 +1,74 @@
+Ecco cosa fanno le biglietterie/pagine evento più forti (Italia + mondo) e un’idea concreta per far sì che il tuo sia superiore e davvero “custom”.
+
+Cosa copiare (i pattern che convertono)
+
+1) “Hero” chiaro + CTA immediata
+	•	Immagine/video grande, titolo evento, data/luogo, e un bottone Compra / Prenota sempre visibile (desktop e mobile).
+	•	È il modello tipico dei leader (TicketOne / Eventbrite).  ￼
+
+2) Checkout corto e “guidato”
+	•	Meno step = più conversione. Eventbrite spinge anche widget/checkout incorporabile (utile per embed su siti partner).  ￼
+
+3) Personalizzazione e discovery
+	•	DICE punta molto su feed personalizzato e suggerimenti (anche via Spotify). Questo aumenta ritorno e acquisti ripetuti.  ￼
+
+4) Seat map / planimetrie interattive
+	•	Fever mette forte enfasi su mappe posti interattive come leva conversione.  ￼
+
+5) Pattern UI “best-in-class”
+	•	Librerie tipo Mobbin mostrano come le app top strutturano la schermata “Event Detail” (CTA sticky, info a blocchi, social proof, FAQ).  ￼
+
+⸻
+
+Dove spesso sono “deboli” (opportunità per superarle)
+	•	Poca identità dell’evento/organizzatore: molte pagine sembrano “tutte uguali”.
+	•	Info dispersive: line-up, orari, accessi, dress code, parcheggi… spesso troppo sotto o troppo lungo.
+	•	Esperienza mobile non perfetta: CTA che sparisce, troppe sezioni, poca gerarchia.
+	•	Zero “vibe”: manca storytelling (cosa mi perdo se non vengo?) e contenuti live (clip, momenti, hype).
+
+⸻
+
+IDEA: “Event Page 3.0” — una pagina evento che sembra un mini-sito (super custom)
+
+Obiettivo: ogni evento ha la sua identità, ma tu mantieni una struttura che converte sempre.
+
+A) Struttura (layout) che spacca
+	1.	Hero dinamico (video loop 3–6s o slideshow) + CTA “Compra/Registrati”
+	2.	3 pillole subito: “Quando”, “Dove”, “Cosa include” (es. drink, tavolo, backstage)
+	3.	Moduli a blocchi (drag & drop per l’organizzatore):
+	•	Line-up / Special guest
+	•	Orari (timeline)
+	•	Location & come arrivare
+	•	Dress code
+	•	FAQ
+	•	Policy (età, rimborsi, nominativi)
+	•	“Upgrade” (fast-lane, VIP, bundle)
+	4.	CTA sticky sempre visibile + micro-riepilogo carrello (1 riga)
+
+B) Personalizzazione vera (non “cambio due colori”)
+	•	Theme Kit per evento: font, palette, corner radius, animazioni, texture, overlay, stile foto (es. “neon club”, “luxury”, “festival”).
+	•	Blocchi “brandizzati”: sponsor, partner, media, e sezioni speciali solo per quell’evento.
+	•	URL e dominio custom (es. evento.tuosito.it) + SEO e OpenGraph curati.
+
+C) Feature “wow” che ti differenzia subito
+	•	Planimetria interattiva (tu già ci stai lavorando): resa super semplice + selezione tavolo/posto con preview (foto/benefit). (Qui batti tanti.)
+	•	Story Blocks: 3–5 card tipo “storia IG” dentro la pagina (hype, regole, teaser, outfit, playlist).
+	•	Social proof live: “X persone stanno guardando”, “Y biglietti rimasti”, “Z tavoli prenotati” (con moderazione, senza fuffa).
+	•	Esperienza post-acquisto premium: wallet pass + QR + istruzioni di accesso ultra chiare.
+
+D) Una chicca che nessuno fa bene: “Modalità Club”
+
+Un toggle in alto: “Sono già al locale”
+	•	cambia la pagina in una versione “operativa”: check-in, upgrade last minute, mappa tavoli, info rapide (bagni/ingressi), assistenza.
+Perfetta se la tua piattaforma è anche gestionale.
+
+⸻
+
+Se vuoi farlo “superiore” davvero: la promessa in 1 riga
+
+“Ogni evento sembra un sito su misura, ma si crea in 5 minuti con moduli e theme kit.”
+
+Se mi dici in che contesto lo userai di più (club serate? concerti? festival? eventi privati?), ti butto giù:
+	•	wireframe preciso della pagina (sezione per sezione)
+	•	set di moduli (con priorità conversione)
+	•	2–3 theme kit pronti (es. Club / Luxury / Festival) coerenti con Event Four You.
