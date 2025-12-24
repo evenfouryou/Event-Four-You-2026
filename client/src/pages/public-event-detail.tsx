@@ -35,6 +35,7 @@ import {
   Zap,
   Map,
   Info,
+  Flame,
 } from "lucide-react";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
@@ -380,6 +381,32 @@ function TicketTypeCard({
 
   const isAvailable = sector.availableSeats > 0;
 
+  const getScarcityBadge = () => {
+    if (sector.availableSeats < 10) {
+      return (
+        <Badge 
+          className="bg-red-500/90 text-white border-0 text-xs px-2 py-0.5"
+          data-testid={`badge-scarcity-critical-${sector.id}`}
+        >
+          <Flame className="w-3 h-3 mr-1" />
+          Ultimi {sector.availableSeats}!
+        </Badge>
+      );
+    }
+    if (sector.availableSeats < 30) {
+      return (
+        <Badge 
+          className="bg-orange-500/90 text-white border-0 text-xs px-2 py-0.5"
+          data-testid={`badge-scarcity-warning-${sector.id}`}
+        >
+          <Flame className="w-3 h-3 mr-1" />
+          Quasi esauriti
+        </Badge>
+      );
+    }
+    return null;
+  };
+
   if (!isAvailable) {
     return (
       <motion.div {...fadeInUp} className="bg-card/50 border border-border rounded-2xl p-4">
@@ -414,6 +441,12 @@ function TicketTypeCard({
             <h3 className="font-semibold text-foreground" data-testid={`text-sector-name-${sector.id}`}>
               {sector.name}
             </h3>
+            <div className="flex items-center gap-2 mt-1">
+              <span className="text-xs text-muted-foreground" data-testid={`text-available-seats-${sector.id}`}>
+                {sector.availableSeats} posti disponibili
+              </span>
+              {getScarcityBadge()}
+            </div>
           </div>
         </div>
         <div className="text-right">
@@ -815,6 +848,35 @@ export default function PublicEventDetailPage() {
                         <MapPin className="w-5 h-5 text-primary" />
                         <span data-testid="text-event-location">{event.locationName}</span>
                       </div>
+                      {(() => {
+                        const availableSectors = event.sectors.filter(s => s.availableSeats > 0);
+                        if (availableSectors.length === 0) return null;
+                        const minPrice = Math.min(...availableSectors.map(s => Number(s.priceIntero)));
+                        return (
+                          <div 
+                            className="flex items-center gap-2 text-primary font-semibold"
+                            data-testid="pill-min-price-desktop"
+                          >
+                            <Ticket className="w-5 h-5" />
+                            <span>Da €{minPrice.toFixed(0)}</span>
+                          </div>
+                        );
+                      })()}
+                      {(() => {
+                        const remaining = event.totalCapacity - event.ticketsSold;
+                        if (remaining < 20 && remaining > 0) {
+                          return (
+                            <Badge 
+                              className="bg-orange-500/90 text-white border-0"
+                              data-testid="badge-global-scarcity-desktop"
+                            >
+                              <Flame className="w-3 h-3 mr-1" />
+                              Solo {remaining} biglietti rimasti!
+                            </Badge>
+                          );
+                        }
+                        return null;
+                      })()}
                     </div>
                     {event.eventDescription && (
                       <div className="prose prose-sm dark:prose-invert max-w-none">
@@ -902,9 +964,29 @@ export default function PublicEventDetailPage() {
                                   <h3 className="font-semibold text-foreground" data-testid={`text-sector-name-${sector.id}`}>
                                     {sector.name}
                                   </h3>
-                                  <p className="text-sm text-muted-foreground">
-                                    {sector.availableSeats} posti disponibili
-                                  </p>
+                                  <div className="flex items-center gap-2">
+                                    <p className="text-sm text-muted-foreground" data-testid={`text-available-seats-desktop-${sector.id}`}>
+                                      {sector.availableSeats} posti disponibili
+                                    </p>
+                                    {sector.availableSeats < 10 && sector.availableSeats > 0 && (
+                                      <Badge 
+                                        className="bg-red-500/90 text-white border-0 text-xs px-2 py-0.5"
+                                        data-testid={`badge-scarcity-critical-desktop-${sector.id}`}
+                                      >
+                                        <Flame className="w-3 h-3 mr-1" />
+                                        Ultimi {sector.availableSeats}!
+                                      </Badge>
+                                    )}
+                                    {sector.availableSeats >= 10 && sector.availableSeats < 30 && (
+                                      <Badge 
+                                        className="bg-orange-500/90 text-white border-0 text-xs px-2 py-0.5"
+                                        data-testid={`badge-scarcity-warning-desktop-${sector.id}`}
+                                      >
+                                        <Flame className="w-3 h-3 mr-1" />
+                                        Quasi esauriti
+                                      </Badge>
+                                    )}
+                                  </div>
                                 </div>
                               </div>
                               <div className="text-right">
@@ -1281,6 +1363,22 @@ export default function PublicEventDetailPage() {
                       {event.locationName}
                     </span>
                   </div>
+                  {(() => {
+                    const availableSectors = event.sectors.filter(s => s.availableSeats > 0);
+                    if (availableSectors.length === 0) return null;
+                    const minPrice = Math.min(...availableSectors.map(s => Number(s.priceIntero)));
+                    return (
+                      <div 
+                        className="flex items-center gap-2 bg-black/40 backdrop-blur-xl rounded-xl px-3 py-2"
+                        data-testid="pill-min-price-mobile"
+                      >
+                        <Ticket className="w-4 h-4 text-primary" />
+                        <span className="text-sm font-medium text-white">
+                          Da €{minPrice.toFixed(0)}
+                        </span>
+                      </div>
+                    );
+                  })()}
                 </div>
               </motion.div>
             </div>
@@ -1405,18 +1503,46 @@ export default function PublicEventDetailPage() {
           transition={springTransition}
           className="fixed bottom-0 left-0 right-0 bg-card/95 backdrop-blur-xl border-t border-border z-50"
           style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+          data-testid="sticky-cta-mobile"
         >
           <div className="flex items-center justify-between gap-4 p-4">
-            <div>
-              <p className="text-xs text-muted-foreground uppercase tracking-wider">Totale</p>
-              <p className="text-2xl font-bold bg-gradient-to-r from-yellow-400 to-orange-400 bg-clip-text text-transparent">
-                €{totalPrice.toFixed(2)}
-              </p>
+            <div className="flex-1 min-w-0">
+              {selectedSector ? (
+                <>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider truncate" data-testid="text-selected-sector-name">
+                    {selectedSector.name}
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-2xl font-bold bg-gradient-to-r from-yellow-400 to-orange-400 bg-clip-text text-transparent" data-testid="text-cta-total">
+                      €{totalPrice.toFixed(2)}
+                    </p>
+                    {(() => {
+                      const remaining = event.totalCapacity - event.ticketsSold;
+                      if (remaining < 20) {
+                        return (
+                          <span 
+                            className="text-xs font-semibold text-orange-400 flex items-center gap-1"
+                            data-testid="badge-global-scarcity"
+                          >
+                            <Flame className="w-3 h-3" />
+                            Solo {remaining} rimasti!
+                          </span>
+                        );
+                      }
+                      return null;
+                    })()}
+                  </div>
+                </>
+              ) : (
+                <p className="text-sm text-muted-foreground" data-testid="text-no-selection">
+                  Seleziona un biglietto
+                </p>
+              )}
             </div>
             <Button
               onClick={handlePurchase}
               disabled={!canPurchase || isAdding}
-              className="h-14 px-8 rounded-xl text-lg font-bold shadow-lg shadow-primary/25 flex-1 max-w-[200px]"
+              className="h-14 px-8 rounded-xl text-lg font-bold shadow-lg shadow-primary/25 shrink-0"
               data-testid="button-purchase"
             >
               {isAdding ? (
