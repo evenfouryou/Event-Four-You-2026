@@ -16,7 +16,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDes
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { Calendar, MapPin, Clock, Repeat, FileText, Save, CheckCircle2, ArrowLeft, ArrowRight, Ticket, Users, Euro, Plus, Trash2, Upload, X, ImageIcon, Loader2, ChevronLeft } from "lucide-react";
+import { Calendar, MapPin, Clock, Repeat, FileText, Save, CheckCircle2, ArrowLeft, ArrowRight, Ticket, Users, Euro, Plus, Trash2, Upload, X, ImageIcon, Loader2, ChevronLeft, Building2 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Label } from "@/components/ui/label";
 import { motion, AnimatePresence } from "framer-motion";
@@ -662,22 +662,24 @@ export default function EventWizard() {
 
               {userCompanies && userCompanies.length > 1 && (
                 <FormItem>
-                  <FormLabel className="text-base">Azienda</FormLabel>
+                  <FormLabel className="text-base font-medium">Azienda</FormLabel>
                   <Select
                     value={selectedCompanyId || ''}
                     onValueChange={(value) => {
                       setSelectedCompanyId(value);
                       form.setValue('companyId', value);
                     }}
-                    data-testid="select-company"
                   >
-                    <SelectTrigger className="h-12">
+                    <SelectTrigger className="h-14 text-base px-4" data-testid="select-company">
                       <SelectValue placeholder="Seleziona azienda" />
                     </SelectTrigger>
                     <SelectContent>
                       {userCompanies.map((uc) => (
-                        <SelectItem key={uc.companyId} value={uc.companyId}>
-                          {uc.companyName} {uc.isDefault && '(Default)'}
+                        <SelectItem key={uc.companyId} value={uc.companyId} className="py-3">
+                          <div className="flex items-center gap-3">
+                            <Building2 className="h-5 w-5 text-muted-foreground" />
+                            <span className="text-base">{uc.companyName} {uc.isDefault && '(Default)'}</span>
+                          </div>
                         </SelectItem>
                       ))}
                     </SelectContent>
