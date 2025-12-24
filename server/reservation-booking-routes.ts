@@ -816,7 +816,7 @@ router.get("/api/pr/reservations", async (req: Request, res: Response) => {
       event: {
         id: events.id,
         name: events.name,
-        date: events.date,
+        startDatetime: events.startDatetime,
       }
     })
       .from(reservationPayments)
@@ -871,12 +871,16 @@ router.post("/api/pr/payouts", async (req: Request, res: Response) => {
       ));
     
     // Create payout request
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    
     const [payout] = await db.insert(prPayouts).values({
       prProfileId: prSession.id,
       companyId: prSession.companyId,
       amount: profile.pendingEarnings,
       status: 'pending',
-      requestedAt: new Date(),
+      periodStart: startOfMonth,
+      periodEnd: now,
       reservationCount: pendingReservations[0]?.count || 0,
     }).returning();
     
@@ -1672,6 +1676,395 @@ router.post("/api/reservations/payouts", requireAuth, requireGestore, async (req
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: "Dati non validi", details: error.errors });
     }
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ==================== PR Session Work APIs ====================
+// These endpoints use session.prProfile for PR phone authentication
+
+// Middleware to require PR session with database validation
+async function requirePrSession(req: Request, res: Response, next: NextFunction) {
+  const prSession = (req.session as any).prProfile;
+  if (!prSession || !prSession.id || !prSession.companyId) {
+    return res.status(401).json({ error: "Non autenticato come PR" });
+  }
+  
+  // Validate PR session against database
+  const [profile] = await db.select()
+    .from(prProfiles)
+    .where(and(
+      eq(prProfiles.id, prSession.id),
+      eq(prProfiles.companyId, prSession.companyId),
+      eq(prProfiles.isActive, true)
+    ));
+  
+  if (!profile) {
+    delete (req.session as any).prProfile;
+    return res.status(401).json({ error: "Sessione PR non valida" });
+  }
+  
+  // Refresh session data
+  (req.session as any).prProfile = {
+    ...prSession,
+    companyId: profile.companyId
+  };
+  
+  next();
+}
+
+// Helper to validate event belongs to PR's company
+async function validateEventOwnership(eventId: string, companyId: string): Promise<boolean> {
+  const [event] = await db.select({ id: events.id })
+    .from(events)
+    .where(and(
+      eq(events.id, eventId),
+      eq(events.companyId, companyId)
+    ));
+  return !!event;
+}
+
+// Get events for PR (events with their list entries or table reservations)
+router.get("/api/pr-session/events", requirePrSession, async (req: Request, res: Response) => {
+  try {
+    const prSession = (req.session as any).prProfile;
+    
+    // Get all events from PR's company that are upcoming or recent
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    
+    const eventsList = await db.select()
+      .from(events)
+      .where(and(
+        eq(events.companyId, prSession.companyId),
+        gte(events.startDatetime, thirtyDaysAgo)
+      ))
+      .orderBy(desc(events.startDatetime));
+    
+    res.json(eventsList);
+  } catch (error: any) {
+    console.error("Error getting PR events:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get PR's list entries for an event
+router.get("/api/pr-session/events/:eventId/list-entries", requirePrSession, async (req: Request, res: Response) => {
+  try {
+    const prSession = (req.session as any).prProfile;
+    const { eventId } = req.params;
+    
+    // Validate event belongs to PR's company
+    const eventOwned = await validateEventOwnership(eventId, prSession.companyId);
+    if (!eventOwned) {
+      return res.status(403).json({ error: "Evento non trovato o non autorizzato" });
+    }
+    
+    // Get entries for this event (scoped to company for security)
+    const entries = await db.select()
+      .from(listEntries)
+      .where(and(
+        eq(listEntries.eventId, eventId),
+        eq(listEntries.companyId, prSession.companyId)
+      ))
+      .orderBy(desc(listEntries.createdAt));
+    
+    res.json(entries);
+  } catch (error: any) {
+    console.error("Error getting PR list entries:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Add list entry (PR session)
+router.post("/api/pr-session/events/:eventId/list-entries", requirePrSession, async (req: Request, res: Response) => {
+  try {
+    const prSession = (req.session as any).prProfile;
+    const { eventId } = req.params;
+    const { firstName, lastName, phone, email, gender, notes, listId } = req.body;
+    
+    // Validate event belongs to PR's company
+    const eventOwned = await validateEventOwnership(eventId, prSession.companyId);
+    if (!eventOwned) {
+      return res.status(403).json({ error: "Evento non trovato o non autorizzato" });
+    }
+    
+    if (!firstName || !lastName || !phone) {
+      return res.status(400).json({ error: "Nome, cognome e telefono sono obbligatori" });
+    }
+    
+    // Generate QR code
+    const qrCode = `LST-${eventId.slice(0, 6).toUpperCase()}-${crypto.randomBytes(6).toString('hex').toUpperCase()}`;
+    
+    const [entry] = await db.insert(listEntries).values({
+      listId: listId || eventId, // Use eventId as fallback if no specific list
+      eventId,
+      companyId: prSession.companyId,
+      firstName,
+      lastName,
+      phone,
+      email: email || null,
+      gender: gender || null,
+      notes: notes || null,
+      qrCode,
+      status: 'pending',
+      createdByRole: 'pr',
+    }).returning();
+    
+    res.status(201).json(entry);
+  } catch (error: any) {
+    console.error("Error creating list entry:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get PR's table reservations for an event  
+router.get("/api/pr-session/events/:eventId/table-reservations", requirePrSession, async (req: Request, res: Response) => {
+  try {
+    const prSession = (req.session as any).prProfile;
+    const { eventId } = req.params;
+    
+    // Validate event belongs to PR's company
+    const eventOwned = await validateEventOwnership(eventId, prSession.companyId);
+    if (!eventOwned) {
+      return res.status(403).json({ error: "Evento non trovato o non autorizzato" });
+    }
+    
+    const reservations = await db.select()
+      .from(tableReservations)
+      .where(and(
+        eq(tableReservations.eventId, eventId),
+        eq(tableReservations.companyId, prSession.companyId)
+      ))
+      .orderBy(desc(tableReservations.createdAt));
+    
+    res.json(reservations);
+  } catch (error: any) {
+    console.error("Error getting PR table reservations:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Add table reservation (PR session)
+router.post("/api/pr-session/events/:eventId/table-reservations", requirePrSession, async (req: Request, res: Response) => {
+  try {
+    const prSession = (req.session as any).prProfile;
+    const { eventId } = req.params;
+    const { tableTypeId, reservationName, reservationPhone, notes } = req.body;
+    
+    // Validate event belongs to PR's company
+    const eventOwned = await validateEventOwnership(eventId, prSession.companyId);
+    if (!eventOwned) {
+      return res.status(403).json({ error: "Evento non trovato o non autorizzato" });
+    }
+    
+    if (!tableTypeId || !reservationName) {
+      return res.status(400).json({ error: "Tipo tavolo e nome prenotazione sono obbligatori" });
+    }
+    
+    // Validate tableType belongs to company
+    const [tableType] = await db.select()
+      .from(tableTypes)
+      .where(and(
+        eq(tableTypes.id, tableTypeId),
+        eq(tableTypes.companyId, prSession.companyId)
+      ));
+    
+    if (!tableType) {
+      return res.status(403).json({ error: "Tipo tavolo non autorizzato" });
+    }
+    
+    const [reservation] = await db.insert(tableReservations).values({
+      tableTypeId,
+      eventId,
+      companyId: prSession.companyId,
+      reservationName,
+      reservationPhone: reservationPhone || null,
+      notes: notes || null,
+      status: 'pending',
+      createdByRole: 'pr',
+    }).returning();
+    
+    res.status(201).json(reservation);
+  } catch (error: any) {
+    console.error("Error creating table reservation:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get PR statistics (entries, reservations, cancellations)
+router.get("/api/pr-session/stats", requirePrSession, async (req: Request, res: Response) => {
+  try {
+    const prSession = (req.session as any).prProfile;
+    
+    // Get list entries stats
+    const listStats = await db.select({
+      total: sql<number>`count(*)::int`,
+      pending: sql<number>`count(*) FILTER (WHERE status = 'pending')::int`,
+      confirmed: sql<number>`count(*) FILTER (WHERE status = 'confirmed')::int`,
+      checkedIn: sql<number>`count(*) FILTER (WHERE status = 'checked_in' OR checked_in_at IS NOT NULL)::int`,
+      cancelled: sql<number>`count(*) FILTER (WHERE status = 'cancelled')::int`,
+    })
+      .from(listEntries)
+      .where(eq(listEntries.companyId, prSession.companyId));
+    
+    // Get table reservations stats
+    const tableStats = await db.select({
+      total: sql<number>`count(*)::int`,
+      pending: sql<number>`count(*) FILTER (WHERE status = 'pending')::int`,
+      approved: sql<number>`count(*) FILTER (WHERE status = 'approved')::int`,
+      rejected: sql<number>`count(*) FILTER (WHERE status = 'rejected')::int`,
+    })
+      .from(tableReservations)
+      .where(eq(tableReservations.companyId, prSession.companyId));
+    
+    // Get paid reservations stats (from reservation payments)
+    const paidStats = await db.select({
+      total: sql<number>`count(*)::int`,
+      totalAmount: sql<string>`COALESCE(SUM(amount), 0)`,
+      totalCommission: sql<string>`COALESCE(SUM(pr_commission_amount), 0)`,
+    })
+      .from(reservationPayments)
+      .where(and(
+        eq(reservationPayments.prProfileId, prSession.id),
+        eq(reservationPayments.paymentStatus, 'paid')
+      ));
+    
+    res.json({
+      lists: listStats[0] || { total: 0, pending: 0, confirmed: 0, checkedIn: 0, cancelled: 0 },
+      tables: tableStats[0] || { total: 0, pending: 0, approved: 0, rejected: 0 },
+      paidReservations: {
+        total: paidStats[0]?.total || 0,
+        totalAmount: parseFloat(paidStats[0]?.totalAmount) || 0,
+        totalCommission: parseFloat(paidStats[0]?.totalCommission) || 0,
+      },
+    });
+  } catch (error: any) {
+    console.error("Error getting PR stats:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get PR contacts/rubrica (unique customers from entries)
+router.get("/api/pr-session/contacts", requirePrSession, async (req: Request, res: Response) => {
+  try {
+    const prSession = (req.session as any).prProfile;
+    
+    // Get unique contacts from list entries
+    const contacts = await db.select({
+      firstName: listEntries.firstName,
+      lastName: listEntries.lastName,
+      phone: listEntries.phone,
+      email: listEntries.email,
+      gender: listEntries.gender,
+      lastSeen: sql<string>`MAX(${listEntries.createdAt})`,
+      entryCount: sql<number>`count(*)::int`,
+    })
+      .from(listEntries)
+      .where(eq(listEntries.companyId, prSession.companyId))
+      .groupBy(listEntries.firstName, listEntries.lastName, listEntries.phone, listEntries.email, listEntries.gender)
+      .orderBy(sql`MAX(${listEntries.createdAt}) DESC`)
+      .limit(500);
+    
+    res.json(contacts);
+  } catch (error: any) {
+    console.error("Error getting PR contacts:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get customer attendance stats
+router.get("/api/pr-session/customer-stats", requirePrSession, async (req: Request, res: Response) => {
+  try {
+    const prSession = (req.session as any).prProfile;
+    const { phone } = req.query;
+    
+    if (!phone) {
+      return res.status(400).json({ error: "Telefono richiesto" });
+    }
+    
+    // Get all entries for this customer
+    const customerEntries = await db.select({
+      entry: listEntries,
+      eventName: events.name,
+      eventDate: events.startDatetime,
+    })
+      .from(listEntries)
+      .leftJoin(events, eq(listEntries.eventId, events.id))
+      .where(and(
+        eq(listEntries.companyId, prSession.companyId),
+        eq(listEntries.phone, phone as string)
+      ))
+      .orderBy(desc(listEntries.createdAt));
+    
+    const stats = {
+      totalEntries: customerEntries.length,
+      checkedIn: customerEntries.filter(e => e.entry.checkedInAt).length,
+      noShow: customerEntries.filter(e => !e.entry.checkedInAt && e.entry.status !== 'cancelled').length,
+      cancelled: customerEntries.filter(e => e.entry.status === 'cancelled').length,
+      history: customerEntries.map(e => ({
+        eventName: e.eventName,
+        eventDate: e.eventDate,
+        status: e.entry.status,
+        checkedIn: !!e.entry.checkedInAt,
+        createdAt: e.entry.createdAt,
+      })),
+    };
+    
+    res.json(stats);
+  } catch (error: any) {
+    console.error("Error getting customer stats:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Delete list entry (PR session)
+router.delete("/api/pr-session/list-entries/:id", requirePrSession, async (req: Request, res: Response) => {
+  try {
+    const prSession = (req.session as any).prProfile;
+    const { id } = req.params;
+    
+    // Only delete if belongs to PR's company
+    const [deleted] = await db.delete(listEntries)
+      .where(and(
+        eq(listEntries.id, id),
+        eq(listEntries.companyId, prSession.companyId)
+      ))
+      .returning();
+    
+    if (!deleted) {
+      return res.status(404).json({ error: "Voce non trovata" });
+    }
+    
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error("Error deleting list entry:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Delete table reservation (PR session)
+router.delete("/api/pr-session/table-reservations/:id", requirePrSession, async (req: Request, res: Response) => {
+  try {
+    const prSession = (req.session as any).prProfile;
+    const { id } = req.params;
+    
+    // Only delete if belongs to PR's company and is pending
+    const [deleted] = await db.delete(tableReservations)
+      .where(and(
+        eq(tableReservations.id, id),
+        eq(tableReservations.companyId, prSession.companyId),
+        eq(tableReservations.status, 'pending')
+      ))
+      .returning();
+    
+    if (!deleted) {
+      return res.status(404).json({ error: "Prenotazione non trovata o già confermata" });
+    }
+    
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error("Error deleting table reservation:", error);
     res.status(500).json({ error: error.message });
   }
 });
