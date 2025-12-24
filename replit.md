@@ -35,6 +35,31 @@ A dedicated system for managing event scanner operators, accessible to `gestore`
 ### School Badge Manager Module
 A digital badge creation system for schools and organizations, accessible to `gestore`/`admin` users. It allows creation of custom branded landing pages for badge applications, email verification, QR code generation for unique badges, and a public view page for generated badges. Organizers can manage and activate/deactivate landing pages, and the module supports custom domains.
 
+### Paid Reservation Booking System (PR Wallet)
+A comprehensive reservation system for event lists and tables with PR (promoter) commission tracking using a wallet model similar to Uber/Glovo:
+
+**Legal Terminology**: This is a "servizio di prenotazione digitale" (digital reservation service), NOT ticket sales. All UI uses "Prenotazione" terminology with mandatory access verification disclaimer: "L'accesso è subordinato al rispetto delle condizioni del locale e alla verifica in fase di accreditamento."
+
+**Database Tables**:
+- `prProfiles`: PR profiles with unique prCode, commission rates (% or fixed), wallet balances (pending/paid/total)
+- `reservationPayments`: Paid reservations with QR code (format: RES-{eventId}-{random}), customer info, payment status, check-in tracking
+- `prPayouts`: Payout requests from PRs with approval workflow
+- `eventReservationSettings`: Per-event settings for list/table reservation fees and access disclaimers
+
+**PR Wallet Flow**:
+1. Customer books via public page with optional PR code
+2. Commission accumulates in PR's wallet as "pending"
+3. PR requests payout when desired
+4. Gestore approves payout → status moves to "paid"
+
+**API Endpoints**: `/api/reservations/*` (profiles, payments, wallet, payouts), `/api/public/reservations`
+
+**Scanner Integration**: The `/api/e4u/scan` endpoint handles RES-* QR codes, verifying payment status and check-in with proper permission checks.
+
+**Frontend Components**:
+- `pr-wallet.tsx`: PR dashboard showing earnings, reservation history, payout requests
+- `public-reservation-section.tsx`: Public booking form with QR code generation and legal disclaimers
+
 ## External Dependencies
 
 ### Third-Party Services
