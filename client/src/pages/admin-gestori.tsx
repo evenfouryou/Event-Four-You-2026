@@ -39,6 +39,11 @@ import {
   FileText,
   Ticket,
   Loader2,
+  ScanLine,
+  UserPlus,
+  GraduationCap,
+  Store,
+  QrCode,
 } from "lucide-react";
 import {
   MobileAppLayout,
@@ -64,6 +69,11 @@ const featuresList: FeatureConfig[] = [
   { key: 'cassaEnabled', label: 'Cassa', description: 'Settori, postazioni e fondi cassa', icon: <Receipt className="h-4 w-4" /> },
   { key: 'nightFileEnabled', label: 'File della Serata', description: 'Documento integrato per evento', icon: <FileText className="h-4 w-4" /> },
   { key: 'siaeEnabled', label: 'SIAE Biglietteria', description: 'Gestione biglietti, cassieri e lettore fiscale SIAE', icon: <Ticket className="h-4 w-4" /> },
+  { key: 'scannerEnabled', label: 'Scanner', description: 'Gestione Scanner e Scanner QR', icon: <ScanLine className="h-4 w-4" /> },
+  { key: 'prEnabled', label: 'Gestione PR', description: 'Gestione promoter e prenotazioni', icon: <UserPlus className="h-4 w-4" /> },
+  { key: 'badgesEnabled', label: 'Badge Scuola', description: 'Creazione badge digitali', icon: <GraduationCap className="h-4 w-4" /> },
+  { key: 'cassaBigliettiEnabled', label: 'Cassa Biglietti', description: 'Vendita biglietti cassa', icon: <Store className="h-4 w-4" /> },
+  { key: 'templateEnabled', label: 'Template Digitali', description: 'Creazione template QR e digitali', icon: <QrCode className="h-4 w-4" /> },
 ];
 
 const springTransition = { type: "spring", stiffness: 400, damping: 30 };
@@ -95,6 +105,11 @@ export default function AdminGestori() {
     cassaEnabled: false,
     nightFileEnabled: false,
     siaeEnabled: false,
+    scannerEnabled: true,
+    prEnabled: true,
+    badgesEnabled: true,
+    cassaBigliettiEnabled: true,
+    templateEnabled: true,
   });
 
   const { data: users, isLoading: usersLoading } = useQuery<User[]>({
@@ -142,6 +157,11 @@ export default function AdminGestori() {
         cassaEnabled: selectedUserFeatures.cassaEnabled ?? false,
         nightFileEnabled: selectedUserFeatures.nightFileEnabled ?? false,
         siaeEnabled: selectedUserFeatures.siaeEnabled ?? false,
+        scannerEnabled: selectedUserFeatures.scannerEnabled ?? true,
+        prEnabled: selectedUserFeatures.prEnabled ?? true,
+        badgesEnabled: selectedUserFeatures.badgesEnabled ?? true,
+        cassaBigliettiEnabled: selectedUserFeatures.cassaBigliettiEnabled ?? true,
+        templateEnabled: selectedUserFeatures.templateEnabled ?? true,
       });
     }
   }, [selectedUserFeatures]);
