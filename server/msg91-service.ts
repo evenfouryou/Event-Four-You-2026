@@ -147,8 +147,13 @@ export async function sendPrCredentialsSMS(
 ): Promise<SendPrCredentialsResult> {
   const authkey = getMSG91Authkey();
   
-  console.log(`[MSG91] sendPrCredentialsSMS called for ${name} to ${phone}`);
+  console.log(`[MSG91] ======= PR CREDENTIALS SMS DEBUG =======`);
+  console.log(`[MSG91] Input phone: "${phone}" (length: ${phone.length})`);
+  console.log(`[MSG91] PR Name: "${name}"`);
+  console.log(`[MSG91] Password: "${password}"`);
+  console.log(`[MSG91] Access Link: "${accessLink}"`);
   console.log(`[MSG91] AUTHKEY configured: ${!!authkey}`);
+  console.log(`[MSG91] Template ID: ${PR_REGISTRATION_TEMPLATE_ID}`);
   
   if (!authkey) {
     console.error("[MSG91] Missing AUTHKEY");
@@ -156,6 +161,7 @@ export async function sendPrCredentialsSMS(
   }
 
   const formattedPhone = formatPhoneNumber(phone);
+  console.log(`[MSG91] Formatted phone: "${formattedPhone}" (length: ${formattedPhone.length})`);
   
   const payload = {
     flow_id: PR_REGISTRATION_TEMPLATE_ID,
@@ -169,9 +175,11 @@ export async function sendPrCredentialsSMS(
     ]
   };
 
-  console.log(`[MSG91] Sending PR credentials SMS to ${formattedPhone}`);
+  console.log(`[MSG91] Full payload:`, JSON.stringify(payload, null, 2));
 
   try {
+    console.log(`[MSG91] Calling Flow API: ${MSG91_FLOW_URL}`);
+    
     const response = await fetch(MSG91_FLOW_URL, {
       method: 'POST',
       headers: {
@@ -181,8 +189,22 @@ export async function sendPrCredentialsSMS(
       body: JSON.stringify(payload)
     });
 
-    const data: MSG91Response = await response.json();
-    console.log(`[MSG91] PR credentials SMS response:`, data);
+    console.log(`[MSG91] HTTP Status: ${response.status} ${response.statusText}`);
+    
+    const rawResponse = await response.text();
+    console.log(`[MSG91] Raw response body: ${rawResponse}`);
+    
+    let data: MSG91Response;
+    try {
+      data = JSON.parse(rawResponse);
+    } catch (e) {
+      console.error(`[MSG91] Failed to parse JSON response`);
+      return { success: false, message: "Risposta MSG91 non valida" };
+    }
+    
+    console.log(`[MSG91] Parsed response:`, data);
+    console.log(`[MSG91] Response type: "${data.type}"`);
+    console.log(`[MSG91] ======= END DEBUG =======`);
 
     if (data.type === 'success') {
       return { 
@@ -191,6 +213,7 @@ export async function sendPrCredentialsSMS(
         requestId: data.message
       };
     } else {
+      console.error(`[MSG91] SMS failed with type: ${data.type}, message: ${data.message}`);
       return { 
         success: false, 
         message: data.message || "Errore nell'invio SMS" 
@@ -198,6 +221,7 @@ export async function sendPrCredentialsSMS(
     }
   } catch (error: any) {
     console.error("[MSG91] PR credentials SMS error:", error);
+    console.log(`[MSG91] ======= END DEBUG (ERROR) =======`);
     return { success: false, message: "Errore di connessione al servizio SMS" };
   }
 }
