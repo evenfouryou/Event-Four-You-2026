@@ -3316,8 +3316,8 @@ function buildC1ReportData(
   const quadroA = {
     // === DATI ORGANIZZATORE ===
     denominazioneOrganizzatore: company?.name || 'N/D',
-    codiceFiscaleOrganizzatore: company?.fiscalCode || company?.vatNumber || company?.taxCode || 'N/D',
-    partitaIvaOrganizzatore: company?.vatNumber || 'N/D',
+    codiceFiscaleOrganizzatore: company?.fiscalCode || company?.taxId || 'N/D',
+    partitaIvaOrganizzatore: company?.taxId || company?.vatNumber || 'N/D',
     indirizzoOrganizzatore: company?.address || 'N/D',
     comuneOrganizzatore: company?.city || 'N/D',
     provinciaOrganizzatore: company?.province || 'N/D',
