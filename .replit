@@ -53,6 +53,8 @@ SMTP_FROM = "Event Four You <info@eventfouryou.com>"
 SIAE_MASTER_TOKEN = "61f12bc11ad07f8042ac953211cefe4127c900070cf51f66903988f90a31dfe4"
 CUSTOM_DOMAIN = "manage.eventfouryou.com"
 PUPPETEER_EXECUTABLE_PATH = "/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium"
+SIAE_TEST_EMAIL = "servertest2@batest.siae.it"
+SIAE_TEST_MODE = "true"
 
 [userenv.production]
 PUBLIC_URL = "https://eventmanage.replit.app"

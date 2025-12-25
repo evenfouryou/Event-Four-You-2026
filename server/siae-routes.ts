@@ -76,7 +76,18 @@ const patchNumberedSeatSchema = makePatchSchema(insertSiaeNumberedSeatSchema.omi
 
 const router = Router();
 
+// SIAE Test Environment Configuration
+const SIAE_TEST_EMAIL = process.env.SIAE_TEST_EMAIL || 'servertest2@batest.siae.it';
+const SIAE_TEST_MODE = process.env.SIAE_TEST_MODE === 'true';
+
+// Get SIAE destination email based on mode
+function getSiaeDestinationEmail(overrideEmail?: string): string {
+  if (overrideEmail) return overrideEmail;
+  return SIAE_TEST_MODE ? SIAE_TEST_EMAIL : SIAE_TEST_EMAIL; // In production, this would use the real SIAE email
+}
+
 console.log('[SIAE Routes] Router initialized, registering routes...');
+console.log(`[SIAE Routes] Test mode: ${SIAE_TEST_MODE}, Test email: ${SIAE_TEST_EMAIL}`);
 
 // Middleware to check if user is authenticated
 function requireAuth(req: Request, res: Response, next: NextFunction) {
@@ -553,6 +564,21 @@ router.put("/api/siae/config", requireAuth, requireGestore, async (req: Request,
     res.json(config);
   } catch (error: any) {
     res.status(400).json({ message: error.message });
+  }
+});
+
+// SIAE Environment Configuration endpoint
+router.get("/api/siae/environment", requireAuth, requireGestore, async (req: Request, res: Response) => {
+  try {
+    res.json({
+      testMode: SIAE_TEST_MODE,
+      testEmail: SIAE_TEST_EMAIL,
+      destinationEmail: getSiaeDestinationEmail(),
+      environment: SIAE_TEST_MODE ? 'test' : 'production',
+      environmentLabel: SIAE_TEST_MODE ? 'Ambiente di Test SIAE' : 'Ambiente di Produzione SIAE',
+    });
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
   }
 });
 
@@ -1937,9 +1963,10 @@ router.post("/api/siae/transmissions/:id/send-email", requireAuth, requireGestor
     // Import email service
     const { sendSiaeTransmissionEmail } = await import('./email-service');
     
-    // Send the email
+    // Send the email to SIAE test environment
+    const destinationEmail = getSiaeDestinationEmail(toEmail);
     await sendSiaeTransmissionEmail({
-      to: toEmail || 'servertest2@batest.siae.it',
+      to: destinationEmail,
       companyName,
       transmissionType: transmission.transmissionType as 'daily' | 'monthly' | 'corrective',
       periodDate: new Date(transmission.periodDate),
@@ -1948,6 +1975,8 @@ router.post("/api/siae/transmissions/:id/send-email", requireAuth, requireGestor
       xmlContent: transmission.fileContent,
       transmissionId: transmission.id,
     });
+    
+    console.log(`[SIAE-ROUTES] Transmission sent to: ${destinationEmail} (Test mode: ${SIAE_TEST_MODE})`);
     
     // Update transmission status to sent
     await siaeStorage.updateSiaeTransmission(id, {
@@ -2070,8 +2099,9 @@ router.post("/api/siae/companies/:companyId/transmissions/send-daily", requireAu
     // Import and send the email
     const { sendSiaeTransmissionEmail } = await import('./email-service');
     
+    const dailyDestination = getSiaeDestinationEmail(toEmail);
     await sendSiaeTransmissionEmail({
-      to: toEmail || 'servertest2@batest.siae.it',
+      to: dailyDestination,
       companyName,
       transmissionType: 'daily',
       periodDate: reportDate,
@@ -2080,6 +2110,8 @@ router.post("/api/siae/companies/:companyId/transmissions/send-daily", requireAu
       xmlContent: xml,
       transmissionId: transmission.id,
     });
+    
+    console.log(`[SIAE-ROUTES] Daily transmission sent to: ${dailyDestination} (Test mode: ${SIAE_TEST_MODE})`);
     
     // Update transmission status
     await siaeStorage.updateSiaeTransmission(transmission.id, {
@@ -2094,7 +2126,7 @@ router.post("/api/siae/companies/:companyId/transmissions/send-daily", requireAu
         id: transmission.id,
         ticketsCount: dayTickets.length,
         totalAmount,
-        sentTo: toEmail || 'servertest2@batest.siae.it',
+        sentTo: dailyDestination,
       }
     });
   } catch (error: any) {
