@@ -132,6 +132,93 @@ function requireOrganizerOrCashier(req: Request, res: Response, next: NextFuncti
   next();
 }
 
+// ==================== DEBUG ENDPOINT - Test Email SIAE ====================
+// Endpoint pubblico per testare l'invio email SMTP (solo in development)
+router.get("/api/siae/debug/test-smtp", async (req: Request, res: Response) => {
+  try {
+    const { emailTransporter, sendSiaeTransmissionEmail } = await import('./email-service');
+    
+    // Test 1: Verifica connessione SMTP
+    const smtpStatus = await new Promise<{connected: boolean; error?: string}>((resolve) => {
+      emailTransporter.verify((error, success) => {
+        if (error) {
+          resolve({ connected: false, error: error.message });
+        } else {
+          resolve({ connected: true });
+        }
+      });
+    });
+    
+    // Get destination email from query or use default
+    const testDestination = (req.query.to as string) || process.env.SIAE_TEST_EMAIL || 'servertest2@batest.siae.it';
+    
+    // Test 2: Invia email di test
+    let emailSent = false;
+    let emailError: string | null = null;
+    
+    try {
+      const testXml = `<?xml version="1.0" encoding="UTF-8"?>
+<ComunicazioneDatiTitoli xmlns="urn:siae:biglietteria:2025">
+  <Intestazione>
+    <CodiceFiscaleEmittente>DEBUG-TEST-CF</CodiceFiscaleEmittente>
+    <NumeroCarta>DEBUG-CARD</NumeroCarta>
+    <DataRiferimento>${new Date().toISOString().split('T')[0]}</DataRiferimento>
+    <TipoTrasmissione>DEBUG</TipoTrasmissione>
+  </Intestazione>
+  <Riepilogo>
+    <TotaleTitoli>0</TotaleTitoli>
+    <Nota>Questo è un test di debug dal sistema Event4U</Nota>
+  </Riepilogo>
+</ComunicazioneDatiTitoli>`;
+
+      await sendSiaeTransmissionEmail({
+        to: testDestination,
+        companyName: 'DEBUG TEST',
+        transmissionType: 'daily',
+        periodDate: new Date(),
+        ticketsCount: 0,
+        totalAmount: '0.00',
+        xmlContent: testXml,
+        transmissionId: `DEBUG-${Date.now()}`,
+      });
+      
+      emailSent = true;
+      console.log(`[SIAE-DEBUG] Test email sent successfully to: ${testDestination}`);
+    } catch (err: any) {
+      emailError = err.message;
+      console.error('[SIAE-DEBUG] Email send failed:', err);
+    }
+    
+    res.json({
+      timestamp: new Date().toISOString(),
+      environment: {
+        SIAE_TEST_MODE: process.env.SIAE_TEST_MODE,
+        SIAE_TEST_EMAIL: process.env.SIAE_TEST_EMAIL,
+        SMTP_HOST: process.env.SMTP_HOST,
+        SMTP_PORT: process.env.SMTP_PORT,
+        SMTP_USER: process.env.SMTP_USER ? '***configured***' : 'NOT SET',
+        SMTP_PASS: process.env.SMTP_PASS ? '***configured***' : 'NOT SET',
+        SMTP_FROM: process.env.SMTP_FROM,
+      },
+      smtp: smtpStatus,
+      emailTest: {
+        destination: testDestination,
+        sent: emailSent,
+        error: emailError,
+      },
+      instructions: emailSent 
+        ? `Email inviata a ${testDestination}. Controlla la casella email per verificare la ricezione.`
+        : `Invio fallito: ${emailError}`,
+    });
+  } catch (error: any) {
+    console.error('[SIAE-DEBUG] Debug endpoint error:', error);
+    res.status(500).json({ 
+      error: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined 
+    });
+  }
+});
+
 // ==================== TAB.1-5 Reference Tables (Super Admin) ====================
 
 // Event Genres (TAB.1)
