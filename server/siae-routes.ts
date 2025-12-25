@@ -3315,20 +3315,21 @@ function buildC1ReportData(
   // Include: Organizzatore, Titolare Sistema Emissione, Dati Locale, Dati Evento
   const quadroA = {
     // === DATI ORGANIZZATORE ===
+    // Mappa campi dalla tabella companies: taxId = P.IVA, fiscalCode = C.F.
     denominazioneOrganizzatore: company?.name || 'N/D',
-    codiceFiscaleOrganizzatore: company?.fiscalCode || company?.taxId || 'N/D',
-    partitaIvaOrganizzatore: company?.taxId || company?.vatNumber || 'N/D',
+    codiceFiscaleOrganizzatore: company?.fiscalCode || 'N/D',
+    partitaIvaOrganizzatore: company?.taxId || 'N/D',
     indirizzoOrganizzatore: company?.address || 'N/D',
     comuneOrganizzatore: company?.city || 'N/D',
     provinciaOrganizzatore: company?.province || 'N/D',
-    capOrganizzatore: company?.postalCode || company?.cap || 'N/D',
+    capOrganizzatore: company?.postalCode || 'N/D',
     
     // === TITOLARE SISTEMA DI EMISSIONE (Allegato 3 - campo obbligatorio) ===
     // Può essere diverso dall'organizzatore (es. società che gestisce biglietteria)
     // Usa dati da siaeSystemConfig se disponibile, altrimenti fallback su company
     titolareSistemaEmissione: siaeConfig?.businessName || company?.name || 'N/D',
     codiceFiscaleTitolareSistema: siaeConfig?.taxId || company?.fiscalCode || 'N/D',
-    partitaIvaTitolareSistema: siaeConfig?.vatNumber || company?.vatNumber || 'N/D',
+    partitaIvaTitolareSistema: siaeConfig?.vatNumber || company?.taxId || 'N/D',
     indirizzoTitolareSistema: siaeConfig?.businessAddress || company?.address || 'N/D',
     comuneTitolareSistema: siaeConfig?.businessCity || company?.city || 'N/D',
     provinciaTitolareSistema: siaeConfig?.businessProvince || company?.province || 'N/D',

@@ -652,19 +652,19 @@ export default function SiaeTicketedEventsPage() {
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
-                                <Link href={`/siae/report-c1/${ticketedEvent.id}?type=giornaliero`}>
+                                <Link href={`/siae/reports/c1/${ticketedEvent.id}?type=giornaliero`}>
                                   <DropdownMenuItem data-testid={`menu-report-daily-${ticketedEvent.id}`}>
                                     <CalendarDays className="w-4 h-4 mr-2" />
                                     Report C1 Giornaliero
                                   </DropdownMenuItem>
                                 </Link>
-                                <Link href={`/siae/report-c1/${ticketedEvent.id}?type=mensile`}>
+                                <Link href={`/siae/reports/c1/${ticketedEvent.id}?type=mensile`}>
                                   <DropdownMenuItem data-testid={`menu-report-monthly-${ticketedEvent.id}`}>
                                     <FileText className="w-4 h-4 mr-2" />
                                     Report C1 Mensile
                                   </DropdownMenuItem>
                                 </Link>
-                                <Link href={`/siae/report-c1/${ticketedEvent.id}`}>
+                                <Link href={`/siae/reports/c1/${ticketedEvent.id}`}>
                                   <DropdownMenuItem data-testid={`menu-report-history-${ticketedEvent.id}`}>
                                     <History className="w-4 h-4 mr-2" />
                                     Storico Trasmissioni
