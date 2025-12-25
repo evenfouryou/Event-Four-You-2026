@@ -2211,6 +2211,72 @@ router.post("/api/siae/transmissions/test-email", requireAuth, requireGestore, a
   }
 });
 
+// Check for SIAE email responses and update transmission statuses
+router.post("/api/siae/transmissions/check-responses", requireAuth, requireGestore, async (req: Request, res: Response) => {
+  try {
+    const { checkForSiaeResponses } = await import('./gmail-client');
+    
+    console.log('[SIAE-ROUTES] Checking for SIAE email responses...');
+    const responses = await checkForSiaeResponses();
+    
+    const updates: Array<{transmissionId: string; status: string; protocolNumber?: string}> = [];
+    
+    for (const response of responses) {
+      // Try to match with existing transmissions
+      if (response.transmissionId) {
+        const transmission = await siaeStorage.getSiaeTransmission(response.transmissionId);
+        if (transmission && transmission.status === 'sent') {
+          // Update the transmission based on the response
+          const newStatus = response.status === 'accepted' ? 'received' : 
+                           response.status === 'rejected' ? 'rejected' : 
+                           response.status === 'error' ? 'error' : 'sent';
+          
+          await siaeStorage.updateSiaeTransmission(response.transmissionId, {
+            status: newStatus,
+            receivedAt: response.date,
+            receiptProtocol: response.protocolNumber || null,
+            receiptContent: response.body.substring(0, 1000), // First 1000 chars
+            errorMessage: response.errorMessage || null,
+          });
+          
+          updates.push({
+            transmissionId: response.transmissionId,
+            status: newStatus,
+            protocolNumber: response.protocolNumber,
+          });
+          
+          // Log the update
+          await siaeStorage.createSiaeLog({
+            companyId: transmission.companyId,
+            eventType: response.status === 'accepted' ? 'transmission_confirmed' : 'transmission_error',
+            eventDetails: `Risposta SIAE per trasmissione ${response.transmissionId}: ${response.status}${response.protocolNumber ? ` - Protocollo: ${response.protocolNumber}` : ''}`,
+            transmissionId: response.transmissionId,
+          });
+        }
+      }
+    }
+    
+    res.json({
+      success: true,
+      totalEmails: responses.length,
+      updatedTransmissions: updates.length,
+      updates,
+      responses: responses.map(r => ({
+        messageId: r.messageId,
+        subject: r.subject,
+        from: r.from,
+        date: r.date,
+        status: r.status,
+        protocolNumber: r.protocolNumber,
+        transmissionId: r.transmissionId,
+      })),
+    });
+  } catch (error: any) {
+    console.error('[SIAE-ROUTES] Failed to check SIAE responses:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
 // Confirm transmission receipt from SIAE
 router.post("/api/siae/transmissions/:id/confirm-receipt", requireAuth, requireGestore, async (req: Request, res: Response) => {
   try {

@@ -280,6 +280,29 @@ export default function SiaeTransmissionsPage() {
     },
   });
 
+  const checkResponsesMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("POST", `/api/siae/transmissions/check-responses`, {});
+      return response.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ predicate: (q) => (q.queryKey[0] as string)?.includes('transmissions') || false });
+      triggerHaptic('success');
+      toast({
+        title: "Controllo Completato",
+        description: `Trovate ${data.totalEmails} email SIAE, aggiornate ${data.updatedTransmissions} trasmissioni.`,
+      });
+    },
+    onError: (error: Error) => {
+      triggerHaptic('error');
+      toast({
+        title: "Errore",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const getStatusConfig = (status: string) => {
     switch (status) {
       case "sent":
@@ -379,6 +402,19 @@ export default function SiaeTransmissionsPage() {
                 </Select>
               </div>
             )}
+            <Button 
+              variant="outline" 
+              onClick={() => checkResponsesMutation.mutate()} 
+              data-testid="button-check-responses" 
+              disabled={checkResponsesMutation.isPending}
+            >
+              {checkResponsesMutation.isPending ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <Mail className="w-4 h-4 mr-2" />
+              )}
+              Controlla Risposte
+            </Button>
             <Button variant="outline" onClick={() => setIsTestEmailDialogOpen(true)} data-testid="button-test-email" disabled={!companyId}>
               <TestTube className="w-4 h-4 mr-2" />
               Test Email
