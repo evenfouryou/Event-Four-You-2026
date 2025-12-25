@@ -483,11 +483,11 @@ export default function Locations() {
                     name="siaeLocationCode"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Codice Locale SIAE</FormLabel>
+                        <FormLabel>Codice Locale SIAE (BA)</FormLabel>
                         <FormControl>
                           <Input {...field} value={field.value || ''} placeholder="es. 12345678" data-testid="input-siae-location-code-desktop" />
                         </FormControl>
-                        <p className="text-sm text-muted-foreground">Codice identificativo del locale rilasciato dalla SIAE</p>
+                        <p className="text-sm text-muted-foreground">Codice identificativo del locale rilasciato dalla SIAE (Modello BA)</p>
                         <FormMessage />
                       </FormItem>
                     )}
