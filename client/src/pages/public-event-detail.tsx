@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, Link, useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -22,6 +22,15 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -47,6 +56,17 @@ import {
   ZoomOut,
   RotateCcw,
   Move,
+  Shield,
+  Lock,
+  Unlock,
+  X,
+  RefreshCw,
+  Eye,
+  Timer,
+  Users,
+  Ban,
+  CheckCircle,
+  History,
 } from "lucide-react";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
@@ -392,6 +412,395 @@ interface SeatHoldInfo {
   holdId?: string;
   expiresAt?: string;
   sessionId?: string;
+}
+
+interface OperationalStats {
+  totalSeats: number;
+  available: number;
+  held: number;
+  sold: number;
+  blocked: number;
+  expiredHolds: number;
+  activeHolds: number;
+}
+
+interface SeatDetails {
+  seat: {
+    id: string;
+    row: string;
+    seatNumber: string;
+    seatLabel?: string;
+    isAccessible?: boolean;
+  };
+  status: string;
+  currentHold: {
+    id: string;
+    sessionId: string;
+    holdType: string;
+    expiresAt: string;
+    createdAt: string;
+    customerId?: string;
+    userId?: string;
+    quantity?: number;
+    priceSnapshot?: string;
+    extendedCount?: number;
+  } | null;
+  holdHistory: Array<{
+    id: string;
+    status: string;
+    holdType: string;
+    createdAt: string;
+    expiresAt: string;
+    sessionId: string;
+  }>;
+}
+
+function OperationalStatsBar({ 
+  eventId, 
+  stats, 
+  isRefreshing, 
+  onRefresh 
+}: { 
+  eventId: string; 
+  stats: OperationalStats | null;
+  isRefreshing: boolean;
+  onRefresh: () => void;
+}) {
+  if (!stats) return null;
+  
+  return (
+    <div 
+      className="sticky top-0 z-40 bg-orange-950/95 backdrop-blur-xl border-b border-orange-500/30 shadow-lg"
+      data-testid="operational-toolbar"
+    >
+      <div className="container mx-auto px-4 py-3">
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <div className="flex items-center gap-2">
+            <Shield className="w-5 h-5 text-orange-400" />
+            <span className="font-bold text-orange-100">Staff Mode</span>
+            <Badge className="bg-orange-500/20 text-orange-300 border-orange-500/30">
+              Operational View
+            </Badge>
+          </div>
+          
+          <div className="flex items-center gap-6 flex-wrap">
+            <div className="flex items-center gap-4 text-sm">
+              <div className="flex items-center gap-1.5" data-testid="stat-total">
+                <Users className="w-4 h-4 text-gray-400" />
+                <span className="text-gray-300">Total:</span>
+                <span className="font-bold text-white">{stats.totalSeats}</span>
+              </div>
+              <div className="flex items-center gap-1.5" data-testid="stat-available">
+                <CheckCircle className="w-4 h-4 text-green-400" />
+                <span className="text-gray-300">Available:</span>
+                <span className="font-bold text-green-400">{stats.available}</span>
+              </div>
+              <div className="flex items-center gap-1.5" data-testid="stat-held">
+                <Timer className="w-4 h-4 text-amber-400" />
+                <span className="text-gray-300">Held:</span>
+                <span className="font-bold text-amber-400">{stats.held}</span>
+              </div>
+              <div className="flex items-center gap-1.5" data-testid="stat-sold">
+                <Ticket className="w-4 h-4 text-blue-400" />
+                <span className="text-gray-300">Sold:</span>
+                <span className="font-bold text-blue-400">{stats.sold}</span>
+              </div>
+              <div className="flex items-center gap-1.5" data-testid="stat-blocked">
+                <Ban className="w-4 h-4 text-red-400" />
+                <span className="text-gray-300">Blocked:</span>
+                <span className="font-bold text-red-400">{stats.blocked}</span>
+              </div>
+              <div className="flex items-center gap-1.5" data-testid="stat-expired">
+                <AlertCircle className="w-4 h-4 text-gray-400" />
+                <span className="text-gray-300">Expired:</span>
+                <span className="font-bold text-gray-400">{stats.expiredHolds}</span>
+              </div>
+            </div>
+            
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onRefresh}
+              disabled={isRefreshing}
+              className="text-orange-300 hover:text-orange-100"
+              data-testid="button-refresh-stats"
+            >
+              <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SeatInfoPanel({
+  isOpen,
+  onClose,
+  seatId,
+  eventId,
+  onActionComplete,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  seatId: string | null;
+  eventId: string;
+  onActionComplete: () => void;
+}) {
+  const { toast } = useToast();
+  
+  const { data: seatDetails, isLoading, refetch } = useQuery<{ success: boolean; seat: SeatDetails['seat']; status: string; currentHold: SeatDetails['currentHold']; holdHistory: SeatDetails['holdHistory'] }>({
+    queryKey: ['/api/events', eventId, 'seats', seatId, 'details'],
+    queryFn: async () => {
+      const res = await fetch(`/api/events/${eventId}/seats/${seatId}/details`, { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to fetch seat details');
+      return res.json();
+    },
+    enabled: isOpen && !!seatId && !!eventId,
+  });
+  
+  const blockMutation = useMutation({
+    mutationFn: async ({ blocked, reason }: { blocked: boolean; reason?: string }) => {
+      return apiRequest('POST', `/api/events/${eventId}/seats/${seatId}/block`, { blocked, reason });
+    },
+    onSuccess: (_, variables) => {
+      toast({
+        title: variables.blocked ? 'Seat Blocked' : 'Seat Unblocked',
+        description: `Seat has been ${variables.blocked ? 'blocked' : 'unblocked'} successfully.`,
+      });
+      refetch();
+      onActionComplete();
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to update seat status',
+        variant: 'destructive',
+      });
+    },
+  });
+  
+  const forceReleaseMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest('POST', `/api/events/${eventId}/seats/force-release`, { seatId, force: true });
+    },
+    onSuccess: () => {
+      toast({
+        title: 'Hold Released',
+        description: 'The hold has been forcefully released.',
+      });
+      refetch();
+      onActionComplete();
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to release hold',
+        variant: 'destructive',
+      });
+    },
+  });
+  
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'available':
+        return <Badge className="bg-green-500/20 text-green-300 border-green-500/30">Available</Badge>;
+      case 'held':
+        return <Badge className="bg-amber-500/20 text-amber-300 border-amber-500/30">Held</Badge>;
+      case 'sold':
+        return <Badge className="bg-blue-500/20 text-blue-300 border-blue-500/30">Sold</Badge>;
+      case 'blocked':
+        return <Badge className="bg-red-500/20 text-red-300 border-red-500/30">Blocked</Badge>;
+      default:
+        return <Badge variant="secondary">{status}</Badge>;
+    }
+  };
+  
+  return (
+    <Sheet open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <SheetContent className="bg-background/95 backdrop-blur-xl border-border w-full sm:max-w-lg">
+        <SheetHeader>
+          <SheetTitle className="flex items-center gap-2">
+            <Eye className="w-5 h-5 text-primary" />
+            Seat Details
+          </SheetTitle>
+          <SheetDescription>
+            View and manage seat information
+          </SheetDescription>
+        </SheetHeader>
+        
+        {isLoading ? (
+          <div className="py-8 space-y-4">
+            <Skeleton className="h-12 rounded-lg" />
+            <Skeleton className="h-24 rounded-lg" />
+            <Skeleton className="h-32 rounded-lg" />
+          </div>
+        ) : seatDetails ? (
+          <ScrollArea className="h-[calc(100vh-120px)] pr-4 mt-4">
+            <div className="space-y-6">
+              <div className="bg-card/50 border border-border rounded-lg p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="font-semibold text-foreground">Seat Information</h3>
+                  {getStatusBadge(seatDetails.status)}
+                </div>
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div>
+                    <span className="text-muted-foreground">Row:</span>
+                    <span className="ml-2 font-medium text-foreground">{seatDetails.seat.row}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Seat:</span>
+                    <span className="ml-2 font-medium text-foreground">{seatDetails.seat.seatNumber}</span>
+                  </div>
+                  {seatDetails.seat.seatLabel && (
+                    <div className="col-span-2">
+                      <span className="text-muted-foreground">Label:</span>
+                      <span className="ml-2 font-medium text-foreground">{seatDetails.seat.seatLabel}</span>
+                    </div>
+                  )}
+                  {seatDetails.seat.isAccessible && (
+                    <div className="col-span-2">
+                      <Badge className="bg-purple-500/20 text-purple-300 border-purple-500/30">Accessible</Badge>
+                    </div>
+                  )}
+                </div>
+              </div>
+              
+              {seatDetails.currentHold && (
+                <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Timer className="w-4 h-4 text-amber-400" />
+                    <h3 className="font-semibold text-amber-100">Current Hold</h3>
+                  </div>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Hold ID:</span>
+                      <span className="font-mono text-xs text-foreground truncate max-w-[200px]">{seatDetails.currentHold.id}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Session:</span>
+                      <span className="font-mono text-xs text-foreground truncate max-w-[200px]">{seatDetails.currentHold.sessionId}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Type:</span>
+                      <Badge variant="outline" className="text-xs">{seatDetails.currentHold.holdType}</Badge>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Created:</span>
+                      <span className="text-foreground">{format(new Date(seatDetails.currentHold.createdAt), 'dd/MM HH:mm:ss')}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Expires:</span>
+                      <span className="text-foreground">{format(new Date(seatDetails.currentHold.expiresAt), 'dd/MM HH:mm:ss')}</span>
+                    </div>
+                    {seatDetails.currentHold.extendedCount !== undefined && seatDetails.currentHold.extendedCount > 0 && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Extended:</span>
+                        <span className="text-foreground">{seatDetails.currentHold.extendedCount}x</span>
+                      </div>
+                    )}
+                    {seatDetails.currentHold.priceSnapshot && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Price:</span>
+                        <span className="text-foreground">€{seatDetails.currentHold.priceSnapshot}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+              
+              <div className="space-y-2">
+                <h3 className="font-semibold text-foreground flex items-center gap-2">
+                  <Zap className="w-4 h-4 text-primary" />
+                  Quick Actions
+                </h3>
+                <div className="flex flex-wrap gap-2">
+                  {seatDetails.status === 'blocked' ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => blockMutation.mutate({ blocked: false })}
+                      disabled={blockMutation.isPending}
+                      className="border-green-500/30 text-green-400 hover:bg-green-500/10"
+                      data-testid="button-unblock-seat"
+                    >
+                      <Unlock className="w-4 h-4 mr-1" />
+                      Unblock Seat
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => blockMutation.mutate({ blocked: true })}
+                      disabled={blockMutation.isPending || seatDetails.status === 'sold'}
+                      className="border-red-500/30 text-red-400 hover:bg-red-500/10"
+                      data-testid="button-block-seat"
+                    >
+                      <Lock className="w-4 h-4 mr-1" />
+                      Block Seat
+                    </Button>
+                  )}
+                  
+                  {seatDetails.currentHold && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => forceReleaseMutation.mutate()}
+                      disabled={forceReleaseMutation.isPending}
+                      className="border-amber-500/30 text-amber-400 hover:bg-amber-500/10"
+                      data-testid="button-force-release"
+                    >
+                      <X className="w-4 h-4 mr-1" />
+                      Force Release
+                    </Button>
+                  )}
+                </div>
+              </div>
+              
+              {seatDetails.holdHistory && seatDetails.holdHistory.length > 0 && (
+                <div className="space-y-3">
+                  <h3 className="font-semibold text-foreground flex items-center gap-2">
+                    <History className="w-4 h-4 text-muted-foreground" />
+                    Hold History
+                  </h3>
+                  <div className="space-y-2">
+                    {seatDetails.holdHistory.map((hold, index) => (
+                      <div 
+                        key={hold.id} 
+                        className="bg-muted/30 rounded-lg p-3 text-sm"
+                        data-testid={`hold-history-${index}`}
+                      >
+                        <div className="flex items-center justify-between mb-1">
+                          <Badge variant="outline" className="text-xs">{hold.holdType}</Badge>
+                          <Badge 
+                            className={`text-xs ${
+                              hold.status === 'active' ? 'bg-green-500/20 text-green-300' :
+                              hold.status === 'expired' ? 'bg-gray-500/20 text-gray-300' :
+                              hold.status === 'released' ? 'bg-blue-500/20 text-blue-300' :
+                              'bg-purple-500/20 text-purple-300'
+                            }`}
+                          >
+                            {hold.status}
+                          </Badge>
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {format(new Date(hold.createdAt), 'dd/MM/yyyy HH:mm:ss')}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </ScrollArea>
+        ) : (
+          <div className="py-8 text-center text-muted-foreground">
+            No seat selected
+          </div>
+        )}
+      </SheetContent>
+    </Sheet>
+  );
 }
 
 function FloorPlanViewer({
@@ -1336,6 +1745,18 @@ export default function PublicEventDetailPage() {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   
+  // Operational Mode State
+  const isOperationalMode = useMemo(() => {
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      return urlParams.get('mode') === 'operational';
+    }
+    return false;
+  }, []);
+  
+  const [operationalSeatId, setOperationalSeatId] = useState<string | null>(null);
+  const [isSeatPanelOpen, setIsSeatPanelOpen] = useState(false);
+  
   // Helper functions for per-sector quantity/type
   const getQuantity = (sectorId: string) => sectorQuantities[sectorId] ?? 0;
   const setQuantity = (sectorId: string, q: number) => setSectorQuantities(prev => ({ ...prev, [sectorId]: q }));
@@ -1391,6 +1812,25 @@ export default function PublicEventDetailPage() {
     retry: false,
   });
 
+  // Operational Mode Stats Query
+  const { data: operationalStatsData, isLoading: isLoadingStats, refetch: refetchStats } = useQuery<{ success: boolean; stats: OperationalStats }>({
+    queryKey: ['/api/events', event?.id, 'operational-stats'],
+    queryFn: async () => {
+      const res = await fetch(`/api/events/${event?.id}/operational-stats`, { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to fetch stats');
+      return res.json();
+    },
+    enabled: isOperationalMode && !!event?.id,
+    refetchInterval: isOperationalMode ? 10000 : false,
+  });
+
+  const operationalStats = operationalStatsData?.stats || null;
+
+  const handleOperationalRefresh = useCallback(() => {
+    refetchStats();
+    queryClient.invalidateQueries({ queryKey: ['/api/events', event?.id, 'operational-stats'] });
+  }, [event?.id, refetchStats]);
+
   const liveViewersCount = useMemo(() => Math.floor(Math.random() * 50) + 30, [params.id]);
 
   const { seatStatuses, clientId: mySessionId, isConnected: wsConnected } = useSeatHolds(event?.id || '');
@@ -1432,6 +1872,13 @@ export default function PublicEventDetailPage() {
   };
 
   const handleSeatClick = (seatId: string, seat: Seat) => {
+    // In operational mode, open the seat info panel instead of selecting
+    if (isOperationalMode) {
+      setOperationalSeatId(seatId);
+      setIsSeatPanelOpen(true);
+      return;
+    }
+    
     setSelectedSeatIds(prev => {
       if (prev.includes(seatId)) {
         return prev.filter(id => id !== seatId);
@@ -1538,15 +1985,45 @@ export default function PublicEventDetailPage() {
   if (!isMobile) {
     return (
       <div className="min-h-screen bg-background" data-testid="page-public-event-detail">
+        {/* Operational Mode Toolbar */}
+        {isOperationalMode && event && (
+          <OperationalStatsBar
+            eventId={event.id}
+            stats={operationalStats}
+            isRefreshing={isLoadingStats}
+            onRefresh={handleOperationalRefresh}
+          />
+        )}
+        
+        {/* Operational Mode Seat Info Panel */}
+        {isOperationalMode && event && (
+          <SeatInfoPanel
+            isOpen={isSeatPanelOpen}
+            onClose={() => {
+              setIsSeatPanelOpen(false);
+              setOperationalSeatId(null);
+            }}
+            seatId={operationalSeatId}
+            eventId={event.id}
+            onActionComplete={handleOperationalRefresh}
+          />
+        )}
+        
         <div className="container mx-auto px-6 py-8 max-w-6xl">
           {/* Header with back button */}
-          <div className="mb-6">
+          <div className="mb-6 flex items-center justify-between gap-4 flex-wrap">
             <Link href="/acquista">
               <Button variant="ghost" data-testid="button-back">
                 <ChevronLeft className="w-5 h-5 mr-2" />
                 Torna agli eventi
               </Button>
             </Link>
+            {isOperationalMode && (
+              <Badge className="bg-orange-500/20 text-orange-300 border-orange-500/30">
+                <Shield className="w-3 h-3 mr-1" />
+                Operational Mode Active - Click seats to view details
+              </Badge>
+            )}
           </div>
 
           {isLoading ? (
@@ -2066,6 +2543,30 @@ export default function PublicEventDetailPage() {
   // Mobile version
   return (
     <div className="fixed inset-0 bg-background flex flex-col">
+      {/* Operational Mode Toolbar - Mobile */}
+      {isOperationalMode && event && (
+        <OperationalStatsBar
+          eventId={event.id}
+          stats={operationalStats}
+          isRefreshing={isLoadingStats}
+          onRefresh={handleOperationalRefresh}
+        />
+      )}
+      
+      {/* Operational Mode Seat Info Panel - Mobile */}
+      {isOperationalMode && event && (
+        <SeatInfoPanel
+          isOpen={isSeatPanelOpen}
+          onClose={() => {
+            setIsSeatPanelOpen(false);
+            setOperationalSeatId(null);
+          }}
+          seatId={operationalSeatId}
+          eventId={event.id}
+          onActionComplete={handleOperationalRefresh}
+        />
+      )}
+      
       <div 
         ref={contentRef}
         className="flex-1 overflow-y-auto overscroll-contain"
@@ -2172,6 +2673,12 @@ export default function PublicEventDetailPage() {
                     <Badge className="bg-amber-500/90 text-white border-0 px-3 py-1 flex items-center gap-1" data-testid="badge-live-viewers">
                       <span className="animate-pulse w-2 h-2 bg-white rounded-full" />
                       {liveViewersCount} stanno guardando
+                    </Badge>
+                  )}
+                  {isOperationalMode && (
+                    <Badge className="bg-orange-500/90 text-white border-0 px-3 py-1 flex items-center gap-1" data-testid="badge-operational-mode">
+                      <Shield className="w-3 h-3" />
+                      Staff Mode
                     </Badge>
                   )}
                 </div>

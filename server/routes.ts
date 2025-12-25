@@ -99,9 +99,11 @@ import {
   venueFloorPlans,
   floorPlanZones,
   floorPlanSeats,
+  floorPlanVersions,
   eventZoneMappings,
   insertVenueFloorPlanSchema,
   insertFloorPlanZoneSchema,
+  insertFloorPlanVersionSchema,
   insertEventZoneMappingSchema,
   eventPageConfigs,
   eventPageBlocks,
@@ -1871,6 +1873,260 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting floor plan:", error);
       res.status(500).json({ message: "Impossibile eliminare la planimetria" });
+    }
+  });
+
+  // ===== FLOOR PLAN VERSIONING =====
+
+  // 1. GET /api/floor-plans/:id/versions - List all versions of a floor plan
+  app.get('/api/floor-plans/:id/versions', isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const versions = await db.select()
+        .from(floorPlanVersions)
+        .where(eq(floorPlanVersions.floorPlanId, id))
+        .orderBy(desc(floorPlanVersions.version));
+      res.json(versions);
+    } catch (error) {
+      console.error("Error fetching floor plan versions:", error);
+      res.status(500).json({ message: "Impossibile recuperare le versioni" });
+    }
+  });
+
+  // 2. POST /api/floor-plans/:id/versions - Create a new draft version (clone current published state)
+  app.post('/api/floor-plans/:id/versions', isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const userId = req.user?.claims?.sub;
+
+      // Get the floor plan to verify it exists
+      const [floorPlan] = await db.select()
+        .from(venueFloorPlans)
+        .where(eq(venueFloorPlans.id, id));
+
+      if (!floorPlan) {
+        return res.status(404).json({ message: "Planimetria non trovata" });
+      }
+
+      // Get the current published version if any
+      const [publishedVersion] = await db.select()
+        .from(floorPlanVersions)
+        .where(and(
+          eq(floorPlanVersions.floorPlanId, id),
+          eq(floorPlanVersions.status, 'published')
+        ));
+
+      // Get the latest version number
+      const [latestVersion] = await db.select({ maxVersion: sql<number>`COALESCE(MAX(${floorPlanVersions.version}), 0)` })
+        .from(floorPlanVersions)
+        .where(eq(floorPlanVersions.floorPlanId, id));
+
+      const newVersionNumber = (latestVersion?.maxVersion || 0) + 1;
+
+      // If we have a published version, clone its data; otherwise fetch current zones/seats
+      let zonesSnapshot: any[] = [];
+      let seatsSnapshot: any[] = [];
+
+      if (publishedVersion) {
+        zonesSnapshot = publishedVersion.zonesSnapshot as any[] || [];
+        seatsSnapshot = publishedVersion.seatsSnapshot as any[] || [];
+      } else {
+        // Fetch current zones and seats from the database
+        const zones = await db.select()
+          .from(floorPlanZones)
+          .where(eq(floorPlanZones.floorPlanId, id));
+        
+        const zoneIds = zones.map(z => z.id);
+        let seats: any[] = [];
+        if (zoneIds.length > 0) {
+          seats = await db.select()
+            .from(floorPlanSeats)
+            .where(inArray(floorPlanSeats.zoneId, zoneIds));
+        }
+        
+        zonesSnapshot = zones;
+        seatsSnapshot = seats;
+      }
+
+      // Create new draft version
+      const [newVersion] = await db.insert(floorPlanVersions)
+        .values({
+          floorPlanId: id,
+          version: newVersionNumber,
+          status: 'draft',
+          zonesSnapshot,
+          seatsSnapshot,
+          notes: req.body.notes || null,
+          createdBy: userId,
+        })
+        .returning();
+
+      res.json(newVersion);
+    } catch (error: any) {
+      console.error("Error creating floor plan version:", error);
+      res.status(400).json({ message: error.message || "Impossibile creare la versione" });
+    }
+  });
+
+  // 3. GET /api/floor-plan-versions/:versionId - Get a specific version with full data
+  app.get('/api/floor-plan-versions/:versionId', isAuthenticated, async (req: any, res) => {
+    try {
+      const { versionId } = req.params;
+      const [version] = await db.select()
+        .from(floorPlanVersions)
+        .where(eq(floorPlanVersions.id, versionId));
+
+      if (!version) {
+        return res.status(404).json({ message: "Versione non trovata" });
+      }
+
+      res.json(version);
+    } catch (error) {
+      console.error("Error fetching floor plan version:", error);
+      res.status(500).json({ message: "Impossibile recuperare la versione" });
+    }
+  });
+
+  // 4. PATCH /api/floor-plan-versions/:versionId - Update a draft version (save editor changes)
+  app.patch('/api/floor-plan-versions/:versionId', isAuthenticated, async (req: any, res) => {
+    try {
+      const { versionId } = req.params;
+
+      // Get the version
+      const [version] = await db.select()
+        .from(floorPlanVersions)
+        .where(eq(floorPlanVersions.id, versionId));
+
+      if (!version) {
+        return res.status(404).json({ message: "Versione non trovata" });
+      }
+
+      // Only draft versions can be updated
+      if (version.status !== 'draft') {
+        return res.status(400).json({ message: "Solo le versioni bozza possono essere modificate" });
+      }
+
+      // Update allowed fields: zonesSnapshot, seatsSnapshot, notes
+      const updateData: any = {};
+      if (req.body.zonesSnapshot !== undefined) {
+        updateData.zonesSnapshot = req.body.zonesSnapshot;
+      }
+      if (req.body.seatsSnapshot !== undefined) {
+        updateData.seatsSnapshot = req.body.seatsSnapshot;
+      }
+      if (req.body.notes !== undefined) {
+        updateData.notes = req.body.notes;
+      }
+
+      const [updated] = await db.update(floorPlanVersions)
+        .set(updateData)
+        .where(eq(floorPlanVersions.id, versionId))
+        .returning();
+
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating floor plan version:", error);
+      res.status(500).json({ message: "Impossibile aggiornare la versione" });
+    }
+  });
+
+  // 5. POST /api/floor-plan-versions/:versionId/publish - Publish a draft (make it live)
+  app.post('/api/floor-plan-versions/:versionId/publish', isAuthenticated, async (req: any, res) => {
+    try {
+      const { versionId } = req.params;
+      const userId = req.user?.claims?.sub;
+
+      // Get the version to publish
+      const [version] = await db.select()
+        .from(floorPlanVersions)
+        .where(eq(floorPlanVersions.id, versionId));
+
+      if (!version) {
+        return res.status(404).json({ message: "Versione non trovata" });
+      }
+
+      if (version.status !== 'draft') {
+        return res.status(400).json({ message: "Solo le versioni bozza possono essere pubblicate" });
+      }
+
+      // Archive any currently published version for this floor plan
+      await db.update(floorPlanVersions)
+        .set({ status: 'archived' })
+        .where(and(
+          eq(floorPlanVersions.floorPlanId, version.floorPlanId),
+          eq(floorPlanVersions.status, 'published')
+        ));
+
+      // Publish the draft version
+      const [published] = await db.update(floorPlanVersions)
+        .set({
+          status: 'published',
+          publishedAt: new Date(),
+          publishedBy: userId,
+        })
+        .where(eq(floorPlanVersions.id, versionId))
+        .returning();
+
+      // Sync the published data to the actual zones and seats tables
+      const zonesSnapshot = published.zonesSnapshot as any[] || [];
+      const seatsSnapshot = published.seatsSnapshot as any[] || [];
+
+      // Clear existing zones (seats cascade delete)
+      await db.delete(floorPlanZones)
+        .where(eq(floorPlanZones.floorPlanId, version.floorPlanId));
+
+      // Insert zones from snapshot
+      if (zonesSnapshot.length > 0) {
+        const zonesToInsert = zonesSnapshot.map(zone => ({
+          ...zone,
+          floorPlanId: version.floorPlanId,
+          createdAt: zone.createdAt ? new Date(zone.createdAt) : new Date(),
+          updatedAt: new Date(),
+        }));
+        await db.insert(floorPlanZones).values(zonesToInsert);
+
+        // Insert seats from snapshot
+        if (seatsSnapshot.length > 0) {
+          const seatsToInsert = seatsSnapshot.map(seat => ({
+            ...seat,
+            createdAt: seat.createdAt ? new Date(seat.createdAt) : new Date(),
+            updatedAt: new Date(),
+          }));
+          await db.insert(floorPlanSeats).values(seatsToInsert);
+        }
+      }
+
+      res.json(published);
+    } catch (error) {
+      console.error("Error publishing floor plan version:", error);
+      res.status(500).json({ message: "Impossibile pubblicare la versione" });
+    }
+  });
+
+  // 6. DELETE /api/floor-plan-versions/:versionId - Delete a draft version
+  app.delete('/api/floor-plan-versions/:versionId', isAuthenticated, async (req: any, res) => {
+    try {
+      const { versionId } = req.params;
+
+      // Get the version
+      const [version] = await db.select()
+        .from(floorPlanVersions)
+        .where(eq(floorPlanVersions.id, versionId));
+
+      if (!version) {
+        return res.status(404).json({ message: "Versione non trovata" });
+      }
+
+      // Only draft versions can be deleted
+      if (version.status === 'published') {
+        return res.status(400).json({ message: "Le versioni pubblicate non possono essere eliminate" });
+      }
+
+      await db.delete(floorPlanVersions).where(eq(floorPlanVersions.id, versionId));
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting floor plan version:", error);
+      res.status(500).json({ message: "Impossibile eliminare la versione" });
     }
   });
 

@@ -129,6 +129,7 @@ import AdminGestoreEvents from "@/pages/admin-gestore-events";
 import AdminEventDetail from "@/pages/admin-event-detail";
 import SiaeTicketingConsole from "@/pages/siae-ticketing-console";
 import OrganizerBilling from "@/pages/organizer-billing";
+import FloorPlanEditor from "@/pages/floor-plan-editor";
 import { CookieConsent } from "@/components/cookie-consent";
 
 function Router() {
@@ -272,6 +273,7 @@ function Router() {
               <Route path="/users" component={Users} />
               <Route path="/locations/:id" component={LocationDetail} />
               <Route path="/locations" component={Locations} />
+              <Route path="/editor/floor-plans/:id" component={FloorPlanEditor} />
               <Route path="/products" component={Products} />
               <Route path="/suppliers" component={Suppliers} />
               <Route path="/purchase-orders" component={PurchaseOrders} />
