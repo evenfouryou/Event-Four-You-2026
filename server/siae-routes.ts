@@ -3608,10 +3608,8 @@ router.get('/api/siae/ticketed-events/:id/reports/c1', requireAuth, async (req: 
     const company = event.companyId ? await storage.getCompany(event.companyId) : null;
     
     // Ottieni siaeSystemConfig per QUADRO A - Titolare Sistema Emissione
-    const siaeConfigResult = event.companyId 
-      ? await db.select().from(siaeSystemConfig).where(eq(siaeSystemConfig.companyId, event.companyId)).limit(1)
-      : [];
-    const siaeConfig = siaeConfigResult[0] || null;
+    // Usa getGlobalSiaeSystemConfig() perché la config viene salvata globalmente
+    const siaeConfig = await siaeStorage.getGlobalSiaeSystemConfig() || null;
     
     // Ottieni location per QUADRO A - Dati Locale
     const location = event.locationId ? await storage.getLocation(event.locationId) : null;
@@ -3675,10 +3673,8 @@ router.post('/api/siae/ticketed-events/:id/reports/c1/send', requireAuth, requir
     const company = await storage.getCompany(event.companyId);
     
     // Ottieni siaeSystemConfig per QUADRO A - Titolare Sistema Emissione
-    const siaeConfigResult = event.companyId 
-      ? await db.select().from(siaeSystemConfig).where(eq(siaeSystemConfig.companyId, event.companyId)).limit(1)
-      : [];
-    const siaeConfig = siaeConfigResult[0] || null;
+    // Usa getGlobalSiaeSystemConfig() perché la config viene salvata globalmente
+    const siaeConfig = await siaeStorage.getGlobalSiaeSystemConfig() || null;
     
     // Ottieni location per QUADRO A - Dati Locale
     const location = event.locationId ? await storage.getLocation(event.locationId) : null;
@@ -3872,10 +3868,8 @@ router.get('/api/siae/ticketed-events/:id/reports/c2', requireAuth, async (req: 
     const company = event.companyId ? await storage.getCompany(event.companyId) : null;
     
     // Ottieni siaeSystemConfig per QUADRO A - Titolare Sistema Emissione
-    const siaeConfigResult = event.companyId 
-      ? await db.select().from(siaeSystemConfig).where(eq(siaeSystemConfig.companyId, event.companyId)).limit(1)
-      : [];
-    const siaeConfig = siaeConfigResult[0] || null;
+    // Usa getGlobalSiaeSystemConfig() perché la config viene salvata globalmente
+    const siaeConfig = await siaeStorage.getGlobalSiaeSystemConfig() || null;
     
     // Ottieni location per QUADRO A - Dati Locale
     const location = event.locationId ? await storage.getLocation(event.locationId) : null;
