@@ -3,6 +3,11 @@ import { siaeTicketedEvents, siaeTransmissions, events, companies, siaeEventSect
 import { eq, and, sql, gte, lt, desc } from "drizzle-orm";
 import { siaeStorage } from "./siae-storage";
 import { storage } from "./storage";
+import { sendSiaeTransmissionEmail } from "./email-service";
+
+// Configurazione SIAE
+const SIAE_TEST_MODE = process.env.SIAE_TEST_MODE === 'true';
+const SIAE_TEST_EMAIL = process.env.SIAE_TEST_EMAIL || 'servertest2@batest.siae.it';
 
 function log(message: string) {
   const formattedTime = new Date().toLocaleTimeString("it-IT", {
@@ -159,7 +164,7 @@ async function sendDailyReports() {
         const dateStr = yesterday.toISOString().split('T')[0].replace(/-/g, '');
         const fileName = `C1_DAILY_${ticketedEvent.siaeEventCode || ticketedEvent.id}_${dateStr}.xml`;
 
-        await siaeStorage.createSiaeTransmission({
+        const transmission = await siaeStorage.createSiaeTransmission({
           companyId: ticketedEvent.companyId,
           ticketedEventId: ticketedEvent.id,
           transmissionType: 'daily',
@@ -173,6 +178,33 @@ async function sendDailyReports() {
         });
 
         log(`Evento ${ticketedEvent.id} (${event.name}) - Report giornaliero creato: ${fileName}`);
+
+        // Invio automatico email a SIAE
+        try {
+          await sendSiaeTransmissionEmail({
+            to: SIAE_TEST_EMAIL,
+            companyName: reportData.company?.name || 'N/A',
+            transmissionType: 'daily',
+            periodDate: yesterday,
+            ticketsCount: reportData.activeTicketsCount,
+            totalAmount: reportData.totalRevenue.toFixed(2),
+            xmlContent,
+            transmissionId: transmission.id,
+          });
+
+          // Aggiorna status a 'sent'
+          await siaeStorage.updateSiaeTransmission(transmission.id, {
+            status: 'sent',
+            sentAt: new Date(),
+          });
+          log(`Evento ${ticketedEvent.id} - Email inviata a ${SIAE_TEST_EMAIL}, status aggiornato a 'sent'`);
+        } catch (emailError: any) {
+          log(`ERRORE invio email per evento ${ticketedEvent.id}: ${emailError.message}`);
+          await siaeStorage.updateSiaeTransmission(transmission.id, {
+            status: 'error',
+            errorMessage: emailError.message,
+          });
+        }
       } catch (eventError: any) {
         log(`ERRORE per evento ${ticketedEvent.id}: ${eventError.message}`);
       }
@@ -220,7 +252,7 @@ async function sendMonthlyReports() {
         const monthStr = `${previousMonth.getFullYear()}${String(previousMonth.getMonth() + 1).padStart(2, '0')}`;
         const fileName = `C1_MONTHLY_${ticketedEvent.siaeEventCode || ticketedEvent.id}_${monthStr}.xml`;
 
-        await siaeStorage.createSiaeTransmission({
+        const transmission = await siaeStorage.createSiaeTransmission({
           companyId: ticketedEvent.companyId,
           ticketedEventId: ticketedEvent.id,
           transmissionType: 'monthly',
@@ -234,6 +266,33 @@ async function sendMonthlyReports() {
         });
 
         log(`Evento ${ticketedEvent.id} - Report mensile creato: ${fileName}`);
+
+        // Invio automatico email a SIAE
+        try {
+          await sendSiaeTransmissionEmail({
+            to: SIAE_TEST_EMAIL,
+            companyName: reportData.company?.name || 'N/A',
+            transmissionType: 'monthly',
+            periodDate: previousMonth,
+            ticketsCount: reportData.activeTicketsCount,
+            totalAmount: reportData.totalRevenue.toFixed(2),
+            xmlContent,
+            transmissionId: transmission.id,
+          });
+
+          // Aggiorna status a 'sent'
+          await siaeStorage.updateSiaeTransmission(transmission.id, {
+            status: 'sent',
+            sentAt: new Date(),
+          });
+          log(`Evento ${ticketedEvent.id} - Email mensile inviata a ${SIAE_TEST_EMAIL}, status aggiornato a 'sent'`);
+        } catch (emailError: any) {
+          log(`ERRORE invio email mensile per evento ${ticketedEvent.id}: ${emailError.message}`);
+          await siaeStorage.updateSiaeTransmission(transmission.id, {
+            status: 'error',
+            errorMessage: emailError.message,
+          });
+        }
       } catch (eventError: any) {
         log(`ERRORE per evento ${ticketedEvent.id}: ${eventError.message}`);
       }
