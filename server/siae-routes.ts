@@ -2102,8 +2102,206 @@ router.post("/api/siae/transmissions/:id/send-email", requireAuth, requireGestor
   }
 });
 
-// Generate and send automatic daily transmission
+// Generate and send C1 transmission (daily or monthly)
+// type: 'daily' for giornaliero (default), 'monthly' for mensile
+router.post("/api/siae/companies/:companyId/transmissions/send-c1", requireAuth, requireGestore, async (req: Request, res: Response) => {
+  try {
+    const { companyId } = req.params;
+    const { date, toEmail, type = 'daily' } = req.body;
+    const isMonthly = type === 'monthly';
+    
+    const reportDate = date ? new Date(date) : new Date();
+    reportDate.setHours(0, 0, 0, 0);
+    
+    // Get activation card for company
+    const activationCards = await siaeStorage.getSiaeActivationCardsByCompany(companyId);
+    const activeCard = activationCards.find(c => c.status === 'active');
+    
+    if (!activeCard) {
+      return res.status(400).json({ message: "Nessuna carta di attivazione attiva trovata" });
+    }
+    
+    // Get system config for fiscal code
+    const systemConfig = await siaeStorage.getSiaeSystemConfig(companyId);
+    const company = await storage.getCompany(companyId);
+    const companyName = company?.name || 'N/A';
+    
+    // Calculate date range based on report type
+    let startDate: Date, endDate: Date;
+    if (isMonthly) {
+      // For monthly: entire month
+      startDate = new Date(reportDate.getFullYear(), reportDate.getMonth(), 1);
+      endDate = new Date(reportDate.getFullYear(), reportDate.getMonth() + 1, 0, 23, 59, 59, 999);
+    } else {
+      // For daily: single day
+      startDate = new Date(reportDate);
+      startDate.setHours(0, 0, 0, 0);
+      endDate = new Date(reportDate);
+      endDate.setHours(23, 59, 59, 999);
+    }
+    
+    // Get tickets for the date range
+    const allTickets = await siaeStorage.getSiaeTicketsByCompany(companyId);
+    const filteredTickets = allTickets.filter(t => {
+      const ticketDate = new Date(t.emissionDate);
+      return ticketDate >= startDate && ticketDate <= endDate;
+    });
+    
+    const now = new Date();
+    const dataGen = now.toISOString().split('T')[0].replace(/-/g, '');
+    const oraGen = now.toTimeString().split(' ')[0].replace(/:/g, '');
+    
+    // Calculate totals
+    const totalAmount = filteredTickets.reduce((sum, t) => sum + parseFloat(t.grossAmount || '0'), 0);
+    const totalIva = filteredTickets.reduce((sum, t) => sum + parseFloat(t.vatAmount || '0'), 0);
+    
+    // Build XML with different format for daily vs monthly
+    let xml: string;
+    
+    if (isMonthly) {
+      // MONTHLY FORMAT: RiepilogoMensile - aggregated summary without individual tickets
+      const meseAttr = `${reportDate.getFullYear()}${String(reportDate.getMonth() + 1).padStart(2, '0')}`;
+      
+      xml = `<?xml version="1.0" encoding="UTF-8"?>
+<RiepilogoMensile Mese="${meseAttr}" DataGenerazione="${dataGen}" OraGenerazione="${oraGen}" ProgressivoGenerazione="1" Sostituzione="N" xmlns="urn:siae:biglietteria:2025">
+  <Titolare>
+    <Denominazione>${escapeXml(companyName)}</Denominazione>
+    <CodiceFiscale>${escapeXml(systemConfig?.taxId || activeCard.cardCode)}</CodiceFiscale>
+    <SistemaEmissione>EVENT4U</SistemaEmissione>
+  </Titolare>
+  <RiepilogoTitoli>
+    <TotaleTitoliEmessi>${filteredTickets.filter(t => t.status === 'emesso' || t.status === 'used').length}</TotaleTitoliEmessi>
+    <TotaleTitoliAnnullati>${filteredTickets.filter(t => t.status === 'annullato').length}</TotaleTitoliAnnullati>
+    <TotaleImportoLordo>${totalAmount.toFixed(2)}</TotaleImportoLordo>
+    <TotaleImportoNetto>${(totalAmount - totalIva).toFixed(2)}</TotaleImportoNetto>
+    <TotaleDiritti>0.00</TotaleDiritti>
+    <TotaleIVA>${totalIva.toFixed(2)}</TotaleIVA>
+  </RiepilogoTitoli>
+  <PeriodoRiferimento>
+    <MeseRiferimento>${String(reportDate.getMonth() + 1).padStart(2, '0')}</MeseRiferimento>
+    <AnnoRiferimento>${reportDate.getFullYear()}</AnnoRiferimento>
+  </PeriodoRiferimento>
+  <InformazioniTrasmissione>
+    <NumeroCarta>${escapeXml(activeCard.cardCode)}</NumeroCarta>
+    <DataOraGenerazione>${now.toISOString()}</DataOraGenerazione>
+    <TipoTrasmissione>ORDINARIA</TipoTrasmissione>
+  </InformazioniTrasmissione>
+</RiepilogoMensile>`;
+    } else {
+      // DAILY FORMAT: ComunicazioneDatiTitoli - detailed with individual tickets
+      xml = `<?xml version="1.0" encoding="UTF-8"?>
+<ComunicazioneDatiTitoli xmlns="urn:siae:biglietteria:2025">
+  <Intestazione>
+    <CodiceFiscaleEmittente>${escapeXml(systemConfig?.taxId || '')}</CodiceFiscaleEmittente>
+    <NumeroCarta>${escapeXml(activeCard.cardCode)}</NumeroCarta>
+    <DataRiferimento>${formatSiaeDate(reportDate)}</DataRiferimento>
+    <DataOraGenerazione>${formatSiaeDateTime(now)}</DataOraGenerazione>
+    <TipoTrasmissione>ORDINARIA</TipoTrasmissione>
+  </Intestazione>
+  <ElencoTitoli>`;
+      
+      for (const ticket of filteredTickets) {
+        let ticketedEvent = null;
+        if (ticket.sectorId) {
+          const sector = await siaeStorage.getSiaeEventSector(ticket.sectorId);
+          if (sector?.ticketedEventId) {
+            ticketedEvent = await siaeStorage.getSiaeTicketedEvent(sector.ticketedEventId);
+          }
+        } else if (ticket.ticketedEventId) {
+          ticketedEvent = await siaeStorage.getSiaeTicketedEvent(ticket.ticketedEventId);
+        }
+        
+        xml += `
+    <Titolo>
+      <NumeroProgressivo>${ticket.progressiveNumber || 0}</NumeroProgressivo>
+      <SigilloFiscale>${escapeXml(ticket.fiscalSealCode)}</SigilloFiscale>
+      <TipologiaTitolo>${escapeXml(ticket.ticketTypeCode)}</TipologiaTitolo>
+      <DataOraEmissione>${formatSiaeDateTime(ticket.emissionDate)}</DataOraEmissione>
+      <CodiceCanale>${escapeXml(ticket.emissionChannelCode)}</CodiceCanale>
+      <ImportoLordo>${parseFloat(ticket.grossAmount || '0').toFixed(2)}</ImportoLordo>
+      <ImportoNetto>${parseFloat(ticket.netAmount || '0').toFixed(2)}</ImportoNetto>
+      <Diritti>0.00</Diritti>
+      <IVA>${parseFloat(ticket.vatAmount || '0').toFixed(2)}</IVA>
+      <CodiceGenere>${escapeXml(ticketedEvent?.genreCode || '')}</CodiceGenere>
+      <CodicePrestazione>${escapeXml(ticket.ticketTypeCode || '')}</CodicePrestazione>
+      <DataEvento>${formatSiaeDate(ticketedEvent?.saleStartDate || null)}</DataEvento>
+      <NominativoAcquirente>
+        <Nome>${escapeXml(ticket.participantFirstName || '')}</Nome>
+        <Cognome>${escapeXml(ticket.participantLastName || '')}</Cognome>
+      </NominativoAcquirente>
+      <Stato>${escapeXml(ticket.status)}</Stato>
+    </Titolo>`;
+      }
+      
+      xml += `
+  </ElencoTitoli>
+  <Riepilogo>
+    <TotaleTitoli>${filteredTickets.length}</TotaleTitoli>
+    <TotaleImportoLordo>${totalAmount.toFixed(2)}</TotaleImportoLordo>
+    <TotaleDiritti>0.00</TotaleDiritti>
+    <TotaleIVA>${totalIva.toFixed(2)}</TotaleIVA>
+  </Riepilogo>
+</ComunicazioneDatiTitoli>`;
+    }
+    
+    const transmissionType = isMonthly ? 'monthly' : 'daily';
+    const typeLabel = isMonthly ? 'mensile' : 'giornaliera';
+    
+    // Create transmission record
+    const transmission = await siaeStorage.createSiaeTransmission({
+      companyId,
+      transmissionType,
+      periodDate: reportDate,
+      fileContent: xml,
+      status: 'pending',
+      ticketsCount: filteredTickets.length,
+      totalAmount: totalAmount.toString(),
+    });
+    
+    // Import and send the email
+    const { sendSiaeTransmissionEmail } = await import('./email-service');
+    
+    const destination = getSiaeDestinationEmail(toEmail);
+    await sendSiaeTransmissionEmail({
+      to: destination,
+      companyName,
+      transmissionType,
+      periodDate: reportDate,
+      ticketsCount: filteredTickets.length,
+      totalAmount: totalAmount.toString(),
+      xmlContent: xml,
+      transmissionId: transmission.id,
+    });
+    
+    console.log(`[SIAE-ROUTES] ${typeLabel.toUpperCase()} transmission sent to: ${destination} (Test mode: ${SIAE_TEST_MODE})`);
+    
+    // Update transmission status
+    await siaeStorage.updateSiaeTransmission(transmission.id, {
+      status: 'sent',
+      sentDate: new Date(),
+    });
+    
+    res.json({
+      success: true,
+      message: `Trasmissione ${typeLabel} generata e inviata con successo`,
+      transmission: {
+        id: transmission.id,
+        type: transmissionType,
+        ticketsCount: filteredTickets.length,
+        totalAmount: totalAmount.toString(),
+        sentTo: destination,
+      }
+    });
+  } catch (error: any) {
+    console.error('[SIAE-ROUTES] Failed to send C1 transmission:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Legacy endpoint - redirect to new send-c1 with type=daily
 router.post("/api/siae/companies/:companyId/transmissions/send-daily", requireAuth, requireGestore, async (req: Request, res: Response) => {
+  req.body.type = 'daily';
+  
   try {
     const { companyId } = req.params;
     const { date, toEmail } = req.body;

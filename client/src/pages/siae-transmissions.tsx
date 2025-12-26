@@ -98,6 +98,7 @@ export default function SiaeTransmissionsPage() {
   const [testEmail, setTestEmail] = useState<string>("servertest2@batest.siae.it");
   const [dailyDate, setDailyDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [dailyEmail, setDailyEmail] = useState<string>("servertest2@batest.siae.it");
+  const [c1Type, setC1Type] = useState<'daily' | 'monthly'>('daily');
   const [receiptProtocol, setReceiptProtocol] = useState<string>("");
   const [receiptContent, setReceiptContent] = useState<string>("");
   const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(null);
@@ -223,11 +224,12 @@ export default function SiaeTransmissionsPage() {
     },
   });
 
-  const sendDailyMutation = useMutation({
-    mutationFn: async ({ date, toEmail }: { date: string; toEmail: string }) => {
-      const response = await apiRequest("POST", `/api/siae/companies/${companyId}/transmissions/send-daily`, {
+  const sendC1Mutation = useMutation({
+    mutationFn: async ({ date, toEmail, type }: { date: string; toEmail: string; type: 'daily' | 'monthly' }) => {
+      const response = await apiRequest("POST", `/api/siae/companies/${companyId}/transmissions/send-c1`, {
         date,
         toEmail,
+        type,
       });
       return response.json();
     },
@@ -426,9 +428,9 @@ export default function SiaeTransmissionsPage() {
               <Upload className="w-4 h-4 mr-2" />
               Genera XML
             </Button>
-            <Button onClick={() => setIsSendDailyDialogOpen(true)} data-testid="button-send-daily" disabled={!companyId}>
+            <Button onClick={() => setIsSendDailyDialogOpen(true)} data-testid="button-send-c1" disabled={!companyId}>
               <Zap className="w-4 h-4 mr-2" />
-              Invia Trasmissione Giornaliera
+              Invia Trasmissione C1
             </Button>
           </div>
         </div>
@@ -649,13 +651,34 @@ export default function SiaeTransmissionsPage() {
         <Dialog open={isSendDailyDialogOpen} onOpenChange={setIsSendDailyDialogOpen}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Trasmissione Giornaliera Automatica</DialogTitle>
-              <DialogDescription>Genera e invia automaticamente la trasmissione XML</DialogDescription>
+              <DialogTitle>Trasmissione C1 SIAE</DialogTitle>
+              <DialogDescription>Genera e invia automaticamente la trasmissione XML C1</DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
               <div>
-                <Label>Data</Label>
-                <Input type="date" value={dailyDate} onChange={(e) => setDailyDate(e.target.value)} />
+                <Label>Tipo Report C1</Label>
+                <Select value={c1Type} onValueChange={(v: 'daily' | 'monthly') => setC1Type(v)}>
+                  <SelectTrigger data-testid="select-c1-type">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="daily">Giornaliero (dettaglio biglietti)</SelectItem>
+                    <SelectItem value="monthly">Mensile (riepilogo aggregato)</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {c1Type === 'monthly' 
+                    ? "Il report mensile aggrega tutti i biglietti del mese selezionato" 
+                    : "Il report giornaliero include il dettaglio di ogni singolo biglietto"}
+                </p>
+              </div>
+              <div>
+                <Label>{c1Type === 'monthly' ? 'Mese di riferimento' : 'Data'}</Label>
+                <Input 
+                  type={c1Type === 'monthly' ? 'month' : 'date'} 
+                  value={dailyDate} 
+                  onChange={(e) => setDailyDate(e.target.value)} 
+                />
               </div>
               <div>
                 <Label>Email Destinatario SIAE</Label>
@@ -666,11 +689,11 @@ export default function SiaeTransmissionsPage() {
               <Button variant="outline" onClick={() => setIsSendDailyDialogOpen(false)}>Annulla</Button>
               <Button
                 onClick={() => {
-                  sendDailyMutation.mutate({ date: dailyDate, toEmail: dailyEmail });
+                  sendC1Mutation.mutate({ date: dailyDate, toEmail: dailyEmail, type: c1Type });
                 }}
-                disabled={!dailyDate || !dailyEmail || sendDailyMutation.isPending}
+                disabled={!dailyDate || !dailyEmail || sendC1Mutation.isPending}
               >
-                {sendDailyMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                {sendC1Mutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                 Genera e Invia
               </Button>
             </DialogFooter>
@@ -964,10 +987,10 @@ export default function SiaeTransmissionsPage() {
             className="w-full h-14 text-base font-semibold bg-gradient-to-r from-[#FFD700] to-[#FFA500] text-black"
             onClick={() => setIsSendDailySheetOpen(true)}
             hapticType="medium"
-            data-testid="button-send-daily"
+            data-testid="button-send-c1-mobile"
           >
             <Zap className="w-5 h-5 mr-2" />
-            Invia Trasmissione Giornaliera
+            Invia Trasmissione C1
           </HapticButton>
           
           <div className="grid grid-cols-2 gap-3">
@@ -1475,7 +1498,7 @@ export default function SiaeTransmissionsPage() {
       <BottomSheet
         open={isSendDailySheetOpen}
         onClose={() => setIsSendDailySheetOpen(false)}
-        title="Trasmissione Giornaliera Automatica"
+        title="Trasmissione C1 SIAE"
       >
         <div className="p-4 space-y-6">
           <div className="text-center py-4">
@@ -1483,19 +1506,32 @@ export default function SiaeTransmissionsPage() {
               <Zap className="w-8 h-8 text-[#FFD700]" />
             </div>
             <p className="text-muted-foreground text-sm">
-              Genera e invia automaticamente la trasmissione XML del giorno selezionato
+              Genera e invia automaticamente la trasmissione XML C1
             </p>
           </div>
 
           <div className="space-y-4">
             <div>
-              <Label className="text-sm font-medium mb-2 block">Data</Label>
+              <Label className="text-sm font-medium mb-2 block">Tipo Report C1</Label>
+              <Select value={c1Type} onValueChange={(v: 'daily' | 'monthly') => setC1Type(v)}>
+                <SelectTrigger className="h-12" data-testid="select-c1-type-mobile">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="daily">Giornaliero (dettaglio)</SelectItem>
+                  <SelectItem value="monthly">Mensile (riepilogo)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div>
+              <Label className="text-sm font-medium mb-2 block">{c1Type === 'monthly' ? 'Mese' : 'Data'}</Label>
               <Input
-                type="date"
+                type={c1Type === 'monthly' ? 'month' : 'date'}
                 value={dailyDate}
                 onChange={(e) => setDailyDate(e.target.value)}
                 className="h-12"
-                data-testid="input-daily-date"
+                data-testid="input-c1-date"
               />
             </div>
             
@@ -1507,7 +1543,7 @@ export default function SiaeTransmissionsPage() {
                 onChange={(e) => setDailyEmail(e.target.value)}
                 className="h-12"
                 placeholder="servertest2@batest.siae.it"
-                data-testid="input-daily-email"
+                data-testid="input-c1-email"
               />
             </div>
           </div>
@@ -1522,12 +1558,12 @@ export default function SiaeTransmissionsPage() {
             </HapticButton>
             <HapticButton
               className="flex-1 h-12 bg-[#FFD700] text-black hover:bg-[#FFD700]/90"
-              onClick={() => sendDailyMutation.mutate({ date: dailyDate, toEmail: dailyEmail })}
-              disabled={!dailyDate || !dailyEmail || sendDailyMutation.isPending}
+              onClick={() => sendC1Mutation.mutate({ date: dailyDate, toEmail: dailyEmail, type: c1Type })}
+              disabled={!dailyDate || !dailyEmail || sendC1Mutation.isPending}
               hapticType="medium"
-              data-testid="button-send-daily-confirm"
+              data-testid="button-send-c1-confirm"
             >
-              {sendDailyMutation.isPending && <Loader2 className="w-5 h-5 mr-2 animate-spin" />}
+              {sendC1Mutation.isPending && <Loader2 className="w-5 h-5 mr-2 animate-spin" />}
               Genera e Invia
             </HapticButton>
           </div>
