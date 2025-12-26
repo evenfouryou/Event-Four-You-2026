@@ -742,7 +742,7 @@ export default function SiaeReportC1() {
         }
       `}</style>
 
-      <div className="no-print p-4 bg-background border-b flex flex-col gap-2 sticky top-0 z-50">
+      <div className="no-print p-4 bg-background border-b flex flex-col gap-3 sticky top-0 z-50">
         <div className="flex items-center justify-between">
           <Button variant="ghost" onClick={() => window.history.back()} data-testid="button-back">
             <ArrowLeft className="w-4 h-4 mr-2" /> Indietro
@@ -755,6 +755,22 @@ export default function SiaeReportC1() {
               <Printer className="w-4 h-4" />
             </Button>
           </div>
+        </div>
+        
+        <div className="flex items-center gap-3">
+          <span className="text-sm font-medium flex items-center gap-2">
+            <Calendar className="w-4 h-4" />
+            Tipo Report:
+          </span>
+          <Select value={reportType} onValueChange={(value: 'giornaliero' | 'mensile') => setReportType(value)}>
+            <SelectTrigger className="flex-1" data-testid="select-report-type-mobile">
+              <SelectValue placeholder="Seleziona tipo" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="giornaliero">Giornaliero (dettaglio)</SelectItem>
+              <SelectItem value="mensile">Mensile (riepilogo)</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
       </div>
 
