@@ -191,7 +191,7 @@ export default function SiaeReportC1() {
     window.history.replaceState({}, '', newUrl);
   }, [reportType]);
 
-  const { data: report, isLoading, error } = useQuery<C1ReportData>({
+  const { data: report, isLoading, error, isFetching } = useQuery<C1ReportData>({
     queryKey: ['/api/siae/ticketed-events', id, 'reports', 'c1', reportType],
     queryFn: async () => {
       const res = await fetch(`/api/siae/ticketed-events/${id}/reports/c1?type=${reportType}`, {
@@ -205,6 +205,8 @@ export default function SiaeReportC1() {
     enabled: !!id,
     refetchOnMount: 'always',
     staleTime: 0,
+    gcTime: 0,
+    placeholderData: undefined,
   });
 
   // Fetch transmission history
@@ -277,7 +279,7 @@ export default function SiaeReportC1() {
     }
   };
 
-  if (isLoading) {
+  if (isLoading || (isFetching && !report)) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full" />

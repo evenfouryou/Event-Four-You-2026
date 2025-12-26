@@ -3819,7 +3819,9 @@ router.get('/api/siae/ticketed-events/:id/reports/c1', requireAuth, async (req: 
     const siaeConfig = await siaeStorage.getGlobalSiaeSystemConfig() || null;
     
     // Ottieni location per QUADRO A - Dati Locale
-    const location = event.locationId ? await storage.getLocation(event.locationId) : null;
+    // Nota: getSiaeTicketedEvent restituisce eventLocation, non locationId
+    const locationId = event.eventLocation || event.locationId;
+    const location = locationId ? await storage.getLocation(locationId) : null;
     
     const sectors = await siaeStorage.getSiaeEventSectors(id);
     const allTickets = await siaeStorage.getSiaeTicketsByEvent(id);
@@ -3884,7 +3886,9 @@ router.post('/api/siae/ticketed-events/:id/reports/c1/send', requireAuth, requir
     const siaeConfig = await siaeStorage.getGlobalSiaeSystemConfig() || null;
     
     // Ottieni location per QUADRO A - Dati Locale
-    const location = event.locationId ? await storage.getLocation(event.locationId) : null;
+    // Nota: getSiaeTicketedEvent restituisce eventLocation, non locationId
+    const locationId = event.eventLocation || event.locationId;
+    const location = locationId ? await storage.getLocation(locationId) : null;
 
     // Get tickets and sectors for C1 report data (usa stesse funzioni del GET)
     const allTickets = await siaeStorage.getSiaeTicketsByEvent(id);
@@ -4225,7 +4229,9 @@ router.get('/api/siae/ticketed-events/:id/reports/c2', requireAuth, async (req: 
     const siaeConfig = await siaeStorage.getGlobalSiaeSystemConfig() || null;
     
     // Ottieni location per QUADRO A - Dati Locale
-    const location = event.locationId ? await storage.getLocation(event.locationId) : null;
+    // Nota: getSiaeTicketedEvent restituisce eventLocation, non locationId
+    const locationId = event.eventLocation || event.locationId;
+    const location = locationId ? await storage.getLocation(locationId) : null;
     
     const sectors = await siaeStorage.getSiaeEventSectors(id);
     const transactions = await siaeStorage.getSiaeTransactionsByEvent(id);

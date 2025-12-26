@@ -795,7 +795,13 @@ export class SiaeStorage implements ISiaeStorage {
       eventTime: sql<string>`TO_CHAR(${events.startDatetime}, 'HH24:MI')`,
       status: events.status,
       eventLocation: events.locationId,
+      locationId: events.locationId,
       venueName: locations.name,
+      venueAddress: locations.address,
+      venueCity: locations.city,
+      venueProvince: locations.province,
+      venueCap: locations.postalCode,
+      venueSiaeCode: locations.siaeLocationCode,
       companyName: companies.name,
     })
     .from(siaeTicketedEvents)
