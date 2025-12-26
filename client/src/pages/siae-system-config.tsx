@@ -80,6 +80,9 @@ type FormData = z.infer<typeof formSchema>;
 const defaultFormValues: Partial<FormData> = {
   businessName: null,
   businessAddress: null,
+  businessCity: null,
+  businessProvince: null,
+  businessPostalCode: null,
   systemCode: null,
   taxId: null,
   vatNumber: null,
@@ -226,6 +229,9 @@ export default function SiaeSystemConfigPage() {
       form.reset({
         businessName: config.businessName,
         businessAddress: config.businessAddress,
+        businessCity: config.businessCity,
+        businessProvince: config.businessProvince,
+        businessPostalCode: config.businessPostalCode,
         systemCode: config.systemCode,
         taxId: config.taxId,
         vatNumber: config.vatNumber,
@@ -483,7 +489,7 @@ export default function SiaeSystemConfigPage() {
                           <FormLabel>Indirizzo Sede Legale</FormLabel>
                           <FormControl>
                             <Input 
-                              placeholder="Es: Via Roma 123, 20100 Milano (MI)"
+                              placeholder="Es: Via Roma 123"
                               {...field}
                               value={field.value || ""}
                               data-testid="input-business-address"
@@ -493,6 +499,64 @@ export default function SiaeSystemConfigPage() {
                         </FormItem>
                       )}
                     />
+                    <div className="grid grid-cols-3 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="businessCity"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Comune</FormLabel>
+                            <FormControl>
+                              <Input 
+                                placeholder="Es: Milano"
+                                {...field}
+                                value={field.value || ""}
+                                data-testid="input-business-city"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="businessProvince"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Provincia</FormLabel>
+                            <FormControl>
+                              <Input 
+                                placeholder="Es: MI"
+                                maxLength={2}
+                                {...field}
+                                value={field.value || ""}
+                                data-testid="input-business-province"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="businessPostalCode"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>CAP</FormLabel>
+                            <FormControl>
+                              <Input 
+                                placeholder="Es: 20100"
+                                maxLength={5}
+                                {...field}
+                                value={field.value || ""}
+                                data-testid="input-business-postal-code"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
                     <Separator className="my-4" />
                     <div className="grid grid-cols-2 gap-4">
                       <FormField
@@ -1238,7 +1302,7 @@ export default function SiaeSystemConfigPage() {
                           <FormLabel className="text-base">Indirizzo Sede Legale</FormLabel>
                           <FormControl>
                             <Input 
-                              placeholder="Es: Via Roma 123, 20100 Milano (MI)"
+                              placeholder="Es: Via Roma 123"
                               className="h-14 text-base rounded-xl"
                               {...field}
                               value={field.value || ""}
@@ -1249,6 +1313,69 @@ export default function SiaeSystemConfigPage() {
                         </FormItem>
                       )}
                     />
+
+                    <FormField
+                      control={form.control}
+                      name="businessCity"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-base">Comune</FormLabel>
+                          <FormControl>
+                            <Input 
+                              placeholder="Es: Milano"
+                              className="h-14 text-base rounded-xl"
+                              {...field}
+                              value={field.value || ""}
+                              data-testid="input-business-city"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <FormField
+                        control={form.control}
+                        name="businessProvince"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-base">Provincia</FormLabel>
+                            <FormControl>
+                              <Input 
+                                placeholder="Es: MI"
+                                maxLength={2}
+                                className="h-14 text-base rounded-xl"
+                                {...field}
+                                value={field.value || ""}
+                                data-testid="input-business-province"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="businessPostalCode"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-base">CAP</FormLabel>
+                            <FormControl>
+                              <Input 
+                                placeholder="Es: 20100"
+                                maxLength={5}
+                                className="h-14 text-base rounded-xl"
+                                {...field}
+                                value={field.value || ""}
+                                data-testid="input-business-postal-code"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
 
                     <Separator className="my-6" />
 

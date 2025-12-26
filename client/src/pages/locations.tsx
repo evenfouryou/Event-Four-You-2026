@@ -786,7 +786,7 @@ export default function Locations() {
               name="city"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="text-base font-medium">Città</FormLabel>
+                  <FormLabel className="text-base font-medium">Comune</FormLabel>
                   <FormControl>
                     <Input 
                       {...field} 
@@ -800,6 +800,49 @@ export default function Locations() {
                 </FormItem>
               )}
             />
+
+            <div className="grid grid-cols-2 gap-3">
+              <FormField
+                control={form.control}
+                name="province"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-base font-medium">Provincia</FormLabel>
+                    <FormControl>
+                      <Input 
+                        {...field} 
+                        value={field.value || ''} 
+                        placeholder="es. MI, RM" 
+                        maxLength={2}
+                        className="h-14 text-base rounded-xl"
+                        data-testid="input-location-province" 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="postalCode"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-base font-medium">CAP</FormLabel>
+                    <FormControl>
+                      <Input 
+                        {...field} 
+                        value={field.value || ''} 
+                        placeholder="es. 20100" 
+                        maxLength={5}
+                        className="h-14 text-base rounded-xl"
+                        data-testid="input-location-cap" 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
 
             <FormField
               control={form.control}

@@ -100,6 +100,10 @@ export default function Companies() {
       name: '',
       taxId: '',
       address: '',
+      city: '',
+      province: '',
+      postalCode: '',
+      fiscalCode: '',
       active: true,
     },
   });
@@ -209,6 +213,10 @@ export default function Companies() {
       name: company.name,
       taxId: company.taxId || '',
       address: company.address || '',
+      city: company.city || '',
+      province: company.province || '',
+      postalCode: company.postalCode || '',
+      fiscalCode: company.fiscalCode || '',
       active: company.active,
     });
     setDialogOpen(true);
@@ -427,6 +435,60 @@ export default function Companies() {
                           className="resize-none"
                           data-testid="input-company-address"
                         />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <div className="grid grid-cols-3 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="city"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Comune</FormLabel>
+                        <FormControl>
+                          <Input {...field} value={field.value ?? ''} placeholder="Es: Roma" data-testid="input-company-city" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="province"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Provincia</FormLabel>
+                        <FormControl>
+                          <Input {...field} value={field.value ?? ''} placeholder="Es: RM" maxLength={2} data-testid="input-company-province" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="postalCode"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>CAP</FormLabel>
+                        <FormControl>
+                          <Input {...field} value={field.value ?? ''} placeholder="Es: 00100" maxLength={5} data-testid="input-company-cap" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <FormField
+                  control={form.control}
+                  name="fiscalCode"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Codice Fiscale Azienda</FormLabel>
+                      <FormControl>
+                        <Input {...field} value={field.value ?? ''} placeholder="Es: 12345678901" maxLength={16} data-testid="input-company-fiscalcode" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -694,6 +756,89 @@ export default function Companies() {
                         value={field.value ?? ''} 
                         className="min-h-[100px] rounded-xl text-base resize-none"
                         data-testid="input-company-address" 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <div className="grid grid-cols-3 gap-3">
+                <FormField
+                  control={form.control}
+                  name="city"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-base">Comune</FormLabel>
+                      <FormControl>
+                        <Input 
+                          {...field} 
+                          value={field.value ?? ''} 
+                          placeholder="Roma"
+                          className="h-12 rounded-xl text-base"
+                          data-testid="input-company-city" 
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="province"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-base">Prov.</FormLabel>
+                      <FormControl>
+                        <Input 
+                          {...field} 
+                          value={field.value ?? ''} 
+                          placeholder="RM"
+                          maxLength={2}
+                          className="h-12 rounded-xl text-base"
+                          data-testid="input-company-province" 
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="postalCode"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-base">CAP</FormLabel>
+                      <FormControl>
+                        <Input 
+                          {...field} 
+                          value={field.value ?? ''} 
+                          placeholder="00100"
+                          maxLength={5}
+                          className="h-12 rounded-xl text-base"
+                          data-testid="input-company-cap" 
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <FormField
+                control={form.control}
+                name="fiscalCode"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-base">Codice Fiscale Azienda</FormLabel>
+                    <FormControl>
+                      <Input 
+                        {...field} 
+                        value={field.value ?? ''} 
+                        placeholder="12345678901"
+                        maxLength={16}
+                        className="h-12 rounded-xl text-base"
+                        data-testid="input-company-fiscalcode" 
                       />
                     </FormControl>
                     <FormMessage />
