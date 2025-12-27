@@ -176,6 +176,19 @@ export default function SiaeTicketedEventsPage() {
   const [expandedEventId, setExpandedEventId] = useState<string | null>(urlEventId || null);
   const [publicInfoImageUrl, setPublicInfoImageUrl] = useState("");
   const [publicInfoDescription, setPublicInfoDescription] = useState("");
+  const [pendingSubscriptionTypes, setPendingSubscriptionTypes] = useState<Array<{
+    name: string;
+    description?: string;
+    turnType: string;
+    eventsCount: number;
+    price: string;
+    maxQuantity?: number;
+  }>>([]);
+  const [showSubscriptionTypeForm, setShowSubscriptionTypeForm] = useState(false);
+  const [newSubTypeName, setNewSubTypeName] = useState("");
+  const [newSubTypeTurnType, setNewSubTypeTurnType] = useState("F");
+  const [newSubTypeEventsCount, setNewSubTypeEventsCount] = useState(1);
+  const [newSubTypePrice, setNewSubTypePrice] = useState("");
 
   const companyId = user?.companyId;
   const isSuperAdmin = user?.role === 'super_admin';
@@ -341,6 +354,12 @@ export default function SiaeTicketedEventsPage() {
         maxTicketsPerUser: 10,
         ticketingStatus: "draft",
       });
+      setPendingSubscriptionTypes([]);
+      setShowSubscriptionTypeForm(false);
+      setNewSubTypeName("");
+      setNewSubTypeTurnType("F");
+      setNewSubTypeEventsCount(1);
+      setNewSubTypePrice("");
     }
   }, [isCreateDialogOpen, form]);
 
@@ -418,14 +437,28 @@ export default function SiaeTicketedEventsPage() {
   const createMutation = useMutation({
     mutationFn: async (data: FormData) => {
       const response = await apiRequest("POST", `/api/siae/ticketed-events`, { ...data, companyId });
-      return response.json();
+      const newEvent = await response.json();
+      
+      if (pendingSubscriptionTypes.length > 0) {
+        for (const subType of pendingSubscriptionTypes) {
+          await apiRequest("POST", `/api/siae/ticketed-events/${newEvent.id}/subscription-types`, {
+            ...subType,
+            ivaRate: "22",
+            companyId,
+          });
+        }
+      }
+      
+      return newEvent;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ predicate: (q) => q.queryKey[0] === '/api/siae/companies' });
       setIsCreateDialogOpen(false);
       toast({
         title: "Biglietteria Attivata",
-        description: "L'evento è stato configurato per la biglietteria SIAE.",
+        description: pendingSubscriptionTypes.length > 0 
+          ? `L'evento è stato configurato per la biglietteria SIAE con ${pendingSubscriptionTypes.length} tipo/i abbonamento.`
+          : "L'evento è stato configurato per la biglietteria SIAE.",
       });
     },
     onError: (error: Error) => {
@@ -1505,6 +1538,144 @@ export default function SiaeTicketedEventsPage() {
                       </FormItem>
                     )}
                   />
+                </div>
+
+                <div className="space-y-4 rounded-lg border p-4 bg-muted/30">
+                  <div className="flex items-center gap-2">
+                    <Package className="w-4 h-4 text-[#FFD700]" />
+                    <h4 className="font-medium">Tipi Abbonamento (Opzionale)</h4>
+                  </div>
+                  
+                  {pendingSubscriptionTypes.length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {pendingSubscriptionTypes.map((subType, index) => (
+                        <div
+                          key={index}
+                          className="flex items-center gap-2 px-3 py-2 rounded-md bg-background border text-sm"
+                          data-testid={`pending-sub-type-${index}`}
+                        >
+                          <span className="font-medium">{subType.name}</span>
+                          <span className="text-muted-foreground">-</span>
+                          <span>{subType.eventsCount} eventi</span>
+                          <span className="text-muted-foreground">-</span>
+                          <span className="text-[#FFD700]">{"\u20AC"}{subType.price}</span>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-5 w-5 ml-1"
+                            onClick={() => {
+                              setPendingSubscriptionTypes(prev => prev.filter((_, i) => i !== index));
+                            }}
+                            data-testid={`remove-sub-type-${index}`}
+                          >
+                            <XCircle className="w-3 h-3" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {showSubscriptionTypeForm ? (
+                    <div className="space-y-3 p-3 rounded-md bg-background/50 border">
+                      <div className="grid grid-cols-4 gap-3">
+                        <div className="col-span-2">
+                          <Label className="text-xs">Nome</Label>
+                          <Input
+                            value={newSubTypeName}
+                            onChange={(e) => setNewSubTypeName(e.target.value)}
+                            placeholder="es. Pass 3 Giorni"
+                            data-testid="input-new-sub-type-name"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-xs">Turno</Label>
+                          <Select value={newSubTypeTurnType} onValueChange={setNewSubTypeTurnType}>
+                            <SelectTrigger data-testid="select-new-sub-type-turn">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="F">Fisso</SelectItem>
+                              <SelectItem value="L">Libero</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label className="text-xs">N. Eventi</Label>
+                          <Input
+                            type="number"
+                            min={1}
+                            value={newSubTypeEventsCount}
+                            onChange={(e) => setNewSubTypeEventsCount(parseInt(e.target.value) || 1)}
+                            data-testid="input-new-sub-type-events"
+                          />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-4 gap-3">
+                        <div className="col-span-2">
+                          <Label className="text-xs">Prezzo ({"\u20AC"})</Label>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            value={newSubTypePrice}
+                            onChange={(e) => setNewSubTypePrice(e.target.value)}
+                            placeholder="0.00"
+                            data-testid="input-new-sub-type-price"
+                          />
+                        </div>
+                        <div className="col-span-2 flex items-end gap-2">
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={() => {
+                              if (newSubTypeName && newSubTypePrice) {
+                                setPendingSubscriptionTypes(prev => [...prev, {
+                                  name: newSubTypeName,
+                                  turnType: newSubTypeTurnType,
+                                  eventsCount: newSubTypeEventsCount,
+                                  price: newSubTypePrice,
+                                }]);
+                                setNewSubTypeName("");
+                                setNewSubTypeTurnType("F");
+                                setNewSubTypeEventsCount(1);
+                                setNewSubTypePrice("");
+                                setShowSubscriptionTypeForm(false);
+                              }
+                            }}
+                            disabled={!newSubTypeName || !newSubTypePrice}
+                            data-testid="button-add-sub-type"
+                          >
+                            Aggiungi
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setShowSubscriptionTypeForm(false);
+                              setNewSubTypeName("");
+                              setNewSubTypeTurnType("F");
+                              setNewSubTypeEventsCount(1);
+                              setNewSubTypePrice("");
+                            }}
+                          >
+                            Annulla
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowSubscriptionTypeForm(true)}
+                      data-testid="button-show-sub-type-form"
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      Aggiungi Tipo
+                    </Button>
+                  )}
                 </div>
 
                 <DialogFooter>
@@ -2914,6 +3085,142 @@ export default function SiaeTicketedEventsPage() {
                     </FormItem>
                   )}
                 />
+              </div>
+
+              <div className="space-y-4 rounded-lg border p-4 bg-muted/30">
+                <div className="flex items-center gap-2">
+                  <Package className="w-4 h-4 text-[#FFD700]" />
+                  <h4 className="font-medium">Tipi Abbonamento (Opzionale)</h4>
+                </div>
+                
+                {pendingSubscriptionTypes.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {pendingSubscriptionTypes.map((subType, index) => (
+                      <div
+                        key={index}
+                        className="flex items-center gap-2 px-3 py-2 rounded-md bg-background border text-sm"
+                        data-testid={`mobile-pending-sub-type-${index}`}
+                      >
+                        <span className="font-medium">{subType.name}</span>
+                        <span className="text-muted-foreground">-</span>
+                        <span>{subType.eventsCount} eventi</span>
+                        <span className="text-muted-foreground">-</span>
+                        <span className="text-[#FFD700]">{"\u20AC"}{subType.price}</span>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-5 w-5 ml-1"
+                          onClick={() => {
+                            setPendingSubscriptionTypes(prev => prev.filter((_, i) => i !== index));
+                          }}
+                          data-testid={`mobile-remove-sub-type-${index}`}
+                        >
+                          <XCircle className="w-3 h-3" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {showSubscriptionTypeForm ? (
+                  <div className="space-y-3 p-3 rounded-md bg-background/50 border">
+                    <div>
+                      <Label className="text-xs">Nome</Label>
+                      <Input
+                        value={newSubTypeName}
+                        onChange={(e) => setNewSubTypeName(e.target.value)}
+                        placeholder="es. Pass 3 Giorni"
+                        data-testid="mobile-input-new-sub-type-name"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <Label className="text-xs">Turno</Label>
+                        <Select value={newSubTypeTurnType} onValueChange={setNewSubTypeTurnType}>
+                          <SelectTrigger data-testid="mobile-select-new-sub-type-turn">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="F">Fisso</SelectItem>
+                            <SelectItem value="L">Libero</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label className="text-xs">N. Eventi</Label>
+                        <Input
+                          type="number"
+                          min={1}
+                          value={newSubTypeEventsCount}
+                          onChange={(e) => setNewSubTypeEventsCount(parseInt(e.target.value) || 1)}
+                          data-testid="mobile-input-new-sub-type-events"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <Label className="text-xs">Prezzo ({"\u20AC"})</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={newSubTypePrice}
+                        onChange={(e) => setNewSubTypePrice(e.target.value)}
+                        placeholder="0.00"
+                        data-testid="mobile-input-new-sub-type-price"
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={() => {
+                          if (newSubTypeName && newSubTypePrice) {
+                            setPendingSubscriptionTypes(prev => [...prev, {
+                              name: newSubTypeName,
+                              turnType: newSubTypeTurnType,
+                              eventsCount: newSubTypeEventsCount,
+                              price: newSubTypePrice,
+                            }]);
+                            setNewSubTypeName("");
+                            setNewSubTypeTurnType("F");
+                            setNewSubTypeEventsCount(1);
+                            setNewSubTypePrice("");
+                            setShowSubscriptionTypeForm(false);
+                          }
+                        }}
+                        disabled={!newSubTypeName || !newSubTypePrice}
+                        data-testid="mobile-button-add-sub-type"
+                      >
+                        Aggiungi
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setShowSubscriptionTypeForm(false);
+                          setNewSubTypeName("");
+                          setNewSubTypeTurnType("F");
+                          setNewSubTypeEventsCount(1);
+                          setNewSubTypePrice("");
+                        }}
+                      >
+                        Annulla
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowSubscriptionTypeForm(true)}
+                    data-testid="mobile-button-show-sub-type-form"
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Aggiungi Tipo
+                  </Button>
+                )}
               </div>
 
               <DialogFooter>
