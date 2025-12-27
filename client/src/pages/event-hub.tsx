@@ -2539,6 +2539,31 @@ export default function EventHub() {
                               <Hash className="h-4 w-4 mr-2" />
                               Modifica Capienza
                             </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem onClick={() => {
+                              const sector = ticketedEvent?.sectors?.find(s => s.id === selectedSectorId);
+                              if (sector) {
+                                updateSectorMutation.mutate({
+                                  id: sector.id,
+                                  active: !sector.active,
+                                });
+                              }
+                            }}>
+                              {(() => {
+                                const sector = ticketedEvent?.sectors?.find(s => s.id === selectedSectorId);
+                                return sector?.active ? (
+                                  <>
+                                    <XCircle className="h-4 w-4 mr-2" />
+                                    Disattiva Settore
+                                  </>
+                                ) : (
+                                  <>
+                                    <CheckCircle2 className="h-4 w-4 mr-2" />
+                                    Attiva Settore
+                                  </>
+                                );
+                              })()}
+                            </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </div>
@@ -4410,6 +4435,31 @@ export default function EventHub() {
                             }}>
                               <Hash className="h-4 w-4 mr-2" />
                               Modifica Capienza
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem onClick={() => {
+                              if (ticketedEvent?.sectors?.[0]) {
+                                const sector = ticketedEvent.sectors[0];
+                                updateSectorMutation.mutate({
+                                  id: sector.id,
+                                  active: !sector.active,
+                                });
+                              }
+                            }}>
+                              {(() => {
+                                const sector = ticketedEvent?.sectors?.[0];
+                                return sector?.active ? (
+                                  <>
+                                    <XCircle className="h-4 w-4 mr-2" />
+                                    Disattiva Settore
+                                  </>
+                                ) : (
+                                  <>
+                                    <CheckCircle2 className="h-4 w-4 mr-2" />
+                                    Attiva Settore
+                                  </>
+                                );
+                              })()}
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
