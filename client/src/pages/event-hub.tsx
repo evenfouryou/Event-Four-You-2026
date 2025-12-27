@@ -1356,7 +1356,7 @@ export default function EventHub() {
   const getPublicEventUrl = useCallback(() => {
     if (!event) return '';
     const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
-    return `${baseUrl}/events/${event.id}`;
+    return `${baseUrl}/acquista/${event.id}`;
   }, [event]);
 
   const copyUrlToClipboard = useCallback(() => {
