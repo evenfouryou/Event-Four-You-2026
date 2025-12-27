@@ -17,6 +17,8 @@ import {
   type SiaeEventGenre,
   type SiaeSectorCode,
   type Event,
+  type SiaeSubscription,
+  type SiaeCustomer,
 } from "@shared/schema";
 
 type SiaeTicketedEventWithCompany = SiaeTicketedEvent & {
@@ -108,6 +110,7 @@ import {
   History,
   CalendarDays,
   Palette,
+  CreditCard,
 } from "lucide-react";
 import { Link, useRoute } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
@@ -131,6 +134,18 @@ const sectorFormSchema = z.object({
 });
 type SectorFormData = z.infer<typeof sectorFormSchema>;
 
+const subscriptionFormSchema = z.object({
+  customerId: z.string().min(1, "Seleziona un cliente"),
+  turnType: z.enum(["F", "L"]),
+  eventsCount: z.coerce.number().min(1),
+  validFrom: z.string().min(1, "Data inizio richiesta"),
+  validTo: z.string().min(1, "Data fine richiesta"),
+  totalAmount: z.coerce.number().min(0),
+  holderFirstName: z.string().min(1, "Nome richiesto"),
+  holderLastName: z.string().min(1, "Cognome richiesto"),
+});
+type SubscriptionFormData = z.infer<typeof subscriptionFormSchema>;
+
 export default function SiaeTicketedEventsPage() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -140,7 +155,9 @@ export default function SiaeTicketedEventsPage() {
   
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isSectorDialogOpen, setIsSectorDialogOpen] = useState(false);
+  const [isSubscriptionDialogOpen, setIsSubscriptionDialogOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<SiaeTicketedEvent | null>(null);
+  const [selectedSubscriptionForEdit, setSelectedSubscriptionForEdit] = useState<SiaeSubscription | null>(null);
   const [expandedEventId, setExpandedEventId] = useState<string | null>(urlEventId || null);
   const [publicInfoImageUrl, setPublicInfoImageUrl] = useState("");
   const [publicInfoDescription, setPublicInfoDescription] = useState("");
@@ -216,6 +233,16 @@ export default function SiaeTicketedEventsPage() {
     enabled: !!expandedEventId,
   });
 
+  const { data: eventSubscriptions, isLoading: subscriptionsLoading } = useQuery<SiaeSubscription[]>({
+    queryKey: ['/api/siae/ticketed-events', expandedEventId, 'subscriptions'],
+    enabled: !!expandedEventId,
+  });
+
+  const { data: customers } = useQuery<SiaeCustomer[]>({
+    queryKey: ['/api/siae/customers'],
+    enabled: !!companyId,
+  });
+
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -245,6 +272,20 @@ export default function SiaeTicketedEventsPage() {
       ivaRate: "22",
       sortOrder: 0,
       active: true,
+    },
+  });
+
+  const subscriptionForm = useForm<SubscriptionFormData>({
+    resolver: zodResolver(subscriptionFormSchema),
+    defaultValues: {
+      customerId: "",
+      turnType: "F",
+      eventsCount: 10,
+      validFrom: "",
+      validTo: "",
+      totalAmount: 0,
+      holderFirstName: "",
+      holderLastName: "",
     },
   });
 
@@ -284,6 +325,21 @@ export default function SiaeTicketedEventsPage() {
       });
     }
   }, [isSectorDialogOpen, sectorForm]);
+
+  useEffect(() => {
+    if (!isSubscriptionDialogOpen) {
+      subscriptionForm.reset({
+        customerId: "",
+        turnType: "F",
+        eventsCount: 10,
+        validFrom: "",
+        validTo: "",
+        totalAmount: 0,
+        holderFirstName: "",
+        holderLastName: "",
+      });
+    }
+  }, [isSubscriptionDialogOpen, subscriptionForm]);
 
   // Auto-set price to 0 when Omaggio is selected
   useEffect(() => {
@@ -387,6 +443,35 @@ export default function SiaeTicketedEventsPage() {
       toast({
         title: "Informazioni Salvate",
         description: "Le informazioni pubbliche sono state aggiornate.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Errore",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const createSubscriptionMutation = useMutation({
+    mutationFn: async (data: SubscriptionFormData & { ticketedEventId: string }) => {
+      const response = await apiRequest("POST", `/api/siae/ticketed-events/${data.ticketedEventId}/subscriptions`, {
+        ...data,
+        companyId,
+        validFrom: new Date(data.validFrom).toISOString(),
+        validTo: new Date(data.validTo).toISOString(),
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ 
+        predicate: (q) => (q.queryKey[0] as string)?.includes('subscriptions') || false 
+      });
+      setIsSubscriptionDialogOpen(false);
+      toast({
+        title: "Abbonamento Creato",
+        description: "L'abbonamento è stato creato con successo.",
       });
     },
     onError: (error: Error) => {
@@ -913,6 +998,77 @@ export default function SiaeTicketedEventsPage() {
                                   <Badge className="bg-emerald-500/20 text-emerald-400">Attivo</Badge>
                                 ) : (
                                   <Badge variant="secondary">Inattivo</Badge>
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    )}
+                  </div>
+
+                  {/* Subscriptions Section */}
+                  <div className="mt-6 space-y-4" data-testid={`section-subscriptions-${ticketedEvent.id}`}>
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-medium flex items-center gap-2">
+                        <CreditCard className="w-4 h-4" />
+                        Abbonamenti
+                      </h4>
+                      <Button
+                        size="sm"
+                        onClick={() => {
+                          setSelectedEvent(ticketedEvent);
+                          setIsSubscriptionDialogOpen(true);
+                        }}
+                        data-testid={`button-add-subscription-${ticketedEvent.id}`}
+                      >
+                        <Plus className="w-4 h-4 mr-2" />
+                        Nuovo Abbonamento
+                      </Button>
+                    </div>
+
+                    {subscriptionsLoading ? (
+                      <div className="space-y-2">
+                        {[1, 2].map((i) => (
+                          <Skeleton key={i} className="h-12 w-full" />
+                        ))}
+                      </div>
+                    ) : eventSubscriptions?.length === 0 ? (
+                      <div className="p-4 text-center text-muted-foreground bg-background/50 rounded-lg border border-dashed">
+                        <CreditCard className="w-6 h-6 mx-auto mb-2 text-muted-foreground" />
+                        Nessun abbonamento collegato a questo evento.
+                      </div>
+                    ) : (
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Codice</TableHead>
+                            <TableHead>Intestatario</TableHead>
+                            <TableHead>Tipo</TableHead>
+                            <TableHead>Eventi</TableHead>
+                            <TableHead>Importo</TableHead>
+                            <TableHead>Stato</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {eventSubscriptions?.map((subscription) => (
+                            <TableRow key={subscription.id} data-testid={`row-subscription-${subscription.id}`}>
+                              <TableCell className="font-mono">{subscription.subscriptionCode}</TableCell>
+                              <TableCell className="font-medium">
+                                {subscription.holderFirstName} {subscription.holderLastName}
+                              </TableCell>
+                              <TableCell>{subscription.turnType === "F" ? "Fisso" : "Libero"}</TableCell>
+                              <TableCell>{subscription.eventsUsed}/{subscription.eventsCount}</TableCell>
+                              <TableCell className="text-[#FFD700] font-semibold">€{Number(subscription.totalAmount).toFixed(2)}</TableCell>
+                              <TableCell>
+                                {subscription.status === "active" ? (
+                                  <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30">Attivo</Badge>
+                                ) : subscription.status === "expired" ? (
+                                  <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30">Scaduto</Badge>
+                                ) : subscription.status === "cancelled" ? (
+                                  <Badge className="bg-red-500/20 text-red-400 border-red-500/30">Annullato</Badge>
+                                ) : (
+                                  <Badge variant="secondary">{subscription.status}</Badge>
                                 )}
                               </TableCell>
                             </TableRow>
@@ -1487,6 +1643,188 @@ export default function SiaeTicketedEventsPage() {
                       <>
                         <Plus className="w-4 h-4 mr-2" />
                         Crea Biglietto
+                      </>
+                    )}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </Form>
+          </DialogContent>
+        </Dialog>
+
+        {/* Create Subscription Dialog */}
+        <Dialog open={isSubscriptionDialogOpen} onOpenChange={setIsSubscriptionDialogOpen}>
+          <DialogContent className="max-w-lg" data-testid="dialog-create-subscription">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <CreditCard className="w-5 h-5 text-[#FFD700]" />
+                Nuovo Abbonamento
+              </DialogTitle>
+              <DialogDescription>
+                Crea un abbonamento per l'evento {selectedEvent ? availableEvents?.find(e => e.id === selectedEvent.eventId)?.name : ""}
+              </DialogDescription>
+            </DialogHeader>
+            <Form {...subscriptionForm}>
+              <form onSubmit={subscriptionForm.handleSubmit((data) => {
+                if (!selectedEvent) return;
+                createSubscriptionMutation.mutate({ ...data, ticketedEventId: selectedEvent.id });
+              })} className="space-y-4" data-testid="form-create-subscription">
+                <FormField
+                  control={subscriptionForm.control}
+                  name="customerId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Cliente</FormLabel>
+                      <Select 
+                        onValueChange={(value) => {
+                          field.onChange(value);
+                          const customer = customers?.find(c => c.id === value);
+                          if (customer) {
+                            subscriptionForm.setValue('holderFirstName', customer.firstName || '');
+                            subscriptionForm.setValue('holderLastName', customer.lastName || '');
+                          }
+                        }} 
+                        value={field.value}
+                      >
+                        <FormControl>
+                          <SelectTrigger data-testid="select-customer">
+                            <SelectValue placeholder="Seleziona cliente" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {customers?.map((customer) => (
+                            <SelectItem key={customer.id} value={customer.id}>
+                              {customer.firstName} {customer.lastName} - {customer.uniqueCode}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={subscriptionForm.control}
+                    name="holderFirstName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Nome Intestatario</FormLabel>
+                        <FormControl>
+                          <Input {...field} data-testid="input-holder-first-name" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={subscriptionForm.control}
+                    name="holderLastName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Cognome Intestatario</FormLabel>
+                        <FormControl>
+                          <Input {...field} data-testid="input-holder-last-name" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={subscriptionForm.control}
+                    name="turnType"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Tipo Turno</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-turn-type">
+                              <SelectValue />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="F">Fisso</SelectItem>
+                            <SelectItem value="L">Libero</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={subscriptionForm.control}
+                    name="eventsCount"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>N. Eventi</FormLabel>
+                        <FormControl>
+                          <Input type="number" {...field} data-testid="input-events-count" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={subscriptionForm.control}
+                    name="validFrom"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Validità Da</FormLabel>
+                        <FormControl>
+                          <Input type="date" {...field} data-testid="input-valid-from" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={subscriptionForm.control}
+                    name="validTo"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Validità A</FormLabel>
+                        <FormControl>
+                          <Input type="date" {...field} data-testid="input-valid-to" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <FormField
+                  control={subscriptionForm.control}
+                  name="totalAmount"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Importo Totale (€)</FormLabel>
+                      <FormControl>
+                        <div className="relative">
+                          <Euro className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                          <Input type="number" step="0.01" {...field} className="pl-9" data-testid="input-amount" />
+                        </div>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <DialogFooter>
+                  <Button type="button" variant="outline" onClick={() => setIsSubscriptionDialogOpen(false)}>
+                    Annulla
+                  </Button>
+                  <Button type="submit" disabled={createSubscriptionMutation.isPending} data-testid="button-submit-subscription">
+                    {createSubscriptionMutation.isPending ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Creazione...
+                      </>
+                    ) : (
+                      <>
+                        <Plus className="w-4 h-4 mr-2" />
+                        Crea Abbonamento
                       </>
                     )}
                   </Button>
