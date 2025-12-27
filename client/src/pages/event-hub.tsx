@@ -739,6 +739,12 @@ export default function EventHub() {
     enabled: !!ticketedEvent?.id,
   });
 
+  // Subscription Types query
+  const { data: subscriptionTypes = [] } = useQuery<any[]>({
+    queryKey: ['/api/siae/ticketed-events', ticketedEvent?.id, 'subscription-types'],
+    enabled: !!ticketedEvent?.id,
+  });
+
   const { data: users = [] } = useQuery<User[]>({
     queryKey: ['/api/users'],
   });
@@ -1966,9 +1972,9 @@ export default function EventHub() {
                           <CardTitle>Settori e Tipologie</CardTitle>
                           <CardDescription>Seleziona un settore per visualizzare i biglietti emessi</CardDescription>
                         </div>
-                        <Button onClick={() => navigate(`/siae/box-office?eventId=${id}`)} data-testid="button-box-office">
-                          <Plus className="h-4 w-4 mr-2" />
-                          Nuovo Biglietto
+                        <Button onClick={() => navigate('/siae/ticketed-events')} data-testid="button-manage-ticketing">
+                          <Settings className="h-4 w-4 mr-2" />
+                          Gestisci Biglietteria
                         </Button>
                       </CardHeader>
                       <CardContent>
@@ -2028,6 +2034,84 @@ export default function EventHub() {
                         )}
                       </CardContent>
                     </Card>
+
+                    {/* Subscription Types Section */}
+                    <Card>
+                      <CardHeader className="flex flex-row items-center justify-between gap-4">
+                        <div>
+                          <CardTitle>Abbonamenti</CardTitle>
+                          <CardDescription>Tipologie di abbonamento per questo evento</CardDescription>
+                        </div>
+                        <Button onClick={() => navigate('/siae/ticketed-events')} data-testid="button-manage-subscriptions">
+                          <Settings className="h-4 w-4 mr-2" />
+                          Gestisci Abbonamenti
+                        </Button>
+                      </CardHeader>
+                      <CardContent>
+                        {!subscriptionTypes || subscriptionTypes.length === 0 ? (
+                          <div className="text-center py-12 text-muted-foreground">
+                            <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                            <p>Nessun tipo di abbonamento configurato</p>
+                            <p className="text-sm mt-2">Configura gli abbonamenti dalla gestione biglietteria</p>
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                            {subscriptionTypes.map((subType: any) => {
+                              const soldCount = subType.soldCount || 0;
+                              const maxQuantity = subType.maxQuantity || 0;
+                              const isSoldOut = maxQuantity > 0 && soldCount >= maxQuantity;
+                              
+                              return (
+                                <Card 
+                                  key={subType.id} 
+                                  className="hover-elevate transition-all" 
+                                  data-testid={`subscription-type-card-${subType.id}`}
+                                >
+                                  <CardHeader className="pb-2">
+                                    <div className="flex items-start justify-between gap-2">
+                                      <CardTitle className="text-lg">{subType.name}</CardTitle>
+                                      <Badge variant={isSoldOut ? 'destructive' : subType.active !== false ? 'default' : 'secondary'}>
+                                        {isSoldOut ? 'Esaurito' : subType.active !== false ? 'Attivo' : 'Disattivato'}
+                                      </Badge>
+                                    </div>
+                                    <CardDescription>
+                                      €{Number(subType.price || 0).toFixed(2)}
+                                    </CardDescription>
+                                  </CardHeader>
+                                  <CardContent>
+                                    <div className="space-y-3">
+                                      <div className="flex justify-between text-sm">
+                                        <span className="text-muted-foreground">Tipo Turno</span>
+                                        <Badge variant="outline">
+                                          {subType.turnType === 'fixed' ? 'Fisso' : 'Libero'}
+                                        </Badge>
+                                      </div>
+                                      <div className="flex justify-between text-sm">
+                                        <span className="text-muted-foreground">Eventi</span>
+                                        <span className="font-medium">{subType.eventsCount || 0}</span>
+                                      </div>
+                                      <div className="flex justify-between text-sm">
+                                        <span className="text-muted-foreground">Venduti</span>
+                                        <span className="font-semibold text-blue-400">{soldCount}</span>
+                                      </div>
+                                      {maxQuantity > 0 && (
+                                        <>
+                                          <div className="flex justify-between text-sm">
+                                            <span className="text-muted-foreground">Disponibili</span>
+                                            <span className="font-medium">{maxQuantity}</span>
+                                          </div>
+                                          <Progress value={maxQuantity > 0 ? (soldCount / maxQuantity) * 100 : 0} className="h-2" />
+                                        </>
+                                      )}
+                                    </div>
+                                  </CardContent>
+                                </Card>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
                   </div>
                 ) : (
                   <Card>
@@ -2053,9 +2137,9 @@ export default function EventHub() {
                             <SelectItem value="cancelled">Annullati</SelectItem>
                           </SelectContent>
                         </Select>
-                        <Button onClick={() => navigate(`/siae/box-office?eventId=${id}`)} data-testid="button-box-office-sector">
-                          <Plus className="h-4 w-4 mr-2" />
-                          Nuovo
+                        <Button onClick={() => navigate('/siae/ticketed-events')} data-testid="button-manage-ticketing-sector">
+                          <Settings className="h-4 w-4 mr-2" />
+                          Gestisci
                         </Button>
                       </div>
                     </CardHeader>
@@ -3900,12 +3984,12 @@ export default function EventHub() {
                         <HapticButton
                           variant="outline"
                           size="sm"
-                          onClick={() => navigate(`/siae/box-office?eventId=${id}`)}
-                          data-testid="btn-new-ticket-mobile"
+                          onClick={() => navigate('/siae/ticketed-events')}
+                          data-testid="btn-manage-ticketing-mobile"
                           className="min-h-[44px]"
                         >
-                          <Plus className="h-4 w-4 mr-2" />
-                          Nuovo
+                          <Settings className="h-4 w-4 mr-2" />
+                          Gestisci
                         </HapticButton>
                       </CardHeader>
                       <CardContent className="px-4">
@@ -3956,6 +4040,86 @@ export default function EventHub() {
                           <div className="text-center py-8 text-muted-foreground">
                             <Ticket className="h-8 w-8 mx-auto mb-2 opacity-50" />
                             <p>Nessun settore configurato</p>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+
+                    {/* Subscription Types Section - Mobile */}
+                    <Card className="glass-card">
+                      <CardHeader className="flex flex-row items-center justify-between gap-2 px-4">
+                        <CardTitle className="flex items-center gap-2 text-lg">
+                          <Users className="h-5 w-5 text-purple-400" />
+                          Abbonamenti
+                        </CardTitle>
+                        <HapticButton
+                          variant="outline"
+                          size="sm"
+                          onClick={() => navigate('/siae/ticketed-events')}
+                          data-testid="btn-manage-subscriptions-mobile"
+                          className="min-h-[44px]"
+                        >
+                          <Settings className="h-4 w-4 mr-2" />
+                          Gestisci
+                        </HapticButton>
+                      </CardHeader>
+                      <CardContent className="px-4">
+                        {subscriptionTypes && subscriptionTypes.length > 0 ? (
+                          <div className="space-y-3">
+                            {subscriptionTypes.map((subType: any) => {
+                              const soldCount = subType.soldCount || 0;
+                              const maxQuantity = subType.maxQuantity || 0;
+                              const isSoldOut = maxQuantity > 0 && soldCount >= maxQuantity;
+                              
+                              return (
+                                <motion.div 
+                                  key={subType.id} 
+                                  className="p-4 rounded-xl bg-background/50 border"
+                                  data-testid={`subscription-type-card-mobile-${subType.id}`}
+                                  whileTap={{ scale: 0.98 }}
+                                  transition={springConfig}
+                                >
+                                  <div className="flex items-center justify-between gap-4 mb-3">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      <h4 className="font-medium text-base">{subType.name}</h4>
+                                      <Badge variant={isSoldOut ? 'destructive' : subType.active !== false ? 'default' : 'secondary'} className="text-xs">
+                                        {isSoldOut ? 'Esaurito' : subType.active !== false ? 'Attivo' : 'Disattivato'}
+                                      </Badge>
+                                    </div>
+                                    <Badge variant="outline" className="text-xs">
+                                      {subType.turnType === 'fixed' ? 'Fisso' : 'Libero'}
+                                    </Badge>
+                                  </div>
+                                  <div className="flex items-center gap-3 text-sm text-muted-foreground mb-2">
+                                    <span>€{Number(subType.price || 0).toFixed(2)}</span>
+                                    <span>•</span>
+                                    <span>{subType.eventsCount || 0} eventi</span>
+                                  </div>
+                                  {maxQuantity > 0 && (
+                                    <>
+                                      <Progress value={maxQuantity > 0 ? (soldCount / maxQuantity) * 100 : 0} className="h-2 mb-2" />
+                                      <div className="flex items-center justify-between text-sm">
+                                        <span className="text-muted-foreground">
+                                          <span className="font-semibold text-blue-400">{soldCount}</span>/{maxQuantity} venduti
+                                        </span>
+                                      </div>
+                                    </>
+                                  )}
+                                  {!maxQuantity && (
+                                    <div className="flex items-center justify-between text-sm">
+                                      <span className="text-muted-foreground">
+                                        <span className="font-semibold text-blue-400">{soldCount}</span> venduti
+                                      </span>
+                                    </div>
+                                  )}
+                                </motion.div>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <div className="text-center py-8 text-muted-foreground">
+                            <Users className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                            <p>Nessun abbonamento configurato</p>
                           </div>
                         )}
                       </CardContent>
