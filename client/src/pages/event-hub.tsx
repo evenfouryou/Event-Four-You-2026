@@ -2544,7 +2544,7 @@ export default function EventHub() {
                               const sector = ticketedEvent?.sectors?.find(s => s.id === selectedSectorId);
                               if (sector) {
                                 updateSectorMutation.mutate({
-                                  id: sector.id,
+                                  ...sector,
                                   active: !sector.active,
                                 });
                               }
@@ -4441,7 +4441,7 @@ export default function EventHub() {
                               if (ticketedEvent?.sectors?.[0]) {
                                 const sector = ticketedEvent.sectors[0];
                                 updateSectorMutation.mutate({
-                                  id: sector.id,
+                                  ...sector,
                                   active: !sector.active,
                                 });
                               }
