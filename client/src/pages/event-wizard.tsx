@@ -458,6 +458,28 @@ export default function EventWizard() {
               }
             }
             
+            // Handle subscription types for existing events
+            if (ticketedEventId && siaeSubscriptionsEnabled) {
+              // Check if subscription types already exist
+              const existingTypesResponse = await apiRequest('GET', `/api/siae/ticketed-events/${ticketedEventId}/subscription-types`);
+              const existingTypes = await existingTypesResponse.json();
+              
+              if (!existingTypes || existingTypes.length === 0) {
+                // Create new subscription type
+                const selectedGenre = siaeGenres?.find(g => g.code === siaeGenreCode);
+                const genreVatRate = selectedGenre?.vatRate || '22';
+                
+                await apiRequest('POST', `/api/siae/ticketed-events/${ticketedEventId}/subscription-types`, {
+                  name: `Abbonamento ${siaeSubscriptionEventsCount} ingressi`,
+                  description: siaeSubscriptionTurnType === 'F' ? 'Turno Fisso' : 'Turno Libero',
+                  turnType: siaeSubscriptionTurnType,
+                  eventsCount: siaeSubscriptionEventsCount,
+                  price: siaeSubscriptionPrice,
+                  ivaRate: genreVatRate,
+                });
+              }
+            }
+            
             toast({
               title: "Successo",
               description: "Evento con biglietteria SIAE aggiornato con successo",
@@ -486,6 +508,21 @@ export default function EventWizard() {
                   ivaRate: genreVatRate,
                 });
               }
+            }
+            
+            // Create subscription type if enabled
+            if (siaeEvent?.id && siaeSubscriptionsEnabled) {
+              const selectedGenre = siaeGenres?.find(g => g.code === siaeGenreCode);
+              const genreVatRate = selectedGenre?.vatRate || '22';
+              
+              await apiRequest('POST', `/api/siae/ticketed-events/${siaeEvent.id}/subscription-types`, {
+                name: `Abbonamento ${siaeSubscriptionEventsCount} ingressi`,
+                description: siaeSubscriptionTurnType === 'F' ? 'Turno Fisso' : 'Turno Libero',
+                turnType: siaeSubscriptionTurnType,
+                eventsCount: siaeSubscriptionEventsCount,
+                price: siaeSubscriptionPrice,
+                ivaRate: genreVatRate,
+              });
             }
             
             toast({
