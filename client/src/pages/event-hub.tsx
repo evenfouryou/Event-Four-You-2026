@@ -1,6 +1,9 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useParams, Link, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
@@ -8,6 +11,14 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { MobileAppLayout, MobileHeader, HapticButton, triggerHaptic } from "@/components/mobile-primitives";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -158,6 +169,20 @@ import type {
 } from "@shared/schema";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+
+const sectorFormSchema = z.object({
+  name: z.string().min(1, "Nome biglietto richiesto"),
+  sectorCode: z.string().min(1, "Codice settore richiesto"),
+  capacity: z.number().min(1, "Quantità richiesta"),
+  isNumbered: z.boolean().default(false),
+  ticketType: z.enum(['INT', 'RID', 'OMA']),
+  price: z.string().default("0"),
+  ddp: z.string().default("0"),
+  ivaRate: z.string().default("22"),
+  sortOrder: z.number().default(0),
+  active: z.boolean().default(true),
+});
+type SectorFormData = z.infer<typeof sectorFormSchema>;
 
 const statusConfig: Record<string, { label: string; color: string; bgColor: string; icon: React.ElementType; gradient: string }> = {
   draft: { label: 'Bozza', color: 'text-slate-400', bgColor: 'bg-slate-500/20', icon: Circle, gradient: 'from-slate-500 to-slate-600' },
@@ -679,6 +704,9 @@ export default function EventHub() {
   const [transactionStatusFilter, setTransactionStatusFilter] = useState<string>("all");
   const [transactionsDisplayLimit, setTransactionsDisplayLimit] = useState(20);
 
+  // Sector creation dialog state
+  const [isSectorDialogOpen, setIsSectorDialogOpen] = useState(false);
+
   // Reset pagination when transaction filters change
   useEffect(() => {
     setTransactionsDisplayLimit(20);
@@ -744,6 +772,80 @@ export default function EventHub() {
     queryKey: ['/api/siae/ticketed-events', ticketedEvent?.id, 'subscription-types'],
     enabled: !!ticketedEvent?.id,
   });
+
+  // Sector codes for the new sector dialog
+  const { data: sectorCodes } = useQuery<any[]>({
+    queryKey: ['/api/siae/sector-codes'],
+    enabled: isSectorDialogOpen,
+  });
+
+  // Sector creation form
+  const sectorForm = useForm<SectorFormData>({
+    resolver: zodResolver(sectorFormSchema),
+    defaultValues: {
+      name: "",
+      sectorCode: "",
+      capacity: 100,
+      isNumbered: false,
+      ticketType: "INT",
+      price: "0",
+      ddp: "0",
+      ivaRate: "22",
+      sortOrder: 0,
+      active: true,
+    },
+  });
+
+  const watchedTicketType = sectorForm.watch("ticketType");
+
+  // Auto-set price to 0 when Omaggio is selected
+  useEffect(() => {
+    if (watchedTicketType === 'OMA') {
+      sectorForm.setValue('price', '0');
+    }
+  }, [watchedTicketType, sectorForm]);
+
+  // Reset form when dialog closes
+  useEffect(() => {
+    if (!isSectorDialogOpen) {
+      sectorForm.reset();
+    }
+  }, [isSectorDialogOpen, sectorForm]);
+
+  const createSectorMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const response = await apiRequest("POST", `/api/siae/event-sectors`, { ...data, ticketedEventId: ticketedEvent?.id });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/siae/events', id, 'ticketing'] });
+      setIsSectorDialogOpen(false);
+      sectorForm.reset();
+      toast({ title: "Biglietto creato con successo" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Errore", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const onSubmitSector = (data: SectorFormData) => {
+    const priceValue = data.ticketType === 'OMA' ? '0' : (data.price || '0');
+    const submitData = {
+      sectorCode: data.sectorCode,
+      name: data.name,
+      capacity: data.capacity,
+      availableSeats: data.capacity,
+      isNumbered: data.isNumbered,
+      priceIntero: data.ticketType === 'INT' ? priceValue : '0',
+      priceRidotto: data.ticketType === 'RID' ? priceValue : '0',
+      priceOmaggio: '0',
+      prevendita: data.ddp || '0',
+      ivaRate: data.ivaRate,
+      sortOrder: data.sortOrder,
+      active: data.active,
+    };
+    createSectorMutation.mutate(submitData);
+  };
 
   const { data: users = [] } = useQuery<User[]>({
     queryKey: ['/api/users'],
@@ -1972,9 +2074,9 @@ export default function EventHub() {
                           <CardTitle>Settori e Tipologie</CardTitle>
                           <CardDescription>Seleziona un settore per visualizzare i biglietti emessi</CardDescription>
                         </div>
-                        <Button onClick={() => navigate('/siae/ticketed-events')} data-testid="button-manage-ticketing">
-                          <Settings className="h-4 w-4 mr-2" />
-                          Gestisci Biglietteria
+                        <Button onClick={() => setIsSectorDialogOpen(true)} data-testid="button-new-ticket">
+                          <Plus className="w-4 h-4 mr-2" />
+                          Nuovo Biglietto
                         </Button>
                       </CardHeader>
                       <CardContent>
@@ -6604,6 +6706,168 @@ export default function EventHub() {
               )}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Sector Creation Dialog */}
+      <Dialog open={isSectorDialogOpen} onOpenChange={setIsSectorDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Nuovo Biglietto</DialogTitle>
+            <DialogDescription>
+              Crea un nuovo tipo di biglietto per questo evento
+            </DialogDescription>
+          </DialogHeader>
+          <Form {...sectorForm}>
+            <form onSubmit={sectorForm.handleSubmit(onSubmitSector)} className="space-y-4">
+              <FormField
+                control={sectorForm.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Nome Biglietto</FormLabel>
+                    <FormControl>
+                      <Input placeholder="es. Ingresso Generale" {...field} data-testid="input-sector-name" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={sectorForm.control}
+                name="sectorCode"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Codice Settore</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-sector-code">
+                          <SelectValue placeholder="Seleziona codice settore" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {sectorCodes?.map((code: any) => (
+                          <SelectItem key={code.code} value={code.code}>
+                            {code.code} - {code.description}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={sectorForm.control}
+                name="capacity"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Quantità</FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="number" 
+                        min={1} 
+                        {...field} 
+                        onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                        data-testid="input-sector-capacity" 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={sectorForm.control}
+                name="ticketType"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Tipo Biglietto</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-ticket-type">
+                          <SelectValue placeholder="Seleziona tipo" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="INT">Intero</SelectItem>
+                        <SelectItem value="RID">Ridotto</SelectItem>
+                        <SelectItem value="OMA">Omaggio</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {watchedTicketType !== 'OMA' && (
+                <FormField
+                  control={sectorForm.control}
+                  name="price"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Prezzo (€)</FormLabel>
+                      <FormControl>
+                        <Input 
+                          type="number" 
+                          step="0.01" 
+                          min="0" 
+                          {...field} 
+                          data-testid="input-sector-price" 
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
+
+              <FormField
+                control={sectorForm.control}
+                name="ivaRate"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Aliquota IVA</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-iva-rate">
+                          <SelectValue placeholder="Seleziona IVA" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="10">10%</SelectItem>
+                        <SelectItem value="22">22%</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <DialogFooter className="pt-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsSectorDialogOpen(false)}
+                >
+                  Annulla
+                </Button>
+                <Button 
+                  type="submit" 
+                  disabled={createSectorMutation.isPending}
+                  data-testid="button-submit-sector"
+                >
+                  {createSectorMutation.isPending ? (
+                    <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Creazione...</>
+                  ) : (
+                    'Crea Biglietto'
+                  )}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
         </DialogContent>
       </Dialog>
 
