@@ -281,72 +281,102 @@ export default function SiaeReportC2() {
   const PrintableQuadroB = () => (
     <>
       <div className="border border-black mb-4">
-        <div className="bg-gray-100 px-2 py-1 font-bold border-b border-black">
+        <div className="bg-gray-100 px-2 py-1 font-bold border-b border-black text-xs">
           QUADRO B - Abbonamenti
         </div>
-        <table className="w-full text-xs">
+        <table className="w-full text-[10px] border-collapse" style={{ tableLayout: 'fixed' }}>
+          <colgroup>
+            <col style={{ width: '10%' }} />
+            <col style={{ width: '18%' }} />
+            <col style={{ width: '12%' }} />
+            <col style={{ width: '8%' }} />
+            <col style={{ width: '12%' }} />
+            <col style={{ width: '16%' }} />
+            <col style={{ width: '12%' }} />
+            <col style={{ width: '12%' }} />
+          </colgroup>
           <thead>
             <tr className="bg-gray-50">
-              <th className="border border-black p-2 text-left" rowSpan={2}>TIPO TITOLO (1)</th>
-              <th className="border border-black p-2 text-center" rowSpan={2}>CODICE ABBONAMENTO</th>
-              <th className="border border-black p-2 text-center">INTRATTENIMENTI</th>
-              <th className="border border-black p-2 text-center">FISSO</th>
-              <th className="border border-black p-2 text-right" rowSpan={2}>NUMERO VENDUTI</th>
-              <th className="border border-black p-2 text-right" rowSpan={2}>IMPORTO LORDO INCASSATO</th>
-              <th className="border border-black p-2 text-center" rowSpan={2}>ABBONAMENTI ANNULLATI</th>
-              <th className="border border-black p-2 text-center" rowSpan={2}>NUMERO EVENTI</th>
+              <th className="border border-black px-1 py-2 text-center align-middle" rowSpan={2}>
+                <div className="text-[9px] leading-tight">TIPO<br/>TITOLO<br/>(1)</div>
+              </th>
+              <th className="border border-black px-1 py-2 text-center align-middle" rowSpan={2}>
+                <div className="text-[9px] leading-tight">CODICE<br/>ABBONAMENTO</div>
+              </th>
+              <th className="border border-black px-1 py-1 text-center align-middle">
+                <div className="text-[9px] leading-tight">INTRATTENIMENTI</div>
+              </th>
+              <th className="border border-black px-1 py-1 text-center align-middle">
+                <div className="text-[9px] leading-tight">FISSO</div>
+              </th>
+              <th className="border border-black px-1 py-2 text-center align-middle" rowSpan={2}>
+                <div className="text-[9px] leading-tight">NUMERO<br/>VENDUTI</div>
+              </th>
+              <th className="border border-black px-1 py-2 text-center align-middle" rowSpan={2}>
+                <div className="text-[9px] leading-tight">IMPORTO LORDO<br/>INCASSATO</div>
+              </th>
+              <th className="border border-black px-1 py-2 text-center align-middle" rowSpan={2}>
+                <div className="text-[9px] leading-tight">ABBONAMENTI<br/>ANNULLATI</div>
+              </th>
+              <th className="border border-black px-1 py-2 text-center align-middle" rowSpan={2}>
+                <div className="text-[9px] leading-tight">NUMERO<br/>EVENTI</div>
+              </th>
             </tr>
             <tr className="bg-gray-50">
-              <th className="border border-black p-2 text-center">SPETTACOLO</th>
-              <th className="border border-black p-2 text-center">LIBERO</th>
+              <th className="border border-black px-1 py-1 text-center align-middle">
+                <div className="text-[9px] leading-tight">SPETTACOLO</div>
+              </th>
+              <th className="border border-black px-1 py-1 text-center align-middle">
+                <div className="text-[9px] leading-tight">LIBERO</div>
+              </th>
             </tr>
           </thead>
           <tbody>
             {report.quadroB?.righeDettaglio && report.quadroB.righeDettaglio.length > 0 ? (
               report.quadroB.righeDettaglio.map((riga, index) => (
                 <tr key={`riga-${index}`}>
-                  <td className="border border-black p-2" title={riga.tipoTitoloDescrizione}>{riga.tipoTitolo}</td>
-                  <td className="border border-black p-2 text-center font-mono">{riga.codiceAbbonamento}</td>
-                  <td className="border border-black p-2 text-center">{riga.tipoSpettacolo === 'I' ? 'Intrattenimenti' : 'Spettacolo'}</td>
-                  <td className="border border-black p-2 text-center">{riga.turnoAbbonamento}</td>
-                  <td className="border border-black p-2 text-right">{riga.numeroVenduti}</td>
-                  <td className="border border-black p-2 text-right">{riga.importoLordoIncassato.toFixed(2)}</td>
-                  <td className="border border-black p-2 text-center">{riga.numeroAnnullati > 0 ? riga.numeroAnnullati : 0}</td>
-                  <td className="border border-black p-2 text-center">{riga.numeroEventi}</td>
+                  <td className="border border-black px-1 py-1 text-center" title={riga.tipoTitoloDescrizione}>{riga.tipoTitolo}</td>
+                  <td className="border border-black px-1 py-1 text-center font-mono text-[9px]">{riga.codiceAbbonamento}</td>
+                  <td className="border border-black px-1 py-1 text-center text-[9px]">{riga.tipoSpettacolo === 'I' ? 'Intrattenimenti' : 'Spettacolo'}</td>
+                  <td className="border border-black px-1 py-1 text-center">{riga.turnoAbbonamento}</td>
+                  <td className="border border-black px-1 py-1 text-right">{riga.numeroVenduti}</td>
+                  <td className="border border-black px-1 py-1 text-right">{riga.importoLordoIncassato.toFixed(2)}</td>
+                  <td className="border border-black px-1 py-1 text-center">{riga.numeroAnnullati > 0 ? riga.numeroAnnullati : 0}</td>
+                  <td className="border border-black px-1 py-1 text-center">{riga.numeroEventi}</td>
                 </tr>
               ))
             ) : report.subscriptions && report.subscriptions.length > 0 ? (
               report.subscriptions.map((sub, index) => (
                 <tr key={sub.id || index}>
-                  <td className="border border-black p-2">A1</td>
-                  <td className="border border-black p-2 text-center font-mono">{sub.subscriptionCode}</td>
-                  <td className="border border-black p-2 text-center">Spettacolo</td>
-                  <td className="border border-black p-2 text-center">{sub.turnType || 'F'}</td>
-                  <td className="border border-black p-2 text-right">{sub.status !== 'cancelled' ? 1 : 0}</td>
-                  <td className="border border-black p-2 text-right">{sub.totalAmount.toFixed(2)}</td>
-                  <td className="border border-black p-2 text-center">{sub.status === 'cancelled' ? 1 : 0}</td>
-                  <td className="border border-black p-2 text-center">{sub.eventsCount}</td>
+                  <td className="border border-black px-1 py-1 text-center">A1</td>
+                  <td className="border border-black px-1 py-1 text-center font-mono text-[9px]">{sub.subscriptionCode}</td>
+                  <td className="border border-black px-1 py-1 text-center text-[9px]">Spettacolo</td>
+                  <td className="border border-black px-1 py-1 text-center">{sub.turnType || 'F'}</td>
+                  <td className="border border-black px-1 py-1 text-right">{sub.status !== 'cancelled' ? 1 : 0}</td>
+                  <td className="border border-black px-1 py-1 text-right">{sub.totalAmount.toFixed(2)}</td>
+                  <td className="border border-black px-1 py-1 text-center">{sub.status === 'cancelled' ? 1 : 0}</td>
+                  <td className="border border-black px-1 py-1 text-center">{sub.eventsCount}</td>
                 </tr>
               ))
             ) : (
               <>
                 <tr>
-                  <td className="border border-black p-2 h-8" colSpan={8}></td>
+                  <td className="border border-black px-1 py-2" colSpan={8}></td>
                 </tr>
                 <tr>
-                  <td className="border border-black p-2 h-8" colSpan={8}></td>
+                  <td className="border border-black px-1 py-2" colSpan={8}></td>
                 </tr>
                 <tr>
-                  <td className="border border-black p-1 h-6" colSpan={8}></td>
+                  <td className="border border-black px-1 py-2" colSpan={8}></td>
                 </tr>
               </>
             )}
             <tr className="bg-gray-100 font-bold">
-              <td className="border border-black p-1 text-center" colSpan={4}>TOTALE</td>
-              <td className="border border-black p-1 text-right">{report.quadroB?.totaleAbbonamenti || report.summary.subscriptionsSold || 0}</td>
-              <td className="border border-black p-1 text-right">{(report.quadroB?.totaleImportoLordo || report.summary.subscriptionRevenue || 0).toFixed(2)}</td>
-              <td className="border border-black p-1 text-center">{report.quadroB?.totaleAnnullati || report.summary.subscriptionsCancelled || 0}</td>
-              <td className="border border-black p-1 text-center">-</td>
+              <td className="border border-black px-1 py-1 text-center" colSpan={4}>TOTALE</td>
+              <td className="border border-black px-1 py-1 text-right">{report.quadroB?.totaleAbbonamenti || report.summary.subscriptionsSold || 0}</td>
+              <td className="border border-black px-1 py-1 text-right">{(report.quadroB?.totaleImportoLordo || report.summary.subscriptionRevenue || 0).toFixed(2)}</td>
+              <td className="border border-black px-1 py-1 text-center">{report.quadroB?.totaleAnnullati || report.summary.subscriptionsCancelled || 0}</td>
+              <td className="border border-black px-1 py-1 text-center">-</td>
             </tr>
           </tbody>
         </table>
