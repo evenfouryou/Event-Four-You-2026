@@ -148,12 +148,39 @@ export default function SiaeTicketedEventsPage() {
   const companyId = user?.companyId;
   const isSuperAdmin = user?.role === 'super_admin';
 
-  const { data: ticketedEvents, isLoading: eventsLoading } = useQuery<SiaeTicketedEventWithCompany[]>({
+  const { data: ticketedEventsRaw, isLoading: eventsLoading } = useQuery<SiaeTicketedEventWithCompany[]>({
     queryKey: isSuperAdmin 
       ? ['/api/siae/admin/ticketed-events']
       : ['/api/siae/companies', companyId, 'ticketed-events'],
     enabled: isSuperAdmin || !!companyId,
   });
+
+  // Ordina gli eventi: prima attivi, poi passati, poi tutti gli altri
+  const sortEvents = (events: SiaeTicketedEventWithCompany[] | undefined) => {
+    if (!events) return undefined;
+    
+    const now = new Date();
+    
+    return [...events].sort((a, b) => {
+      // Priorità dello stato
+      const getStatusPriority = (event: SiaeTicketedEventWithCompany) => {
+        if (event.ticketingStatus === 'active') return 0; // Prima gli attivi
+        if (event.ticketingStatus === 'closed') return 1; // Poi i chiusi/passati
+        if (event.ticketingStatus === 'suspended') return 1; // Sospesi come passati
+        return 2; // Draft e altri alla fine
+      };
+      
+      const priorityDiff = getStatusPriority(a) - getStatusPriority(b);
+      if (priorityDiff !== 0) return priorityDiff;
+      
+      // Se stesso stato, ordina per data (più recente prima)
+      const dateA = a.eventDate ? new Date(a.eventDate) : new Date(0);
+      const dateB = b.eventDate ? new Date(b.eventDate) : new Date(0);
+      return dateB.getTime() - dateA.getTime();
+    });
+  };
+  
+  const ticketedEvents = sortEvents(ticketedEventsRaw);
 
   const eventsGroupedByCompany = isSuperAdmin && ticketedEvents
     ? ticketedEvents.reduce((groups, event) => {
