@@ -1793,8 +1793,17 @@ router.get("/api/siae/resales/available", async (req: Request, res: Response) =>
 
 router.get("/api/siae/ticketed-events/:eventId/resales", async (req: Request, res: Response) => {
   try {
-    const resales = await siaeStorage.getAvailableSiaeResalesByEvent(req.params.eventId);
+    const resales = await siaeStorage.getSiaeResalesByEvent(req.params.eventId);
     res.json(resales);
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+router.get("/api/siae/ticketed-events/:eventId/name-changes", async (req: Request, res: Response) => {
+  try {
+    const changes = await siaeStorage.getSiaeNameChangesByEvent(req.params.eventId);
+    res.json(changes);
   } catch (error: any) {
     res.status(500).json({ message: error.message });
   }

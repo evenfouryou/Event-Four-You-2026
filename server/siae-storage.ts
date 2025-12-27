@@ -228,6 +228,7 @@ export interface ISiaeStorage {
   
   getSiaeNameChanges(ticketId: string): Promise<SiaeNameChange[]>;
   getSiaeNameChangesByCompany(companyId: string): Promise<SiaeNameChange[]>;
+  getSiaeNameChangesByEvent(ticketedEventId: string): Promise<SiaeNameChange[]>;
   createSiaeNameChange(change: InsertSiaeNameChange): Promise<SiaeNameChange>;
   updateSiaeNameChange(id: string, change: Partial<SiaeNameChange>): Promise<SiaeNameChange | undefined>;
   
@@ -238,6 +239,7 @@ export interface ISiaeStorage {
   getSiaeResalesByCompany(companyId: string): Promise<SiaeResale[]>;
   getAvailableSiaeResales(): Promise<SiaeResale[]>;
   getAvailableSiaeResalesByEvent(eventId: string): Promise<SiaeResale[]>;
+  getSiaeResalesByEvent(ticketedEventId: string): Promise<SiaeResale[]>;
   getSiaeResale(id: string): Promise<SiaeResale | undefined>;
   createSiaeResale(resale: InsertSiaeResale): Promise<SiaeResale>;
   updateSiaeResale(id: string, resale: Partial<SiaeResale>): Promise<SiaeResale | undefined>;
@@ -1072,6 +1074,16 @@ export class SiaeStorage implements ISiaeStorage {
       .then(rows => rows.map(r => r.nameChange));
   }
   
+  async getSiaeNameChangesByEvent(ticketedEventId: string): Promise<SiaeNameChange[]> {
+    return await db.select({ nameChange: siaeNameChanges })
+      .from(siaeNameChanges)
+      .innerJoin(siaeTickets, eq(siaeNameChanges.originalTicketId, siaeTickets.id))
+      .innerJoin(siaeEventSectors, eq(siaeTickets.sectorId, siaeEventSectors.id))
+      .where(eq(siaeEventSectors.ticketedEventId, ticketedEventId))
+      .orderBy(desc(siaeNameChanges.createdAt))
+      .then(rows => rows.map(r => r.nameChange));
+  }
+  
   async createSiaeNameChange(change: InsertSiaeNameChange): Promise<SiaeNameChange> {
     const [created] = await db.insert(siaeNameChanges).values(change).returning();
     return created;
@@ -1125,6 +1137,16 @@ export class SiaeStorage implements ISiaeStorage {
         eq(siaeTickets.eventId, eventId)
       ))
       .orderBy(siaeResales.resalePrice)
+      .then(rows => rows.map(r => r.resale));
+  }
+  
+  async getSiaeResalesByEvent(ticketedEventId: string): Promise<SiaeResale[]> {
+    return await db.select({ resale: siaeResales })
+      .from(siaeResales)
+      .innerJoin(siaeTickets, eq(siaeResales.originalTicketId, siaeTickets.id))
+      .innerJoin(siaeEventSectors, eq(siaeTickets.sectorId, siaeEventSectors.id))
+      .where(eq(siaeEventSectors.ticketedEventId, ticketedEventId))
+      .orderBy(desc(siaeResales.createdAt))
       .then(rows => rows.map(r => r.resale));
   }
   
