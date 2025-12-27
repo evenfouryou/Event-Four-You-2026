@@ -29,6 +29,7 @@ import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -3954,107 +3955,153 @@ export default function EventHub() {
 
         {/* Sector Creation Dialog - Desktop */}
         <Dialog open={isSectorDialogOpen} onOpenChange={setIsSectorDialogOpen}>
-          <DialogContent className="sm:max-w-[500px]">
+          <DialogContent className="sm:max-w-[600px]">
             <DialogHeader>
-              <DialogTitle>Nuovo Settore</DialogTitle>
+              <DialogTitle>Nuovo Biglietto</DialogTitle>
               <DialogDescription>
-                Crea un nuovo settore per la biglietteria
+                Crea un nuovo tipo di biglietto per questo evento
               </DialogDescription>
             </DialogHeader>
             <Form {...sectorForm}>
               <form onSubmit={sectorForm.handleSubmit(onSubmitSector)} className="space-y-4">
-                <FormField
-                  control={sectorForm.control}
-                  name="name"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Nome Settore</FormLabel>
-                      <FormControl>
-                        <Input placeholder="es. Pista" {...field} data-testid="input-sector-name" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={sectorForm.control}
-                  name="capacity"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Capienza</FormLabel>
-                      <FormControl>
-                        <Input 
-                          type="number" 
-                          min={1}
-                          placeholder="100"
-                          {...field}
-                          onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
-                          data-testid="input-sector-capacity"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={sectorForm.control}
-                  name="ticketTypeCode"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Tipo Biglietto</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={sectorForm.control}
+                    name="name"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Nome Biglietto</FormLabel>
                         <FormControl>
-                          <SelectTrigger data-testid="select-ticket-type">
-                            <SelectValue placeholder="Seleziona tipo" />
-                          </SelectTrigger>
+                          <Input placeholder="es. Ingresso Standard" {...field} data-testid="input-sector-name" />
                         </FormControl>
-                        <SelectContent>
-                          <SelectItem value="01">Intero</SelectItem>
-                          <SelectItem value="02">Ridotto</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
-                <FormField
-                  control={sectorForm.control}
-                  name="grossAmount"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Prezzo (€)</FormLabel>
-                      <FormControl>
-                        <Input placeholder="10.00" {...field} data-testid="input-gross-amount" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                  <FormField
+                    control={sectorForm.control}
+                    name="ticketType"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Tipologia</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-ticket-type">
+                              <SelectValue placeholder="Seleziona tipo" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="INT">Intero</SelectItem>
+                            <SelectItem value="RID">Ridotto</SelectItem>
+                            <SelectItem value="OMA">Omaggio</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
 
-                <FormField
-                  control={sectorForm.control}
-                  name="ivaRate"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Aliquota IVA</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
+                <div className="grid grid-cols-3 gap-4">
+                  <FormField
+                    control={sectorForm.control}
+                    name="price"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Prezzo €</FormLabel>
                         <FormControl>
-                          <SelectTrigger data-testid="select-iva-rate">
-                            <SelectValue placeholder="Seleziona IVA" />
-                          </SelectTrigger>
+                          <Input 
+                            type="number" 
+                            step="0.01" 
+                            placeholder="10.00" 
+                            {...field} 
+                            disabled={sectorForm.watch("ticketType") === "OMA"}
+                            data-testid="input-price" 
+                          />
                         </FormControl>
-                        <SelectContent>
-                          <SelectItem value="10">10%</SelectItem>
-                          <SelectItem value="22">22%</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={sectorForm.control}
+                    name="ddp"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>DDP €</FormLabel>
+                        <FormControl>
+                          <Input type="number" step="0.01" placeholder="0.00" {...field} data-testid="input-ddp" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={sectorForm.control}
+                    name="capacity"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Quantità</FormLabel>
+                        <FormControl>
+                          <Input 
+                            type="number" 
+                            min={1}
+                            placeholder="100"
+                            {...field}
+                            onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                            data-testid="input-sector-capacity"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={sectorForm.control}
+                    name="ivaRate"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Aliquota IVA</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-iva-rate">
+                              <SelectValue placeholder="Seleziona IVA" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="10">10%</SelectItem>
+                            <SelectItem value="22">22%</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={sectorForm.control}
+                    name="isNumbered"
+                    render={({ field }) => (
+                      <FormItem className="flex items-center gap-3 pt-8">
+                        <FormControl>
+                          <Checkbox 
+                            checked={field.value} 
+                            onCheckedChange={field.onChange}
+                            data-testid="checkbox-numbered"
+                          />
+                        </FormControl>
+                        <FormLabel className="!mt-0">Posti numerati</FormLabel>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
 
                 <DialogFooter className="pt-4">
                   <Button
@@ -4072,7 +4119,7 @@ export default function EventHub() {
                     {createSectorMutation.isPending ? (
                       <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Creazione...</>
                     ) : (
-                      'Crea Settore'
+                      'Crea Biglietto'
                     )}
                   </Button>
                 </DialogFooter>
@@ -4083,28 +4130,52 @@ export default function EventHub() {
 
         {/* Subscription Type Creation Dialog - Desktop */}
         <Dialog open={isSubscriptionTypeDialogOpen} onOpenChange={setIsSubscriptionTypeDialogOpen}>
-          <DialogContent className="sm:max-w-md">
+          <DialogContent className="sm:max-w-[600px]">
             <DialogHeader>
-              <DialogTitle>Nuovo Tipo Abbonamento</DialogTitle>
+              <DialogTitle>Nuovo Abbonamento</DialogTitle>
               <DialogDescription>
                 Crea un nuovo tipo di abbonamento per questo evento
               </DialogDescription>
             </DialogHeader>
             <Form {...subscriptionTypeForm}>
               <form onSubmit={subscriptionTypeForm.handleSubmit(onSubmitSubscriptionType)} className="space-y-4">
-                <FormField
-                  control={subscriptionTypeForm.control}
-                  name="name"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Nome</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Nome abbonamento" {...field} data-testid="input-subscription-name" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={subscriptionTypeForm.control}
+                    name="name"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Nome Abbonamento</FormLabel>
+                        <FormControl>
+                          <Input placeholder="es. Pass Weekend" {...field} data-testid="input-subscription-name" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={subscriptionTypeForm.control}
+                    name="turnType"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Tipo Turno</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-subscription-turn-type">
+                              <SelectValue placeholder="Seleziona tipo" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="F">Fisso</SelectItem>
+                            <SelectItem value="L">Libero</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
 
                 <FormField
                   control={subscriptionTypeForm.control}
@@ -4120,62 +4191,63 @@ export default function EventHub() {
                   )}
                 />
 
-                <FormField
-                  control={subscriptionTypeForm.control}
-                  name="turnType"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Tipo Turno</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
+                <div className="grid grid-cols-3 gap-4">
+                  <FormField
+                    control={subscriptionTypeForm.control}
+                    name="eventsCount"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>N. Eventi</FormLabel>
                         <FormControl>
-                          <SelectTrigger data-testid="select-subscription-turn-type">
-                            <SelectValue placeholder="Seleziona tipo turno" />
-                          </SelectTrigger>
+                          <Input 
+                            type="number" 
+                            min={1}
+                            placeholder="3"
+                            {...field}
+                            onChange={(e) => field.onChange(parseInt(e.target.value) || 1)}
+                            data-testid="input-subscription-events-count"
+                          />
                         </FormControl>
-                        <SelectContent>
-                          <SelectItem value="F">Fisso</SelectItem>
-                          <SelectItem value="L">Libero</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
-                <FormField
-                  control={subscriptionTypeForm.control}
-                  name="eventsCount"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Numero Eventi</FormLabel>
-                      <FormControl>
-                        <Input 
-                          type="number" 
-                          min={1}
-                          placeholder="Numero eventi inclusi"
-                          {...field}
-                          onChange={(e) => field.onChange(parseInt(e.target.value) || 1)}
-                          data-testid="input-subscription-events-count"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                  <FormField
+                    control={subscriptionTypeForm.control}
+                    name="price"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Prezzo €</FormLabel>
+                        <FormControl>
+                          <Input type="number" step="0.01" placeholder="50.00" {...field} data-testid="input-subscription-price" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
-                <FormField
-                  control={subscriptionTypeForm.control}
-                  name="price"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Prezzo (€)</FormLabel>
-                      <FormControl>
-                        <Input placeholder="0.00" {...field} data-testid="input-subscription-price" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                  <FormField
+                    control={subscriptionTypeForm.control}
+                    name="maxQuantity"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Quantità Max</FormLabel>
+                        <FormControl>
+                          <Input 
+                            type="number" 
+                            min={0}
+                            placeholder="Illimitato"
+                            value={field.value ?? ""}
+                            onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : undefined)}
+                            data-testid="input-subscription-max-quantity"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
 
                 <FormField
                   control={subscriptionTypeForm.control}
@@ -4194,27 +4266,6 @@ export default function EventHub() {
                           <SelectItem value="22">22%</SelectItem>
                         </SelectContent>
                       </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={subscriptionTypeForm.control}
-                  name="maxQuantity"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Quantità Massima (opzionale)</FormLabel>
-                      <FormControl>
-                        <Input 
-                          type="number" 
-                          min={0}
-                          placeholder="Lascia vuoto per illimitato"
-                          value={field.value ?? ""}
-                          onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : undefined)}
-                          data-testid="input-subscription-max-quantity"
-                        />
-                      </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -7991,7 +8042,7 @@ export default function EventHub() {
 
       {/* Sector Creation Dialog */}
       <Dialog open={isSectorDialogOpen} onOpenChange={setIsSectorDialogOpen}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="sm:max-w-[600px]">
           <DialogHeader>
             <DialogTitle>Nuovo Biglietto</DialogTitle>
             <DialogDescription>
@@ -8000,131 +8051,144 @@ export default function EventHub() {
           </DialogHeader>
           <Form {...sectorForm}>
             <form onSubmit={sectorForm.handleSubmit(onSubmitSector)} className="space-y-4">
-              <FormField
-                control={sectorForm.control}
-                name="name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Nome Biglietto</FormLabel>
-                    <FormControl>
-                      <Input placeholder="es. Ingresso Generale" {...field} data-testid="input-sector-name" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={sectorForm.control}
-                name="sectorCode"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Codice Settore</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={sectorForm.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Nome Biglietto</FormLabel>
                       <FormControl>
-                        <SelectTrigger data-testid="select-sector-code">
-                          <SelectValue placeholder="Seleziona codice settore" />
-                        </SelectTrigger>
+                        <Input placeholder="es. Ingresso Standard" {...field} data-testid="input-sector-name" />
                       </FormControl>
-                      <SelectContent>
-                        {sectorCodes?.map((code: any) => (
-                          <SelectItem key={code.code} value={code.code}>
-                            {code.code} - {code.description}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-              <FormField
-                control={sectorForm.control}
-                name="capacity"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Quantità</FormLabel>
-                    <FormControl>
-                      <Input 
-                        type="number" 
-                        min={1} 
-                        {...field} 
-                        onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
-                        data-testid="input-sector-capacity" 
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                <FormField
+                  control={sectorForm.control}
+                  name="ticketType"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Tipologia</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-ticket-type">
+                            <SelectValue placeholder="Seleziona tipo" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="INT">Intero</SelectItem>
+                          <SelectItem value="RID">Ridotto</SelectItem>
+                          <SelectItem value="OMA">Omaggio</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
 
-              <FormField
-                control={sectorForm.control}
-                name="ticketType"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Tipo Biglietto</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger data-testid="select-ticket-type">
-                          <SelectValue placeholder="Seleziona tipo" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="INT">Intero</SelectItem>
-                        <SelectItem value="RID">Ridotto</SelectItem>
-                        <SelectItem value="OMA">Omaggio</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {watchedTicketType !== 'OMA' && (
+              <div className="grid grid-cols-3 gap-4">
                 <FormField
                   control={sectorForm.control}
                   name="price"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Prezzo (€)</FormLabel>
+                      <FormLabel>Prezzo €</FormLabel>
                       <FormControl>
                         <Input 
                           type="number" 
                           step="0.01" 
-                          min="0" 
+                          placeholder="10.00" 
                           {...field} 
-                          data-testid="input-sector-price" 
+                          disabled={sectorForm.watch("ticketType") === "OMA"}
+                          data-testid="input-price" 
                         />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-              )}
 
-              <FormField
-                control={sectorForm.control}
-                name="ivaRate"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Aliquota IVA</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
+                <FormField
+                  control={sectorForm.control}
+                  name="ddp"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>DDP €</FormLabel>
                       <FormControl>
-                        <SelectTrigger data-testid="select-iva-rate">
-                          <SelectValue placeholder="Seleziona IVA" />
-                        </SelectTrigger>
+                        <Input type="number" step="0.01" placeholder="0.00" {...field} data-testid="input-ddp" />
                       </FormControl>
-                      <SelectContent>
-                        <SelectItem value="10">10%</SelectItem>
-                        <SelectItem value="22">22%</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={sectorForm.control}
+                  name="capacity"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Quantità</FormLabel>
+                      <FormControl>
+                        <Input 
+                          type="number" 
+                          min={1}
+                          placeholder="100"
+                          {...field}
+                          onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                          data-testid="input-sector-capacity"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={sectorForm.control}
+                  name="ivaRate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Aliquota IVA</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-iva-rate">
+                            <SelectValue placeholder="Seleziona IVA" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="10">10%</SelectItem>
+                          <SelectItem value="22">22%</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={sectorForm.control}
+                  name="isNumbered"
+                  render={({ field }) => (
+                    <FormItem className="flex items-center gap-3 pt-8">
+                      <FormControl>
+                        <Checkbox 
+                          checked={field.value} 
+                          onCheckedChange={field.onChange}
+                          data-testid="checkbox-numbered"
+                        />
+                      </FormControl>
+                      <FormLabel className="!mt-0">Posti numerati</FormLabel>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
 
               <DialogFooter className="pt-4">
                 <Button
@@ -8316,28 +8380,52 @@ export default function EventHub() {
 
       {/* Subscription Type Creation Dialog */}
       <Dialog open={isSubscriptionTypeDialogOpen} onOpenChange={setIsSubscriptionTypeDialogOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-[600px]">
           <DialogHeader>
-            <DialogTitle>Nuovo Tipo Abbonamento</DialogTitle>
+            <DialogTitle>Nuovo Abbonamento</DialogTitle>
             <DialogDescription>
               Crea un nuovo tipo di abbonamento per questo evento
             </DialogDescription>
           </DialogHeader>
           <Form {...subscriptionTypeForm}>
             <form onSubmit={subscriptionTypeForm.handleSubmit(onSubmitSubscriptionType)} className="space-y-4">
-              <FormField
-                control={subscriptionTypeForm.control}
-                name="name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Nome</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Nome abbonamento" {...field} data-testid="input-subscription-name" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={subscriptionTypeForm.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Nome Abbonamento</FormLabel>
+                      <FormControl>
+                        <Input placeholder="es. Pass Weekend" {...field} data-testid="input-subscription-name" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={subscriptionTypeForm.control}
+                  name="turnType"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Tipo Turno</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-subscription-turn-type">
+                            <SelectValue placeholder="Seleziona tipo" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="F">Fisso</SelectItem>
+                          <SelectItem value="L">Libero</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
 
               <FormField
                 control={subscriptionTypeForm.control}
@@ -8353,62 +8441,63 @@ export default function EventHub() {
                 )}
               />
 
-              <FormField
-                control={subscriptionTypeForm.control}
-                name="turnType"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Tipo Turno</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
+              <div className="grid grid-cols-3 gap-4">
+                <FormField
+                  control={subscriptionTypeForm.control}
+                  name="eventsCount"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>N. Eventi</FormLabel>
                       <FormControl>
-                        <SelectTrigger data-testid="select-subscription-turn-type">
-                          <SelectValue placeholder="Seleziona tipo turno" />
-                        </SelectTrigger>
+                        <Input 
+                          type="number" 
+                          min={1}
+                          placeholder="3"
+                          {...field}
+                          onChange={(e) => field.onChange(parseInt(e.target.value) || 1)}
+                          data-testid="input-subscription-events-count"
+                        />
                       </FormControl>
-                      <SelectContent>
-                        <SelectItem value="F">Fisso</SelectItem>
-                        <SelectItem value="L">Libero</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-              <FormField
-                control={subscriptionTypeForm.control}
-                name="eventsCount"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Numero Eventi</FormLabel>
-                    <FormControl>
-                      <Input 
-                        type="number" 
-                        min={1}
-                        placeholder="Numero eventi inclusi"
-                        {...field}
-                        onChange={(e) => field.onChange(parseInt(e.target.value) || 1)}
-                        data-testid="input-subscription-events-count"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                <FormField
+                  control={subscriptionTypeForm.control}
+                  name="price"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Prezzo €</FormLabel>
+                      <FormControl>
+                        <Input type="number" step="0.01" placeholder="50.00" {...field} data-testid="input-subscription-price" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-              <FormField
-                control={subscriptionTypeForm.control}
-                name="price"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Prezzo (€)</FormLabel>
-                    <FormControl>
-                      <Input placeholder="0.00" {...field} data-testid="input-subscription-price" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                <FormField
+                  control={subscriptionTypeForm.control}
+                  name="maxQuantity"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Quantità Max</FormLabel>
+                      <FormControl>
+                        <Input 
+                          type="number" 
+                          min={0}
+                          placeholder="Illimitato"
+                          value={field.value ?? ""}
+                          onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : undefined)}
+                          data-testid="input-subscription-max-quantity"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
 
               <FormField
                 control={subscriptionTypeForm.control}
@@ -8427,27 +8516,6 @@ export default function EventHub() {
                         <SelectItem value="22">22%</SelectItem>
                       </SelectContent>
                     </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={subscriptionTypeForm.control}
-                name="maxQuantity"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Quantità Massima (opzionale)</FormLabel>
-                    <FormControl>
-                      <Input 
-                        type="number" 
-                        min={0}
-                        placeholder="Lascia vuoto per illimitato"
-                        value={field.value ?? ""}
-                        onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : undefined)}
-                        data-testid="input-subscription-max-quantity"
-                      />
-                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
