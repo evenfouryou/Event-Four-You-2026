@@ -178,6 +178,17 @@ export default function SiaeReportC1() {
   const [reportDate, setReportDate] = useState<string>(defaultDate);
   const isMonthly = reportType === 'mensile';
 
+  // Handler per cambio tipo report - normalizza la data
+  const handleReportTypeChange = (newType: 'giornaliero' | 'mensile') => {
+    setReportType(newType);
+    if (newType === 'mensile') {
+      // Converti la data nel formato primo giorno del mese (senza problemi di timezone)
+      const [year, month] = reportDate.split('-');
+      setReportDate(`${year}-${month}-01`);
+    }
+    // Per giornaliero, mantiene la data attuale (già valida)
+  };
+
   // Update URL when report type or date changes
   useEffect(() => {
     const newUrl = `${window.location.pathname}?type=${reportType}&date=${reportDate}`;
@@ -261,7 +272,9 @@ export default function SiaeReportC1() {
   const reportDisplayDate = quadroA.dataRiferimento ? new Date(quadroA.dataRiferimento) : eventDate;
   const formattedDate = reportDisplayDate.toLocaleDateString('it-IT');
   const transmissionDate = new Date().toLocaleDateString('it-IT');
-  const monthName = eventDate.toLocaleDateString('it-IT', { month: 'long', year: 'numeric' });
+  // Usa reportDate per mostrare il mese corretto selezionato dall'utente
+  const selectedDate = new Date(reportDate + 'T00:00:00');
+  const monthName = selectedDate.toLocaleDateString('it-IT', { month: 'long', year: 'numeric' });
 
   const totalCapacity = quadroA.capienza;
   const totalEmessi = quadroB.totaleBigliettiEmessi;
@@ -362,7 +375,7 @@ export default function SiaeReportC1() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-xs text-muted-foreground mb-1 block">Tipo</label>
-                  <Select value={reportType} onValueChange={(value: 'giornaliero' | 'mensile') => setReportType(value)}>
+                  <Select value={reportType} onValueChange={handleReportTypeChange}>
                     <SelectTrigger data-testid="select-report-type">
                       <SelectValue placeholder="Seleziona tipo" />
                     </SelectTrigger>
@@ -779,7 +792,7 @@ export default function SiaeReportC1() {
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="text-xs text-muted-foreground mb-1 block">Tipo Report</label>
-            <Select value={reportType} onValueChange={(value: 'giornaliero' | 'mensile') => setReportType(value)}>
+            <Select value={reportType} onValueChange={handleReportTypeChange}>
               <SelectTrigger data-testid="select-report-type-mobile">
                 <SelectValue placeholder="Seleziona tipo" />
               </SelectTrigger>
