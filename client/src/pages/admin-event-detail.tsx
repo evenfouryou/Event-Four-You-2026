@@ -77,6 +77,13 @@ const cardVariants = {
   }),
 };
 
+interface SiaeTicketedEvent {
+  id: string;
+  eventId: string;
+  companyId: string;
+  ticketingStatus: string;
+}
+
 export default function AdminEventDetail() {
   const [, setLocation] = useLocation();
   const params = useParams<{ eventId: string; gestoreId?: string }>();
@@ -89,14 +96,20 @@ export default function AdminEventDetail() {
     enabled: !!eventId,
   });
 
-  const { data: tickets, isLoading: ticketsLoading } = useQuery<SiaeTicket[]>({
-    queryKey: [`/api/siae/ticketed-events/${eventId}/tickets`],
+  // Get ticketed event by base event ID
+  const { data: ticketedEvent } = useQuery<SiaeTicketedEvent>({
+    queryKey: ['/api/siae/events', eventId, 'ticketing'],
     enabled: !!eventId,
   });
 
+  const { data: tickets, isLoading: ticketsLoading } = useQuery<SiaeTicket[]>({
+    queryKey: ['/api/siae/ticketed-events', ticketedEvent?.id, 'tickets'],
+    enabled: !!ticketedEvent?.id,
+  });
+
   const { data: transactions, isLoading: transactionsLoading } = useQuery<SiaeTransaction[]>({
-    queryKey: [`/api/siae/ticketed-events/${eventId}/transactions`],
-    enabled: !!eventId,
+    queryKey: ['/api/siae/ticketed-events', ticketedEvent?.id, 'transactions'],
+    enabled: !!ticketedEvent?.id,
   });
 
   const stats = useMemo(() => {
