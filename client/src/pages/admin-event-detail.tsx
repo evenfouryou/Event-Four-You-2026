@@ -22,6 +22,13 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Sheet,
   SheetContent,
   SheetHeader,
@@ -150,6 +157,15 @@ interface Location {
   capacity?: number;
 }
 
+interface CancellationReason {
+  id: string;
+  code: string;
+  name: string;
+  description?: string;
+  requiresReference: boolean;
+  active: boolean;
+}
+
 export default function AdminEventDetail() {
   const [, setLocation] = useLocation();
   const params = useParams<{ eventId: string; gestoreId?: string }>();
@@ -160,6 +176,7 @@ export default function AdminEventDetail() {
   
   const [ticketToCancel, setTicketToCancel] = useState<SiaeTicket | null>(null);
   const [cancelWithRefund, setCancelWithRefund] = useState(false);
+  const [selectedReasonCode, setSelectedReasonCode] = useState<string>("");
   const [selectedTicket, setSelectedTicket] = useState<SiaeTicket | null>(null);
   const [showTicketDetail, setShowTicketDetail] = useState(false);
 
@@ -196,6 +213,11 @@ export default function AdminEventDetail() {
     enabled: !!event?.locationId,
   });
 
+  // Query per causali di annullamento SIAE
+  const { data: cancellationReasons } = useQuery<CancellationReason[]>({
+    queryKey: ['/api/siae/cancellation-reasons'],
+  });
+
   const stats = useMemo(() => {
     if (!tickets || !transactions) return null;
     
@@ -217,9 +239,9 @@ export default function AdminEventDetail() {
 
   // Cancel ticket mutation (with optional refund)
   const cancelTicketMutation = useMutation({
-    mutationFn: async ({ ticketId, withRefund }: { ticketId: string; withRefund: boolean }) => {
+    mutationFn: async ({ ticketId, reasonCode, withRefund }: { ticketId: string; reasonCode: string; withRefund: boolean }) => {
       const response = await apiRequest("PATCH", `/api/siae/tickets/${ticketId}/cancel`, {
-        reasonCode: withRefund ? "RIM" : "ANN",
+        reasonCode,
         refund: withRefund,
         refundReason: withRefund ? "Rimborso amministrativo" : undefined
       });
@@ -238,6 +260,7 @@ export default function AdminEventDetail() {
       });
       setTicketToCancel(null);
       setCancelWithRefund(false);
+      setSelectedReasonCode("");
       setShowTicketDetail(false);
       setSelectedTicket(null);
     },
@@ -761,7 +784,7 @@ export default function AdminEventDetail() {
         </div>
 
         {/* Cancel Ticket Dialog - Mobile (with optional refund) */}
-        <AlertDialog open={!!ticketToCancel} onOpenChange={(open) => { if (!open) { setTicketToCancel(null); setCancelWithRefund(false); } }}>
+        <AlertDialog open={!!ticketToCancel} onOpenChange={(open) => { if (!open) { setTicketToCancel(null); setCancelWithRefund(false); setSelectedReasonCode(""); } }}>
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>Annullare questo biglietto?</AlertDialogTitle>
@@ -771,6 +794,23 @@ export default function AdminEventDetail() {
                     Stai per annullare il biglietto #{ticketToCancel?.progressiveNumber} 
                     del valore di €{ticketToCancel?.grossAmount ? parseFloat(ticketToCancel.grossAmount).toFixed(2) : '0.00'}.
                   </p>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="reasonCodeMobile">Causale annullamento (SIAE)</Label>
+                    <Select value={selectedReasonCode} onValueChange={setSelectedReasonCode}>
+                      <SelectTrigger data-testid="select-cancellation-reason-mobile">
+                        <SelectValue placeholder="Seleziona causale..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {cancellationReasons?.filter(r => r.active).map((reason) => (
+                          <SelectItem key={reason.code} value={reason.code}>
+                            {reason.code} - {reason.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
                   <div className="flex items-center space-x-2 p-3 rounded-lg bg-muted/50">
                     <Checkbox 
                       id="cancelWithRefundMobile" 
@@ -788,9 +828,13 @@ export default function AdminEventDetail() {
             <AlertDialogFooter>
               <AlertDialogCancel>Annulla</AlertDialogCancel>
               <AlertDialogAction
-                onClick={() => ticketToCancel && cancelTicketMutation.mutate({ ticketId: ticketToCancel.id, withRefund: cancelWithRefund })}
+                onClick={() => ticketToCancel && selectedReasonCode && cancelTicketMutation.mutate({ 
+                  ticketId: ticketToCancel.id, 
+                  reasonCode: selectedReasonCode, 
+                  withRefund: cancelWithRefund 
+                })}
                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                disabled={cancelTicketMutation.isPending}
+                disabled={cancelTicketMutation.isPending || !selectedReasonCode}
               >
                 {cancelTicketMutation.isPending 
                   ? (cancelWithRefund ? "Elaborazione..." : "Annullamento...") 
@@ -918,7 +962,7 @@ export default function AdminEventDetail() {
       </Tabs>
 
       {/* Cancel Ticket Dialog (with optional refund) */}
-      <AlertDialog open={!!ticketToCancel} onOpenChange={(open) => { if (!open) { setTicketToCancel(null); setCancelWithRefund(false); } }}>
+      <AlertDialog open={!!ticketToCancel} onOpenChange={(open) => { if (!open) { setTicketToCancel(null); setCancelWithRefund(false); setSelectedReasonCode(""); } }}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Annullare questo biglietto?</AlertDialogTitle>
@@ -928,6 +972,23 @@ export default function AdminEventDetail() {
                   Stai per annullare il biglietto #{ticketToCancel?.progressiveNumber} 
                   del valore di €{ticketToCancel?.grossAmount ? parseFloat(ticketToCancel.grossAmount).toFixed(2) : '0.00'}.
                 </p>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="reasonCode">Causale annullamento (SIAE)</Label>
+                  <Select value={selectedReasonCode} onValueChange={setSelectedReasonCode}>
+                    <SelectTrigger data-testid="select-cancellation-reason">
+                      <SelectValue placeholder="Seleziona causale..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {cancellationReasons?.filter(r => r.active).map((reason) => (
+                        <SelectItem key={reason.code} value={reason.code}>
+                          {reason.code} - {reason.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
                 <div className="flex items-center space-x-2 p-3 rounded-lg bg-muted/50">
                   <Checkbox 
                     id="cancelWithRefund" 
@@ -950,9 +1011,13 @@ export default function AdminEventDetail() {
           <AlertDialogFooter>
             <AlertDialogCancel>Annulla</AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => ticketToCancel && cancelTicketMutation.mutate({ ticketId: ticketToCancel.id, withRefund: cancelWithRefund })}
+              onClick={() => ticketToCancel && selectedReasonCode && cancelTicketMutation.mutate({ 
+                ticketId: ticketToCancel.id, 
+                reasonCode: selectedReasonCode, 
+                withRefund: cancelWithRefund 
+              })}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              disabled={cancelTicketMutation.isPending}
+              disabled={cancelTicketMutation.isPending || !selectedReasonCode}
             >
               {cancelTicketMutation.isPending 
                 ? (cancelWithRefund ? "Annullamento e rimborso..." : "Annullamento...") 
