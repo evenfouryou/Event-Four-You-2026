@@ -729,6 +729,8 @@ export default function EventHub() {
   const [ticketToCancel, setTicketToCancel] = useState<SiaeTicket | null>(null);
   const [cancelReason, setCancelReason] = useState("01");
   const [cancelNote, setCancelNote] = useState("");
+  const [refundDialogOpen, setRefundDialogOpen] = useState(false);
+  const [ticketToRefund, setTicketToRefund] = useState<SiaeTicket | null>(null);
 
   // Biglietti drill-down state
   const [selectedSectorId, setSelectedSectorId] = useState<string | null>(null);
@@ -1609,6 +1611,30 @@ export default function EventHub() {
     },
   });
 
+  // Refund ticket mutation (uses cancel with refund reason)
+  const refundTicketMutation = useMutation({
+    mutationFn: async (ticketId: string) => {
+      return apiRequest('POST', `/api/siae/tickets/${ticketId}/cancel`, { 
+        reasonCode: "RIM",
+        reason: "Rimborso richiesto" 
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/siae/ticketed-events', ticketedEvent?.id, 'tickets'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/siae/events', id, 'ticketing'] });
+      setRefundDialogOpen(false);
+      setTicketToRefund(null);
+      toast({ title: "Rimborso Effettuato", description: "Il biglietto è stato annullato e il rimborso è stato registrato." });
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: "Errore Rimborso", 
+        description: error?.message || "Impossibile effettuare il rimborso", 
+        variant: "destructive" 
+      });
+    },
+  });
+
   // Helper to get filtered tickets
   const filteredTickets = useMemo(() => {
     let filtered = siaeTickets;
@@ -1680,9 +1706,46 @@ export default function EventHub() {
         return <Badge className="bg-blue-500/20 text-blue-400 border-blue-500/30">Usato</Badge>;
       case 'cancelled':
         return <Badge className="bg-red-500/20 text-red-400 border-red-500/30">Annullato</Badge>;
+      case 'sold':
+        return <Badge className="bg-teal-500/20 text-teal-400 border-teal-500/30">Venduto</Badge>;
+      case 'refunded':
+        return <Badge className="bg-purple-500/20 text-purple-400 border-purple-500/30">Rimborsato</Badge>;
       default:
         return <Badge variant="secondary">{status}</Badge>;
     }
+  };
+
+  // Helper for emission channel display
+  const getEmissionChannelLabel = (code: string | undefined) => {
+    const channels: Record<string, string> = {
+      'BOX': 'Cassa',
+      'WEB': 'Online',
+      'APP': 'App Mobile',
+      'API': 'API',
+      'POS': 'POS'
+    };
+    return code ? (channels[code] || code) : '-';
+  };
+
+  // Helper for ticket type display
+  const getTicketTypeLabel = (code: string | undefined, type: string | undefined) => {
+    if (type) {
+      const labels: Record<string, string> = {
+        'intero': 'Intero',
+        'ridotto': 'Ridotto',
+        'omaggio': 'Omaggio'
+      };
+      return labels[type] || type;
+    }
+    const codeLabels: Record<string, string> = {
+      'INT': 'Intero',
+      'RID': 'Ridotto',
+      'OMG': 'Omaggio',
+      '01': 'Intero',
+      '02': 'Ridotto',
+      '03': 'Omaggio'
+    };
+    return code ? (codeLabels[code] || code) : '-';
   };
 
   const handleCancelTicket = (ticket: SiaeTicket) => {
@@ -2904,57 +2967,87 @@ export default function EventHub() {
                         
                         return (
                           <>
-                            <Table>
-                              <TableHeader>
-                                <TableRow>
-                                  <TableHead>Numero</TableHead>
-                                  <TableHead>Partecipante</TableHead>
-                                  <TableHead>Tipo</TableHead>
-                                  <TableHead>Prezzo</TableHead>
-                                  <TableHead>Stato</TableHead>
-                                  <TableHead>Data</TableHead>
-                                  <TableHead className="w-24"></TableHead>
-                                </TableRow>
-                              </TableHeader>
-                              <TableBody>
-                                {displayedSectorTickets.map(ticket => (
-                                  <TableRow 
-                                    key={ticket.id} 
-                                    className="cursor-pointer" 
-                                    onClick={() => { setSelectedTicketForDetail(ticket); setShowTicketDetailSheet(true); }}
-                                    data-testid={`row-ticket-${ticket.id}`}
-                                  >
-                                    <TableCell className="font-mono">{ticket.progressiveNumber}</TableCell>
-                                    <TableCell>
-                                      {ticket.participantFirstName || ticket.participantLastName 
-                                        ? `${ticket.participantFirstName || ''} ${ticket.participantLastName || ''}`.trim()
-                                        : <span className="text-muted-foreground">-</span>
-                                      }
-                                    </TableCell>
-                                    <TableCell>
-                                      <Badge variant="secondary">{ticket.ticketTypeCode === '01' ? 'Intero' : 'Ridotto'}</Badge>
-                                    </TableCell>
-                                    <TableCell>€{Number(ticket.grossAmount).toFixed(2)}</TableCell>
-                                    <TableCell>{getTicketStatusBadge(ticket.status)}</TableCell>
-                                    <TableCell className="text-muted-foreground">
-                                      {ticket.emissionDate ? format(new Date(ticket.emissionDate), 'dd/MM HH:mm') : '-'}
-                                    </TableCell>
-                                    <TableCell>
-                                      <div className="flex items-center gap-1">
-                                        <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); setSelectedTicketForDetail(ticket); setShowTicketDetailSheet(true); }} data-testid={`button-view-ticket-${ticket.id}`}>
-                                          <Eye className="h-4 w-4" />
-                                        </Button>
-                                        {ticket.status === 'valid' && (
-                                          <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleCancelTicket(ticket); }} data-testid={`button-cancel-ticket-${ticket.id}`}>
-                                            <X className="h-4 w-4" />
-                                          </Button>
-                                        )}
-                                      </div>
-                                    </TableCell>
+                            <div className="overflow-x-auto">
+                              <Table>
+                                <TableHeader>
+                                  <TableRow>
+                                    <TableHead className="whitespace-nowrap">Sistema</TableHead>
+                                    <TableHead className="whitespace-nowrap">Prog.</TableHead>
+                                    <TableHead className="whitespace-nowrap">Carta Attivazione</TableHead>
+                                    <TableHead className="whitespace-nowrap">Sigillo Fiscale</TableHead>
+                                    <TableHead className="whitespace-nowrap">Codice Ordine</TableHead>
+                                    <TableHead className="whitespace-nowrap">Tipo Titolo</TableHead>
+                                    <TableHead className="whitespace-nowrap">Data/Ora Emissione</TableHead>
+                                    <TableHead className="whitespace-nowrap">Stato</TableHead>
+                                    <TableHead className="w-16"></TableHead>
                                   </TableRow>
-                                ))}
-                              </TableBody>
-                            </Table>
+                                </TableHeader>
+                                <TableBody>
+                                  {displayedSectorTickets.map(ticket => (
+                                    <TableRow 
+                                      key={ticket.id} 
+                                      className="cursor-pointer" 
+                                      onClick={() => { setSelectedTicketForDetail(ticket); setShowTicketDetailSheet(true); }}
+                                      data-testid={`row-ticket-${ticket.id}`}
+                                    >
+                                      <TableCell className="font-mono text-xs">
+                                        {getEmissionChannelLabel((ticket as any).emissionChannelCode)}
+                                      </TableCell>
+                                      <TableCell className="font-mono text-sm font-medium">
+                                        {ticket.progressiveNumber || '-'}
+                                      </TableCell>
+                                      <TableCell className="font-mono text-xs">
+                                        {(ticket as any).cardCode || '-'}
+                                      </TableCell>
+                                      <TableCell className="font-mono text-xs">
+                                        {ticket.fiscalSealCode || '-'}
+                                      </TableCell>
+                                      <TableCell className="font-mono text-xs">
+                                        {ticket.ticketCode || (ticket as any).transactionId?.slice(0, 8) || '-'}
+                                      </TableCell>
+                                      <TableCell>
+                                        <Badge variant="secondary">{getTicketTypeLabel(ticket.ticketTypeCode, (ticket as any).ticketType)}</Badge>
+                                      </TableCell>
+                                      <TableCell className="text-muted-foreground text-xs whitespace-nowrap">
+                                        {ticket.emissionDate ? format(new Date(ticket.emissionDate), 'dd/MM/yyyy HH:mm') : '-'}
+                                      </TableCell>
+                                      <TableCell>{getTicketStatusBadge(ticket.status)}</TableCell>
+                                      <TableCell>
+                                        <DropdownMenu>
+                                          <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                                            <Button variant="ghost" size="icon" data-testid={`button-ticket-actions-${ticket.id}`}>
+                                              <MoreHorizontal className="h-4 w-4" />
+                                            </Button>
+                                          </DropdownMenuTrigger>
+                                          <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                                            <DropdownMenuItem onSelect={() => { setSelectedTicketForDetail(ticket); setShowTicketDetailSheet(true); }}>
+                                              <Eye className="h-4 w-4 mr-2" />
+                                              Visualizza Dettagli
+                                            </DropdownMenuItem>
+                                            {(ticket.status === 'valid' || ticket.status === 'sold') && (
+                                              <>
+                                                <DropdownMenuSeparator />
+                                                <DropdownMenuItem onSelect={() => handleCancelTicket(ticket)} className="text-amber-500">
+                                                  <XCircle className="h-4 w-4 mr-2" />
+                                                  Annulla Biglietto
+                                                </DropdownMenuItem>
+                                                <DropdownMenuItem 
+                                                  onSelect={() => { setTicketToRefund(ticket); setRefundDialogOpen(true); }} 
+                                                  className="text-red-500"
+                                                >
+                                                  <RefreshCw className="h-4 w-4 mr-2" />
+                                                  Emetti Rimborso
+                                                </DropdownMenuItem>
+                                              </>
+                                            )}
+                                          </DropdownMenuContent>
+                                        </DropdownMenu>
+                                      </TableCell>
+                                    </TableRow>
+                                  ))}
+                                </TableBody>
+                              </Table>
+                            </div>
                             {filteredSectorTickets.length > ticketsDisplayLimit && (
                               <div className="text-center mt-4">
                                 <Button variant="outline" onClick={() => setTicketsDisplayLimit(prev => prev + 20)}>
@@ -3993,6 +4086,34 @@ export default function EventHub() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* Refund Ticket Dialog */}
+        <AlertDialog open={refundDialogOpen} onOpenChange={setRefundDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle className="flex items-center gap-2">
+                <RefreshCw className="h-5 w-5 text-red-400" />
+                Emetti Rimborso
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                Stai per emettere un rimborso per il biglietto #{ticketToRefund?.progressiveNumber}.
+                <br /><br />
+                <span className="text-amber-400">Attenzione:</span> Il biglietto verrà annullato e il rimborso sarà registrato nel sistema SIAE.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Annulla</AlertDialogCancel>
+              <AlertDialogAction 
+                onClick={() => ticketToRefund && refundTicketMutation.mutate(ticketToRefund.id)}
+                disabled={refundTicketMutation.isPending}
+                className="bg-red-500 hover:bg-red-600"
+              >
+                {refundTicketMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                Conferma Rimborso
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
         {/* Ticket Detail Sheet */}
         <Sheet open={showTicketDetailSheet} onOpenChange={setShowTicketDetailSheet}>
@@ -5965,32 +6086,66 @@ export default function EventHub() {
                               {displayedSectorTickets.map(ticket => (
                                 <motion.div
                                   key={ticket.id}
-                                  className="p-3 rounded-lg bg-background/50 border cursor-pointer"
+                                  className="p-3 rounded-lg bg-background/50 border"
                                   whileTap={{ scale: 0.98 }}
                                   transition={springConfig}
-                                  onClick={() => {
-                                    triggerHaptic('light');
-                                    setSelectedTicketForDetail(ticket);
-                                    setShowTicketDetailSheet(true);
-                                  }}
                                   data-testid={`ticket-row-mobile-${ticket.id}`}
                                 >
                                   <div className="flex items-center justify-between gap-2">
-                                    <div className="flex-1 min-w-0">
-                                      <div className="flex items-center gap-2">
+                                    <div 
+                                      className="flex-1 min-w-0 cursor-pointer"
+                                      onClick={() => {
+                                        triggerHaptic('light');
+                                        setSelectedTicketForDetail(ticket);
+                                        setShowTicketDetailSheet(true);
+                                      }}
+                                    >
+                                      <div className="flex items-center gap-2 flex-wrap">
                                         <span className="font-mono font-medium">#{ticket.progressiveNumber}</span>
+                                        <Badge variant="outline" className="text-xs">{getEmissionChannelLabel((ticket as any).emissionChannelCode)}</Badge>
                                         {getTicketStatusBadge(ticket.status)}
                                       </div>
-                                      <div className="text-sm text-muted-foreground mt-1">
-                                        {ticket.participantFirstName || ticket.participantLastName 
-                                          ? `${ticket.participantFirstName || ''} ${ticket.participantLastName || ''}`.trim()
-                                          : 'Partecipante non specificato'
-                                        }
+                                      <div className="text-xs text-muted-foreground mt-1 space-y-0.5">
+                                        <div className="flex items-center gap-2">
+                                          <span>Sigillo: {ticket.fiscalSealCode || '-'}</span>
+                                          <span>Tipo: {getTicketTypeLabel(ticket.ticketTypeCode, (ticket as any).ticketType)}</span>
+                                        </div>
+                                        <div>
+                                          {ticket.emissionDate ? format(new Date(ticket.emissionDate), 'dd/MM/yyyy HH:mm') : '-'}
+                                        </div>
                                       </div>
                                     </div>
                                     <div className="flex items-center gap-2">
                                       <span className="font-medium text-emerald-400">€{Number(ticket.grossAmount).toFixed(2)}</span>
-                                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                                      <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                          <Button variant="ghost" size="icon" className="h-8 w-8" data-testid={`button-ticket-actions-mobile-${ticket.id}`}>
+                                            <MoreHorizontal className="h-4 w-4" />
+                                          </Button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="end">
+                                          <DropdownMenuItem onSelect={() => { setSelectedTicketForDetail(ticket); setShowTicketDetailSheet(true); }}>
+                                            <Eye className="h-4 w-4 mr-2" />
+                                            Visualizza
+                                          </DropdownMenuItem>
+                                          {(ticket.status === 'valid' || ticket.status === 'sold') && (
+                                            <>
+                                              <DropdownMenuSeparator />
+                                              <DropdownMenuItem onSelect={() => handleCancelTicket(ticket)} className="text-amber-500">
+                                                <XCircle className="h-4 w-4 mr-2" />
+                                                Annulla
+                                              </DropdownMenuItem>
+                                              <DropdownMenuItem 
+                                                onSelect={() => { setTicketToRefund(ticket); setRefundDialogOpen(true); }} 
+                                                className="text-red-500"
+                                              >
+                                                <RefreshCw className="h-4 w-4 mr-2" />
+                                                Rimborsa
+                                              </DropdownMenuItem>
+                                            </>
+                                          )}
+                                        </DropdownMenuContent>
+                                      </DropdownMenu>
                                     </div>
                                   </div>
                                 </motion.div>
