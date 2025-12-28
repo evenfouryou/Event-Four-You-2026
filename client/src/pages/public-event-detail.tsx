@@ -150,6 +150,21 @@ interface EventDetail {
   sectors: Sector[];
 }
 
+interface SubscriptionType {
+  id: string;
+  name: string;
+  description: string | null;
+  price: string;
+  eventsCount: number;
+  turnType: string;
+  maxQuantity: number | null;
+  soldCount: number;
+  validFrom: Date | null;
+  validTo: Date | null;
+  availableQuantity: number | null;
+  isAvailable: boolean;
+}
+
 interface PageConfig {
   config: {
     heroVideoUrl?: string;
@@ -1727,6 +1742,82 @@ function TicketTypeCard({
   );
 }
 
+function SubscriptionTypeCard({
+  subscription,
+  onAddToCart,
+  isAdding,
+}: {
+  subscription: SubscriptionType;
+  onAddToCart: (subscription: SubscriptionType) => void;
+  isAdding: boolean;
+}) {
+  const price = Number(subscription.price);
+
+  return (
+    <motion.div 
+      {...fadeInUp} 
+      className="bg-card/50 border border-purple-500/30 rounded-2xl p-4 space-y-4"
+      data-testid={`card-subscription-${subscription.id}`}
+    >
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-400 to-purple-600 flex items-center justify-center">
+            <Ticket className="w-5 h-5 text-white" />
+          </div>
+          <div>
+            <h3 className="font-semibold text-foreground" data-testid={`text-subscription-name-${subscription.id}`}>
+              {subscription.name}
+            </h3>
+            <div className="flex items-center gap-2 mt-1">
+              <Badge className="bg-purple-500/20 text-purple-400 border-purple-500/30 text-xs">
+                Abbonamento
+              </Badge>
+              <span className="text-xs text-muted-foreground">
+                {subscription.eventsCount} eventi
+              </span>
+              {subscription.availableQuantity !== null && (
+                <span className="text-xs text-muted-foreground">
+                  • {subscription.availableQuantity} disponibili
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+        <div className="text-right">
+          <div className="text-2xl font-bold bg-gradient-to-r from-purple-400 to-purple-600 bg-clip-text text-transparent" data-testid={`text-subscription-price-${subscription.id}`}>
+            €{price.toFixed(2)}
+          </div>
+        </div>
+      </div>
+
+      {subscription.description && (
+        <p className="text-sm text-muted-foreground">
+          {subscription.description}
+        </p>
+      )}
+
+      <Button
+        className="w-full bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white font-semibold h-12 rounded-xl"
+        onClick={() => onAddToCart(subscription)}
+        disabled={isAdding}
+        data-testid={`button-add-subscription-${subscription.id}`}
+      >
+        {isAdding ? (
+          <span className="flex items-center gap-2">
+            <RefreshCw className="w-4 h-4 animate-spin" />
+            Aggiungendo...
+          </span>
+        ) : (
+          <span className="flex items-center gap-2">
+            <ShoppingCart className="w-4 h-4" />
+            Aggiungi al Carrello
+          </span>
+        )}
+      </Button>
+    </motion.div>
+  );
+}
+
 export default function PublicEventDetailPage() {
   const params = useParams<{ id: string }>();
   const [, navigate] = useLocation();
@@ -1767,6 +1858,18 @@ export default function PublicEventDetailPage() {
 
   const { data: event, isLoading, error } = useQuery<EventDetail>({
     queryKey: ["/api/public/events", params.id],
+  });
+
+  const { data: subscriptionTypes } = useQuery<SubscriptionType[]>({
+    queryKey: ["/api/public/events", event?.eventId, "subscriptions"],
+    queryFn: async () => {
+      const res = await fetch(`/api/public/events/${event?.eventId}/subscriptions`, {
+        credentials: "include",
+      });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!event?.eventId,
   });
 
   const { data: floorPlan } = useQuery<FloorPlan>({
@@ -1952,6 +2055,47 @@ export default function PublicEventDetailPage() {
       });
     } finally {
       setIsAdding(false);
+    }
+  };
+
+  const [addingSubscriptionId, setAddingSubscriptionId] = useState<string | null>(null);
+
+  const handleAddSubscriptionToCart = async (subscription: SubscriptionType) => {
+    if (!event || addingSubscriptionId) return;
+
+    triggerHaptic('medium');
+    setAddingSubscriptionId(subscription.id);
+    
+    try {
+      await apiRequest("POST", "/api/public/cart/add", {
+        ticketedEventId: event.id,
+        subscriptionTypeId: subscription.id,
+        quantity: 1,
+        participantFirstName: firstName,
+        participantLastName: lastName,
+      });
+      
+      setCartCount(prev => prev + 1);
+      triggerHaptic('success');
+      
+      toast({
+        title: "Abbonamento aggiunto!",
+        description: `${subscription.name} aggiunto al carrello`,
+      });
+      
+      queryClient.invalidateQueries({ queryKey: ["/api/public/cart"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/public/events", event.eventId, "subscriptions"] });
+      
+      navigate("/carrello");
+    } catch (error: any) {
+      triggerHaptic('error');
+      toast({
+        title: "Errore",
+        description: error.message || "Impossibile aggiungere al carrello.",
+        variant: "destructive",
+      });
+    } finally {
+      setAddingSubscriptionId(null);
     }
   };
 
@@ -2844,6 +2988,35 @@ export default function PublicEventDetailPage() {
                     <p className="text-sm text-muted-foreground">
                       I biglietti non sono ancora disponibili.
                     </p>
+                  </div>
+                </motion.div>
+              )}
+
+              {subscriptionTypes && subscriptionTypes.length > 0 && (
+                <motion.div
+                  {...fadeInUp}
+                  transition={{ ...springTransition, delay: 0.4 }}
+                >
+                  <h2 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
+                    <Ticket className="w-5 h-5 text-purple-400" />
+                    Abbonamenti
+                  </h2>
+                  
+                  <div className="space-y-4" data-testid="grid-subscriptions">
+                    {subscriptionTypes.map((subscription, index) => (
+                      <motion.div
+                        key={subscription.id}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ ...springTransition, delay: 0.45 + index * 0.05 }}
+                      >
+                        <SubscriptionTypeCard
+                          subscription={subscription}
+                          onAddToCart={handleAddSubscriptionToCart}
+                          isAdding={addingSubscriptionId === subscription.id}
+                        />
+                      </motion.div>
+                    ))}
                   </div>
                 </motion.div>
               )}

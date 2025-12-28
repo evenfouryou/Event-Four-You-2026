@@ -54,7 +54,9 @@ import { motion, AnimatePresence } from "framer-motion";
 interface CartItem {
   id: string;
   ticketedEventId: string;
-  sectorId: string;
+  itemType: 'ticket' | 'subscription';
+  sectorId: string | null;
+  subscriptionTypeId: string | null;
   seatId: string | null;
   quantity: number;
   ticketType: string;
@@ -64,7 +66,8 @@ interface CartItem {
   reservedUntil: Date;
   eventName: string;
   eventStart: Date;
-  sectorName: string;
+  sectorName: string | null;
+  subscriptionName: string | null;
   locationName: string;
 }
 
@@ -137,7 +140,11 @@ function TicketCard({
                   >
                     {item.eventName}
                   </h3>
-                  <p className="text-sm text-muted-foreground mt-0.5">{item.sectorName}</p>
+                  <p className="text-sm text-muted-foreground mt-0.5" data-testid={`text-item-type-${item.id}`}>
+                    {item.itemType === 'subscription' 
+                      ? item.subscriptionName || 'Abbonamento'
+                      : item.sectorName || 'Settore'}
+                  </p>
                 </div>
                 
                 <HapticButton
@@ -165,9 +172,15 @@ function TicketCard({
               </div>
               
               <div className="flex items-center gap-2 mt-2">
-                <Badge variant="outline" className="border-border text-muted-foreground text-xs">
-                  {item.ticketType === "intero" ? "Intero" : "Ridotto"}
-                </Badge>
+                {item.itemType === 'subscription' ? (
+                  <Badge className="bg-purple-500/20 text-purple-400 border-purple-500/30 text-xs" data-testid={`badge-subscription-${item.id}`}>
+                    Abbonamento
+                  </Badge>
+                ) : (
+                  <Badge variant="outline" className="border-border text-muted-foreground text-xs" data-testid={`badge-ticket-type-${item.id}`}>
+                    {item.ticketType === "intero" ? "Intero" : "Ridotto"}
+                  </Badge>
+                )}
                 {item.participantFirstName && (
                   <Badge className="bg-teal-500/20 text-teal-400 border-teal-500/30 text-xs">
                     {item.participantFirstName} {item.participantLastName}

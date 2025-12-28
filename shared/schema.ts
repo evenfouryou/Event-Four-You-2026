@@ -2978,8 +2978,10 @@ export const publicCartItems = pgTable("public_cart_items", {
   sessionId: varchar("session_id", { length: 100 }).notNull(), // Browser session ID (cookie)
   customerId: varchar("customer_id").references(() => siaeCustomers.id), // Optional se già loggato
   ticketedEventId: varchar("ticketed_event_id").notNull().references(() => siaeTicketedEvents.id),
-  sectorId: varchar("sector_id").notNull().references(() => siaeEventSectors.id),
+  itemType: varchar("item_type", { length: 20 }).notNull().default('ticket'), // 'ticket' o 'subscription'
+  sectorId: varchar("sector_id").references(() => siaeEventSectors.id), // Per biglietti
   seatId: varchar("seat_id").references(() => siaeSeats.id), // Per posti numerati
+  subscriptionTypeId: varchar("subscription_type_id").references(() => siaeSubscriptionTypes.id), // Per abbonamenti
   quantity: integer("quantity").notNull().default(1), // Per posti non numerati
   ticketType: varchar("ticket_type", { length: 20 }).notNull().default('intero'), // intero, ridotto, omaggio
   unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).notNull(),
@@ -3006,6 +3008,10 @@ export const publicCartItemsRelations = relations(publicCartItems, ({ one }) => 
   seat: one(siaeSeats, {
     fields: [publicCartItems.seatId],
     references: [siaeSeats.id],
+  }),
+  subscriptionType: one(siaeSubscriptionTypes, {
+    fields: [publicCartItems.subscriptionTypeId],
+    references: [siaeSubscriptionTypes.id],
   }),
 }));
 

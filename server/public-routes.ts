@@ -47,7 +47,7 @@ import { sendTicketEmail, sendPasswordResetEmail } from "./email-service";
 import { ticketTemplates, ticketTemplateElements } from "@shared/schema";
 import { sendOTP as sendMSG91OTP, verifyOTP as verifyMSG91OTP, resendOTP as resendMSG91OTP, isMSG91Configured } from "./msg91-service";
 import { siaeStorage } from "./siae-storage";
-import { siaeNameChanges, siaeResales, siaeWalletTransactions, eventReservationSettings, eventLists, listEntries, tableTypes, tableReservations, reservationPayments, prProfiles } from "@shared/schema";
+import { siaeNameChanges, siaeResales, siaeWalletTransactions, eventReservationSettings, eventLists, listEntries, tableTypes, tableReservations, reservationPayments, prProfiles, siaeSubscriptionTypes, siaeSubscriptions } from "@shared/schema";
 import svgCaptcha from "svg-captcha";
 import QRCode from "qrcode";
 
@@ -1050,7 +1050,9 @@ router.get("/api/public/cart", async (req, res) => {
       .select({
         id: publicCartItems.id,
         ticketedEventId: publicCartItems.ticketedEventId,
+        itemType: publicCartItems.itemType,
         sectorId: publicCartItems.sectorId,
+        subscriptionTypeId: publicCartItems.subscriptionTypeId,
         seatId: publicCartItems.seatId,
         quantity: publicCartItems.quantity,
         ticketType: publicCartItems.ticketType,
@@ -1061,13 +1063,15 @@ router.get("/api/public/cart", async (req, res) => {
         eventName: events.name,
         eventStart: events.startDatetime,
         sectorName: siaeEventSectors.name,
+        subscriptionName: siaeSubscriptionTypes.name,
         locationName: locations.name,
       })
       .from(publicCartItems)
       .innerJoin(siaeTicketedEvents, eq(publicCartItems.ticketedEventId, siaeTicketedEvents.id))
       .innerJoin(events, eq(siaeTicketedEvents.eventId, events.id))
       .innerJoin(locations, eq(events.locationId, locations.id))
-      .innerJoin(siaeEventSectors, eq(publicCartItems.sectorId, siaeEventSectors.id))
+      .leftJoin(siaeEventSectors, eq(publicCartItems.sectorId, siaeEventSectors.id))
+      .leftJoin(siaeSubscriptionTypes, eq(publicCartItems.subscriptionTypeId, siaeSubscriptionTypes.id))
       .where(eq(publicCartItems.sessionId, sessionId));
 
     // Calcola totale
@@ -1092,11 +1096,67 @@ router.post("/api/public/cart/add", async (req, res) => {
       ticketedEventId,
       sectorId,
       seatId,
+      subscriptionTypeId,
       quantity = 1,
       ticketType = "intero",
       participantFirstName,
       participantLastName,
     } = req.body;
+
+    // Se è un abbonamento
+    if (subscriptionTypeId) {
+      const [subscriptionType] = await db
+        .select()
+        .from(siaeSubscriptionTypes)
+        .where(eq(siaeSubscriptionTypes.id, subscriptionTypeId));
+
+      if (!subscriptionType) {
+        return res.status(404).json({ message: "Tipo abbonamento non trovato" });
+      }
+
+      if (!subscriptionType.active) {
+        return res.status(400).json({ message: "Abbonamento non disponibile" });
+      }
+
+      // Verifica disponibilità
+      if (subscriptionType.maxQuantity && subscriptionType.soldCount >= subscriptionType.maxQuantity) {
+        return res.status(400).json({ message: "Abbonamenti esauriti" });
+      }
+
+      // Verifica periodo di validità
+      const now = new Date();
+      if (subscriptionType.validFrom && now < new Date(subscriptionType.validFrom)) {
+        return res.status(400).json({ message: "Vendita abbonamenti non ancora iniziata" });
+      }
+      if (subscriptionType.validTo && now > new Date(subscriptionType.validTo)) {
+        return res.status(400).json({ message: "Vendita abbonamenti terminata" });
+      }
+
+      const reservedUntil = new Date(Date.now() + 15 * 60 * 1000);
+
+      const [cartItem] = await db
+        .insert(publicCartItems)
+        .values({
+          sessionId,
+          ticketedEventId: subscriptionType.ticketedEventId,
+          itemType: 'subscription',
+          subscriptionTypeId,
+          quantity,
+          ticketType: 'abbonamento',
+          unitPrice: subscriptionType.price,
+          participantFirstName,
+          participantLastName,
+          reservedUntil,
+        })
+        .returning();
+
+      return res.json(cartItem);
+    }
+
+    // Altrimenti è un biglietto normale
+    if (!sectorId) {
+      return res.status(400).json({ message: "Settore richiesto per biglietti" });
+    }
 
     // Verifica evento e settore
     const [sector] = await db
@@ -1145,6 +1205,7 @@ router.post("/api/public/cart/add", async (req, res) => {
       .values({
         sessionId,
         ticketedEventId,
+        itemType: 'ticket',
         sectorId,
         seatId,
         quantity: sector.isNumbered ? 1 : quantity,
@@ -1676,10 +1737,83 @@ router.post("/api/public/checkout/confirm", async (req, res) => {
       })
       .returning();
 
-    // Genera biglietti
+    // Genera biglietti e/o abbonamenti
     const tickets: any[] = [];
+    const subscriptions: any[] = [];
 
     for (const item of cartItems) {
+      // Handle subscription items
+      if (item.itemType === 'subscription' && item.subscriptionTypeId) {
+        console.log(`[PUBLIC] Processing subscription item: subscriptionTypeId=${item.subscriptionTypeId}, quantity=${item.quantity}`);
+        
+        const [subscriptionType] = await db
+          .select()
+          .from(siaeSubscriptionTypes)
+          .where(eq(siaeSubscriptionTypes.id, item.subscriptionTypeId));
+
+        if (!subscriptionType) {
+          console.error(`[PUBLIC] Subscription type not found: ${item.subscriptionTypeId}`);
+          throw new Error(`Tipo abbonamento non trovato: ${item.subscriptionTypeId}`);
+        }
+
+        // Create subscription records
+        for (let i = 0; i < item.quantity; i++) {
+          // Generate subscription code
+          const subscriptionCode = `ABO-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+          
+          // Get next progressive number for subscriptions
+          const [maxProgress] = await db
+            .select({ max: sql<number>`COALESCE(MAX(progressive_number), 0)` })
+            .from(siaeSubscriptions)
+            .where(eq(siaeSubscriptions.companyId, ticketedEvent.companyId));
+          
+          const progressiveNumber = (maxProgress?.max || 0) + 1;
+
+          // Calculate rateo per event (total price / events count)
+          const priceValue = parseFloat(subscriptionType.price);
+          const rateoPerEvent = (priceValue / subscriptionType.eventsCount).toFixed(2);
+          const ivaRate = parseFloat(subscriptionType.ivaRate || '22');
+          const rateoVat = (parseFloat(rateoPerEvent) * ivaRate / 100).toFixed(2);
+
+          const [subscription] = await db
+            .insert(siaeSubscriptions)
+            .values({
+              companyId: ticketedEvent.companyId,
+              customerId: customer.id,
+              subscriptionCode,
+              progressiveNumber,
+              turnType: subscriptionType.turnType || 'F',
+              eventsCount: subscriptionType.eventsCount,
+              eventsUsed: 0,
+              validFrom: subscriptionType.validFrom || new Date(),
+              validTo: subscriptionType.validTo || new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+              totalAmount: subscriptionType.price,
+              rateoPerEvent,
+              rateoVat,
+              holderFirstName: item.participantFirstName || customer.firstName,
+              holderLastName: item.participantLastName || customer.lastName,
+              status: 'active',
+              ticketedEventId: ticketedEvent.id,
+              subscriptionTypeId: subscriptionType.id,
+            })
+            .returning();
+
+          subscriptions.push(subscription);
+          console.log(`[PUBLIC] Created subscription: ${subscriptionCode}, progressiveNumber: ${progressiveNumber}`);
+        }
+
+        // Update subscription type sold count
+        await db
+          .update(siaeSubscriptionTypes)
+          .set({
+            soldCount: sql`${siaeSubscriptionTypes.soldCount} + ${item.quantity}`,
+          })
+          .where(eq(siaeSubscriptionTypes.id, item.subscriptionTypeId));
+
+        continue; // Skip ticket processing for subscription items
+      }
+
+      // Handle ticket items (existing logic)
       console.log(`[PUBLIC] Processing cart item: sectorId=${item.sectorId}, quantity=${item.quantity}`);
       
       const [sector] = await db
@@ -3616,6 +3750,67 @@ async function generateReservationQrCodeDataUrl(token: string): Promise<string> 
     return '';
   }
 }
+
+// GET /api/public/events/:eventId/subscriptions - Get available subscription types
+router.get("/api/public/events/:eventId/subscriptions", async (req, res) => {
+  try {
+    const { eventId } = req.params;
+
+    // First find the ticketed event for this event ID
+    const [ticketedEvent] = await db
+      .select()
+      .from(siaeTicketedEvents)
+      .where(eq(siaeTicketedEvents.eventId, parseInt(eventId)));
+
+    if (!ticketedEvent) {
+      return res.json([]);
+    }
+
+    const now = new Date();
+
+    // Get active subscription types for this ticketed event
+    const subscriptionTypes = await db
+      .select({
+        id: siaeSubscriptionTypes.id,
+        name: siaeSubscriptionTypes.name,
+        description: siaeSubscriptionTypes.description,
+        price: siaeSubscriptionTypes.price,
+        eventsCount: siaeSubscriptionTypes.eventsCount,
+        turnType: siaeSubscriptionTypes.turnType,
+        maxQuantity: siaeSubscriptionTypes.maxQuantity,
+        soldCount: siaeSubscriptionTypes.soldCount,
+        validFrom: siaeSubscriptionTypes.validFrom,
+        validTo: siaeSubscriptionTypes.validTo,
+      })
+      .from(siaeSubscriptionTypes)
+      .where(
+        and(
+          eq(siaeSubscriptionTypes.ticketedEventId, ticketedEvent.id),
+          eq(siaeSubscriptionTypes.active, true),
+          or(
+            isNull(siaeSubscriptionTypes.validFrom),
+            lte(siaeSubscriptionTypes.validFrom, now)
+          ),
+          or(
+            isNull(siaeSubscriptionTypes.validTo),
+            gte(siaeSubscriptionTypes.validTo, now)
+          )
+        )
+      );
+
+    // Calculate available quantity for each subscription type
+    const result = subscriptionTypes.map(st => ({
+      ...st,
+      availableQuantity: st.maxQuantity ? st.maxQuantity - (st.soldCount || 0) : null,
+      isAvailable: !st.maxQuantity || (st.soldCount || 0) < st.maxQuantity,
+    })).filter(st => st.isAvailable);
+
+    res.json(result);
+  } catch (error: any) {
+    console.error("[PUBLIC] Get subscriptions error:", error);
+    res.status(500).json({ message: "Errore nel caricamento abbonamenti" });
+  }
+});
 
 // GET /api/public/events/:eventId/reservation-settings - Get public reservation settings
 router.get("/api/public/events/:eventId/reservation-settings", async (req, res) => {
