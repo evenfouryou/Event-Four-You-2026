@@ -1152,7 +1152,7 @@ router.get("/api/siae/admin/pending-approvals", requireAuth, requireSuperAdmin, 
         approvalStatus: siaeTicketedEvents.approvalStatus,
         createdAt: siaeTicketedEvents.createdAt,
         eventName: events.name,
-        eventDate: events.startDate,
+        eventDate: events.startDatetime,
         companyName: companies.name,
       })
       .from(siaeTicketedEvents)
