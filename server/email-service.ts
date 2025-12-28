@@ -217,7 +217,7 @@ export async function sendTicketEmail(options: TicketEmailOptions): Promise<void
     <div class="footer">
       <p class="footer-text">Hai domande sul tuo ordine?</p>
       <p class="footer-text">Contattaci a <a href="mailto:support@event4u.it" class="footer-link">support@event4u.it</a></p>
-      <p class="footer-text" style="margin-top: 20px;">&copy; ${new Date().getFullYear()} Event4U - Tutti i diritti riservati</p>
+      <p style="color: #94A3B8; font-size: 12px; margin-top: 20px;">&copy; ${new Date().getFullYear()} Event4U - Tutti i diritti riservati</p>
     </div>
   </div>
 </body>
@@ -324,6 +324,10 @@ interface SiaeTransmissionEmailOptions {
 export async function sendSiaeTransmissionEmail(options: SiaeTransmissionEmailOptions): Promise<void> {
   const { to, companyName, transmissionType, periodDate, ticketsCount, totalAmount, xmlContent, transmissionId } = options;
 
+  const isSigned = xmlContent.includes('Signature');
+  const fileExtension = isSigned ? 'xml.p7m' : 'xml';
+  const fileName = `C1_TRANS_${transmissionId}_${periodDate.toISOString().split('T')[0].replace(/-/g, '')}.${fileExtension}`;
+
   const typeLabels: Record<string, string> = {
     'daily': 'Giornaliera',
     'monthly': 'Mensile',
@@ -332,10 +336,6 @@ export async function sendSiaeTransmissionEmail(options: SiaeTransmissionEmailOp
 
   const formatDate = (date: Date) => {
     return date.toLocaleDateString('it-IT', { day: '2-digit', month: 'long', year: 'numeric' });
-  };
-
-  const formatDateFilename = (date: Date) => {
-    return date.toISOString().split('T')[0].replace(/-/g, '');
   };
 
   const htmlBody = `
@@ -373,22 +373,24 @@ export async function sendSiaeTransmissionEmail(options: SiaeTransmissionEmailOp
           <td style="padding: 12px 0; border-bottom: 1px solid #eee; font-weight: 500; text-align: right;">${ticketsCount}</td>
         </tr>
         <tr>
-          <td style="padding: 12px 0; color: #666;">Importo Totale</td>
-          <td style="padding: 12px 0; font-weight: bold; text-align: right; font-size: 18px; color: #1a237e;">€ ${parseFloat(totalAmount).toFixed(2)}</td>
+          <td style="padding: 12px 0; border-bottom: 1px solid #eee; color: #666;">Importo Totale</td>
+          <td style="padding: 12px 0; border-bottom: 1px solid #eee; font-weight: 500; text-align: right; color: #2e7d32;">€${totalAmount}</td>
+        </tr>
+        <tr>
+          <td style="padding: 12px 0; border-bottom: 1px solid #eee; color: #666;">Stato Firma</td>
+          <td style="padding: 12px 0; border-bottom: 1px solid #eee; font-weight: 500; text-align: right;">${isSigned ? 'FIRMATA (p7m)' : 'NON FIRMATA'}</td>
         </tr>
       </table>
+      
+      <div style="margin-top: 25px; padding: 15px; background-color: #e8eaf6; border-radius: 4px;">
+        <p style="margin: 0; font-size: 14px; color: #1a237e;">
+          <strong>Nota:</strong> Il file XML è allegato a questa email con nome <code>${fileName}</code>.
+        </p>
+      </div>
     </div>
 
-    <div style="background-color: #e3f2fd; border-radius: 8px; padding: 20px; margin-bottom: 30px; border-left: 4px solid #1a237e;">
-      <p style="margin: 0; color: #1a237e; font-size: 14px;">
-        <strong>Nota:</strong> Il file XML allegato contiene i dati della comunicazione in formato conforme al Provvedimento n. 356768/2025 dell'Agenzia delle Entrate.
-      </p>
-    </div>
-
-    <div style="text-align: center; padding-top: 20px; border-top: 1px solid #eee;">
-      <p style="color: #999; font-size: 12px;">Trasmissione ID: ${transmissionId}</p>
-      <p style="color: #999; font-size: 12px;">Data/Ora Generazione: ${new Date().toLocaleString('it-IT')}</p>
-      <p style="color: #999; font-size: 12px;">&copy; ${new Date().getFullYear()} Event4U - Sistema di Biglietteria SIAE</p>
+    <div style="text-align: center; color: #999; font-size: 12px;">
+      <p>&copy; ${new Date().getFullYear()} Event4U - Sistema Gestione Fiscale</p>
     </div>
   </div>
 </body>
@@ -396,20 +398,21 @@ export async function sendSiaeTransmissionEmail(options: SiaeTransmissionEmailOp
   `;
 
   const mailOptions = {
-    from: process.env.SMTP_FROM || `"Event4U SIAE" <${process.env.SMTP_USER || 'noreply@event4u.it'}>`,
+    from: process.env.SMTP_FROM || `"Event4U" <${process.env.SMTP_USER || 'noreply@event4u.it'}>`,
     to,
-    subject: `Trasmissione SIAE ${typeLabels[transmissionType]} - ${formatDate(periodDate)} - ${companyName}`,
+    subject: `Report SIAE C1 - ${companyName} - ${typeLabels[transmissionType]} - ${formatDate(periodDate)}`,
     html: htmlBody,
-    attachments: [{
-      filename: `SIAE_${formatDateFilename(periodDate)}_${transmissionId}.xml`,
-      content: xmlContent,
-      contentType: 'application/xml',
-    }],
+    attachments: [
+      {
+        filename: fileName,
+        content: xmlContent,
+      },
+    ],
   };
 
   try {
     await emailTransporter.sendMail(mailOptions);
-    console.log(`[EMAIL-SERVICE] SIAE transmission email sent successfully to ${to}`);
+    console.log(`[EMAIL-SERVICE] SIAE Transmission email sent successfully to ${to} (File: ${fileName})`);
   } catch (error) {
     console.error('[EMAIL-SERVICE] Failed to send SIAE transmission email:', error);
     throw error;

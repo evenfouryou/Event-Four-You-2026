@@ -31,16 +31,7 @@ async function generateC1ReportData(ticketedEvent: any, reportType: 'giornaliero
   const today = refDate.toISOString().split('T')[0];
 
   const getTicketPrice = (t: any) => Number(t.ticketPrice) || Number(t.grossAmount) || Number(t.priceAtPurchase) || 0;
-  const getTicketType = (t: any): 'intero' | 'ridotto' | 'omaggio' => {
-    if (t.ticketType === 'intero' || t.ticketType === 'ridotto' || t.ticketType === 'omaggio') {
-      return t.ticketType;
-    }
-    if (t.ticketTypeCode === 'INT') return 'intero';
-    if (t.ticketTypeCode === 'RID') return 'ridotto';
-    if (t.ticketTypeCode === 'OMG' || t.ticketTypeCode === 'OMA') return 'omaggio';
-    return 'intero';
-  };
-
+  
   let filteredTickets: any[];
   if (isMonthly) {
     const startOfMonth = new Date(refDate.getFullYear(), refDate.getMonth(), 1);
@@ -59,7 +50,29 @@ async function generateC1ReportData(ticketedEvent: any, reportType: 'giornaliero
   const activeTickets = filteredTickets.filter(t => t.status === 'emesso' || t.status === 'used');
   const cancelledTickets = filteredTickets.filter(t => t.status === 'annullato');
 
-  const totalRevenue = activeTickets.reduce((sum, t) => sum + getTicketPrice(t), 0);
+  // Recupera abbonamenti per il periodo
+  let subscriptions: any[] = [];
+  try {
+    const allSubscriptions = await siaeStorage.getSiaeSubscriptionsByCompany(ticketedEvent.companyId);
+    if (isMonthly) {
+      const startOfMonth = new Date(refDate.getFullYear(), refDate.getMonth(), 1);
+      const endOfMonth = new Date(refDate.getFullYear(), refDate.getMonth() + 1, 0, 23, 59, 59);
+      subscriptions = allSubscriptions.filter(s => {
+        const subDate = new Date(s.createdAt!);
+        return subDate >= startOfMonth && subDate <= endOfMonth;
+      });
+    } else {
+      subscriptions = allSubscriptions.filter(s => {
+        const subDate = s.createdAt?.toISOString().split('T')[0];
+        return subDate === today;
+      });
+    }
+  } catch (e) {
+    log(`Errore recupero abbonamenti: ${e.message}`);
+  }
+
+  const totalTicketRevenue = activeTickets.reduce((sum, t) => sum + getTicketPrice(t), 0);
+  const totalSubRevenue = subscriptions.reduce((sum, s) => sum + (Number(s.price) || 0), 0);
 
   return {
     ticketedEvent,
@@ -70,7 +83,8 @@ async function generateC1ReportData(ticketedEvent: any, reportType: 'giornaliero
     reportDate,
     activeTicketsCount: activeTickets.length,
     cancelledTicketsCount: cancelledTickets.length,
-    totalRevenue,
+    totalRevenue: totalTicketRevenue,
+    subscriptions,
     filteredTickets: activeTickets,
   };
 }
@@ -116,6 +130,24 @@ function generateXMLContent(reportData: any): string {
                 <Capienza>100</Capienza>
                 <IVAEccedenteOmaggi>0</IVAEccedenteOmaggi>
             </OrdineDiPosto>`;
+  }
+
+  // Genera sezione Abbonamenti se presenti
+  let abbonamentiXml = '';
+  const subscriptions = reportData.subscriptions || [];
+  if (subscriptions.length > 0) {
+    const totalSubRevenue = subscriptions.reduce((sum: number, s: any) => sum + (Number(s.price) || 0), 0);
+    const totalSubRevenueInCents = Math.round(totalSubRevenue * 100);
+    const subIvaAmount = Math.round(totalSubRevenueInCents * 0.10);
+    
+    abbonamentiXml = `
+        <Abbonamenti>
+            <AbbonamentiEmessi>
+                <Quantita>${subscriptions.length}</Quantita>
+                <CorrispettivoLordo>${totalSubRevenueInCents}</CorrispettivoLordo>
+                <IVACorrispettivo>${subIvaAmount}</IVACorrispettivo>
+            </AbbonamentiEmessi>
+        </Abbonamenti>`;
   }
 
   const rootElement = isMonthly ? 'RiepilogoMensile' : 'RiepilogoGiornaliero';
@@ -167,7 +199,7 @@ function generateXMLContent(reportData: any): string {
                 <IVACorrispettivo>0</IVACorrispettivo>
                 <IVAPrevendita>0</IVAPrevendita>
             </TitoliAnnullati>
-        </TitoliIngresso>
+        </TitoliIngresso>${abbonamentiXml}
     </Organizzatore>
 </${rootElement}>`;
   
