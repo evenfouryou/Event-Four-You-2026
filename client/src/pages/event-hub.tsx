@@ -3183,7 +3183,7 @@ export default function EventHub() {
                       </CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <div className="grid grid-cols-3 gap-4">
+                      <div className="grid grid-cols-4 gap-4">
                         <div className="text-center p-4 rounded-lg bg-muted/50">
                           <div className="mb-2">
                             {ticketedEvent?.ticketingStatus === 'draft' ? (
@@ -3197,6 +3197,18 @@ export default function EventHub() {
                             )}
                           </div>
                           <div className="text-xs text-muted-foreground">Biglietteria</div>
+                        </div>
+                        <div className="text-center p-4 rounded-lg bg-muted/50">
+                          <div className="mb-2">
+                            {(ticketedEvent as any)?.approvalStatus === 'approved' ? (
+                              <Badge className="bg-emerald-500 text-base px-4 py-1">Approvato</Badge>
+                            ) : (ticketedEvent as any)?.approvalStatus === 'rejected' ? (
+                              <Badge variant="destructive" className="text-base px-4 py-1">Rifiutato</Badge>
+                            ) : (
+                              <Badge variant="outline" className="text-amber-500 border-amber-500 text-base px-4 py-1">In Attesa</Badge>
+                            )}
+                          </div>
+                          <div className="text-xs text-muted-foreground">Approvazione</div>
                         </div>
                         <div className="text-center p-4 rounded-lg bg-muted/50">
                           <div className="mb-2">
@@ -3219,7 +3231,17 @@ export default function EventHub() {
                           <div className="text-xs text-muted-foreground">Acquisto Online</div>
                         </div>
                       </div>
-                      {ticketedEvent?.ticketingStatus === 'draft' && (
+                      {(ticketedEvent as any)?.approvalStatus === 'pending' && (
+                        <div className="mt-4 p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-sm text-amber-600 dark:text-amber-400">
+                          <strong>In attesa di approvazione:</strong> Questo evento deve essere approvato da un amministratore prima di poter attivare la vendita biglietti.
+                        </div>
+                      )}
+                      {(ticketedEvent as any)?.approvalStatus === 'rejected' && (
+                        <div className="mt-4 p-3 rounded-lg bg-red-500/10 border border-red-500/30 text-sm text-red-600 dark:text-red-400">
+                          <strong>Evento rifiutato:</strong> {(ticketedEvent as any)?.rejectedReason || 'Contatta un amministratore per maggiori informazioni.'}
+                        </div>
+                      )}
+                      {ticketedEvent?.ticketingStatus === 'draft' && (ticketedEvent as any)?.approvalStatus === 'approved' && (
                         <div className="mt-4 p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-sm text-amber-600 dark:text-amber-400">
                           <strong>Evento in bozza:</strong> Per renderlo visibile al pubblico, attiva il toggle "Vendita Online" qui sotto.
                         </div>
@@ -3258,15 +3280,17 @@ export default function EventHub() {
                           <div className="flex-1">
                             <div className="font-medium">Vendita Online Attiva</div>
                             <div className="text-sm text-muted-foreground">
-                              {ticketedEvent.ticketingStatus === 'active'
-                                ? "I biglietti sono acquistabili online"
-                                : "La vendita online è disattivata"}
+                              {(ticketedEvent as any).approvalStatus !== 'approved'
+                                ? "In attesa di approvazione amministratore"
+                                : ticketedEvent.ticketingStatus === 'active'
+                                  ? "I biglietti sono acquistabili online"
+                                  : "La vendita online è disattivata"}
                             </div>
                           </div>
                           <Switch
                             checked={ticketedEvent.ticketingStatus === 'active'}
                             onCheckedChange={(checked) => toggleTicketingStatusMutation.mutate(checked)}
-                            disabled={!ticketedEvent || event?.status === 'closed' || toggleTicketingStatusMutation.isPending}
+                            disabled={!ticketedEvent || event?.status === 'closed' || toggleTicketingStatusMutation.isPending || (ticketedEvent as any).approvalStatus !== 'approved'}
                             data-testid="switch-ticketing-active"
                           />
                         </div>
@@ -6732,7 +6756,7 @@ export default function EventHub() {
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="px-4">
-                      <div className="grid grid-cols-3 gap-2">
+                      <div className="grid grid-cols-2 gap-2">
                         <div className="text-center p-3 rounded-lg bg-white/5">
                           <div className="mb-1">
                             {ticketedEvent?.ticketingStatus === 'draft' ? (
@@ -6746,6 +6770,18 @@ export default function EventHub() {
                             )}
                           </div>
                           <div className="text-[10px] text-muted-foreground">Biglietteria</div>
+                        </div>
+                        <div className="text-center p-3 rounded-lg bg-white/5">
+                          <div className="mb-1">
+                            {(ticketedEvent as any)?.approvalStatus === 'approved' ? (
+                              <Badge className="bg-emerald-500 text-xs px-2">Approvato</Badge>
+                            ) : (ticketedEvent as any)?.approvalStatus === 'rejected' ? (
+                              <Badge variant="destructive" className="text-xs px-2">Rifiutato</Badge>
+                            ) : (
+                              <Badge variant="outline" className="text-amber-500 border-amber-500 text-xs px-2">In Attesa</Badge>
+                            )}
+                          </div>
+                          <div className="text-[10px] text-muted-foreground">Approvazione</div>
                         </div>
                         <div className="text-center p-3 rounded-lg bg-white/5">
                           <div className="mb-1">
@@ -6768,7 +6804,17 @@ export default function EventHub() {
                           <div className="text-[10px] text-muted-foreground">Acquisto</div>
                         </div>
                       </div>
-                      {ticketedEvent?.ticketingStatus === 'draft' && (
+                      {(ticketedEvent as any)?.approvalStatus === 'pending' && (
+                        <div className="mt-3 p-2 rounded-lg bg-amber-500/10 border border-amber-500/30 text-xs text-amber-600 dark:text-amber-400">
+                          <strong>In attesa:</strong> Richiede approvazione admin.
+                        </div>
+                      )}
+                      {(ticketedEvent as any)?.approvalStatus === 'rejected' && (
+                        <div className="mt-3 p-2 rounded-lg bg-red-500/10 border border-red-500/30 text-xs text-red-600 dark:text-red-400">
+                          <strong>Rifiutato:</strong> {(ticketedEvent as any)?.rejectedReason || 'Contatta admin.'}
+                        </div>
+                      )}
+                      {ticketedEvent?.ticketingStatus === 'draft' && (ticketedEvent as any)?.approvalStatus === 'approved' && (
                         <div className="mt-3 p-2 rounded-lg bg-amber-500/10 border border-amber-500/30 text-xs text-amber-600 dark:text-amber-400">
                           <strong>In bozza:</strong> Attiva "Vendita Online" per pubblicare.
                         </div>
@@ -6810,9 +6856,11 @@ export default function EventHub() {
                           <div className="flex-1 min-w-0">
                             <div className="font-medium text-sm">Vendita Online Attiva</div>
                             <div className="text-xs text-muted-foreground">
-                              {ticketedEvent.ticketingStatus === 'active'
-                                ? "I biglietti sono acquistabili online"
-                                : "La vendita online è disattivata"}
+                              {(ticketedEvent as any).approvalStatus !== 'approved'
+                                ? "In attesa di approvazione"
+                                : ticketedEvent.ticketingStatus === 'active'
+                                  ? "I biglietti sono acquistabili online"
+                                  : "La vendita online è disattivata"}
                             </div>
                           </div>
                           <Switch
@@ -6821,7 +6869,7 @@ export default function EventHub() {
                               triggerHaptic('light');
                               toggleTicketingStatusMutation.mutate(checked);
                             }}
-                            disabled={!ticketedEvent || event?.status === 'closed' || toggleTicketingStatusMutation.isPending}
+                            disabled={!ticketedEvent || event?.status === 'closed' || toggleTicketingStatusMutation.isPending || (ticketedEvent as any).approvalStatus !== 'approved'}
                             data-testid="switch-ticketing-active"
                           />
                         </div>
