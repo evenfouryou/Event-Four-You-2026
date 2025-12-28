@@ -111,32 +111,61 @@ const viewfinderVariants = {
   },
 };
 
+// Singleton AudioContext for reliable audio playback
+let audioContext: AudioContext | null = null;
+
+// Initialize audio context on first user interaction
+function initAudioContext() {
+  if (!audioContext) {
+    audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+  }
+  // Resume if suspended (required by browser autoplay policies)
+  if (audioContext.state === 'suspended') {
+    audioContext.resume();
+  }
+  return audioContext;
+}
+
 // Play sound feedback for scans
 function playSound(type: 'success' | 'error') {
   try {
-    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-    const oscillator = audioContext.createOscillator();
-    const gainNode = audioContext.createGain();
-    
-    oscillator.connect(gainNode);
-    gainNode.connect(audioContext.destination);
-    
+    const ctx = initAudioContext();
+    if (!ctx) return;
+
     if (type === 'success') {
-      // Positive sound: two ascending beeps
-      oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
-      oscillator.frequency.setValueAtTime(1200, audioContext.currentTime + 0.1);
-      gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-      gainNode.gain.setValueAtTime(0, audioContext.currentTime + 0.2);
-      oscillator.start(audioContext.currentTime);
-      oscillator.stop(audioContext.currentTime + 0.2);
+      // Success: Two ascending beeps
+      const osc1 = ctx.createOscillator();
+      const gain1 = ctx.createGain();
+      osc1.connect(gain1);
+      gain1.connect(ctx.destination);
+      osc1.frequency.setValueAtTime(800, ctx.currentTime);
+      gain1.gain.setValueAtTime(0.4, ctx.currentTime);
+      gain1.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.1);
+      osc1.start(ctx.currentTime);
+      osc1.stop(ctx.currentTime + 0.1);
+
+      const osc2 = ctx.createOscillator();
+      const gain2 = ctx.createGain();
+      osc2.connect(gain2);
+      gain2.connect(ctx.destination);
+      osc2.frequency.setValueAtTime(1200, ctx.currentTime + 0.12);
+      gain2.gain.setValueAtTime(0.4, ctx.currentTime + 0.12);
+      gain2.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.25);
+      osc2.start(ctx.currentTime + 0.12);
+      osc2.stop(ctx.currentTime + 0.25);
     } else {
-      // Error sound: descending beep
-      oscillator.frequency.setValueAtTime(400, audioContext.currentTime);
-      oscillator.frequency.setValueAtTime(200, audioContext.currentTime + 0.15);
-      gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-      gainNode.gain.setValueAtTime(0, audioContext.currentTime + 0.15);
-      oscillator.start(audioContext.currentTime);
-      oscillator.stop(audioContext.currentTime + 0.15);
+      // Error: Low descending buzz
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(300, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(150, ctx.currentTime + 0.3);
+      gain.gain.setValueAtTime(0.3, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.3);
     }
   } catch (error) {
     console.error('Audio error:', error);
@@ -164,6 +193,8 @@ export default function ScannerScanPage() {
   const [showSearch, setShowSearch] = useState(false);
   const [flashEnabled, setFlashEnabled] = useState(false);
   const [viewfinderState, setViewfinderState] = useState<"idle" | "scanning" | "success" | "error">("idle");
+  const [scanPaused, setScanPaused] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
 
   const { data: event } = useQuery<Event>({
     queryKey: ['/api/events', eventId],
@@ -191,6 +222,19 @@ export default function ScannerScanPage() {
       setShowSearch(false);
       setIsProcessing(false);
       
+      // Pause scanner and show confirmation modal
+      setScanPaused(true);
+      setShowConfirmModal(true);
+      
+      // Pause the camera to prevent re-scanning
+      if (scannerRef.current) {
+        try {
+          scannerRef.current.pause(true);
+        } catch (e) {
+          console.log('Could not pause scanner');
+        }
+      }
+      
       if (data.success) {
         setViewfinderState("success");
         triggerHaptic("success");
@@ -199,21 +243,6 @@ export default function ScannerScanPage() {
         setViewfinderState("error");
         triggerHaptic("error");
         playSound("error");
-      }
-      
-      setTimeout(() => setViewfinderState("scanning"), 800);
-      
-      if (data.success && data.person) {
-        toast({ 
-          title: "Check-in OK", 
-          description: `${data.person.firstName} ${data.person.lastName}` 
-        });
-      } else if (data.alreadyCheckedIn) {
-        toast({ 
-          title: "Già entrato", 
-          description: data.message || "QR già utilizzato",
-          variant: "destructive"
-        });
       }
     },
     onError: (error: any) => {
@@ -225,21 +254,48 @@ export default function ScannerScanPage() {
       setIsProcessing(false);
       setViewfinderState("error");
       triggerHaptic("error");
-      setTimeout(() => setViewfinderState("scanning"), 800);
+      playSound("error");
       
-      toast({ 
-        title: "Errore", 
-        description: error.message, 
-        variant: "destructive" 
-      });
+      // Pause scanner and show confirmation modal for errors too
+      setScanPaused(true);
+      setShowConfirmModal(true);
+      
+      if (scannerRef.current) {
+        try {
+          scannerRef.current.pause(true);
+        } catch (e) {
+          console.log('Could not pause scanner');
+        }
+      }
     },
   });
 
+  // Handle confirmation - resume scanning
+  const handleConfirmScan = useCallback(() => {
+    setShowConfirmModal(false);
+    setScanResult(null);
+    setScanPaused(false);
+    setViewfinderState("scanning");
+    
+    // Resume the camera
+    if (scannerRef.current) {
+      try {
+        scannerRef.current.resume();
+      } catch (e) {
+        console.log('Could not resume scanner, restarting...');
+        // If resume fails, restart the camera
+        stopCamera().then(() => startCamera());
+      }
+    }
+  }, []);
+
   const handleScan = useCallback((code: string) => {
-    if (!code.trim() || isProcessing) return;
+    if (!code.trim() || isProcessing || scanPaused) return;
     setIsProcessing(true);
+    // Initialize audio on first scan (user gesture)
+    initAudioContext();
     scanMutation.mutate(code.trim());
-  }, [isProcessing, scanMutation]);
+  }, [isProcessing, scanPaused, scanMutation]);
 
   // Keep the ref updated with the latest handleScan
   handleScanRef.current = handleScan;
@@ -1271,6 +1327,145 @@ export default function ScannerScanPage() {
           )}
         </div>
       </BottomSheet>
+
+      {/* Scan Confirmation Modal */}
+      <Dialog open={showConfirmModal} onOpenChange={(open) => !open && handleConfirmScan()}>
+        <DialogContent className="max-w-md mx-4 rounded-2xl border-0 bg-card/95 backdrop-blur-xl">
+          <DialogHeader className="pb-2">
+            <DialogTitle className="flex items-center gap-3 text-xl">
+              {scanResult?.success ? (
+                <>
+                  <div className="w-12 h-12 rounded-full bg-emerald-500/20 flex items-center justify-center">
+                    <CheckCircle2 className="w-7 h-7 text-emerald-500" />
+                  </div>
+                  <span className="text-emerald-500">Check-in Effettuato</span>
+                </>
+              ) : scanResult?.alreadyCheckedIn ? (
+                <>
+                  <div className="w-12 h-12 rounded-full bg-amber-500/20 flex items-center justify-center">
+                    <AlertTriangle className="w-7 h-7 text-amber-500" />
+                  </div>
+                  <span className="text-amber-500">Già Entrato</span>
+                </>
+              ) : (
+                <>
+                  <div className="w-12 h-12 rounded-full bg-rose-500/20 flex items-center justify-center">
+                    <XCircle className="w-7 h-7 text-rose-500" />
+                  </div>
+                  <span className="text-rose-500">Errore</span>
+                </>
+              )}
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            {scanResult?.person && (
+              <div className="space-y-3">
+                <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/50">
+                  <User className="w-5 h-5 text-primary shrink-0" />
+                  <div>
+                    <p className="text-xs text-muted-foreground">Nome e Cognome</p>
+                    <p className="font-semibold text-lg" data-testid="confirm-person-name">
+                      {scanResult.person.firstName} {scanResult.person.lastName}
+                    </p>
+                  </div>
+                </div>
+                
+                {scanResult.ticketInfo && (
+                  <>
+                    <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/50">
+                      <Ticket className="w-5 h-5 text-primary shrink-0" />
+                      <div>
+                        <p className="text-xs text-muted-foreground">Tipo Biglietto</p>
+                        <p className="font-semibold" data-testid="confirm-ticket-type">
+                          {scanResult.ticketInfo.ticketTypeName || scanResult.ticketInfo.type || 'Standard'}
+                        </p>
+                      </div>
+                    </div>
+                    
+                    {scanResult.ticketInfo.price && (
+                      <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/50">
+                        <CreditCard className="w-5 h-5 text-primary shrink-0" />
+                        <div>
+                          <p className="text-xs text-muted-foreground">Prezzo</p>
+                          <p className="font-semibold text-emerald-500" data-testid="confirm-ticket-price">
+                            €{Number(scanResult.ticketInfo.price).toFixed(2)}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {scanResult.ticketInfo.seatNumber && (
+                      <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/50">
+                        <MapPin className="w-5 h-5 text-primary shrink-0" />
+                        <div>
+                          <p className="text-xs text-muted-foreground">Posto</p>
+                          <p className="font-semibold" data-testid="confirm-seat-number">
+                            {scanResult.ticketInfo.sectorName && `${scanResult.ticketInfo.sectorName} - `}
+                            Posto {scanResult.ticketInfo.seatNumber}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+                
+                {scanResult.subscriptionInfo && (
+                  <>
+                    <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/50">
+                      <CreditCard className="w-5 h-5 text-primary shrink-0" />
+                      <div>
+                        <p className="text-xs text-muted-foreground">Tipo Abbonamento</p>
+                        <p className="font-semibold" data-testid="confirm-subscription-type">
+                          {scanResult.subscriptionInfo.typeName || 'Abbonamento'}
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/50">
+                      <Calendar className="w-5 h-5 text-primary shrink-0" />
+                      <div>
+                        <p className="text-xs text-muted-foreground">Eventi Utilizzati</p>
+                        <p className="font-semibold" data-testid="confirm-events-used">
+                          {scanResult.subscriptionInfo.eventsUsed} / {scanResult.subscriptionInfo.eventsCount}
+                        </p>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+            
+            {!scanResult?.success && scanResult?.message && (
+              <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/20">
+                <p className="text-rose-400 text-center">{scanResult.message}</p>
+              </div>
+            )}
+            
+            {!scanResult?.success && scanResult?.error && (
+              <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/20">
+                <p className="text-rose-400 text-center">{scanResult.error}</p>
+              </div>
+            )}
+          </div>
+          
+          <HapticButton
+            onClick={handleConfirmScan}
+            className={`w-full h-14 text-lg rounded-xl ${
+              scanResult?.success 
+                ? 'bg-emerald-500 hover:bg-emerald-600' 
+                : scanResult?.alreadyCheckedIn
+                  ? 'bg-amber-500 hover:bg-amber-600'
+                  : 'bg-rose-500 hover:bg-rose-600'
+            }`}
+            hapticType="medium"
+            data-testid="button-confirm-scan"
+          >
+            <CheckCircle2 className="w-5 h-5 mr-2" />
+            OK - Prossimo
+          </HapticButton>
+        </DialogContent>
+      </Dialog>
 
       {/* No Results Message */}
       <AnimatePresence>
