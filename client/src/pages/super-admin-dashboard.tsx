@@ -1,7 +1,7 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Building2, Calendar, TrendingUp, Package, Settings, UserPlus, Ticket, ChevronLeft, CreditCard, FileText, Send, ClipboardList, Shield } from "lucide-react";
+import { Building2, Calendar, TrendingUp, Package, Settings, UserPlus, Ticket, ChevronLeft, CreditCard, FileText, Send, ClipboardList, Shield, Clock, CheckCircle } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -379,6 +379,15 @@ export default function SuperAdminDashboard() {
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-3 gap-3">
+                <Button
+                  variant="outline"
+                  className="flex flex-col items-center gap-2 h-auto py-4"
+                  onClick={() => setLocation('/siae-approvals')}
+                  data-testid="link-siae-approvals"
+                >
+                  <CheckCircle className="w-5 h-5 text-green-500" />
+                  <span className="text-xs">Approvazioni</span>
+                </Button>
                 <Button
                   variant="outline"
                   className="flex flex-col items-center gap-2 h-auto py-4"

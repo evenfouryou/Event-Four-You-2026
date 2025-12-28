@@ -3,7 +3,7 @@ import { Router, Request, Response, NextFunction } from "express";
 import { siaeStorage } from "./siae-storage";
 import { storage } from "./storage";
 import { db } from "./db";
-import { events, siaeCashiers, siaeTickets, siaeTransactions, siaeSubscriptions, siaeCashierAllocations, siaeOtpAttempts, siaeNameChanges, siaeResales, publicCartItems, publicCheckoutSessions, publicCustomerSessions, tableBookings, guestListEntries, siaeTransmissions, companies, siaeEmissionChannels, siaeSystemConfig } from "@shared/schema";
+import { events, siaeCashiers, siaeTickets, siaeTransactions, siaeSubscriptions, siaeCashierAllocations, siaeOtpAttempts, siaeNameChanges, siaeResales, publicCartItems, publicCheckoutSessions, publicCustomerSessions, tableBookings, guestListEntries, siaeTransmissions, companies, siaeEmissionChannels, siaeSystemConfig, userFeatures, siaeTicketedEvents, users } from "@shared/schema";
 import { eq, and, sql, desc } from "drizzle-orm";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
@@ -1136,10 +1136,215 @@ router.get("/api/siae/ticketed-events/:id", requireAuth, async (req: Request, re
   }
 });
 
+// ==================== SIAE Event Approval Routes (Super Admin) ====================
+
+// Get all pending approval events (super_admin only)
+router.get("/api/siae/admin/pending-approvals", requireAuth, requireSuperAdmin, async (req: Request, res: Response) => {
+  try {
+    const pendingEvents = await db
+      .select({
+        id: siaeTicketedEvents.id,
+        eventId: siaeTicketedEvents.eventId,
+        companyId: siaeTicketedEvents.companyId,
+        genreCode: siaeTicketedEvents.genreCode,
+        totalCapacity: siaeTicketedEvents.totalCapacity,
+        ticketingStatus: siaeTicketedEvents.ticketingStatus,
+        approvalStatus: siaeTicketedEvents.approvalStatus,
+        createdAt: siaeTicketedEvents.createdAt,
+        eventName: events.name,
+        eventDate: events.startDate,
+        companyName: companies.name,
+      })
+      .from(siaeTicketedEvents)
+      .leftJoin(events, eq(siaeTicketedEvents.eventId, events.id))
+      .leftJoin(companies, eq(siaeTicketedEvents.companyId, companies.id))
+      .where(eq(siaeTicketedEvents.approvalStatus, 'pending'))
+      .orderBy(desc(siaeTicketedEvents.createdAt));
+    
+    res.json(pendingEvents);
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Approve a SIAE event (super_admin only)
+router.post("/api/siae/admin/approve/:id", requireAuth, requireSuperAdmin, async (req: Request, res: Response) => {
+  try {
+    const user = req.user as any;
+    const eventId = req.params.id;
+    
+    // Check current event state
+    const [existing] = await db
+      .select()
+      .from(siaeTicketedEvents)
+      .where(eq(siaeTicketedEvents.id, eventId));
+    
+    if (!existing) {
+      return res.status(404).json({ message: "Evento non trovato" });
+    }
+    
+    if (existing.approvalStatus === 'approved') {
+      return res.status(400).json({ message: "Evento già approvato" });
+    }
+    
+    const [updated] = await db
+      .update(siaeTicketedEvents)
+      .set({
+        approvalStatus: 'approved',
+        approvedBy: user.id,
+        approvedAt: new Date(),
+        rejectedReason: null,
+        updatedAt: new Date(),
+      })
+      .where(and(
+        eq(siaeTicketedEvents.id, eventId),
+        eq(siaeTicketedEvents.approvalStatus, 'pending')
+      ))
+      .returning();
+    
+    if (!updated) {
+      return res.status(400).json({ message: "Impossibile approvare l'evento. Stato non valido." });
+    }
+    
+    res.json({ message: "Evento approvato con successo", event: updated });
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Reject a SIAE event (super_admin only)
+router.post("/api/siae/admin/reject/:id", requireAuth, requireSuperAdmin, async (req: Request, res: Response) => {
+  try {
+    const user = req.user as any;
+    const eventId = req.params.id;
+    const { reason } = req.body;
+    
+    if (!reason || reason.trim() === '') {
+      return res.status(400).json({ message: "È richiesta una motivazione per il rifiuto" });
+    }
+    
+    // Check current event state
+    const [existing] = await db
+      .select()
+      .from(siaeTicketedEvents)
+      .where(eq(siaeTicketedEvents.id, eventId));
+    
+    if (!existing) {
+      return res.status(404).json({ message: "Evento non trovato" });
+    }
+    
+    if (existing.approvalStatus === 'rejected') {
+      return res.status(400).json({ message: "Evento già rifiutato" });
+    }
+    
+    if (existing.approvalStatus === 'approved') {
+      return res.status(400).json({ message: "Non è possibile rifiutare un evento già approvato" });
+    }
+    
+    const [updated] = await db
+      .update(siaeTicketedEvents)
+      .set({
+        approvalStatus: 'rejected',
+        approvedBy: user.id,
+        approvedAt: new Date(),
+        rejectedReason: reason.trim(),
+        updatedAt: new Date(),
+      })
+      .where(and(
+        eq(siaeTicketedEvents.id, eventId),
+        eq(siaeTicketedEvents.approvalStatus, 'pending')
+      ))
+      .returning();
+    
+    if (!updated) {
+      return res.status(400).json({ message: "Impossibile rifiutare l'evento. Stato non valido." });
+    }
+    
+    res.json({ message: "Evento rifiutato", event: updated });
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Get user's skipSiaeApproval status
+router.get("/api/siae/admin/users/:userId/approval-settings", requireAuth, requireSuperAdmin, async (req: Request, res: Response) => {
+  try {
+    const [features] = await db
+      .select()
+      .from(userFeatures)
+      .where(eq(userFeatures.userId, req.params.userId));
+    
+    res.json({ skipSiaeApproval: features?.skipSiaeApproval || false });
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Update user's skipSiaeApproval status
+router.patch("/api/siae/admin/users/:userId/approval-settings", requireAuth, requireSuperAdmin, async (req: Request, res: Response) => {
+  try {
+    const { skipSiaeApproval } = req.body;
+    const userId = req.params.userId;
+    
+    // Check if user features exist
+    const [existing] = await db
+      .select()
+      .from(userFeatures)
+      .where(eq(userFeatures.userId, userId));
+    
+    if (existing) {
+      await db
+        .update(userFeatures)
+        .set({ skipSiaeApproval: !!skipSiaeApproval, updatedAt: new Date() })
+        .where(eq(userFeatures.userId, userId));
+    } else {
+      await db.insert(userFeatures).values({
+        userId,
+        skipSiaeApproval: !!skipSiaeApproval,
+      });
+    }
+    
+    res.json({ message: "Impostazioni aggiornate", skipSiaeApproval: !!skipSiaeApproval });
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
 router.post("/api/siae/ticketed-events", requireAuth, requireOrganizer, async (req: Request, res: Response) => {
   try {
     const data = insertSiaeTicketedEventSchema.parse(req.body);
-    const event = await siaeStorage.createSiaeTicketedEvent(data);
+    const user = req.user as any;
+    
+    // Check if user has skipSiaeApproval flag
+    let approvalStatus = 'pending';
+    let approvedBy = null;
+    let approvedAt = null;
+    
+    // Super admin events are auto-approved
+    if (user.role === 'super_admin') {
+      approvalStatus = 'approved';
+      approvedBy = user.id;
+      approvedAt = new Date();
+    } else {
+      // Check user features for skipSiaeApproval
+      const [features] = await db
+        .select()
+        .from(userFeatures)
+        .where(eq(userFeatures.userId, user.id));
+      
+      if (features?.skipSiaeApproval) {
+        approvalStatus = 'approved';
+        approvedBy = user.id;
+        approvedAt = new Date();
+      }
+    }
+    
+    const event = await siaeStorage.createSiaeTicketedEvent({
+      ...data,
+      approvalStatus,
+      approvedBy,
+      approvedAt,
+    });
     res.status(201).json(event);
   } catch (error: any) {
     res.status(400).json({ message: error.message });
@@ -1151,6 +1356,21 @@ router.patch("/api/siae/ticketed-events/:id", requireAuth, requireOrganizer, asy
     console.log("[SIAE PATCH] Received body:", JSON.stringify(req.body).substring(0, 500));
     const data = patchTicketedEventSchema.parse(req.body);
     console.log("[SIAE PATCH] Parsed data:", JSON.stringify(data).substring(0, 500));
+    
+    // Check if trying to activate an unapproved event
+    if (data.ticketingStatus === 'active') {
+      const [existingEvent] = await db
+        .select()
+        .from(siaeTicketedEvents)
+        .where(eq(siaeTicketedEvents.id, req.params.id));
+      
+      if (existingEvent && existingEvent.approvalStatus !== 'approved') {
+        return res.status(400).json({ 
+          message: "Non è possibile attivare un evento non ancora approvato. L'evento deve essere prima approvato dall'amministratore." 
+        });
+      }
+    }
+    
     const event = await siaeStorage.updateSiaeTicketedEvent(req.params.id, data);
     if (!event) {
       return res.status(404).json({ message: "Evento biglietteria non trovato" });
@@ -5197,6 +5417,14 @@ router.post("/api/cashiers/events/:eventId/tickets", requireAuth, async (req: Re
     const event = await siaeStorage.getSiaeTicketedEvent(eventId);
     if (!event) {
       return res.status(404).json({ message: "Evento non trovato" });
+    }
+    
+    // Check if event is approved for ticket sales
+    if ((event as any).approvalStatus !== 'approved') {
+      return res.status(403).json({ 
+        message: "Non è possibile emettere biglietti per un evento non ancora approvato",
+        errorCode: "EVENT_NOT_APPROVED"
+      });
     }
     
     // Calculate ticket price before requesting seal (use appropriate price based on ticket type)

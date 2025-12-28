@@ -23,6 +23,14 @@ The core data model links Companies to Users, Locations, Events, Products, and P
 ### SIAE Ticketing Module
 A SIAE-compliant ticketing and fiscal management system for Italian clubs, adhering to Italian fiscal regulations. It includes reference data, fiscal compliance, customer management, ticketing, transactions, and operations. API endpoints manage CRUD for reference data, activation cards, customer registration, ticket emission with fiscal seals, transaction processing, and XML transmission tracking. Fiscal seal generation is server-side via a Desktop Bridge Relay System. This module is disabled by default and can be enabled per `gestore` user by a Super Admin. It also includes CAPTCHA integration.
 
+#### Event Approval Workflow
+SIAE ticketed events require administrative approval before ticket sales can begin:
+-   **Approval States**: `pending` (awaiting review), `approved` (ready for sales), `rejected` (declined with reason).
+-   **Auto-Approval**: Super admins create pre-approved events. Trusted organizers with `skipSiaeApproval` flag in `userFeatures` also bypass approval.
+-   **Backend Guards**: PATCH route blocks activation to `active` status for unapproved events. Ticket emission route blocks sales for unapproved events.
+-   **Admin Dashboard**: `/siae/approvals` page (super_admin only) lists pending events with approve/reject actions.
+-   **UI Feedback**: Approval badges shown on event listings. Disabled "Attiva Vendite" option with "In attesa approvazione" message for pending events.
+
 ### Event Command Center (Event Hub)
 A real-time dashboard (`/events/:id/hub`) with tabbed navigation for Overview (KPIs, activity log, entrance charts, venue map), Ticketing, Guest Lists, Tables, Staff, Inventory, and Finance. Features `KPICard`, `EntranceChart`, `VenueMap`, `ActivityLogEntry`, `AlertBanner`, and `QuickActionButton` with real-time updates via WebSockets.
 

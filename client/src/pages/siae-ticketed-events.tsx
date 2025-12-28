@@ -630,6 +630,27 @@ export default function SiaeTicketedEventsPage() {
     }
   };
 
+  const getApprovalBadge = (status: string | null | undefined, rejectedReason?: string | null) => {
+    switch (status) {
+      case "approved":
+        return <Badge className="bg-green-500/20 text-green-400 border-green-500/30">Approvato</Badge>;
+      case "rejected":
+        return (
+          <div className="flex flex-col gap-1">
+            <Badge className="bg-red-500/20 text-red-400 border-red-500/30">Rifiutato</Badge>
+            {rejectedReason && (
+              <span className="text-xs text-red-400 max-w-32 truncate" title={rejectedReason}>
+                {rejectedReason}
+              </span>
+            )}
+          </div>
+        );
+      case "pending":
+      default:
+        return <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30">In Attesa</Badge>;
+    }
+  };
+
   const eventsWithoutTicketing = availableEvents?.filter(
     (event) => !ticketedEvents?.some((te) => te.eventId === event.id)
   );
@@ -760,6 +781,7 @@ export default function SiaeTicketedEventsPage() {
                             <TableHead>Evento</TableHead>
                             <TableHead>Data</TableHead>
                             <TableHead>Stato</TableHead>
+                            <TableHead>Approvazione</TableHead>
                             <TableHead>Capienza</TableHead>
                             <TableHead>Venduti</TableHead>
                             <TableHead>Incasso</TableHead>
@@ -776,6 +798,7 @@ export default function SiaeTicketedEventsPage() {
                                   {displayEventDate && format(new Date(displayEventDate), "d MMM yyyy", { locale: it })}
                                 </TableCell>
                                 <TableCell>{getStatusBadge(event.ticketingStatus)}</TableCell>
+                                <TableCell>{getApprovalBadge((event as any).approvalStatus, (event as any).rejectedReason)}</TableCell>
                                 <TableCell>{event.totalCapacity}</TableCell>
                                 <TableCell>{event.ticketsSold}</TableCell>
                                 <TableCell>€{Number(event.totalRevenue || 0).toFixed(2)}</TableCell>
@@ -803,6 +826,7 @@ export default function SiaeTicketedEventsPage() {
                     <TableHead>Evento</TableHead>
                     <TableHead>Data</TableHead>
                     <TableHead>Stato</TableHead>
+                    <TableHead>Approvazione</TableHead>
                     <TableHead>Capienza</TableHead>
                     <TableHead>Venduti</TableHead>
                     <TableHead>Disponibili</TableHead>
@@ -842,6 +866,7 @@ export default function SiaeTicketedEventsPage() {
                           )}
                         </TableCell>
                         <TableCell>{getStatusBadge(ticketedEvent.ticketingStatus)}</TableCell>
+                        <TableCell>{getApprovalBadge((ticketedEvent as any).approvalStatus, (ticketedEvent as any).rejectedReason)}</TableCell>
                         <TableCell>{ticketedEvent.totalCapacity}</TableCell>
                         <TableCell data-testid={`stat-sold-${ticketedEvent.id}`}>
                           <span className="text-[#FFD700] font-semibold">{ticketedEvent.ticketsSold}</span>
@@ -890,13 +915,20 @@ export default function SiaeTicketedEventsPage() {
                                 </Link>
                                 <DropdownMenuSeparator />
                                 {ticketedEvent.ticketingStatus === "draft" && (
-                                  <DropdownMenuItem
-                                    onClick={() => updateStatusMutation.mutate({ id: ticketedEvent.id, status: "active" })}
-                                    data-testid={`menu-activate-${ticketedEvent.id}`}
-                                  >
-                                    <Play className="w-4 h-4 mr-2" />
-                                    Attiva Vendite
-                                  </DropdownMenuItem>
+                                  (ticketedEvent as any).approvalStatus === 'approved' ? (
+                                    <DropdownMenuItem
+                                      onClick={() => updateStatusMutation.mutate({ id: ticketedEvent.id, status: "active" })}
+                                      data-testid={`menu-activate-${ticketedEvent.id}`}
+                                    >
+                                      <Play className="w-4 h-4 mr-2" />
+                                      Attiva Vendite
+                                    </DropdownMenuItem>
+                                  ) : (
+                                    <DropdownMenuItem disabled className="opacity-50">
+                                      <Clock className="w-4 h-4 mr-2" />
+                                      In attesa approvazione
+                                    </DropdownMenuItem>
+                                  )
                                 )}
                                 {ticketedEvent.ticketingStatus === "active" && (
                                   <DropdownMenuItem
@@ -908,13 +940,20 @@ export default function SiaeTicketedEventsPage() {
                                   </DropdownMenuItem>
                                 )}
                                 {ticketedEvent.ticketingStatus === "suspended" && (
-                                  <DropdownMenuItem
-                                    onClick={() => updateStatusMutation.mutate({ id: ticketedEvent.id, status: "active" })}
-                                    data-testid={`menu-resume-${ticketedEvent.id}`}
-                                  >
-                                    <Play className="w-4 h-4 mr-2" />
-                                    Riprendi Vendite
-                                  </DropdownMenuItem>
+                                  (ticketedEvent as any).approvalStatus === 'approved' ? (
+                                    <DropdownMenuItem
+                                      onClick={() => updateStatusMutation.mutate({ id: ticketedEvent.id, status: "active" })}
+                                      data-testid={`menu-resume-${ticketedEvent.id}`}
+                                    >
+                                      <Play className="w-4 h-4 mr-2" />
+                                      Riprendi Vendite
+                                    </DropdownMenuItem>
+                                  ) : (
+                                    <DropdownMenuItem disabled className="opacity-50">
+                                      <Clock className="w-4 h-4 mr-2" />
+                                      In attesa approvazione
+                                    </DropdownMenuItem>
+                                  )
                                 )}
                                 {ticketedEvent.ticketingStatus !== "closed" && (
                                   <DropdownMenuItem
@@ -2512,13 +2551,20 @@ export default function SiaeTicketedEventsPage() {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           {ticketedEvent.ticketingStatus === "draft" && (
-                            <DropdownMenuItem
-                              onClick={() => updateStatusMutation.mutate({ id: ticketedEvent.id, status: "active" })}
-                              data-testid={`menu-activate-${ticketedEvent.id}`}
-                            >
-                              <Play className="w-4 h-4 mr-2" />
-                              Attiva Vendite
-                            </DropdownMenuItem>
+                            (ticketedEvent as any).approvalStatus === 'approved' ? (
+                              <DropdownMenuItem
+                                onClick={() => updateStatusMutation.mutate({ id: ticketedEvent.id, status: "active" })}
+                                data-testid={`menu-activate-${ticketedEvent.id}`}
+                              >
+                                <Play className="w-4 h-4 mr-2" />
+                                Attiva Vendite
+                              </DropdownMenuItem>
+                            ) : (
+                              <DropdownMenuItem disabled className="opacity-50">
+                                <Clock className="w-4 h-4 mr-2" />
+                                In attesa approvazione
+                              </DropdownMenuItem>
+                            )
                           )}
                           {ticketedEvent.ticketingStatus === "active" && (
                             <DropdownMenuItem
@@ -2530,13 +2576,20 @@ export default function SiaeTicketedEventsPage() {
                             </DropdownMenuItem>
                           )}
                           {ticketedEvent.ticketingStatus === "suspended" && (
-                            <DropdownMenuItem
-                              onClick={() => updateStatusMutation.mutate({ id: ticketedEvent.id, status: "active" })}
-                              data-testid={`menu-resume-${ticketedEvent.id}`}
-                            >
-                              <Play className="w-4 h-4 mr-2" />
-                              Riprendi Vendite
-                            </DropdownMenuItem>
+                            (ticketedEvent as any).approvalStatus === 'approved' ? (
+                              <DropdownMenuItem
+                                onClick={() => updateStatusMutation.mutate({ id: ticketedEvent.id, status: "active" })}
+                                data-testid={`menu-resume-${ticketedEvent.id}`}
+                              >
+                                <Play className="w-4 h-4 mr-2" />
+                                Riprendi Vendite
+                              </DropdownMenuItem>
+                            ) : (
+                              <DropdownMenuItem disabled className="opacity-50">
+                                <Clock className="w-4 h-4 mr-2" />
+                                In attesa approvazione
+                              </DropdownMenuItem>
+                            )
                           )}
                           {ticketedEvent.ticketingStatus !== "closed" && (
                             <DropdownMenuItem
