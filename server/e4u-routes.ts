@@ -1200,14 +1200,26 @@ router.patch("/api/e4u/scanners/:id/access", requireAuth, requireGestore, async 
 router.delete("/api/e4u/scanners/:id", requireAuth, requireGestore, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
+    const user = req.user as any;
+    
+    // First verify the scanner exists and belongs to user's company
+    const [existingScanner] = await db.select()
+      .from(eventScanners)
+      .where(eq(eventScanners.id, id));
+    
+    if (!existingScanner) {
+      return res.status(404).json({ message: "Scanner non trovato" });
+    }
+    
+    // Security check: verify company ownership (super_admin bypasses)
+    if (existingScanner.companyId !== user.companyId && user.role !== 'super_admin') {
+      return res.status(403).json({ message: "Non autorizzato a rimuovere questo scanner" });
+    }
     
     const [deleted] = await db.delete(eventScanners)
       .where(eq(eventScanners.id, id))
       .returning();
     
-    if (!deleted) {
-      return res.status(404).json({ message: "Scanner non trovato" });
-    }
     res.json({ message: "Scanner rimosso dall'evento" });
   } catch (error: any) {
     res.status(500).json({ message: error.message });

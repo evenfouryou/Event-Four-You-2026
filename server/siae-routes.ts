@@ -1353,9 +1353,9 @@ router.post("/api/siae/ticketed-events", requireAuth, requireOrganizer, async (r
 
 router.patch("/api/siae/ticketed-events/:id", requireAuth, requireOrganizer, async (req: Request, res: Response) => {
   try {
-    console.log("[SIAE PATCH] Received body:", JSON.stringify(req.body).substring(0, 500));
-    const data = patchTicketedEventSchema.parse(req.body);
-    console.log("[SIAE PATCH] Parsed data:", JSON.stringify(data).substring(0, 500));
+    // Strip readonly/computed fields that frontend might send but aren't in the schema
+    const { id: _id, companyId: _companyId, createdAt: _createdAt, updatedAt: _updatedAt, sectors: _sectors, event: _event, ...patchData } = req.body;
+    const data = patchTicketedEventSchema.parse(patchData);
     
     // Check if trying to activate an unapproved event
     if (data.ticketingStatus === 'active') {
