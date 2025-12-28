@@ -1759,6 +1759,16 @@ export const siaeSubscriptions = pgTable("siae_subscriptions", {
   holderLastName: varchar("holder_last_name", { length: 100 }).notNull(),
   // Stato
   status: varchar("status", { length: 20 }).notNull().default('active'), // active, expired, cancelled
+  // QR Code per scansione
+  qrCode: varchar("qr_code", { length: 100 }).unique(),
+  // Sigillo Fiscale SIAE
+  fiscalSealId: varchar("fiscal_seal_id"),
+  fiscalSealCode: varchar("fiscal_seal_code", { length: 16 }),
+  fiscalSealCounter: integer("fiscal_seal_counter"),
+  // Carta e Canale emissione
+  cardCode: varchar("card_code", { length: 20 }),
+  emissionChannelCode: varchar("emission_channel_code", { length: 8 }),
+  emissionDate: timestamp("emission_date").defaultNow(),
   // Collegamento opzionale a evento/settore per vendita da cassa
   ticketedEventId: varchar("ticketed_event_id").references(() => siaeTicketedEvents.id),
   sectorId: varchar("sector_id").references(() => siaeEventSectors.id),

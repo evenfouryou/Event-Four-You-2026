@@ -1756,10 +1756,23 @@ router.post("/api/public/checkout/confirm", async (req, res) => {
           throw new Error(`Tipo abbonamento non trovato: ${item.subscriptionTypeId}`);
         }
 
+        // Get activation card for fiscal seal
+        const [subCard] = await db
+          .select()
+          .from(siaeActivationCards)
+          .where(
+            and(
+              eq(siaeActivationCards.companyId, ticketedEvent.companyId),
+              eq(siaeActivationCards.status, "active")
+            )
+          )
+          .limit(1);
+
         // Create subscription records
         for (let i = 0; i < item.quantity; i++) {
-          // Generate subscription code
+          // Generate subscription code and QR code
           const subscriptionCode = `ABO-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+          const qrCode = `SUB-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
           
           // Get next progressive number for subscriptions
           const [maxProgress] = await db
@@ -1774,6 +1787,18 @@ router.post("/api/public/checkout/confirm", async (req, res) => {
           const rateoPerEvent = (priceValue / subscriptionType.eventsCount).toFixed(2);
           const ivaRate = parseFloat(subscriptionType.ivaRate || '22');
           const rateoVat = (parseFloat(rateoPerEvent) * ivaRate / 100).toFixed(2);
+
+          // Request SIAE fiscal seal for subscription
+          const priceInCents = Math.round(priceValue * 100);
+          let sealData: FiscalSealData | null = null;
+          try {
+            console.log(`[PUBLIC] Requesting fiscal seal for subscription ${i + 1}/${item.quantity}, price: ${priceInCents} cents`);
+            sealData = await requestFiscalSeal(priceInCents);
+            console.log(`[PUBLIC] Subscription seal received: ${sealData.sealCode}, counter: ${sealData.counter}`);
+          } catch (sealError: any) {
+            console.warn(`[PUBLIC] Failed to get fiscal seal for subscription, proceeding without:`, sealError.message);
+            // For subscriptions, we proceed without seal if unavailable (can be added later)
+          }
 
           const [subscription] = await db
             .insert(siaeSubscriptions)
@@ -1793,13 +1818,20 @@ router.post("/api/public/checkout/confirm", async (req, res) => {
               holderFirstName: item.participantFirstName || customer.firstName,
               holderLastName: item.participantLastName || customer.lastName,
               status: 'active',
+              qrCode,
+              fiscalSealId: sealData?.sealId || null,
+              fiscalSealCode: sealData?.sealCode || null,
+              fiscalSealCounter: sealData?.counter || null,
+              cardCode: subCard?.serialNumber || null,
+              emissionChannelCode: 'WEB',
+              emissionDate: new Date(),
               ticketedEventId: ticketedEvent.id,
               subscriptionTypeId: subscriptionType.id,
             })
             .returning();
 
           subscriptions.push(subscription);
-          console.log(`[PUBLIC] Created subscription: ${subscriptionCode}, progressiveNumber: ${progressiveNumber}`);
+          console.log(`[PUBLIC] Created subscription: ${subscriptionCode}, QR: ${qrCode}, progressiveNumber: ${progressiveNumber}, seal: ${sealData?.sealCode || 'none'}`);
         }
 
         // Update subscription type sold count
