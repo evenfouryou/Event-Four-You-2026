@@ -280,8 +280,18 @@ export default function ScannerManagement() {
   };
 
   const openAssignDialog = (scanner: UserType) => {
+    // Reset form first, then set the scanner (resetAssignForm resets selectedScanner to null)
+    setSelectedEventId("");
+    setSelectedSectorIds([]);
+    setSelectedListIds([]);
+    setSelectedTableTypeIds([]);
+    setCanScanLists(true);
+    setCanScanTables(true);
+    setCanScanTickets(true);
+    setStartTime("");
+    setEndTime("");
+    // Set scanner after resetting other fields
     setSelectedScanner(scanner);
-    resetAssignForm();
     setShowAssignDialog(true);
   };
 
