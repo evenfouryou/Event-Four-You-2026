@@ -20,7 +20,25 @@ function log(message: string) {
   console.log(`${formattedTime} [SIAE-Scheduler] ${message}`);
 }
 
-async function generateC1ReportData(ticketedEvent: any, reportType: 'giornaliero' | 'mensile', reportDate: Date) {
+// Funzione per ottenere il progressivo giornaliero per evitare collisioni
+async function getNextProgressivo(ticketedEventId: string, transmissionType: string, periodDate: Date): Promise<number> {
+  const dateStr = periodDate.toISOString().split('T')[0];
+  const startOfDay = new Date(dateStr + 'T00:00:00.000Z');
+  const endOfDay = new Date(dateStr + 'T23:59:59.999Z');
+
+  const existing = await db.select()
+    .from(siaeTransmissions)
+    .where(and(
+      eq(siaeTransmissions.ticketedEventId, ticketedEventId),
+      eq(siaeTransmissions.transmissionType, transmissionType),
+      gte(siaeTransmissions.periodDate, startOfDay),
+      lt(siaeTransmissions.periodDate, endOfDay)
+    ));
+
+  return existing.length + 1;
+}
+
+async function generateC1ReportData(ticketedEvent: any, reportType: 'giornaliero' | 'mensile', reportDate: Date, progressivo: number = 1) {
   const company = await storage.getCompany(ticketedEvent.companyId);
   const sectors = await siaeStorage.getSiaeEventSectors(ticketedEvent.id);
   const allTickets = await siaeStorage.getSiaeTicketsByEvent(ticketedEvent.id);
