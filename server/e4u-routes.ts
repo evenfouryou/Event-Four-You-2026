@@ -1786,9 +1786,10 @@ router.post("/api/e4u/scan", requireAuth, async (req: Request, res: Response) =>
     // SIAE-TKT-{ticketId} for SIAE tickets
     const parts = qrCode.split('-');
     
-    // Check if it's a SIAE ticket QR code
-    if (parts.length === 3 && parts[0] === 'SIAE' && parts[1] === 'TKT') {
-      const ticketId = parts[2];
+    // Check if it's a SIAE ticket QR code (format: SIAE-TKT-{uuid})
+    // UUID contains dashes, so we need to rejoin the parts after TKT
+    if (parts.length >= 3 && parts[0] === 'SIAE' && parts[1] === 'TKT') {
+      const ticketId = parts.slice(2).join('-');
       
       // Find ticket by ID
       const [ticket] = await db.select({
@@ -1897,8 +1898,9 @@ router.post("/api/e4u/scan", requireAuth, async (req: Request, res: Response) =>
     }
     
     // Check if it's a SIAE subscription QR code (format: SIAE-SUB-{subscriptionId})
-    if (parts.length === 3 && parts[0] === 'SIAE' && parts[1] === 'SUB') {
-      const subscriptionId = parts[2];
+    // UUID contains dashes, so we need to rejoin the parts after SUB
+    if (parts.length >= 3 && parts[0] === 'SIAE' && parts[1] === 'SUB') {
+      const subscriptionId = parts.slice(2).join('-');
       
       // Find subscription by ID
       const [subscription] = await db.select()
