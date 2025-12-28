@@ -179,7 +179,7 @@ export default function EventWizard() {
     queryKey: ['/api/event-formats'],
   });
 
-  const { data: siaeGenres } = useQuery<SiaeEventGenre[]>({
+  const { data: siaeGenres, isLoading: isLoadingGenres } = useQuery<SiaeEventGenre[]>({
     queryKey: ['/api/siae/event-genres'],
   });
 
@@ -1311,49 +1311,56 @@ export default function EventWizard() {
             <div className="space-y-6">
               <div className="space-y-3">
                 <Label className="text-base font-medium">Genere Evento (TAB.1 SIAE)</Label>
-                <Select 
-                  value={siaeGenreCode} 
-                  onValueChange={(code) => {
-                    setSiaeGenreCode(code);
-                    const selectedGenre = siaeGenres?.find(g => g.code === code);
-                    if (selectedGenre) {
-                      setSiaeTaxType(selectedGenre.taxType || 'S');
-                    }
-                  }}
-                >
-                  <SelectTrigger className="h-14 text-base px-4" data-testid="select-siae-genre">
-                    <SelectValue placeholder="Seleziona genere evento" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {siaeGenres?.filter(g => g.active).map((genre) => (
-                      <SelectItem key={genre.id} value={genre.code} className="py-3">
-                        <div className="flex items-center gap-3">
-                          <span className="font-mono text-base">{genre.code}</span>
-                          <span className="text-base">{genre.name}</span>
-                          {genre.vatRate !== null && genre.vatRate !== undefined && (
-                            <Badge variant="outline">IVA {Number(genre.vatRate)}%</Badge>
-                          )}
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                {isLoadingGenres ? (
+                  <div className="h-14 flex items-center justify-center border rounded-lg bg-muted/30">
+                    <Loader2 className="h-5 w-5 animate-spin mr-2" />
+                    <span className="text-muted-foreground">Caricamento generi...</span>
+                  </div>
+                ) : (
+                  <Select 
+                    value={siaeGenreCode} 
+                    onValueChange={(code) => {
+                      setSiaeGenreCode(code);
+                      const selectedGenre = siaeGenres?.find(g => g.code === code);
+                      if (selectedGenre) {
+                        setSiaeTaxType(selectedGenre.taxType || 'S');
+                      }
+                    }}
+                  >
+                    <SelectTrigger className="h-14 text-base px-4" data-testid="select-siae-genre">
+                      <SelectValue placeholder="Seleziona genere evento" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {siaeGenres?.filter(g => g.active).map((genre) => (
+                        <SelectItem key={genre.id} value={genre.code} className="py-3">
+                          <div className="flex items-center gap-3">
+                            <span className="font-mono text-base">{genre.code}</span>
+                            <span className="text-base">{genre.name}</span>
+                            {genre.vatRate !== null && genre.vatRate !== undefined && (
+                              <Badge variant="outline">IVA {Number(genre.vatRate)}%</Badge>
+                            )}
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
               </div>
 
               {siaeGenreCode && (
                 <motion.div 
                   initial={{ opacity: 0, scale: 0.95 }}
                   animate={{ opacity: 1, scale: 1 }}
-                  className="rounded-2xl border bg-muted/30 p-5"
+                  className="rounded-2xl border-2 border-primary/50 bg-primary/5 p-5"
                 >
                   <div className="flex items-center justify-between">
                     <div>
-                      <Label className="text-base font-medium">Aliquota IVA</Label>
+                      <Label className="text-base font-medium">Aliquota IVA Applicata</Label>
                       <p className="text-sm text-muted-foreground mt-1">
-                        Determinata dal genere selezionato
+                        Questa aliquota sarà applicata a tutti i biglietti
                       </p>
                     </div>
-                    <Badge className="text-xl px-5 py-2" data-testid="badge-vat-rate">
+                    <Badge className="text-xl px-5 py-2 bg-primary" data-testid="badge-vat-rate">
                       {(() => {
                         const rate = siaeGenres?.find(g => g.code === siaeGenreCode)?.vatRate;
                         return rate !== null && rate !== undefined ? `${Number(rate)}%` : 'N/D';
@@ -2491,33 +2498,40 @@ export default function EventWizard() {
                   <div className="grid grid-cols-2 gap-6">
                     <div className="space-y-3">
                       <Label>Genere Evento (TAB.1 SIAE)</Label>
-                      <Select 
-                        value={siaeGenreCode} 
-                        onValueChange={(code) => {
-                          setSiaeGenreCode(code);
-                          const selectedGenre = siaeGenres?.find(g => g.code === code);
-                          if (selectedGenre) {
-                            setSiaeTaxType(selectedGenre.taxType || 'S');
-                          }
-                        }}
-                      >
-                        <SelectTrigger className="h-11" data-testid="select-siae-genre">
-                          <SelectValue placeholder="Seleziona genere evento" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {siaeGenres?.filter(g => g.active).map((genre) => (
-                            <SelectItem key={genre.id} value={genre.code}>
-                              <div className="flex items-center gap-2">
-                                <span className="font-mono">{genre.code}</span>
-                                <span>{genre.name}</span>
-                                {genre.vatRate !== null && genre.vatRate !== undefined && (
-                                  <Badge variant="outline" className="ml-2">IVA {Number(genre.vatRate)}%</Badge>
-                                )}
-                              </div>
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      {isLoadingGenres ? (
+                        <div className="h-11 flex items-center justify-center border rounded-lg bg-muted/30">
+                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                          <span className="text-sm text-muted-foreground">Caricamento...</span>
+                        </div>
+                      ) : (
+                        <Select 
+                          value={siaeGenreCode} 
+                          onValueChange={(code) => {
+                            setSiaeGenreCode(code);
+                            const selectedGenre = siaeGenres?.find(g => g.code === code);
+                            if (selectedGenre) {
+                              setSiaeTaxType(selectedGenre.taxType || 'S');
+                            }
+                          }}
+                        >
+                          <SelectTrigger className="h-11" data-testid="select-siae-genre">
+                            <SelectValue placeholder="Seleziona genere evento" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {siaeGenres?.filter(g => g.active).map((genre) => (
+                              <SelectItem key={genre.id} value={genre.code}>
+                                <div className="flex items-center gap-2">
+                                  <span className="font-mono">{genre.code}</span>
+                                  <span>{genre.name}</span>
+                                  {genre.vatRate !== null && genre.vatRate !== undefined && (
+                                    <Badge variant="outline" className="ml-2">IVA {Number(genre.vatRate)}%</Badge>
+                                  )}
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
                     </div>
 
                     <div className="space-y-3">
@@ -2538,12 +2552,12 @@ export default function EventWizard() {
                   </div>
 
                   {siaeGenreCode && (
-                    <div className="rounded-lg border bg-muted/30 p-4 flex items-center justify-between">
+                    <div className="rounded-lg border-2 border-primary/50 bg-primary/5 p-4 flex items-center justify-between">
                       <div>
-                        <Label className="font-medium">Aliquota IVA</Label>
-                        <p className="text-sm text-muted-foreground">Determinata dal genere selezionato</p>
+                        <Label className="font-medium">Aliquota IVA Applicata</Label>
+                        <p className="text-sm text-muted-foreground">Questa aliquota sarà applicata a tutti i biglietti</p>
                       </div>
-                      <Badge className="text-lg px-4 py-1.5" data-testid="badge-vat-rate">
+                      <Badge className="text-lg px-4 py-1.5 bg-primary" data-testid="badge-vat-rate">
                         {(() => {
                           const rate = siaeGenres?.find(g => g.code === siaeGenreCode)?.vatRate;
                           return rate !== null && rate !== undefined ? `${Number(rate)}%` : 'N/D';

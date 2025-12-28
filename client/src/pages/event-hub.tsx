@@ -3349,6 +3349,56 @@ export default function EventHub() {
                         </Button>
                       )}
 
+                      {/* Guida Requisiti Pubblicazione */}
+                      <div className="border border-dashed rounded-lg p-4 space-y-3">
+                        <div className="text-sm font-medium flex items-center gap-2">
+                          <Shield className="h-4 w-4 text-blue-500" />
+                          Requisiti per la vendita online
+                        </div>
+                        <div className="text-sm space-y-2">
+                          <div className="flex items-center gap-2">
+                            {event?.isPublic ? (
+                              <CheckCircle2 className="h-4 w-4 text-emerald-500 flex-shrink-0" />
+                            ) : (
+                              <XCircle className="h-4 w-4 text-slate-400 flex-shrink-0" />
+                            )}
+                            <span className={event?.isPublic ? '' : 'text-muted-foreground'}>
+                              Evento pubblico
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {ticketedEvent?.ticketingStatus === 'active' ? (
+                              <CheckCircle2 className="h-4 w-4 text-emerald-500 flex-shrink-0" />
+                            ) : (
+                              <XCircle className="h-4 w-4 text-slate-400 flex-shrink-0" />
+                            )}
+                            <span className={ticketedEvent?.ticketingStatus === 'active' ? '' : 'text-muted-foreground'}>
+                              Biglietteria attiva (non in bozza)
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {(event?.status === 'scheduled' || event?.status === 'ongoing') ? (
+                              <CheckCircle2 className="h-4 w-4 text-emerald-500 flex-shrink-0" />
+                            ) : (
+                              <XCircle className="h-4 w-4 text-slate-400 flex-shrink-0" />
+                            )}
+                            <span className={(event?.status === 'scheduled' || event?.status === 'ongoing') ? '' : 'text-muted-foreground'}>
+                              Evento programmato o in corso
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {event?.endDatetime && new Date(event.endDatetime) > new Date() ? (
+                              <CheckCircle2 className="h-4 w-4 text-emerald-500 flex-shrink-0" />
+                            ) : (
+                              <XCircle className="h-4 w-4 text-slate-400 flex-shrink-0" />
+                            )}
+                            <span className={event?.endDatetime && new Date(event.endDatetime) > new Date() ? '' : 'text-muted-foreground'}>
+                              Data fine evento futura
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
                       {ticketedEvent && ticketedEvent.ticketingStatus === 'active' && (
                         <AlertDialog open={pauseTicketingDialogOpen} onOpenChange={setPauseTicketingDialogOpen}>
                           <Button
@@ -6736,6 +6786,48 @@ export default function EventHub() {
                       )}
                     </CardContent>
                   </Card>
+
+                  {/* Guida Requisiti Pubblicazione - Mobile */}
+                  <div className="glass-card border border-dashed rounded-xl p-4 space-y-3">
+                    <div className="text-sm font-medium flex items-center gap-2">
+                      <Shield className="h-4 w-4 text-blue-500" />
+                      Requisiti per la vendita online
+                    </div>
+                    <div className="text-xs space-y-1.5">
+                      <div className="flex items-center gap-2">
+                        {event?.isPublic ? (
+                          <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 flex-shrink-0" />
+                        ) : (
+                          <XCircle className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />
+                        )}
+                        <span className={event?.isPublic ? '' : 'text-muted-foreground'}>Evento pubblico</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {ticketedEvent?.ticketingStatus === 'active' ? (
+                          <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 flex-shrink-0" />
+                        ) : (
+                          <XCircle className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />
+                        )}
+                        <span className={ticketedEvent?.ticketingStatus === 'active' ? '' : 'text-muted-foreground'}>Biglietteria attiva</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {(event?.status === 'scheduled' || event?.status === 'ongoing') ? (
+                          <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 flex-shrink-0" />
+                        ) : (
+                          <XCircle className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />
+                        )}
+                        <span className={(event?.status === 'scheduled' || event?.status === 'ongoing') ? '' : 'text-muted-foreground'}>Evento programmato</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {event?.endDatetime && new Date(event.endDatetime) > new Date() ? (
+                          <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 flex-shrink-0" />
+                        ) : (
+                          <XCircle className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />
+                        )}
+                        <span className={event?.endDatetime && new Date(event.endDatetime) > new Date() ? '' : 'text-muted-foreground'}>Data fine futura</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </TabsContent>
             </Tabs>
