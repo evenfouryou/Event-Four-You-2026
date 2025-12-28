@@ -417,6 +417,7 @@ router.get("/api/siae/event-genres/export/csv", requireAuth, requireOrganizer, a
       { key: 'name', header: 'Nome' },
       { key: 'description', header: 'Descrizione' },
       { key: 'taxType', header: 'Tipo Imposta' },
+      { key: 'vatRate', header: 'Aliquota IVA %' },
     ]);
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', 'attachment; filename="siae_generi_evento.csv"');

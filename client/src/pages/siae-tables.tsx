@@ -111,8 +111,8 @@ function EventGenresTab() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, ...data }: Partial<SiaeEventGenre> & { id: string }) =>
-      apiRequest('PATCH', `/api/siae/event-genres/${id}`, data),
+    mutationFn: ({ code, ...data }: Partial<SiaeEventGenre> & { code: string }) =>
+      apiRequest('PATCH', `/api/siae/event-genres/${code}`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/siae/event-genres'] });
       toast({ title: "Genere evento aggiornato" });
@@ -124,7 +124,7 @@ function EventGenresTab() {
 
   const onSubmit = (data: any) => {
     if (editingItem) {
-      updateMutation.mutate({ id: editingItem.id, ...data });
+      updateMutation.mutate({ code: editingItem.code, ...data });
     } else {
       createMutation.mutate(data);
     }
