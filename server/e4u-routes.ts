@@ -1404,6 +1404,131 @@ router.get("/api/e4u/events/:eventId/checked-in", requireAuth, async (req: Reque
   }
 });
 
+// GET /api/e4u/events/:eventId/all-entries - Get ALL entries (checked in and not) for event
+// This is for the scanner to see the full list of titles to scan
+router.get("/api/e4u/events/:eventId/all-entries", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const { eventId } = req.params;
+    const user = req.user as any;
+    
+    // SECURITY: Verify user has access to this event
+    const isGestore = await isGestoreForEvent(user, eventId);
+    if (!isGestore) {
+      // Check if user is an assigned scanner for this event
+      const [scannerAssignment] = await db.select()
+        .from(eventScanners)
+        .where(and(eq(eventScanners.userId, getUserId(user)), eq(eventScanners.eventId, eventId)));
+      
+      if (!scannerAssignment) {
+        return res.status(403).json({ message: "Non hai accesso a questo evento" });
+      }
+    }
+    
+    const allEntries: any[] = [];
+    
+    // Get all list entries
+    const lists = await db.select().from(eventLists).where(eq(eventLists.eventId, eventId));
+    for (const list of lists) {
+      const entries = await db.select()
+        .from(listEntries)
+        .where(eq(listEntries.listId, list.id));
+      
+      for (const entry of entries) {
+        allEntries.push({
+          id: entry.id,
+          firstName: entry.firstName,
+          lastName: entry.lastName,
+          phone: entry.phone,
+          type: 'list',
+          status: entry.status,
+          isCheckedIn: entry.status === 'checked_in',
+          checkedInAt: entry.checkedInAt,
+          listName: list.name,
+          qrCode: entry.qrCode,
+          plusOnes: entry.plusOnes,
+        });
+      }
+    }
+    
+    // Get all table guests
+    const reservations = await db.select()
+      .from(tableReservations)
+      .where(eq(tableReservations.eventId, eventId));
+    
+    for (const reservation of reservations) {
+      const guests = await db.select()
+        .from(tableGuests)
+        .where(eq(tableGuests.reservationId, reservation.id));
+      
+      // Get table type info
+      const [tableType] = await db.select()
+        .from(tableTypes)
+        .where(eq(tableTypes.id, reservation.tableTypeId));
+      
+      for (const guest of guests) {
+        allEntries.push({
+          id: guest.id,
+          firstName: guest.firstName,
+          lastName: guest.lastName,
+          phone: guest.phone,
+          type: 'table',
+          status: guest.status,
+          isCheckedIn: guest.status === 'checked_in',
+          checkedInAt: guest.checkedInAt,
+          tableName: reservation.reservationName,
+          tableTypeName: tableType?.name,
+          qrCode: guest.qrCode,
+        });
+      }
+    }
+    
+    // Get all tickets
+    const [ticketedEvent] = await db.select()
+      .from(siaeTicketedEvents)
+      .where(eq(siaeTicketedEvents.eventId, eventId));
+    
+    if (ticketedEvent) {
+      const tickets = await db.select()
+        .from(siaeTickets)
+        .where(eq(siaeTickets.ticketedEventId, ticketedEvent.id));
+      
+      for (const ticket of tickets) {
+        // Skip cancelled tickets
+        if (ticket.status === 'cancelled') continue;
+        
+        allEntries.push({
+          id: ticket.id,
+          firstName: ticket.participantFirstName || '',
+          lastName: ticket.participantLastName || '',
+          phone: '',
+          type: 'ticket',
+          status: ticket.status,
+          isCheckedIn: ticket.status === 'used',
+          checkedInAt: ticket.usedAt,
+          ticketType: ticket.ticketType,
+          ticketCode: ticket.ticketCode,
+          sector: ticket.sectorName,
+          price: ticket.ticketPrice,
+          qrCode: ticket.qrCode,
+        });
+      }
+    }
+    
+    // Sort: not checked in first, then by name
+    allEntries.sort((a, b) => {
+      // Not checked in first
+      if (!a.isCheckedIn && b.isCheckedIn) return -1;
+      if (a.isCheckedIn && !b.isCheckedIn) return 1;
+      // Then by name
+      return `${a.lastName} ${a.firstName}`.localeCompare(`${b.lastName} ${b.firstName}`);
+    });
+    
+    res.json(allEntries);
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
 // GET /api/e4u/scanner/total-stats - Get total scan stats for scanner (all events)
 router.get("/api/e4u/scanner/total-stats", requireAuth, async (req: Request, res: Response) => {
   try {

@@ -36,6 +36,7 @@ import {
   ChevronRight,
   Zap,
   ZapOff,
+  List,
 } from "lucide-react";
 
 interface ScanResult {
@@ -569,6 +570,13 @@ export default function ScannerScanPage() {
               </Card>
             </div>
 
+            <Link href={`/scanner/tickets/${eventId}`}>
+              <Button variant="outline" className="w-full mb-4" data-testid="button-view-tickets">
+                <List className="h-4 w-4 mr-2" />
+                Visualizza tutti i titoli
+              </Button>
+            </Link>
+
             <Card>
               <CardHeader className="flex flex-row items-center justify-between gap-2">
                 <CardTitle className="flex items-center gap-2">
@@ -986,6 +994,17 @@ export default function ScannerScanPage() {
                 </span>
               )}
             </HapticButton>
+            <Link href={`/scanner/tickets/${eventId}`}>
+              <HapticButton
+                variant="ghost"
+                size="icon"
+                className="h-12 w-12 rounded-full bg-white/10 backdrop-blur-sm border border-white/10"
+                data-testid="button-tickets-list"
+                hapticType="light"
+              >
+                <List className="h-5 w-5 text-white" />
+              </HapticButton>
+            </Link>
           </div>
 
           {/* Search Bar */}

@@ -107,6 +107,7 @@ import ScannerHistory from "@/pages/scanner-history";
 import ScannerStats from "@/pages/scanner-stats";
 import ScannerScan from "@/pages/scanner-scan";
 import ScannerScanned from "@/pages/scanner-scanned";
+import ScannerTickets from "@/pages/scanner-tickets";
 import ClientWallet from "@/pages/client-wallet";
 import StaffPrHome from "@/pages/staff-pr-home";
 import StaffPrEventPanel from "@/pages/staff-pr-event-panel";
@@ -205,6 +206,7 @@ function Router() {
         <Switch>
           <Route path="/scanner/scan/:eventId" component={ScannerScan} />
           <Route path="/scanner/scanned/:eventId" component={ScannerScanned} />
+          <Route path="/scanner/tickets/:eventId" component={ScannerTickets} />
           <Route path="/scanner/stats/:eventId?" component={ScannerStats} />
           <Route path="/scanner/history" component={ScannerHistory} />
           <Route path="/scanner" component={ScannerHome} />
@@ -357,6 +359,7 @@ function Router() {
               <Route path="/billing" component={OrganizerBilling} />
               <Route path="/scanner/scan/:eventId" component={ScannerScan} />
               <Route path="/scanner/scanned/:eventId" component={ScannerScanned} />
+              <Route path="/scanner/tickets/:eventId" component={ScannerTickets} />
               <Route path="/scanner/stats/:eventId?" component={ScannerStats} />
               <Route path="/scanner/history" component={ScannerHistory} />
               <Route path="/scanner" component={ScannerHome} />
