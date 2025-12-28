@@ -1201,7 +1201,10 @@ router.post("/api/siae/admin/approve/:id", requireAuth, requireSuperAdmin, async
       })
       .where(and(
         eq(siaeTicketedEvents.id, eventId),
-        eq(siaeTicketedEvents.approvalStatus, 'pending')
+        or(
+          eq(siaeTicketedEvents.approvalStatus, 'pending'),
+          isNull(siaeTicketedEvents.approvalStatus)
+        )
       ))
       .returning();
     
@@ -1255,7 +1258,10 @@ router.post("/api/siae/admin/reject/:id", requireAuth, requireSuperAdmin, async 
       })
       .where(and(
         eq(siaeTicketedEvents.id, eventId),
-        eq(siaeTicketedEvents.approvalStatus, 'pending')
+        or(
+          eq(siaeTicketedEvents.approvalStatus, 'pending'),
+          isNull(siaeTicketedEvents.approvalStatus)
+        )
       ))
       .returning();
     

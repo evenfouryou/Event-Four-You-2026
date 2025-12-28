@@ -3235,7 +3235,7 @@ export default function EventHub() {
                           <div className="text-xs text-muted-foreground">Acquisto Online</div>
                         </div>
                       </div>
-                      {(ticketedEvent as any)?.approvalStatus === 'pending' && (
+                      {(ticketedEvent as any)?.approvalStatus !== 'approved' && (ticketedEvent as any)?.approvalStatus !== 'rejected' && (
                         <div className="mt-4 p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-sm text-amber-600 dark:text-amber-400">
                           <strong>In attesa di approvazione:</strong> Questo evento deve essere approvato da un amministratore prima di poter attivare la vendita biglietti.
                         </div>
@@ -6810,7 +6810,7 @@ export default function EventHub() {
                           <div className="text-[10px] text-muted-foreground">Acquisto</div>
                         </div>
                       </div>
-                      {(ticketedEvent as any)?.approvalStatus === 'pending' && (
+                      {(ticketedEvent as any)?.approvalStatus !== 'approved' && (ticketedEvent as any)?.approvalStatus !== 'rejected' && (
                         <div className="mt-3 p-2 rounded-lg bg-amber-500/10 border border-amber-500/30 text-xs text-amber-600 dark:text-amber-400">
                           <strong>In attesa:</strong> Richiede approvazione admin.
                         </div>
