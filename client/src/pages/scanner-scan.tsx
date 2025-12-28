@@ -347,7 +347,8 @@ export default function ScannerScanPage() {
               <CardContent className="space-y-4">
                 <div 
                   id={scannerContainerId} 
-                  className={`aspect-square max-w-md mx-auto rounded-lg overflow-hidden bg-muted ${cameraActive ? '' : 'hidden'}`}
+                  className={`aspect-square max-w-md mx-auto rounded-lg overflow-hidden bg-muted ${cameraActive ? 'opacity-100' : 'opacity-0 absolute pointer-events-none'}`}
+                  style={{ minHeight: cameraActive ? 'auto' : '1px', minWidth: cameraActive ? 'auto' : '1px' }}
                 />
                 
                 {!cameraActive && !cameraError && (
@@ -661,7 +662,7 @@ export default function ScannerScanPage() {
       {/* Full-screen Camera Background */}
       <div 
         id={scannerContainerId} 
-        className={`absolute inset-0 ${cameraActive ? '' : 'hidden'}`}
+        className={`absolute inset-0 ${cameraActive ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
         style={{ width: '100%', height: '100%' }}
       />
 
