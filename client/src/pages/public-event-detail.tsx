@@ -2568,6 +2568,28 @@ export default function PublicEventDetailPage() {
                   </CardContent>
                 </Card>
 
+                {/* Subscriptions section - Desktop */}
+                {subscriptionTypes && subscriptionTypes.length > 0 && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Ticket className="w-5 h-5 text-purple-400" />
+                        Abbonamenti
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4" data-testid="grid-subscriptions-desktop">
+                      {subscriptionTypes.map((subscription) => (
+                        <SubscriptionTypeCard
+                          key={subscription.id}
+                          subscription={subscription}
+                          onAddToCart={handleAddSubscriptionToCart}
+                          isAdding={addingSubscriptionId === subscription.id}
+                        />
+                      ))}
+                    </CardContent>
+                  </Card>
+                )}
+
                 {event && (
                   <PublicReservationSection eventId={event.id} />
                 )}
