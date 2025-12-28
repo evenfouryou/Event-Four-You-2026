@@ -72,10 +72,19 @@ export default function Login() {
         window.location.href = '/pr/wallet';
         return;
       } else if (loginMethod === 'username') {
-        // Cashier/operator login with username
-        await apiRequest('POST', '/api/cashiers/login', { username, password });
+        // Username login (scanner, cashier, etc.) - uses email field which stores username
+        const response: any = await apiRequest('POST', '/api/auth/login', { email: username, password });
         triggerHaptic('success');
-        window.location.href = '/cashier/dashboard';
+        
+        if (response.user?.role === 'scanner') {
+          window.location.href = '/scanner';
+        } else if (response.user?.role === 'cassiere') {
+          window.location.href = '/cashier/dashboard';
+        } else if (response.user?.role === 'bartender' || response.user?.role === 'warehouse') {
+          window.location.href = '/staff';
+        } else {
+          window.location.href = redirectTo || '/';
+        }
         return;
       } else {
         // Email login (default)
