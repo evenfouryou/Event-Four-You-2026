@@ -107,6 +107,67 @@ const listItemVariants = {
   }),
 };
 
+// Singleton AudioContext for reliable audio playback
+let audioContext: AudioContext | null = null;
+
+// Initialize audio context on first user interaction
+function initAudioContext() {
+  if (!audioContext) {
+    audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+  }
+  // Resume if suspended (required by browser autoplay policies)
+  if (audioContext.state === 'suspended') {
+    audioContext.resume();
+  }
+  return audioContext;
+}
+
+// Play sound feedback for scans
+function playSound(type: 'success' | 'error') {
+  try {
+    const ctx = initAudioContext();
+    if (!ctx) return;
+
+    if (type === 'success') {
+      // Success: Two ascending beeps
+      const osc1 = ctx.createOscillator();
+      const gain1 = ctx.createGain();
+      osc1.connect(gain1);
+      gain1.connect(ctx.destination);
+      osc1.frequency.setValueAtTime(800, ctx.currentTime);
+      gain1.gain.setValueAtTime(0.4, ctx.currentTime);
+      gain1.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.1);
+      osc1.start(ctx.currentTime);
+      osc1.stop(ctx.currentTime + 0.1);
+
+      const osc2 = ctx.createOscillator();
+      const gain2 = ctx.createGain();
+      osc2.connect(gain2);
+      gain2.connect(ctx.destination);
+      osc2.frequency.setValueAtTime(1200, ctx.currentTime + 0.12);
+      gain2.gain.setValueAtTime(0.4, ctx.currentTime + 0.12);
+      gain2.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.25);
+      osc2.start(ctx.currentTime + 0.12);
+      osc2.stop(ctx.currentTime + 0.25);
+    } else {
+      // Error: Low descending buzz
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(300, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(150, ctx.currentTime + 0.3);
+      gain.gain.setValueAtTime(0.3, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.3);
+    }
+  } catch (error) {
+    console.error('Audio error:', error);
+  }
+}
+
 export default function E4uScannerPage() {
   const { eventId } = useParams<{ eventId?: string }>();
   const { toast } = useToast();
@@ -151,21 +212,27 @@ export default function E4uScannerPage() {
       
       if (data.success && data.person) {
         triggerHaptic('success');
+        playSound('success');
         toast({ 
           title: "Check-in effettuato!", 
           description: `${data.person.firstName} ${data.person.lastName}` 
         });
       } else if (data.alreadyCheckedIn) {
         triggerHaptic('error');
+        playSound('error');
         toast({ 
           title: "Già registrato", 
           description: data.message || "Questo QR è già stato utilizzato",
           variant: "destructive"
         });
+      } else {
+        triggerHaptic('error');
+        playSound('error');
       }
     },
     onError: (error: any) => {
       triggerHaptic('error');
+      playSound('error');
       const errorResult: ScanResult = { 
         success: false, 
         error: error.message || "Errore durante la scansione" 
@@ -198,6 +265,8 @@ export default function E4uScannerPage() {
       });
       return;
     }
+    // Initialize audio on first scan (user gesture)
+    initAudioContext();
     scanMutation.mutate(qrInput.trim());
   };
 
