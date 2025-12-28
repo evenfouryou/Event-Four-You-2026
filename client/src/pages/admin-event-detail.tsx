@@ -369,6 +369,7 @@ export default function AdminEventDetail() {
                   <TableHead>Prog.</TableHead>
                   <TableHead>Carta Attivazione</TableHead>
                   <TableHead>Sigillo Fiscale</TableHead>
+                  <TableHead>Cont. Carta</TableHead>
                   <TableHead>Codice Ordine</TableHead>
                   <TableHead>Tipo Titolo</TableHead>
                   <TableHead>Data/Ora Emissione</TableHead>
@@ -387,6 +388,7 @@ export default function AdminEventDetail() {
                     <TableCell className="font-mono font-semibold">{ticket.progressiveNumber}</TableCell>
                     <TableCell className="font-mono text-xs">{ticket.cardCode || "-"}</TableCell>
                     <TableCell className="font-mono text-xs">{ticket.fiscalSealCode || "-"}</TableCell>
+                    <TableCell className="font-mono text-xs">{ticket.fiscalSealCounter || "-"}</TableCell>
                     <TableCell className="font-mono text-xs">{ticket.ticketCode || ticket.transactionId || "-"}</TableCell>
                     <TableCell>
                       <Badge variant="secondary">

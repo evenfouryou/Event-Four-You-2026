@@ -1349,6 +1349,7 @@ export const siaeTickets = pgTable("siae_tickets", {
   // Sigillo Fiscale
   fiscalSealId: varchar("fiscal_seal_id"), // No FK to avoid circular dependency - managed via application logic
   fiscalSealCode: varchar("fiscal_seal_code", { length: 16 }), // Copia per query rapide
+  fiscalSealCounter: integer("fiscal_seal_counter"), // Contatore progressivo carta SIAE (dal sigillo)
   progressiveNumber: integer("progressive_number").notNull(), // Numero progressivo sistema
   // Carta e Canale
   cardCode: varchar("card_code", { length: 20 }), // Codice carta attivazione (seriale smart card)

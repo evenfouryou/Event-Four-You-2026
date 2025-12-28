@@ -1792,6 +1792,9 @@ router.post("/api/siae/tickets", requireAuth, requireOrganizer, async (req: Requ
     
     // Crea biglietto con sigillo REALE generato server-side
     // I campi sigillo sono SEMPRE generati dal server - mai accettati dal client
+    // Calcola progressivo sequenziale dell'evento (non il contatore della carta)
+    const eventProgressiveNumber = (ticketedEvent.ticketsSold || 0) + 1;
+    
     const ticketData = {
       ticketedEventId: data.ticketedEventId,
       sectorId: data.sectorId,
@@ -1806,7 +1809,8 @@ router.post("/api/siae/tickets", requireAuth, requireOrganizer, async (req: Requ
       grossAmount: grossAmount,
       // SIGILLO GENERATO SERVER-SIDE - OBBLIGATORIO SIAE
       fiscalSealCode: sealData.sealCode,
-      progressiveNumber: sealData.counter,
+      fiscalSealCounter: sealData.counter, // Contatore carta SIAE
+      progressiveNumber: eventProgressiveNumber, // Progressivo sequenziale dell'evento
       cardCode: sealData.serialNumber,
       emissionChannelCode: "BOX", // Box Office per emissione manuale
     };

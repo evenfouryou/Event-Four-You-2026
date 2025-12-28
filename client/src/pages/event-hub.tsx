@@ -2975,6 +2975,7 @@ export default function EventHub() {
                                     <TableHead className="whitespace-nowrap">Prog.</TableHead>
                                     <TableHead className="whitespace-nowrap">Carta Attivazione</TableHead>
                                     <TableHead className="whitespace-nowrap">Sigillo Fiscale</TableHead>
+                                    <TableHead className="whitespace-nowrap">Cont. Carta</TableHead>
                                     <TableHead className="whitespace-nowrap">Codice Ordine</TableHead>
                                     <TableHead className="whitespace-nowrap">Tipo Titolo</TableHead>
                                     <TableHead className="whitespace-nowrap">Data/Ora Emissione</TableHead>
@@ -3001,6 +3002,9 @@ export default function EventHub() {
                                       </TableCell>
                                       <TableCell className="font-mono text-xs">
                                         {ticket.fiscalSealCode || '-'}
+                                      </TableCell>
+                                      <TableCell className="font-mono text-xs">
+                                        {(ticket as any).fiscalSealCounter || '-'}
                                       </TableCell>
                                       <TableCell className="font-mono text-xs">
                                         {ticket.ticketCode || (ticket as any).transactionId?.slice(0, 8) || '-'}
@@ -4161,6 +4165,14 @@ export default function EventHub() {
                       </span>
                     </div>
                   )}
+                  <div className="flex justify-between items-center py-2 border-b">
+                    <span className="text-muted-foreground">Carta Attivazione</span>
+                    <span className="font-mono text-xs">{(selectedTicketForDetail as any).cardCode || '-'}</span>
+                  </div>
+                  <div className="flex justify-between items-center py-2 border-b">
+                    <span className="text-muted-foreground">Contatore Carta</span>
+                    <span className="font-mono">{(selectedTicketForDetail as any).fiscalSealCounter || '-'}</span>
+                  </div>
                   <div className="flex justify-between items-center py-2 border-b">
                     <span className="text-muted-foreground">Emissione</span>
                     <span className="font-medium">
@@ -6106,8 +6118,9 @@ export default function EventHub() {
                                         {getTicketStatusBadge(ticket.status)}
                                       </div>
                                       <div className="text-xs text-muted-foreground mt-1 space-y-0.5">
-                                        <div className="flex items-center gap-2">
+                                        <div className="flex items-center gap-2 flex-wrap">
                                           <span>Sigillo: {ticket.fiscalSealCode || '-'}</span>
+                                          <span>Cont.: {(ticket as any).fiscalSealCounter || '-'}</span>
                                           <span>Tipo: {getTicketTypeLabel(ticket.ticketTypeCode, (ticket as any).ticketType)}</span>
                                         </div>
                                         <div>

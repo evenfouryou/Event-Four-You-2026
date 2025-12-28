@@ -1871,6 +1871,7 @@ router.post("/api/public/checkout/confirm", async (req, res) => {
             customerId: customer.id,
             fiscalSealId: fiscalSeal.id,
             fiscalSealCode: sealData.sealCode,
+            fiscalSealCounter: sealData.counter, // Contatore carta SIAE
             progressiveNumber: eventProgressiveNumber, // Progressivo sequenziale dell'evento
             cardCode: sealData.serialNumber,
             emissionChannelCode: emissionChannel?.channelCode || "WEB",
