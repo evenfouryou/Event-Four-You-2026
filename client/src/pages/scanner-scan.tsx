@@ -37,6 +37,10 @@ import {
   Zap,
   ZapOff,
   List,
+  User,
+  Ticket,
+  MapPin,
+  CreditCard,
 } from "lucide-react";
 
 interface ScanResult {
@@ -1371,67 +1375,84 @@ export default function ScannerScanPage() {
                   </div>
                 </div>
                 
-                {scanResult.ticketInfo && (
+                {/* Ticket info - uses person fields from backend */}
+                {scanResult.person.type === 'biglietto' && (
                   <>
-                    <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/50">
-                      <Ticket className="w-5 h-5 text-primary shrink-0" />
-                      <div>
-                        <p className="text-xs text-muted-foreground">Tipo Biglietto</p>
-                        <p className="font-semibold" data-testid="confirm-ticket-type">
-                          {scanResult.ticketInfo.ticketTypeName || scanResult.ticketInfo.type || 'Standard'}
-                        </p>
-                      </div>
-                    </div>
-                    
-                    {scanResult.ticketInfo.price && (
+                    {scanResult.person.ticketType && (
                       <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/50">
-                        <CreditCard className="w-5 h-5 text-primary shrink-0" />
+                        <Ticket className="w-5 h-5 text-primary shrink-0" />
                         <div>
-                          <p className="text-xs text-muted-foreground">Prezzo</p>
-                          <p className="font-semibold text-emerald-500" data-testid="confirm-ticket-price">
-                            €{Number(scanResult.ticketInfo.price).toFixed(2)}
+                          <p className="text-xs text-muted-foreground">Tipo Biglietto</p>
+                          <p className="font-semibold" data-testid="confirm-ticket-type">
+                            {scanResult.person.ticketType}
                           </p>
                         </div>
                       </div>
                     )}
                     
-                    {scanResult.ticketInfo.seatNumber && (
+                    {scanResult.person.sector && (
                       <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/50">
                         <MapPin className="w-5 h-5 text-primary shrink-0" />
                         <div>
-                          <p className="text-xs text-muted-foreground">Posto</p>
-                          <p className="font-semibold" data-testid="confirm-seat-number">
-                            {scanResult.ticketInfo.sectorName && `${scanResult.ticketInfo.sectorName} - `}
-                            Posto {scanResult.ticketInfo.seatNumber}
+                          <p className="text-xs text-muted-foreground">Settore</p>
+                          <p className="font-semibold" data-testid="confirm-sector">
+                            {scanResult.person.sector}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {scanResult.person.price && (
+                      <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/50">
+                        <CreditCard className="w-5 h-5 text-primary shrink-0" />
+                        <div>
+                          <p className="text-xs text-muted-foreground">Prezzo</p>
+                          <p className="font-semibold text-emerald-500" data-testid="confirm-ticket-price">
+                            €{Number(scanResult.person.price).toFixed(2)}
                           </p>
                         </div>
                       </div>
                     )}
                   </>
                 )}
-                
-                {scanResult.subscriptionInfo && (
-                  <>
-                    <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/50">
-                      <CreditCard className="w-5 h-5 text-primary shrink-0" />
-                      <div>
-                        <p className="text-xs text-muted-foreground">Tipo Abbonamento</p>
-                        <p className="font-semibold" data-testid="confirm-subscription-type">
-                          {scanResult.subscriptionInfo.typeName || 'Abbonamento'}
-                        </p>
-                      </div>
+
+                {/* List/Table info */}
+                {(scanResult.person.type === 'lista' || scanResult.person.type === 'prenotazione_lista') && scanResult.person.listName && (
+                  <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/50">
+                    <Users className="w-5 h-5 text-blue-500 shrink-0" />
+                    <div>
+                      <p className="text-xs text-muted-foreground">Lista</p>
+                      <p className="font-semibold" data-testid="confirm-list-name">
+                        {scanResult.person.listName}
+                        {scanResult.person.plusOnes ? ` (+${scanResult.person.plusOnes})` : ''}
+                      </p>
                     </div>
-                    
-                    <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/50">
-                      <Calendar className="w-5 h-5 text-primary shrink-0" />
-                      <div>
-                        <p className="text-xs text-muted-foreground">Eventi Utilizzati</p>
-                        <p className="font-semibold" data-testid="confirm-events-used">
-                          {scanResult.subscriptionInfo.eventsUsed} / {scanResult.subscriptionInfo.eventsCount}
-                        </p>
-                      </div>
+                  </div>
+                )}
+
+                {(scanResult.person.type === 'tavolo' || scanResult.person.type === 'prenotazione_tavolo') && (scanResult.person.tableName || scanResult.person.tableTypeName) && (
+                  <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/50">
+                    <Armchair className="w-5 h-5 text-purple-500 shrink-0" />
+                    <div>
+                      <p className="text-xs text-muted-foreground">Tavolo</p>
+                      <p className="font-semibold" data-testid="confirm-table-name">
+                        {scanResult.person.tableName || scanResult.person.tableTypeName}
+                        {scanResult.person.guestCount ? ` (${scanResult.person.guestCount} ospiti)` : ''}
+                      </p>
                     </div>
-                  </>
+                  </div>
+                )}
+
+                {scanResult.person.amount && (
+                  <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/50">
+                    <CreditCard className="w-5 h-5 text-primary shrink-0" />
+                    <div>
+                      <p className="text-xs text-muted-foreground">Importo</p>
+                      <p className="font-semibold text-emerald-500" data-testid="confirm-amount">
+                        €{scanResult.person.amount}
+                      </p>
+                    </div>
+                  </div>
                 )}
               </div>
             )}

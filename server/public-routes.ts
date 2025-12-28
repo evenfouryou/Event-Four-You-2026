@@ -3175,6 +3175,11 @@ router.get("/api/public/account/tickets/:id", async (req, res) => {
       organizerCompany: ticket.organizerCompany || "Organizzatore",
       ticketingManager: ticket.ticketingManager || null,
       progressiveNumber: ticket.progressiveNumber || null,
+      // Map DB field names to frontend expected names
+      allowNameChange: ticket.allowsChangeName,
+      allowResale: ticket.allowsResale,
+      nameChangeDeadlineHours: 24,
+      resaleDeadlineHours: 48,
       canNameChange,
       canResale: canResale && !existingResale,
       isListed: !!existingResale,
