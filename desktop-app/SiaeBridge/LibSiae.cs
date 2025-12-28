@@ -237,6 +237,12 @@ namespace SiaeBridge
         /// </summary>
         [DllImport(DLL_NAME, CallingConvention = CallingConvention.StdCall)]
         public static extern int Hash(int mechanism, byte[] toHash, int len, byte[] hashed);
+
+        /// <summary>
+        /// Apply PKCS#1 padding to hash for RSA signature (output 128 bytes)
+        /// </summary>
+        [DllImport(DLL_NAME, CallingConvention = CallingConvention.StdCall)]
+        public static extern int Padding(byte[] toPad, int len, byte[] padded);
         
         #endregion
 

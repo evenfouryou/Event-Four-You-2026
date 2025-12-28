@@ -1019,7 +1019,16 @@ namespace SiaeBridge
                     Log($"  WARNING: No PIN provided for signature operation");
                 }
 
-                // Calculate SHA-1 hash of the XML content
+                // Step 1: Get the correct key ID from the smart card (as per libSIAE documentation)
+                byte keyId = LibSiae.GetKeyIDML(_slot);
+                Log($"  GetKeyIDML = {keyId} (0x{keyId:X2})");
+                
+                if (keyId == 0)
+                {
+                    return ERR("GetKeyID ha restituito 0 - nessuna chiave di firma disponibile");
+                }
+
+                // Step 2: Calculate SHA-1 hash of the XML content
                 byte[] xmlBytes = Encoding.UTF8.GetBytes(xmlContent);
                 byte[] hash = new byte[20]; // SHA-1 produces 20 bytes
                 
@@ -1031,15 +1040,27 @@ namespace SiaeBridge
                     return ERR($"Calcolo hash fallito: 0x{hashResult:X4}");
                 }
 
-                // Sign the hash using the card's private key
-                byte[] signature = new byte[256]; // RSA signature
-                int signResult = LibSiae.SignML(0, hash, signature, _slot); // keyIndex 0 for default signing key
-                Log($"  SignML(keyIndex=0) = {signResult} (0x{signResult:X4})");
+                // Step 3: Apply PKCS#1 padding (output 128 bytes as per libSIAE documentation)
+                byte[] paddedHash = new byte[128];
+                int padResult = LibSiae.Padding(hash, hash.Length, paddedHash);
+                Log($"  Padding = {padResult} (0x{padResult:X4})");
+                
+                if (padResult != 0)
+                {
+                    return ERR($"Padding fallito: 0x{padResult:X4}");
+                }
+
+                // Step 4: Sign the padded hash using the card's private key
+                byte[] signature = new byte[128]; // RSA 1024-bit signature = 128 bytes
+                int signResult = LibSiae.SignML(keyId, paddedHash, signature, _slot);
+                Log($"  SignML(keyIndex={keyId}) = {signResult} (0x{signResult:X4})");
                 
                 if (signResult != 0)
                 {
                     return ERR($"Firma fallita: 0x{signResult:X4}");
                 }
+                
+                Log($"  ✓ Signature successful with keyIndex={keyId}");
 
                 // Get the certificate for inclusion in signed XML
                 byte[] cert = new byte[2048];
