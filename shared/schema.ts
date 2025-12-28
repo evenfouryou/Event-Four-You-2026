@@ -1480,6 +1480,7 @@ export const siaeNameChanges = pgTable("siae_name_changes", {
   // Nuovo nominativo - Dati anagrafici SIAE obbligatori
   newFirstName: varchar("new_first_name", { length: 100 }).notNull(),
   newLastName: varchar("new_last_name", { length: 100 }).notNull(),
+  newEmail: varchar("new_email", { length: 255 }), // Email per invio nuovo biglietto
   newFiscalCode: varchar("new_fiscal_code", { length: 16 }), // Codice fiscale italiano
   newDocumentType: varchar("new_document_type", { length: 30 }), // CI, passaporto, patente
   newDocumentNumber: varchar("new_document_number", { length: 50 }), // Numero documento

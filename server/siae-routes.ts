@@ -2018,6 +2018,247 @@ router.patch("/api/siae/name-changes/:id", requireAuth, requireOrganizer, async 
   }
 });
 
+// ==================== Process Name Change (Complete Workflow) ====================
+router.post("/api/siae/name-changes/:id/process", requireAuth, requireOrganizer, async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user?.id;
+    const { action, rejectionReason } = req.body;
+    
+    if (!action || !['approve', 'reject'].includes(action)) {
+      return res.status(400).json({ message: "Azione non valida. Usa 'approve' o 'reject'" });
+    }
+    
+    // 1. Get the name change request
+    const [nameChangeRequest] = await db.select().from(siaeNameChanges).where(eq(siaeNameChanges.id, req.params.id));
+    if (!nameChangeRequest) {
+      return res.status(404).json({ message: "Richiesta cambio nominativo non trovata" });
+    }
+    
+    if (nameChangeRequest.status !== 'pending') {
+      return res.status(400).json({ message: "Richiesta già processata" });
+    }
+    
+    // Handle rejection
+    if (action === 'reject') {
+      const [updated] = await db.update(siaeNameChanges)
+        .set({
+          status: 'rejected',
+          notes: rejectionReason || 'Rifiutata dall\'operatore',
+          processedAt: new Date(),
+          processedByUserId: userId,
+          updatedAt: new Date()
+        })
+        .where(eq(siaeNameChanges.id, req.params.id))
+        .returning();
+      return res.json({ success: true, nameChange: updated, message: "Richiesta rifiutata" });
+    }
+    
+    // 2. Get the original ticket with all details
+    const [originalTicket] = await db.select().from(siaeTickets).where(eq(siaeTickets.id, nameChangeRequest.originalTicketId));
+    if (!originalTicket) {
+      return res.status(404).json({ message: "Biglietto originale non trovato" });
+    }
+    
+    if (!['emitted', 'active', 'valid'].includes(originalTicket.status)) {
+      return res.status(400).json({ message: `Biglietto non modificabile (stato: ${originalTicket.status})` });
+    }
+    
+    // 3. Get ticketed event details
+    const [ticketedEvent] = await db.select().from(siaeTicketedEvents).where(eq(siaeTicketedEvents.id, originalTicket.ticketedEventId));
+    if (!ticketedEvent) {
+      return res.status(404).json({ message: "Evento ticketed non trovato" });
+    }
+    
+    // 4. Get event details for email
+    const [event] = await db.select().from(events).where(eq(events.id, ticketedEvent.eventId));
+    
+    // 5. Get sector details
+    const [sector] = await db.select().from(siaeEventSectors).where(eq(siaeEventSectors.id, originalTicket.sectorId));
+    
+    // 6. Check bridge/smart card availability
+    const bridgeStatus = getCachedBridgeStatus();
+    if (!bridgeStatus.connected || !bridgeStatus.cardInserted) {
+      return res.status(503).json({ 
+        message: "Lettore smart card SIAE non disponibile. Connetti il bridge desktop e inserisci la carta.",
+        code: "BRIDGE_NOT_READY"
+      });
+    }
+    
+    // 7. Request fiscal seal for new ticket
+    let sealData;
+    try {
+      sealData = await requestFiscalSeal({
+        ticketCode: `NC-${Date.now()}`,
+        amount: Number(originalTicket.grossAmount || originalTicket.ticketPrice || 0),
+        eventCode: ticketedEvent.siaeEventCode || 'EVT',
+        sectorCode: originalTicket.sectorCode
+      });
+    } catch (sealError: any) {
+      console.error('[NAME-CHANGE] Failed to get fiscal seal:', sealError);
+      return res.status(503).json({
+        message: "Errore nella richiesta del sigillo fiscale. Riprova.",
+        code: "SEAL_REQUEST_FAILED",
+        details: sealError.message
+      });
+    }
+    
+    // 8. Begin transaction: Cancel old ticket and create new one
+    const result = await db.transaction(async (tx) => {
+      // 8a. Mark original ticket as replaced
+      await tx.update(siaeTickets)
+        .set({
+          status: 'replaced',
+          cancellationReasonCode: 'CN', // CN = Cambio Nominativo
+          cancellationDate: new Date(),
+          cancelledByUserId: userId,
+          updatedAt: new Date()
+        })
+        .where(eq(siaeTickets.id, originalTicket.id));
+      
+      // 8b. Get next progressive number
+      const [{ maxProgress }] = await tx
+        .select({ maxProgress: sql<number>`COALESCE(MAX(progressive_number), 0)` })
+        .from(siaeTickets)
+        .where(eq(siaeTickets.ticketedEventId, originalTicket.ticketedEventId));
+      const newProgressiveNumber = (maxProgress || 0) + 1;
+      
+      // 8c. Generate new ticket code
+      const newTicketCode = `${ticketedEvent.siaeEventCode || 'TKT'}-NC-${newProgressiveNumber.toString().padStart(6, '0')}`;
+      
+      // 8d. Create new ticket with new holder data
+      const [newTicket] = await tx.insert(siaeTickets)
+        .values({
+          ticketedEventId: originalTicket.ticketedEventId,
+          sectorId: originalTicket.sectorId,
+          transactionId: originalTicket.transactionId,
+          customerId: originalTicket.customerId,
+          // Fiscal seal data
+          fiscalSealCode: sealData.sealCode,
+          fiscalSealCounter: sealData.counter,
+          progressiveNumber: newProgressiveNumber,
+          cardCode: sealData.serialNumber,
+          // Dates
+          emissionDate: new Date(),
+          emissionDateStr: new Date().toISOString().slice(0, 10).replace(/-/g, ''),
+          emissionTimeStr: new Date().toTimeString().slice(0, 5).replace(':', ''),
+          // Ticket type
+          ticketTypeCode: originalTicket.ticketTypeCode,
+          sectorCode: originalTicket.sectorCode,
+          ticketCode: newTicketCode,
+          ticketType: originalTicket.ticketType,
+          ticketPrice: originalTicket.ticketPrice,
+          // Seat info (if numbered)
+          seatId: originalTicket.seatId,
+          row: originalTicket.row,
+          seatNumber: originalTicket.seatNumber,
+          // Prices
+          grossAmount: originalTicket.grossAmount,
+          netAmount: originalTicket.netAmount,
+          vatAmount: originalTicket.vatAmount,
+          prevendita: originalTicket.prevendita,
+          prevenditaVat: originalTicket.prevenditaVat,
+          // NEW HOLDER DATA
+          participantFirstName: nameChangeRequest.newFirstName,
+          participantLastName: nameChangeRequest.newLastName,
+          // Emission info
+          issuedByUserId: userId,
+          isComplimentary: originalTicket.isComplimentary,
+          paymentMethod: 'name_change',
+          // Status
+          status: 'active',
+          // Reference to original
+          originalTicketId: originalTicket.id,
+          // QR Code
+          qrCode: `SIAE-TKT-NC-${newProgressiveNumber}`
+        })
+        .returning();
+      
+      // 8e. Update original ticket with replacement reference
+      await tx.update(siaeTickets)
+        .set({ replacedByTicketId: newTicket.id })
+        .where(eq(siaeTickets.id, originalTicket.id));
+      
+      // 8f. Update name change request
+      const [updatedNameChange] = await tx.update(siaeNameChanges)
+        .set({
+          newTicketId: newTicket.id,
+          status: 'completed',
+          processedAt: new Date(),
+          processedByUserId: userId,
+          updatedAt: new Date()
+        })
+        .where(eq(siaeNameChanges.id, req.params.id))
+        .returning();
+      
+      return { newTicket, updatedNameChange };
+    });
+    
+    // 9. Send email to new holder (async, don't block response)
+    if (nameChangeRequest.newEmail && event) {
+      try {
+        const { sendTicketEmail, generateTicketHtml, generateDigitalTicketPdf } = await import('./email-service');
+        const { generateDigitalTicketPdf: generatePdf } = await import('./pdf-service');
+        
+        const ticketData = {
+          eventName: event.name,
+          eventDate: event.date,
+          locationName: event.location || 'N/A',
+          sectorName: sector?.name || 'N/A',
+          holderName: `${nameChangeRequest.newFirstName} ${nameChangeRequest.newLastName}`,
+          price: String(originalTicket.grossAmount || originalTicket.ticketPrice || '0'),
+          ticketCode: result.newTicket.ticketCode || '',
+          qrCode: result.newTicket.qrCode || `SIAE-TKT-NC-${result.newTicket.id}`,
+          fiscalSealCode: sealData.sealCode
+        };
+        
+        const pdfBuffer = await generatePdf(ticketData);
+        
+        await sendTicketEmail({
+          to: nameChangeRequest.newEmail,
+          subject: `Cambio Nominativo Completato - ${event.name}`,
+          eventName: event.name,
+          tickets: [{ id: result.newTicket.id, html: generateTicketHtml(ticketData) }],
+          pdfBuffers: [pdfBuffer]
+        });
+        
+        console.log(`[NAME-CHANGE] Email sent to new holder: ${nameChangeRequest.newEmail}`);
+      } catch (emailError) {
+        console.error('[NAME-CHANGE] Failed to send email:', emailError);
+        // Don't fail the request, email is not critical
+      }
+    }
+    
+    // 10. Create audit log
+    await siaeStorage.createSiaeAuditLog({
+      companyId: ticketedEvent.companyId,
+      userId,
+      action: 'name_change_completed',
+      entityType: 'ticket',
+      entityId: result.newTicket.id,
+      details: {
+        originalTicketId: originalTicket.id,
+        newTicketId: result.newTicket.id,
+        nameChangeId: req.params.id,
+        oldHolder: `${originalTicket.participantFirstName} ${originalTicket.participantLastName}`,
+        newHolder: `${nameChangeRequest.newFirstName} ${nameChangeRequest.newLastName}`,
+        fiscalSeal: sealData.sealCode
+      }
+    });
+    
+    res.json({
+      success: true,
+      message: "Cambio nominativo completato con successo",
+      nameChange: result.updatedNameChange,
+      newTicket: result.newTicket,
+      oldTicketId: originalTicket.id
+    });
+    
+  } catch (error: any) {
+    console.error('[NAME-CHANGE] Process error:', error);
+    res.status(500).json({ message: error.message || "Errore durante il processamento del cambio nominativo" });
+  }
+});
+
 // ==================== Resales (Customer) ====================
 
 router.get("/api/siae/companies/:companyId/resales", requireAuth, requireGestore, async (req: Request, res: Response) => {
