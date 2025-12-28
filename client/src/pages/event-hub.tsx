@@ -729,6 +729,7 @@ export default function EventHub() {
   const [ticketToCancel, setTicketToCancel] = useState<SiaeTicket | null>(null);
   const [cancelReason, setCancelReason] = useState("01");
   const [cancelNote, setCancelNote] = useState("");
+  const [cancelWithRefund, setCancelWithRefund] = useState(false);
   const [refundDialogOpen, setRefundDialogOpen] = useState(false);
   const [ticketToRefund, setTicketToRefund] = useState<SiaeTicket | null>(null);
 
@@ -1588,19 +1589,24 @@ export default function EventHub() {
     return { label: `${allowedSectors.length} settori`, color: 'bg-amber-500/20 text-amber-400' };
   };
 
-  // Cancel ticket mutation
+  // Cancel ticket mutation (with optional refund)
   const cancelTicketMutation = useMutation({
-    mutationFn: async ({ ticketId, reason }: { ticketId: string; reason: string }) => {
-      return apiRequest('POST', `/api/siae/tickets/${ticketId}/cancel`, { reasonCode: reason });
+    mutationFn: async ({ ticketId, reason, withRefund }: { ticketId: string; reason: string; withRefund?: boolean }) => {
+      const reasonCode = withRefund ? "RIM" : reason;
+      return apiRequest('POST', `/api/siae/tickets/${ticketId}/cancel`, { reasonCode, reason: withRefund ? "Annullamento con rimborso" : undefined });
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['/api/siae/ticketed-events', ticketedEvent?.id, 'tickets'] });
       queryClient.invalidateQueries({ queryKey: ['/api/siae/events', id, 'ticketing'] });
       setCancelTicketDialogOpen(false);
       setTicketToCancel(null);
       setCancelReason("01");
       setCancelNote("");
-      toast({ title: "Biglietto Annullato", description: "Il biglietto è stato annullato con successo." });
+      setCancelWithRefund(false);
+      const message = variables.withRefund 
+        ? "Il biglietto è stato annullato e il rimborso è stato registrato."
+        : "Il biglietto è stato annullato con successo.";
+      toast({ title: variables.withRefund ? "Annullamento e Rimborso" : "Biglietto Annullato", description: message });
     },
     onError: (error: any) => {
       toast({ 
@@ -1757,7 +1763,8 @@ export default function EventHub() {
     if (!ticketToCancel) return;
     cancelTicketMutation.mutate({ 
       ticketId: ticketToCancel.id, 
-      reason: cancelNote ? `${cancelReason}: ${cancelNote}` : cancelReason 
+      reason: cancelNote ? `${cancelReason}: ${cancelNote}` : cancelReason,
+      withRefund: cancelWithRefund
     });
   };
 
@@ -4064,7 +4071,7 @@ export default function EventHub() {
             <div className="space-y-4 py-4">
               <div className="space-y-2">
                 <Label>Motivo Annullamento</Label>
-                <Select value={cancelReason} onValueChange={setCancelReason}>
+                <Select value={cancelReason} onValueChange={setCancelReason} disabled={cancelWithRefund}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -4080,12 +4087,28 @@ export default function EventHub() {
                 <Label>Note (opzionale)</Label>
                 <Textarea value={cancelNote} onChange={(e) => setCancelNote(e.target.value)} placeholder="Inserisci note aggiuntive..." />
               </div>
+              <div className="flex items-center space-x-2 pt-2 border-t">
+                <Checkbox 
+                  id="cancelWithRefund" 
+                  checked={cancelWithRefund} 
+                  onCheckedChange={(checked) => setCancelWithRefund(checked === true)}
+                  data-testid="checkbox-cancel-with-refund"
+                />
+                <Label htmlFor="cancelWithRefund" className="cursor-pointer text-sm">
+                  Emetti anche rimborso automatico
+                </Label>
+              </div>
+              {cancelWithRefund && (
+                <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-sm text-amber-400">
+                  Il biglietto verrà annullato e il rimborso sarà automaticamente registrato nel sistema SIAE.
+                </div>
+              )}
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setCancelTicketDialogOpen(false)}>Annulla</Button>
+              <Button variant="outline" onClick={() => setCancelTicketDialogOpen(false)}>Chiudi</Button>
               <Button variant="destructive" onClick={confirmCancelTicket} disabled={cancelTicketMutation.isPending}>
                 {cancelTicketMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
-                Conferma Annullamento
+                {cancelWithRefund ? "Annulla e Rimborsa" : "Conferma Annullamento"}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -6647,67 +6670,7 @@ export default function EventHub() {
               </>
             )}
 
-                {/* Cancel Ticket Dialog */}
-                <AlertDialog open={cancelTicketDialogOpen} onOpenChange={setCancelTicketDialogOpen}>
-                  <AlertDialogContent className="max-w-[90vw] sm:max-w-md p-4 sm:p-6">
-                    <AlertDialogHeader className="pb-3 sm:pb-4">
-                      <AlertDialogTitle className="text-base sm:text-lg">Annulla Biglietto</AlertDialogTitle>
-                      <AlertDialogDescription className="text-xs sm:text-sm">
-                        Stai per annullare il biglietto{' '}
-                        <span className="font-mono font-semibold">
-                          {ticketToCancel?.fiscalSealCode || ticketToCancel?.progressiveNumber || ticketToCancel?.id.slice(0, 8)}
-                        </span>.
-                        Questa azione non può essere annullata.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <div className="space-y-3 sm:space-y-4 py-3 sm:py-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="cancel-reason" className="text-xs sm:text-sm">Causale Annullamento</Label>
-                        <Select value={cancelReason} onValueChange={setCancelReason}>
-                          <SelectTrigger data-testid="select-cancel-reason">
-                            <SelectValue placeholder="Seleziona causale" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="01">01 - Richiesta cliente</SelectItem>
-                            <SelectItem value="02">02 - Errore emissione</SelectItem>
-                            <SelectItem value="03">03 - Evento annullato</SelectItem>
-                            <SelectItem value="04">04 - Duplicato</SelectItem>
-                            <SelectItem value="99">99 - Altro</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="cancel-note" className="text-xs sm:text-sm">Note aggiuntive (opzionale)</Label>
-                        <Textarea
-                          id="cancel-note"
-                          value={cancelNote}
-                          onChange={(e) => setCancelNote(e.target.value)}
-                          placeholder="Descrivi il motivo dell'annullamento..."
-                          className="resize-none min-h-[80px]"
-                          data-testid="input-cancel-note"
-                        />
-                      </div>
-                    </div>
-                    <AlertDialogFooter className="flex-col-reverse sm:flex-row gap-2 sm:gap-3">
-                      <AlertDialogCancel data-testid="button-cancel-dialog-close" className="w-full sm:w-auto">Annulla</AlertDialogCancel>
-                      <AlertDialogAction
-                        onClick={confirmCancelTicket}
-                        className="bg-red-600 hover:bg-red-700 w-full sm:w-auto"
-                        disabled={cancelTicketMutation.isPending}
-                        data-testid="button-confirm-cancel-ticket"
-                      >
-                        {cancelTicketMutation.isPending ? (
-                          <>
-                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                            Annullamento...
-                          </>
-                        ) : (
-                          'Conferma Annullamento'
-                        )}
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
+                {/* Cancel Ticket Dialog - Mobile version removed, using shared Dialog above */}
               </TabsContent>
 
               <TabsContent value="transazioni" data-testid="subtab-transazioni-content-mobile">
