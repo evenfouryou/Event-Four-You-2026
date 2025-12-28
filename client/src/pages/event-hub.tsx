@@ -3485,7 +3485,7 @@ export default function EventHub() {
 
           {/* Cashiers Tab */}
           <TabsContent value="cashiers">
-            <EventCashierAllocations eventId={id || ''} />
+            <EventCashierAllocations eventId={id || ''} siaeEventId={ticketedEvent?.id} />
           </TabsContent>
 
           {/* Guests Tab */}
