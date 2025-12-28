@@ -1309,11 +1309,14 @@ export default function EventHub() {
   });
 
   const toggleTicketingStatusMutation = useMutation({
-    mutationFn: async (active: boolean) => {
+    mutationFn: async (statusOrActive: boolean | string) => {
       if (!ticketedEvent) throw new Error("Ticketed event not found");
+      const newStatus = typeof statusOrActive === 'boolean' 
+        ? (statusOrActive ? 'active' : 'suspended')
+        : statusOrActive;
       return apiRequest('PATCH', `/api/siae/ticketed-events/${ticketedEvent.id}`, {
         ...ticketedEvent,
-        ticketingStatus: active ? 'active' : 'suspended',
+        ticketingStatus: newStatus,
       });
     },
     onSuccess: () => {
@@ -3282,21 +3285,34 @@ export default function EventHub() {
                       {ticketedEvent && (
                         <div className="flex items-center justify-between gap-4 p-4 rounded-lg bg-muted/50">
                           <div className="flex-1">
-                            <div className="font-medium">Vendita Online Attiva</div>
+                            <div className="font-medium">Stato Biglietteria</div>
                             <div className="text-sm text-muted-foreground">
                               {(ticketedEvent as any).approvalStatus !== 'approved'
                                 ? "In attesa di approvazione amministratore"
-                                : ticketedEvent.ticketingStatus === 'active'
-                                  ? "I biglietti sono acquistabili online"
-                                  : "La vendita online è disattivata"}
+                                : ticketedEvent.ticketingStatus === 'draft'
+                                  ? "In bozza - non ancora attivo"
+                                  : ticketedEvent.ticketingStatus === 'active'
+                                    ? "I biglietti sono acquistabili online"
+                                    : ticketedEvent.ticketingStatus === 'suspended'
+                                      ? "Vendita temporaneamente sospesa"
+                                      : "Vendita chiusa"}
                             </div>
                           </div>
-                          <Switch
-                            checked={ticketedEvent.ticketingStatus === 'active'}
-                            onCheckedChange={(checked) => toggleTicketingStatusMutation.mutate(checked)}
+                          <Select
+                            value={ticketedEvent.ticketingStatus}
+                            onValueChange={(value) => toggleTicketingStatusMutation.mutate(value)}
                             disabled={!ticketedEvent || event?.status === 'closed' || toggleTicketingStatusMutation.isPending || (ticketedEvent as any).approvalStatus !== 'approved'}
-                            data-testid="switch-ticketing-active"
-                          />
+                          >
+                            <SelectTrigger className="w-[140px]" data-testid="select-ticketing-status">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="draft">Bozza</SelectItem>
+                              <SelectItem value="active">Attivo</SelectItem>
+                              <SelectItem value="suspended">Sospeso</SelectItem>
+                              <SelectItem value="closed">Chiuso</SelectItem>
+                            </SelectContent>
+                          </Select>
                         </div>
                       )}
                     </CardContent>
@@ -6860,24 +6876,37 @@ export default function EventHub() {
                       {ticketedEvent && (
                         <div className="flex items-center justify-between gap-3 p-4 rounded-xl bg-background/50 border">
                           <div className="flex-1 min-w-0">
-                            <div className="font-medium text-sm">Vendita Online Attiva</div>
+                            <div className="font-medium text-sm">Stato Biglietteria</div>
                             <div className="text-xs text-muted-foreground">
                               {(ticketedEvent as any).approvalStatus !== 'approved'
                                 ? "In attesa di approvazione"
-                                : ticketedEvent.ticketingStatus === 'active'
-                                  ? "I biglietti sono acquistabili online"
-                                  : "La vendita online è disattivata"}
+                                : ticketedEvent.ticketingStatus === 'draft'
+                                  ? "In bozza"
+                                  : ticketedEvent.ticketingStatus === 'active'
+                                    ? "Vendita attiva"
+                                    : ticketedEvent.ticketingStatus === 'suspended'
+                                      ? "Sospeso"
+                                      : "Chiuso"}
                             </div>
                           </div>
-                          <Switch
-                            checked={ticketedEvent.ticketingStatus === 'active'}
-                            onCheckedChange={(checked) => {
+                          <Select
+                            value={ticketedEvent.ticketingStatus}
+                            onValueChange={(value) => {
                               triggerHaptic('light');
-                              toggleTicketingStatusMutation.mutate(checked);
+                              toggleTicketingStatusMutation.mutate(value);
                             }}
                             disabled={!ticketedEvent || event?.status === 'closed' || toggleTicketingStatusMutation.isPending || (ticketedEvent as any).approvalStatus !== 'approved'}
-                            data-testid="switch-ticketing-active"
-                          />
+                          >
+                            <SelectTrigger className="w-[120px]" data-testid="select-ticketing-status-mobile">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="draft">Bozza</SelectItem>
+                              <SelectItem value="active">Attivo</SelectItem>
+                              <SelectItem value="suspended">Sospeso</SelectItem>
+                              <SelectItem value="closed">Chiuso</SelectItem>
+                            </SelectContent>
+                          </Select>
                         </div>
                       )}
                     </CardContent>
