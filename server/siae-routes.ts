@@ -2366,7 +2366,7 @@ router.post("/api/siae/transmissions/:id/send-email", requireAuth, requireGestor
 router.post("/api/siae/companies/:companyId/transmissions/send-c1", requireAuth, requireGestore, async (req: Request, res: Response) => {
   try {
     const { companyId } = req.params;
-    const { date, toEmail, type = 'daily' } = req.body;
+    const { date, toEmail, type = 'daily', signWithSmartCard = true } = req.body;
     const isMonthly = type === 'monthly';
     
     const reportDate = date ? new Date(date) : new Date();
@@ -2506,12 +2506,36 @@ router.post("/api/siae/companies/:companyId/transmissions/send-c1", requireAuth,
     const transmissionType = isMonthly ? 'monthly' : 'daily';
     const typeLabel = isMonthly ? 'mensile' : 'giornaliera';
     
+    // Try to sign the XML with smart card if requested
+    let xmlToSend = xml;
+    let signatureInfo = '';
+    let signatureData = null;
+    
+    if (signWithSmartCard) {
+      try {
+        const bridgeConnected = isBridgeConnected();
+        if (bridgeConnected) {
+          console.log(`[SIAE-ROUTES] Attempting XML signature for C1 ${typeLabel} report...`);
+          signatureData = await requestXmlSignature(xml);
+          xmlToSend = signatureData.signedXml;
+          signatureInfo = ' (firmato digitalmente)';
+          console.log(`[SIAE-ROUTES] XML signed successfully for C1 ${typeLabel}`);
+        } else {
+          console.log(`[SIAE-ROUTES] Bridge not connected, sending unsigned XML for C1 ${typeLabel}`);
+          signatureInfo = ' (non firmato - bridge non connesso)';
+        }
+      } catch (signError: any) {
+        console.error(`[SIAE-ROUTES] XML signature failed for C1 ${typeLabel}:`, signError.message);
+        signatureInfo = ` (non firmato - ${signError.message})`;
+      }
+    }
+    
     // Create transmission record
     const transmission = await siaeStorage.createSiaeTransmission({
       companyId,
       transmissionType,
       periodDate: reportDate,
-      fileContent: xml,
+      fileContent: xmlToSend,
       status: 'pending',
       ticketsCount: filteredTickets.length,
       totalAmount: totalAmount.toString(),
@@ -2528,11 +2552,11 @@ router.post("/api/siae/companies/:companyId/transmissions/send-c1", requireAuth,
       periodDate: reportDate,
       ticketsCount: filteredTickets.length,
       totalAmount: totalAmount.toString(),
-      xmlContent: xml,
+      xmlContent: xmlToSend,
       transmissionId: transmission.id,
     });
     
-    console.log(`[SIAE-ROUTES] ${typeLabel.toUpperCase()} transmission sent to: ${destination} (Test mode: ${SIAE_TEST_MODE})`);
+    console.log(`[SIAE-ROUTES] ${typeLabel.toUpperCase()} transmission sent to: ${destination}${signatureInfo} (Test mode: ${SIAE_TEST_MODE})`);
     
     // Update transmission status
     await siaeStorage.updateSiaeTransmission(transmission.id, {
@@ -2542,13 +2566,14 @@ router.post("/api/siae/companies/:companyId/transmissions/send-c1", requireAuth,
     
     res.json({
       success: true,
-      message: `Trasmissione ${typeLabel} generata e inviata con successo`,
+      message: `Trasmissione ${typeLabel} generata e inviata con successo${signatureInfo}`,
       transmission: {
         id: transmission.id,
         type: transmissionType,
         ticketsCount: filteredTickets.length,
         totalAmount: totalAmount.toString(),
         sentTo: destination,
+        signed: signatureData !== null,
       }
     });
   } catch (error: any) {
