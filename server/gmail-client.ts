@@ -2,7 +2,7 @@
 // Supports both custom OAuth and Replit's Gmail connector
 
 import { google } from 'googleapis';
-import { getCustomGmailClient, isGmailAuthorized } from './gmail-oauth';
+import { getSystemGmailClient, isGmailConnected } from './gmail-oauth';
 
 let connectionSettings: any;
 
@@ -53,19 +53,17 @@ async function getReplitGmailClient() {
   return google.gmail({ version: 'v1', auth: oauth2Client });
 }
 
-// Get Gmail client - tries custom OAuth first, then falls back to Replit connector
-export async function getGmailClient(companyId?: string) {
-  // Try custom OAuth first if companyId provided
-  if (companyId) {
-    try {
-      const authStatus = await isGmailAuthorized(companyId);
-      if (authStatus.authorized) {
-        console.log(`[Gmail] Using custom OAuth for company ${companyId} (${authStatus.email})`);
-        return await getCustomGmailClient(companyId);
-      }
-    } catch (error: any) {
-      console.log(`[Gmail] Custom OAuth not available: ${error.message}`);
+// Get Gmail client - tries system-wide OAuth first, then falls back to Replit connector
+export async function getGmailClient(_companyId?: string) {
+  // Try system-wide OAuth first
+  try {
+    const status = await isGmailConnected();
+    if (status.connected) {
+      console.log(`[Gmail] Using system-wide OAuth (${status.email})`);
+      return await getSystemGmailClient();
     }
+  } catch (error: any) {
+    console.log(`[Gmail] System-wide OAuth not available: ${error.message}`);
   }
   
   // Fall back to Replit connector
@@ -227,5 +225,5 @@ export async function checkForSiaeResponses(companyId?: string): Promise<SiaeEma
   }
 }
 
-// Check Gmail authorization status for a company
-export { isGmailAuthorized } from './gmail-oauth';
+// Check Gmail connection status (system-wide)
+export { isGmailConnected } from './gmail-oauth';

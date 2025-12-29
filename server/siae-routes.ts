@@ -3383,20 +3383,11 @@ router.post("/api/siae/transmissions/test-email", requireAuth, requireGestore, a
   }
 });
 
-// Gmail OAuth - Get authorization URL
+// Gmail OAuth - Get authorization URL (system-wide, no companyId needed)
 router.get("/api/gmail/auth", requireAuth, requireGestore, async (req: Request, res: Response) => {
   try {
     const { getAuthUrl } = await import('./gmail-oauth');
-    const companyId = req.query.companyId as string || (req.user as any)?.companyId;
-    
-    if (!companyId) {
-      return res.status(400).json({ message: "Company ID richiesto" });
-    }
-    
-    // State contains companyId for callback
-    const state = Buffer.from(JSON.stringify({ companyId })).toString('base64');
-    const authUrl = getAuthUrl(state);
-    
+    const authUrl = getAuthUrl();
     res.json({ authUrl });
   } catch (error: any) {
     console.error('[Gmail OAuth] Error generating auth URL:', error);
@@ -3404,38 +3395,29 @@ router.get("/api/gmail/auth", requireAuth, requireGestore, async (req: Request, 
   }
 });
 
-// Gmail OAuth - Callback from Google
+// Gmail OAuth - Callback from Google (system-wide)
 router.get("/api/gmail/callback", async (req: Request, res: Response) => {
   try {
-    const { code, state, error: oauthError } = req.query;
+    const { code, error: oauthError } = req.query;
     
     if (oauthError) {
       console.error('[Gmail OAuth] OAuth error:', oauthError);
       return res.redirect('/siae/transmissions?gmail_error=access_denied');
     }
     
-    if (!code || !state) {
+    if (!code) {
       return res.redirect('/siae/transmissions?gmail_error=missing_params');
     }
     
-    // Decode state to get companyId
-    let companyId: string;
-    try {
-      const stateData = JSON.parse(Buffer.from(state as string, 'base64').toString());
-      companyId = stateData.companyId;
-    } catch {
-      return res.redirect('/siae/transmissions?gmail_error=invalid_state');
-    }
-    
-    const { exchangeCodeForTokens, saveTokens } = await import('./gmail-oauth');
+    const { exchangeCodeForTokens, saveSystemTokens } = await import('./gmail-oauth');
     
     // Exchange code for tokens
     const tokens = await exchangeCodeForTokens(code as string);
     
-    // Save tokens for company
-    await saveTokens(companyId, tokens);
+    // Save system-wide tokens
+    await saveSystemTokens(tokens);
     
-    console.log(`[Gmail OAuth] Successfully authorized Gmail for company ${companyId} (${tokens.email})`);
+    console.log(`[Gmail OAuth] Successfully connected Gmail system-wide (${tokens.email})`);
     
     res.redirect(`/siae/transmissions?gmail_success=true&gmail_email=${encodeURIComponent(tokens.email || '')}`);
   } catch (error: any) {
@@ -3444,38 +3426,31 @@ router.get("/api/gmail/callback", async (req: Request, res: Response) => {
   }
 });
 
-// Gmail OAuth - Get status
-router.get("/api/gmail/status", requireAuth, requireGestore, async (req: Request, res: Response) => {
+// Gmail OAuth - Get status (system-wide, no companyId needed)
+router.get("/api/gmail/status", requireAuth, async (req: Request, res: Response) => {
   try {
-    const { isGmailAuthorized } = await import('./gmail-oauth');
-    const companyId = req.query.companyId as string || (req.user as any)?.companyId;
-    
-    if (!companyId) {
-      return res.status(400).json({ message: "Company ID richiesto" });
-    }
-    
-    const status = await isGmailAuthorized(companyId);
-    res.json(status);
+    const { isGmailConnected } = await import('./gmail-oauth');
+    const status = await isGmailConnected();
+    res.json({
+      authorized: status.connected,
+      connected: status.connected,
+      email: status.email,
+      expiresAt: status.expiresAt,
+    });
   } catch (error: any) {
     console.error('[Gmail OAuth] Error checking status:', error);
     res.status(500).json({ message: error.message });
   }
 });
 
-// Gmail OAuth - Revoke authorization
+// Gmail OAuth - Disconnect (system-wide)
 router.delete("/api/gmail/revoke", requireAuth, requireGestore, async (req: Request, res: Response) => {
   try {
-    const { revokeGmailAuthorization } = await import('./gmail-oauth');
-    const companyId = req.query.companyId as string || (req.user as any)?.companyId;
-    
-    if (!companyId) {
-      return res.status(400).json({ message: "Company ID richiesto" });
-    }
-    
-    await revokeGmailAuthorization(companyId);
-    res.json({ success: true, message: "Autorizzazione Gmail revocata" });
+    const { disconnectGmail } = await import('./gmail-oauth');
+    await disconnectGmail();
+    res.json({ success: true, message: "Gmail disconnesso" });
   } catch (error: any) {
-    console.error('[Gmail OAuth] Error revoking:', error);
+    console.error('[Gmail OAuth] Error disconnecting:', error);
     res.status(500).json({ message: error.message });
   }
 });
