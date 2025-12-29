@@ -125,10 +125,9 @@ export default function SiaeTransmissionsPage() {
     enabled: !!companyId,
   });
 
-  // Gmail OAuth status
-  const { data: gmailStatus } = useQuery<{ authorized: boolean; email?: string }>({
-    queryKey: ['/api/gmail/status', companyId],
-    enabled: !!companyId,
+  // Gmail OAuth status (system-wide, always enabled)
+  const { data: gmailStatus } = useQuery<{ authorized: boolean; connected: boolean; email?: string }>({
+    queryKey: ['/api/gmail/status'],
   });
 
   // Handle URL params for Gmail OAuth callback
@@ -326,10 +325,10 @@ export default function SiaeTransmissionsPage() {
     },
   });
 
-  // Gmail OAuth authorization
+  // Gmail OAuth authorization (system-wide)
   const authorizeGmailMutation = useMutation({
     mutationFn: async () => {
-      const response = await apiRequest("GET", `/api/gmail/auth?companyId=${companyId}`);
+      const response = await apiRequest("GET", `/api/gmail/auth`);
       return response.json();
     },
     onSuccess: (data) => {
@@ -349,7 +348,7 @@ export default function SiaeTransmissionsPage() {
 
   const revokeGmailMutation = useMutation({
     mutationFn: async () => {
-      const response = await apiRequest("DELETE", `/api/gmail/revoke?companyId=${companyId}`);
+      const response = await apiRequest("DELETE", `/api/gmail/revoke`);
       return response.json();
     },
     onSuccess: () => {
@@ -357,7 +356,7 @@ export default function SiaeTransmissionsPage() {
       triggerHaptic('success');
       toast({
         title: "Gmail Scollegato",
-        description: "L'autorizzazione Gmail è stata revocata.",
+        description: "Gmail è stato disconnesso dal sistema.",
       });
     },
     onError: (error: Error) => {
@@ -543,7 +542,7 @@ export default function SiaeTransmissionsPage() {
                     variant="outline" 
                     onClick={() => authorizeGmailMutation.mutate()} 
                     data-testid="button-authorize-gmail" 
-                    disabled={authorizeGmailMutation.isPending || !companyId}
+                    disabled={authorizeGmailMutation.isPending}
                   >
                     {authorizeGmailMutation.isPending ? (
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -554,7 +553,7 @@ export default function SiaeTransmissionsPage() {
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent side="bottom" className="max-w-xs text-center">
-                  <p>Autorizza Gmail per leggere le risposte SIAE automaticamente.</p>
+                  <p>Collega Gmail per leggere le risposte SIAE automaticamente (connessione di sistema).</p>
                   <p className="text-xs text-muted-foreground mt-1">
                     In alternativa, puoi confermare manualmente il protocollo.
                   </p>
