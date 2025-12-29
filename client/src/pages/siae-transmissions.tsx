@@ -22,6 +22,11 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
   Table,
   TableBody,
   TableCell,
@@ -411,19 +416,29 @@ export default function SiaeTransmissionsPage() {
                 </Select>
               </div>
             )}
-            <Button 
-              variant="outline" 
-              onClick={() => checkResponsesMutation.mutate()} 
-              data-testid="button-check-responses" 
-              disabled={checkResponsesMutation.isPending}
-            >
-              {checkResponsesMutation.isPending ? (
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              ) : (
-                <Mail className="w-4 h-4 mr-2" />
-              )}
-              Controlla Risposte
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button 
+                  variant="outline" 
+                  onClick={() => checkResponsesMutation.mutate()} 
+                  data-testid="button-check-responses" 
+                  disabled={checkResponsesMutation.isPending}
+                >
+                  {checkResponsesMutation.isPending ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <Mail className="w-4 h-4 mr-2" />
+                  )}
+                  Controlla Risposte
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="max-w-xs text-center">
+                <p>Verifica automaticamente le risposte SIAE via Gmail.</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Richiede permessi Gmail di lettura. In alternativa, usa la conferma manuale del protocollo.
+                </p>
+              </TooltipContent>
+            </Tooltip>
             <Button variant="outline" onClick={() => setIsTestEmailDialogOpen(true)} data-testid="button-test-email" disabled={!companyId}>
               <TestTube className="w-4 h-4 mr-2" />
               Test Email

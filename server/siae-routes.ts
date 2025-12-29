@@ -3447,17 +3447,27 @@ router.post("/api/siae/transmissions/check-responses", requireAuth, requireGesto
     console.error('[SIAE-ROUTES] Failed to check SIAE responses:', error);
     
     // Check for Gmail permission errors
-    if (error.message?.includes('Insufficient Permission') || error.code === 403) {
+    if (error.message?.includes('Insufficient Permission') || 
+        error.message?.includes('GMAIL_PERMISSION_ERROR') ||
+        error.code === 403) {
       return res.status(403).json({ 
-        message: "L'integrazione Gmail non ha i permessi per leggere le email. Usa la conferma manuale del protocollo per registrare le risposte SIAE.",
-        code: 'GMAIL_PERMISSION_DENIED'
+        message: "Il connettore Gmail non ha i permessi per leggere le email. " +
+                 "Per abilitare la verifica automatica delle risposte SIAE, ricollega il connettore Gmail " +
+                 "con i permessi di lettura (Strumenti → Connettori → Gmail → Ricollega). " +
+                 "In alternativa, puoi confermare manualmente il protocollo cliccando su una trasmissione e inserendo il numero di protocollo ricevuto.",
+        code: 'GMAIL_PERMISSION_DENIED',
+        canUseManualConfirm: true
       });
     }
     
-    if (error.message?.includes('Gmail not connected')) {
+    if (error.message?.includes('Gmail not connected') || 
+        error.message?.includes('GMAIL_NOT_CONNECTED')) {
       return res.status(400).json({ 
-        message: "Gmail non è connesso. Configura l'integrazione Gmail nelle impostazioni o usa la conferma manuale del protocollo.",
-        code: 'GMAIL_NOT_CONNECTED'
+        message: "Connettore Gmail non configurato. " +
+                 "Per la verifica automatica delle risposte SIAE, configura il connettore Gmail (Strumenti → Connettori → Gmail). " +
+                 "In alternativa, puoi confermare manualmente il protocollo cliccando su una trasmissione.",
+        code: 'GMAIL_NOT_CONNECTED',
+        canUseManualConfirm: true
       });
     }
     

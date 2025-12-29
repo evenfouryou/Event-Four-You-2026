@@ -181,8 +181,28 @@ export async function checkForSiaeResponses(): Promise<SiaeEmailResponse[]> {
     sinceDate.setDate(sinceDate.getDate() - 7);
     
     return await fetchSiaeResponses(sinceDate);
-  } catch (error) {
+  } catch (error: any) {
     console.error('[Gmail] Error fetching SIAE responses:', error);
+    
+    // Handle insufficient permissions error
+    if (error.message?.includes('Insufficient Permission') || 
+        error.code === 403 || 
+        error.errors?.[0]?.reason === 'insufficientPermissions') {
+      throw new Error(
+        'GMAIL_PERMISSION_ERROR: Il connettore Gmail non ha i permessi per leggere le email. ' +
+        'Per verificare le risposte SIAE, devi ricollegare il connettore Gmail con i permessi di lettura. ' +
+        'Vai in Impostazioni → Connettori → Gmail → Ricollega con permessi "Leggi email".'
+      );
+    }
+    
+    // Handle not connected error
+    if (error.message?.includes('Gmail not connected')) {
+      throw new Error(
+        'GMAIL_NOT_CONNECTED: Connettore Gmail non configurato. ' +
+        'Per verificare le risposte SIAE automaticamente, configura il connettore Gmail nelle impostazioni.'
+      );
+    }
+    
     throw error;
   }
 }
