@@ -2904,364 +2904,22 @@ router.post("/api/siae/companies/:companyId/transmissions/send-c1", requireAuth,
     });
     
     const now = new Date();
-    const dataGen = now.toISOString().split('T')[0].replace(/-/g, '');
     const oraGen = now.toTimeString().split(' ')[0].replace(/:/g, '');
     
     // Calculate totals
     const totalAmount = filteredTickets.reduce((sum, t) => sum + parseFloat(t.grossAmount || '0'), 0);
-    const totalIva = filteredTickets.reduce((sum, t) => sum + parseFloat(t.vatAmount || '0'), 0);
     
-    // Build XML with different format for daily vs monthly
-    let xml: string;
-    
-    if (isMonthly) {
-      // MONTHLY FORMAT: RiepilogoMensile - correct SIAE format with Organizzatore/Evento/OrdineDiPosto structure
-      const meseAttr = `${reportDate.getFullYear()}${String(reportDate.getMonth() + 1).padStart(2, '0')}`;
-      const systemEmissionCode = systemConfig?.systemCode || 'EVENT4U1';
-      
-      // Get next progressive number for this month (count existing transmissions + 1)
-      const monthlyTransmissions = await siaeStorage.getSiaeTransmissionsByCompany(companyId);
-      const thisMonthTransmissions = monthlyTransmissions.filter(t => {
-        const tDate = new Date(t.periodDate);
-        return t.transmissionType === 'monthly' && 
-               tDate.getFullYear() === reportDate.getFullYear() && 
-               tDate.getMonth() === reportDate.getMonth();
-      });
-      const progressiveGen = thisMonthTransmissions.length + 1;
-      
-      // Group tickets by event -> sector -> ticket type for aggregation
-      const ticketsByEvent: Map<string, typeof filteredTickets> = new Map();
-      for (const ticket of filteredTickets) {
-        const eventId = ticket.ticketedEventId;
-        if (!ticketsByEvent.has(eventId)) {
-          ticketsByEvent.set(eventId, []);
-        }
-        ticketsByEvent.get(eventId)!.push(ticket);
-      }
-      
-      // Build events XML
-      let eventsXml = '';
-      for (const [ticketedEventId, eventTickets] of ticketsByEvent) {
-        const ticketedEvent = await siaeStorage.getSiaeTicketedEvent(ticketedEventId);
-        if (!ticketedEvent) continue;
-        
-        // Get the actual event details for date/time/name
-        const eventDetails = await storage.getEvent(ticketedEvent.eventId);
-        if (!eventDetails) continue;
-        
-        // Get location for venue name and code
-        const location = await storage.getLocation(eventDetails.locationId);
-        const venueName = location?.name || 'N/D';
-        const venueCode = ticketedEvent.siaeLocationCode || location?.siaeLocationCode || 'VENUE01';
-        
-        // Format event date/time: YYYYMMDD and HHMM
-        const eventDate = new Date(eventDetails.startDatetime);
-        const eventDateStr = eventDate.getFullYear().toString() + 
-                             String(eventDate.getMonth() + 1).padStart(2, '0') + 
-                             String(eventDate.getDate()).padStart(2, '0');
-        const eventTimeStr = String(eventDate.getHours()).padStart(2, '0') + 
-                             String(eventDate.getMinutes()).padStart(2, '0');
-        
-        // Group tickets by sector (use '__DEFAULT__' placeholder for tickets without sectorId)
-        const DEFAULT_SECTOR_KEY = '__DEFAULT__';
-        const ticketsBySector: Map<string, typeof eventTickets> = new Map();
-        for (const ticket of eventTickets) {
-          const sectorKey = ticket.sectorId || DEFAULT_SECTOR_KEY;
-          if (!ticketsBySector.has(sectorKey)) {
-            ticketsBySector.set(sectorKey, []);
-          }
-          ticketsBySector.get(sectorKey)!.push(ticket);
-        }
-        
-        // Build OrdineDiPosto (sectors) XML
-        let sectorsXml = '';
-        for (const [sectorKey, sectorTickets] of ticketsBySector) {
-          let codiceOrdine = 'A0'; // Default code for general admission
-          let capacity = ticketedEvent.capacity || 100; // Use event capacity as fallback
-          
-          // Only fetch sector from DB if it's not the default placeholder
-          if (sectorKey !== DEFAULT_SECTOR_KEY) {
-            const sector = await siaeStorage.getSiaeEventSector(sectorKey);
-            if (sector) {
-              codiceOrdine = sector.sectorCode || 'A0';
-              capacity = sector.capacity || capacity;
-            }
-          }
-          
-          // Group tickets by ticket type for TitoliAccesso aggregation
-          const ticketsByType: Map<string, typeof sectorTickets> = new Map();
-          for (const ticket of sectorTickets) {
-            // Map ticketTypeCode to TipoTitolo: R1 = regular, R2 = reduced, O1 = complimentary
-            let tipoTitolo = 'R1'; // Default to regular
-            if (ticket.ticketTypeCode === 'R2' || ticket.ticketTypeCode === 'RID') {
-              tipoTitolo = 'R2';
-            } else if (ticket.ticketTypeCode === 'O1' || ticket.ticketTypeCode === 'OMA' || ticket.isComplimentary) {
-              tipoTitolo = 'O1';
-            } else if (ticket.ticketTypeCode) {
-              tipoTitolo = ticket.ticketTypeCode;
-            }
-            if (!ticketsByType.has(tipoTitolo)) {
-              ticketsByType.set(tipoTitolo, []);
-            }
-            ticketsByType.get(tipoTitolo)!.push(ticket);
-          }
-          
-          // Build TitoliAccesso for each ticket type
-          let titoliAccessoXml = '';
-          let totalOmaggiIva = 0;
-          for (const [tipoTitolo, typeTickets] of ticketsByType) {
-            // Only count valid/issued tickets (not cancelled)
-            const validTickets = typeTickets.filter(t => t.status !== 'annullato' && t.status !== 'cancelled');
-            if (validTickets.length === 0) continue;
-            
-            const quantita = validTickets.length;
-            const corrispettivoLordo = validTickets.reduce((sum, t) => sum + parseFloat(t.grossAmount || '0'), 0);
-            const prevendita = validTickets.reduce((sum, t) => sum + parseFloat(t.prevendita || '0'), 0);
-            const ivaCorrispettivo = validTickets.reduce((sum, t) => sum + parseFloat(t.vatAmount || '0'), 0);
-            const ivaPrevendita = validTickets.reduce((sum, t) => sum + parseFloat(t.prevenditaVat || '0'), 0);
-            
-            // ImportoPrestazione is typically 0 unless there's a specific service amount
-            const importoPrestazione = 0;
-            
-            // Track complimentary ticket IVA for IVAEccedenteOmaggi
-            if (tipoTitolo === 'O1') {
-              totalOmaggiIva += ivaCorrispettivo;
-            }
-            
-            titoliAccessoXml += `
-                <TitoliAccesso>
-                    <TipoTitolo>${escapeXml(tipoTitolo)}</TipoTitolo>
-                    <Quantita>${quantita}</Quantita>
-                    <CorrispettivoLordo>${corrispettivoLordo.toFixed(2)}</CorrispettivoLordo>
-                    <Prevendita>${prevendita.toFixed(2)}</Prevendita>
-                    <IVACorrispettivo>${ivaCorrispettivo.toFixed(2)}</IVACorrispettivo>
-                    <IVAPrevendita>${ivaPrevendita.toFixed(2)}</IVAPrevendita>
-                    <ImportoPrestazione>${importoPrestazione.toFixed(2)}</ImportoPrestazione>
-                </TitoliAccesso>`;
-          }
-          
-          sectorsXml += `
-            <OrdineDiPosto>
-                <CodiceOrdine>${escapeXml(codiceOrdine)}</CodiceOrdine>
-                <Capienza>${capacity}</Capienza>${titoliAccessoXml}
-                <IVAEccedenteOmaggi>${totalOmaggiIva.toFixed(0)}</IVAEccedenteOmaggi>
-            </OrdineDiPosto>`;
-        }
-        
-        // TipoTassazione: S = spettacolo, I = intrattenimento
-        const tipoTassazione = ticketedEvent.taxType || 'S';
-        const genreCode = ticketedEvent.genreCode || '05';
-        const eventName = eventDetails.name || 'Evento';
-        
-        eventsXml += `
-        <Evento>
-            <Intrattenimento>
-                <TipoTassazione valore="${escapeXml(tipoTassazione)}"/>
-            </Intrattenimento>
-            <Locale>
-                <Denominazione>${escapeXml(venueName)}</Denominazione>
-                <CodiceLocale>${escapeXml(venueCode)}</CodiceLocale>
-            </Locale>
-            <DataEvento>${eventDateStr}</DataEvento>
-            <OraEvento>${eventTimeStr}</OraEvento>
-            <MultiGenere>
-                <TipoGenere>${escapeXml(genreCode)}</TipoGenere>
-                <IncidenzaGenere>10</IncidenzaGenere>
-                <TitoliOpere>
-                    <Titolo>${escapeXml(eventName)}</Titolo>
-                </TitoliOpere>
-            </MultiGenere>${sectorsXml}
-        </Evento>`;
-      }
-      
-      // Organizzatore info (same as Titolare in most cases, or from SiaeSystemConfig)
-      const organizerName = systemConfig?.businessName || companyName;
-      const organizerTaxId = taxId;
-      const organizerType = 'G'; // G = Gestore
-      
-      xml = `<?xml version="1.0" encoding="UTF-8"?>
-<RiepilogoMensile Data="${meseAttr}" DataGenerazione="${meseAttr}" OraGenerazione="${oraGen}" ProgressivoGenerazione="${progressiveGen}" Sostituzione="N">
-    <Titolare>
-        <Denominazione>${escapeXml(companyName)}</Denominazione>
-        <CodiceFiscale>${escapeXml(taxId)}</CodiceFiscale>
-        <SistemaEmissione>${escapeXml(systemEmissionCode)}</SistemaEmissione>
-    </Titolare>
-    <Organizzatore>
-        <Denominazione>${escapeXml(organizerName)}</Denominazione>
-        <CodiceFiscale>${escapeXml(organizerTaxId)}</CodiceFiscale>
-        <TipoOrganizzatore valore="${organizerType}"/>${eventsXml}
-    </Organizzatore>
-</RiepilogoMensile>`;
-    } else {
-      // DAILY FORMAT: Same RiepilogoMensile structure but with daily date (YYYYMMDD)
-      const dataGiorno = reportDate.getFullYear().toString() + 
-                         String(reportDate.getMonth() + 1).padStart(2, '0') + 
-                         String(reportDate.getDate()).padStart(2, '0');
-      const systemEmissionCode = systemConfig?.systemCode || 'EVENT4U1';
-      
-      // Get next progressive number for this day
-      const dailyTransmissions = await siaeStorage.getSiaeTransmissionsByCompany(companyId);
-      const thisDayTransmissions = dailyTransmissions.filter(t => {
-        const tDate = new Date(t.periodDate);
-        return t.transmissionType === 'daily' && 
-               tDate.getFullYear() === reportDate.getFullYear() && 
-               tDate.getMonth() === reportDate.getMonth() &&
-               tDate.getDate() === reportDate.getDate();
-      });
-      const progressiveGen = thisDayTransmissions.length + 1;
-      
-      // Group tickets by event -> sector -> ticket type (same as monthly)
-      const ticketsByEvent: Map<string, typeof filteredTickets> = new Map();
-      for (const ticket of filteredTickets) {
-        const eventId = ticket.ticketedEventId;
-        if (!ticketsByEvent.has(eventId)) {
-          ticketsByEvent.set(eventId, []);
-        }
-        ticketsByEvent.get(eventId)!.push(ticket);
-      }
-      
-      // Build events XML
-      let eventsXml = '';
-      for (const [ticketedEventId, eventTickets] of ticketsByEvent) {
-        const ticketedEvent = await siaeStorage.getSiaeTicketedEvent(ticketedEventId);
-        if (!ticketedEvent) continue;
-        
-        const eventDetails = await storage.getEvent(ticketedEvent.eventId);
-        if (!eventDetails) continue;
-        
-        const location = await storage.getLocation(eventDetails.locationId);
-        const venueName = location?.name || 'N/D';
-        const venueCode = ticketedEvent.siaeLocationCode || location?.siaeLocationCode || 'VENUE01';
-        
-        const eventDate = new Date(eventDetails.startDatetime);
-        const eventDateStr = eventDate.getFullYear().toString() + 
-                             String(eventDate.getMonth() + 1).padStart(2, '0') + 
-                             String(eventDate.getDate()).padStart(2, '0');
-        const eventTimeStr = String(eventDate.getHours()).padStart(2, '0') + 
-                             String(eventDate.getMinutes()).padStart(2, '0');
-        
-        // Group tickets by sector (use '__DEFAULT__' for tickets without sectorId)
-        const DEFAULT_SECTOR_KEY = '__DEFAULT__';
-        const ticketsBySector: Map<string, typeof eventTickets> = new Map();
-        for (const ticket of eventTickets) {
-          const sectorKey = ticket.sectorId || DEFAULT_SECTOR_KEY;
-          if (!ticketsBySector.has(sectorKey)) {
-            ticketsBySector.set(sectorKey, []);
-          }
-          ticketsBySector.get(sectorKey)!.push(ticket);
-        }
-        
-        // Build OrdineDiPosto (sectors) XML
-        let sectorsXml = '';
-        for (const [sectorKey, sectorTickets] of ticketsBySector) {
-          let codiceOrdine = 'A0';
-          let capacity = ticketedEvent.capacity || 100;
-          
-          if (sectorKey !== DEFAULT_SECTOR_KEY) {
-            const sector = await siaeStorage.getSiaeEventSector(sectorKey);
-            if (sector) {
-              codiceOrdine = sector.sectorCode || 'A0';
-              capacity = sector.capacity || capacity;
-            }
-          }
-          
-          // Group by ticket type for TitoliAccesso
-          const ticketsByType: Map<string, typeof sectorTickets> = new Map();
-          for (const ticket of sectorTickets) {
-            let tipoTitolo = 'R1';
-            if (ticket.ticketTypeCode === 'R2' || ticket.ticketTypeCode === 'RID') {
-              tipoTitolo = 'R2';
-            } else if (ticket.ticketTypeCode === 'O1' || ticket.ticketTypeCode === 'OMA' || ticket.isComplimentary) {
-              tipoTitolo = 'O1';
-            } else if (ticket.ticketTypeCode) {
-              tipoTitolo = ticket.ticketTypeCode;
-            }
-            if (!ticketsByType.has(tipoTitolo)) {
-              ticketsByType.set(tipoTitolo, []);
-            }
-            ticketsByType.get(tipoTitolo)!.push(ticket);
-          }
-          
-          let titoliAccessoXml = '';
-          let totalOmaggiIva = 0;
-          for (const [tipoTitolo, typeTickets] of ticketsByType) {
-            const validTickets = typeTickets.filter(t => t.status !== 'annullato' && t.status !== 'cancelled');
-            if (validTickets.length === 0) continue;
-            
-            const quantita = validTickets.length;
-            const corrispettivoLordo = validTickets.reduce((sum, t) => sum + parseFloat(t.grossAmount || '0'), 0);
-            const prevendita = validTickets.reduce((sum, t) => sum + parseFloat(t.prevendita || '0'), 0);
-            const ivaCorrispettivo = validTickets.reduce((sum, t) => sum + parseFloat(t.vatAmount || '0'), 0);
-            const ivaPrevendita = validTickets.reduce((sum, t) => sum + parseFloat(t.prevenditaVat || '0'), 0);
-            const importoPrestazione = 0;
-            
-            if (tipoTitolo === 'O1') {
-              totalOmaggiIva += ivaCorrispettivo;
-            }
-            
-            titoliAccessoXml += `
-                <TitoliAccesso>
-                    <TipoTitolo>${escapeXml(tipoTitolo)}</TipoTitolo>
-                    <Quantita>${quantita}</Quantita>
-                    <CorrispettivoLordo>${corrispettivoLordo.toFixed(2)}</CorrispettivoLordo>
-                    <Prevendita>${prevendita.toFixed(2)}</Prevendita>
-                    <IVACorrispettivo>${ivaCorrispettivo.toFixed(2)}</IVACorrispettivo>
-                    <IVAPrevendita>${ivaPrevendita.toFixed(2)}</IVAPrevendita>
-                    <ImportoPrestazione>${importoPrestazione.toFixed(2)}</ImportoPrestazione>
-                </TitoliAccesso>`;
-          }
-          
-          sectorsXml += `
-            <OrdineDiPosto>
-                <CodiceOrdine>${escapeXml(codiceOrdine)}</CodiceOrdine>
-                <Capienza>${capacity}</Capienza>${titoliAccessoXml}
-                <IVAEccedenteOmaggi>${totalOmaggiIva.toFixed(0)}</IVAEccedenteOmaggi>
-            </OrdineDiPosto>`;
-        }
-        
-        const tipoTassazione = ticketedEvent.taxType || 'S';
-        const genreCode = ticketedEvent.genreCode || '05';
-        const eventName = eventDetails.name || 'Evento';
-        
-        eventsXml += `
-        <Evento>
-            <Intrattenimento>
-                <TipoTassazione valore="${escapeXml(tipoTassazione)}"/>
-            </Intrattenimento>
-            <Locale>
-                <Denominazione>${escapeXml(venueName)}</Denominazione>
-                <CodiceLocale>${escapeXml(venueCode)}</CodiceLocale>
-            </Locale>
-            <DataEvento>${eventDateStr}</DataEvento>
-            <OraEvento>${eventTimeStr}</OraEvento>
-            <MultiGenere>
-                <TipoGenere>${escapeXml(genreCode)}</TipoGenere>
-                <IncidenzaGenere>10</IncidenzaGenere>
-                <TitoliOpere>
-                    <Titolo>${escapeXml(eventName)}</Titolo>
-                </TitoliOpere>
-            </MultiGenere>${sectorsXml}
-        </Evento>`;
-      }
-      
-      const organizerName = systemConfig?.businessName || companyName;
-      const organizerTaxId = taxId;
-      const organizerType = 'G';
-      
-      xml = `<?xml version="1.0" encoding="UTF-8"?>
-<RiepilogoMensile Data="${dataGiorno}" DataGenerazione="${dataGen}" OraGenerazione="${oraGen}" ProgressivoGenerazione="${progressiveGen}" Sostituzione="N">
-    <Titolare>
-        <Denominazione>${escapeXml(companyName)}</Denominazione>
-        <CodiceFiscale>${escapeXml(taxId)}</CodiceFiscale>
-        <SistemaEmissione>${escapeXml(systemEmissionCode)}</SistemaEmissione>
-    </Titolare>
-    <Organizzatore>
-        <Denominazione>${escapeXml(organizerName)}</Denominazione>
-        <CodiceFiscale>${escapeXml(organizerTaxId)}</CodiceFiscale>
-        <TipoOrganizzatore valore="${organizerType}"/>${eventsXml}
-    </Organizzatore>
-</RiepilogoMensile>`;
-    }
+    // Generate C1 XML using shared helper (eliminates duplication between daily/monthly)
+    const xml = await generateC1ReportXml({
+      companyId,
+      reportDate,
+      isMonthly,
+      filteredTickets,
+      systemConfig,
+      companyName,
+      taxId,
+      oraGen,
+    });
     
     const transmissionType = isMonthly ? 'monthly' : 'daily';
     const typeLabel = isMonthly ? 'mensile' : 'giornaliera';
@@ -4216,6 +3874,211 @@ function formatSiaeDate(date: Date | null | undefined): string {
 function formatSiaeDateTime(date: Date | null | undefined): string {
   if (!date) return '';
   return date.toISOString().replace('.000Z', '');
+}
+
+// ==================== C1 Report XML Generation Helper ====================
+// Shared helper to generate RiepilogoMensile XML for both daily and monthly C1 reports
+// Avoids code duplication - both formats use identical structure with different date formats
+
+interface C1ReportParams {
+  companyId: string;
+  reportDate: Date;
+  isMonthly: boolean;
+  filteredTickets: any[];
+  systemConfig: any;
+  companyName: string;
+  taxId: string;
+  oraGen: string;
+}
+
+async function generateC1ReportXml(params: C1ReportParams): Promise<string> {
+  const { companyId, reportDate, isMonthly, filteredTickets, systemConfig, companyName, taxId, oraGen } = params;
+  
+  // Calculate Data attribute: YYYYMM for monthly, YYYYMMDD for daily
+  let dataAttr: string;
+  let dataGenAttr: string;
+  
+  if (isMonthly) {
+    dataAttr = `${reportDate.getFullYear()}${String(reportDate.getMonth() + 1).padStart(2, '0')}`;
+    dataGenAttr = dataAttr; // Monthly uses same format for DataGenerazione
+  } else {
+    dataAttr = reportDate.getFullYear().toString() + 
+               String(reportDate.getMonth() + 1).padStart(2, '0') + 
+               String(reportDate.getDate()).padStart(2, '0');
+    dataGenAttr = new Date().toISOString().split('T')[0].replace(/-/g, '');
+  }
+  
+  const systemEmissionCode = systemConfig?.systemCode || 'EVENT4U1';
+  
+  // Get next progressive number (by month for monthly, by day for daily)
+  const allTransmissions = await siaeStorage.getSiaeTransmissionsByCompany(companyId);
+  const relevantTransmissions = allTransmissions.filter(t => {
+    const tDate = new Date(t.periodDate);
+    if (isMonthly) {
+      return t.transmissionType === 'monthly' && 
+             tDate.getFullYear() === reportDate.getFullYear() && 
+             tDate.getMonth() === reportDate.getMonth();
+    } else {
+      return t.transmissionType === 'daily' && 
+             tDate.getFullYear() === reportDate.getFullYear() && 
+             tDate.getMonth() === reportDate.getMonth() &&
+             tDate.getDate() === reportDate.getDate();
+    }
+  });
+  const progressiveGen = relevantTransmissions.length + 1;
+  
+  // Group tickets by event
+  const ticketsByEvent: Map<string, typeof filteredTickets> = new Map();
+  for (const ticket of filteredTickets) {
+    const eventId = ticket.ticketedEventId;
+    if (!ticketsByEvent.has(eventId)) {
+      ticketsByEvent.set(eventId, []);
+    }
+    ticketsByEvent.get(eventId)!.push(ticket);
+  }
+  
+  // Build events XML
+  let eventsXml = '';
+  const DEFAULT_SECTOR_KEY = '__DEFAULT__';
+  
+  for (const [ticketedEventId, eventTickets] of ticketsByEvent) {
+    const ticketedEvent = await siaeStorage.getSiaeTicketedEvent(ticketedEventId);
+    if (!ticketedEvent) continue;
+    
+    const eventDetails = await storage.getEvent(ticketedEvent.eventId);
+    if (!eventDetails) continue;
+    
+    const location = await storage.getLocation(eventDetails.locationId);
+    const venueName = location?.name || 'N/D';
+    const venueCode = ticketedEvent.siaeLocationCode || location?.siaeLocationCode || 'VENUE01';
+    
+    const eventDate = new Date(eventDetails.startDatetime);
+    const eventDateStr = eventDate.getFullYear().toString() + 
+                         String(eventDate.getMonth() + 1).padStart(2, '0') + 
+                         String(eventDate.getDate()).padStart(2, '0');
+    const eventTimeStr = String(eventDate.getHours()).padStart(2, '0') + 
+                         String(eventDate.getMinutes()).padStart(2, '0');
+    
+    // Group tickets by sector
+    const ticketsBySector: Map<string, typeof eventTickets> = new Map();
+    for (const ticket of eventTickets) {
+      const sectorKey = ticket.sectorId || DEFAULT_SECTOR_KEY;
+      if (!ticketsBySector.has(sectorKey)) {
+        ticketsBySector.set(sectorKey, []);
+      }
+      ticketsBySector.get(sectorKey)!.push(ticket);
+    }
+    
+    // Build OrdineDiPosto (sectors) XML
+    let sectorsXml = '';
+    for (const [sectorKey, sectorTickets] of ticketsBySector) {
+      let codiceOrdine = 'A0';
+      let capacity = ticketedEvent.capacity || 100;
+      
+      if (sectorKey !== DEFAULT_SECTOR_KEY) {
+        const sector = await siaeStorage.getSiaeEventSector(sectorKey);
+        if (sector) {
+          codiceOrdine = sector.sectorCode || 'A0';
+          capacity = sector.capacity || capacity;
+        }
+      }
+      
+      // Group by ticket type for TitoliAccesso
+      const ticketsByType: Map<string, typeof sectorTickets> = new Map();
+      for (const ticket of sectorTickets) {
+        let tipoTitolo = 'R1';
+        if (ticket.ticketTypeCode === 'R2' || ticket.ticketTypeCode === 'RID') {
+          tipoTitolo = 'R2';
+        } else if (ticket.ticketTypeCode === 'O1' || ticket.ticketTypeCode === 'OMA' || ticket.isComplimentary) {
+          tipoTitolo = 'O1';
+        } else if (ticket.ticketTypeCode) {
+          tipoTitolo = ticket.ticketTypeCode;
+        }
+        if (!ticketsByType.has(tipoTitolo)) {
+          ticketsByType.set(tipoTitolo, []);
+        }
+        ticketsByType.get(tipoTitolo)!.push(ticket);
+      }
+      
+      let titoliAccessoXml = '';
+      let totalOmaggiIva = 0;
+      for (const [tipoTitolo, typeTickets] of ticketsByType) {
+        const validTickets = typeTickets.filter((t: any) => t.status !== 'annullato' && t.status !== 'cancelled');
+        if (validTickets.length === 0) continue;
+        
+        const quantita = validTickets.length;
+        const corrispettivoLordo = validTickets.reduce((sum: number, t: any) => sum + parseFloat(t.grossAmount || '0'), 0);
+        const prevendita = validTickets.reduce((sum: number, t: any) => sum + parseFloat(t.prevendita || '0'), 0);
+        const ivaCorrispettivo = validTickets.reduce((sum: number, t: any) => sum + parseFloat(t.vatAmount || '0'), 0);
+        const ivaPrevendita = validTickets.reduce((sum: number, t: any) => sum + parseFloat(t.prevenditaVat || '0'), 0);
+        const importoPrestazione = 0;
+        
+        if (tipoTitolo === 'O1') {
+          totalOmaggiIva += ivaCorrispettivo;
+        }
+        
+        titoliAccessoXml += `
+                <TitoliAccesso>
+                    <TipoTitolo>${escapeXml(tipoTitolo)}</TipoTitolo>
+                    <Quantita>${quantita}</Quantita>
+                    <CorrispettivoLordo>${corrispettivoLordo.toFixed(2)}</CorrispettivoLordo>
+                    <Prevendita>${prevendita.toFixed(2)}</Prevendita>
+                    <IVACorrispettivo>${ivaCorrispettivo.toFixed(2)}</IVACorrispettivo>
+                    <IVAPrevendita>${ivaPrevendita.toFixed(2)}</IVAPrevendita>
+                    <ImportoPrestazione>${importoPrestazione.toFixed(2)}</ImportoPrestazione>
+                </TitoliAccesso>`;
+      }
+      
+      sectorsXml += `
+            <OrdineDiPosto>
+                <CodiceOrdine>${escapeXml(codiceOrdine)}</CodiceOrdine>
+                <Capienza>${capacity}</Capienza>${titoliAccessoXml}
+                <IVAEccedenteOmaggi>${totalOmaggiIva.toFixed(0)}</IVAEccedenteOmaggi>
+            </OrdineDiPosto>`;
+    }
+    
+    const tipoTassazione = ticketedEvent.taxType || 'S';
+    const genreCode = ticketedEvent.genreCode || '05';
+    const eventName = eventDetails.name || 'Evento';
+    
+    eventsXml += `
+        <Evento>
+            <Intrattenimento>
+                <TipoTassazione valore="${escapeXml(tipoTassazione)}"/>
+            </Intrattenimento>
+            <Locale>
+                <Denominazione>${escapeXml(venueName)}</Denominazione>
+                <CodiceLocale>${escapeXml(venueCode)}</CodiceLocale>
+            </Locale>
+            <DataEvento>${eventDateStr}</DataEvento>
+            <OraEvento>${eventTimeStr}</OraEvento>
+            <MultiGenere>
+                <TipoGenere>${escapeXml(genreCode)}</TipoGenere>
+                <IncidenzaGenere>10</IncidenzaGenere>
+                <TitoliOpere>
+                    <Titolo>${escapeXml(eventName)}</Titolo>
+                </TitoliOpere>
+            </MultiGenere>${sectorsXml}
+        </Evento>`;
+  }
+  
+  const organizerName = systemConfig?.businessName || companyName;
+  const organizerTaxId = taxId;
+  const organizerType = 'G';
+  
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<RiepilogoMensile Data="${dataAttr}" DataGenerazione="${dataGenAttr}" OraGenerazione="${oraGen}" ProgressivoGenerazione="${progressiveGen}" Sostituzione="N">
+    <Titolare>
+        <Denominazione>${escapeXml(companyName)}</Denominazione>
+        <CodiceFiscale>${escapeXml(taxId)}</CodiceFiscale>
+        <SistemaEmissione>${escapeXml(systemEmissionCode)}</SistemaEmissione>
+    </Titolare>
+    <Organizzatore>
+        <Denominazione>${escapeXml(organizerName)}</Denominazione>
+        <CodiceFiscale>${escapeXml(organizerTaxId)}</CodiceFiscale>
+        <TipoOrganizzatore valore="${organizerType}"/>${eventsXml}
+    </Organizzatore>
+</RiepilogoMensile>`;
 }
 
 /**

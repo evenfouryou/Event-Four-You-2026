@@ -23,6 +23,28 @@ The core data model links Companies to Users, Locations, Events, Products, and P
 ### SIAE Ticketing Module
 A SIAE-compliant ticketing and fiscal management system for Italian clubs, adhering to Italian fiscal regulations. It includes reference data, fiscal compliance, customer management, ticketing, transactions, and operations. API endpoints manage CRUD for reference data, activation cards, customer registration, ticket emission with fiscal seals, transaction processing, and XML transmission tracking. Fiscal seal generation is server-side via a Desktop Bridge Relay System. This module is disabled by default and can be enabled per `gestore` user by a Super Admin. It also includes CAPTCHA integration.
 
+#### Dual Report Strategy (SIAE XML Formats)
+The system uses two distinct XML report formats for different purposes:
+
+1. **RiepilogoMensile (C1 Reports)** - Used for manual transmissions via `/api/siae/companies/:companyId/transmissions/send-c1`:
+   - **Daily format**: `Data="YYYYMMDD"` (single day of tickets aggregated)
+   - **Monthly format**: `Data="YYYYMM"` (entire month aggregated)
+   - Structure: `RiepilogoMensile → Titolare → Organizzatore → Evento → OrdineDiPosto → TitoliAccesso`
+   - No XML namespace, plain XML format
+   - Date formats: YYYYMMDD for DataEvento, HHMM for OraEvento, HHMMSS for OraGenerazione
+   - Ticket aggregation by event, sector (CodiceOrdine), and type (TipoTitolo: R1=regular, R2=reduced, O1=complimentary)
+   - Fallback: Tickets without sectorId use default "A0" sector with event capacity
+
+2. **RiepilogoControlloAccessi (RCA Reports)** - Used for automated nightly transmissions via scheduler:
+   - Generated automatically at 02:00 (daily) and 03:00 first of month (monthly)
+   - Uses DTD: `RiepilogoControlloAccessi_v0100_20080201.dtd`
+   - Purpose: Access control audit compliance
+   - Structure: `RiepilogoControlloAccessi → Titolare → Evento → SistemaEmissione → Titoli`
+
+Code locations:
+- C1 Reports: `server/siae-routes.ts` → `generateC1ReportXml()` helper function
+- RCA Reports: `server/siae-scheduler.ts` → `generateXMLContent()` function
+
 #### Event Approval Workflow
 SIAE ticketed events require administrative approval before ticket sales can begin:
 -   **Approval States**: `pending` (awaiting review), `approved` (ready for sales), `rejected` (declined with reason).
