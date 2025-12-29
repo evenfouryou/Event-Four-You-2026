@@ -319,7 +319,7 @@ export default function PublicForgotPassword() {
             <p className="text-muted-foreground text-base">
               Ricordi la password?{" "}
               <Link 
-                href="/accedi" 
+                href="/login" 
                 className="text-primary font-semibold active:opacity-70 transition-opacity" 
                 data-testid="link-login"
                 onClick={() => triggerHaptic('light')}
