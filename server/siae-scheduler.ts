@@ -6,9 +6,11 @@ import { storage } from "./storage";
 import { sendSiaeTransmissionEmail } from "./email-service";
 import { isBridgeConnected, requestXmlSignature } from "./bridge-relay";
 
-// Configurazione SIAE
+// Configurazione SIAE secondo Allegato B e C - Provvedimento Agenzia delle Entrate 04/03/2008
 const SIAE_TEST_MODE = process.env.SIAE_TEST_MODE === 'true';
 const SIAE_TEST_EMAIL = process.env.SIAE_TEST_EMAIL || 'servertest2@batest.siae.it';
+const SIAE_SYSTEM_CODE = process.env.SIAE_SYSTEM_CODE || 'EVENT4U1'; // Max 8 caratteri
+const SIAE_VERSION = 'V.01.00';
 
 function log(message: string) {
   const formattedTime = new Date().toLocaleTimeString("it-IT", {
@@ -18,6 +20,102 @@ function log(message: string) {
     hour12: false,
   });
   console.log(`${formattedTime} [SIAE-Scheduler] ${message}`);
+}
+
+// ==================== SIAE Date/Time Format Helpers ====================
+// Formato SIAE conforme a Allegato B - Provvedimento 04/03/2008
+
+/**
+ * Formatta data in formato SIAE compatto AAAAMMGG
+ * Es: 20241228 per 28 dicembre 2024
+ */
+export function formatSiaeDateCompact(date: Date | string | null): string {
+  if (!date) return '00000000';
+  const d = typeof date === 'string' ? new Date(date) : date;
+  if (isNaN(d.getTime())) return '00000000';
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}${month}${day}`;
+}
+
+/**
+ * Formatta ora in formato SIAE compatto HHMMSS
+ * Es: 143015 per 14:30:15
+ */
+export function formatSiaeTimeCompact(date: Date | string | null): string {
+  if (!date) return '000000';
+  const d = typeof date === 'string' ? new Date(date) : date;
+  if (isNaN(d.getTime())) return '000000';
+  const hours = String(d.getHours()).padStart(2, '0');
+  const minutes = String(d.getMinutes()).padStart(2, '0');
+  const seconds = String(d.getSeconds()).padStart(2, '0');
+  return `${hours}${minutes}${seconds}`;
+}
+
+/**
+ * Formatta ora in formato SIAE HHMM (per OraEvento)
+ * Es: 1430 per 14:30
+ */
+export function formatSiaeTimeHHMM(date: Date | string | null): string {
+  if (!date) return '0000';
+  const d = typeof date === 'string' ? new Date(date) : date;
+  if (isNaN(d.getTime())) return '0000';
+  const hours = String(d.getHours()).padStart(2, '0');
+  const minutes = String(d.getMinutes()).padStart(2, '0');
+  return `${hours}${minutes}`;
+}
+
+/**
+ * Genera nome file conforme a Allegato C SIAE
+ * Formato: RCA_AAAA_MM_GG_###.xsi o RCA_AAAA_MM_GG_###.xsi.p7m
+ */
+export function generateSiaeFileName(date: Date, sequenceNumber: number, isSigned: boolean): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const seq = String(sequenceNumber).padStart(3, '0');
+  const extension = isSigned ? '.xsi.p7m' : '.xsi';
+  return `RCA_${year}_${month}_${day}_${seq}${extension}`;
+}
+
+/**
+ * Genera subject email conforme a RFC-2822 SIAE
+ * Formato: RCA_<AAAA>_<MM>_<GG>_<SSSSSSSS>_<###>_<TTT>_V.<XX>.<YY>
+ */
+export function generateSiaeEmailSubject(date: Date, systemCode: string, sequenceNumber: number): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const code = systemCode.padEnd(8, '0').substring(0, 8);
+  const seq = String(sequenceNumber).padStart(3, '0');
+  return `RCA_${year}_${month}_${day}_${code}_${seq}_XSI_${SIAE_VERSION}`;
+}
+
+/**
+ * Mappa codice genere evento a codice SIAE (2 caratteri)
+ * Secondo Allegato B - TAB.1
+ */
+export function mapGenreToSiae(genreCode: string | null): string {
+  const genreMap: Record<string, string> = {
+    '60': 'DI', // Discoteca/Disco
+    '61': 'DI', // Disco/Club
+    '10': 'TE', // Teatro
+    '20': 'CI', // Cinema
+    '30': 'CO', // Concerto
+    '40': 'SP', // Sport
+    '50': 'AL', // Altro
+  };
+  return genreMap[genreCode || '60'] || 'DI';
+}
+
+/**
+ * Determina tipo SpettacoloIntrattenimento secondo specifiche SIAE
+ * S=spettacolo, I=intrattenimento, P=spettacolo digitale, N=intrattenimento digitale
+ */
+export function getSpettacoloIntrattenimentoCode(taxType: string | null, isDigital: boolean = false): string {
+  if (taxType === 'S') return isDigital ? 'P' : 'S';
+  return isDigital ? 'N' : 'I';
 }
 
 // Funzione per ottenere il progressivo giornaliero per evitare collisioni
@@ -85,7 +183,7 @@ async function generateC1ReportData(ticketedEvent: any, reportType: 'giornaliero
         return subDate === today;
       });
     }
-  } catch (e) {
+  } catch (e: any) {
     log(`Errore recupero abbonamenti: ${e.message}`);
   }
 
@@ -108,121 +206,194 @@ async function generateC1ReportData(ticketedEvent: any, reportType: 'giornaliero
   };
 }
 
+/**
+ * Genera XML in formato RiepilogoControlloAccessi conforme a DTD SIAE
+ * Allegato B - Provvedimento Agenzia delle Entrate 04/03/2008
+ */
 function generateXMLContent(reportData: any): string {
-  const { ticketedEvent, company, eventRecord, sectors, reportType, reportDate, activeTicketsCount, cancelledTicketsCount, totalRevenue, filteredTickets, progressivo = 1 } = reportData;
-  const isMonthly = reportType === 'mensile';
+  const { 
+    ticketedEvent, 
+    company, 
+    eventRecord, 
+    sectors, 
+    reportType, 
+    reportDate, 
+    activeTicketsCount, 
+    cancelledTicketsCount, 
+    totalRevenue, 
+    filteredTickets, 
+    progressivo = 1 
+  } = reportData;
   
   const now = new Date();
-  const meseAttr = isMonthly 
-    ? `${reportDate.getFullYear()}${String(reportDate.getMonth() + 1).padStart(2, '0')}`
-    : reportDate.toISOString().split('T')[0].replace(/-/g, '');
-  const dataGen = now.toISOString().split('T')[0].replace(/-/g, '');
-  const oraGen = now.toTimeString().split(' ')[0].replace(/:/g, '');
+  const systemCode = ticketedEvent.systemCode || SIAE_SYSTEM_CODE;
+  const taxId = company?.taxId || 'XXXXXXXXXXXXXXXX';
+  
+  // Date/time in formato SIAE
+  const dataRiepilogo = formatSiaeDateCompact(reportDate);
+  const dataGenerazione = formatSiaeDateCompact(now);
+  const oraGenerazione = formatSiaeTimeCompact(now);
+  
+  // Data e ora evento
+  const eventDateTime = eventRecord?.startDatetime ? new Date(eventRecord.startDatetime) : reportDate;
+  const dataEvento = formatSiaeDateCompact(eventDateTime);
+  const oraEvento = formatSiaeTimeHHMM(eventDateTime);
+  
+  // Codice genere SIAE (2 caratteri)
+  const tipoGenere = mapGenreToSiae(ticketedEvent.genreCode);
+  
+  // Tipo spettacolo/intrattenimento
+  const spettacoloIntrattenimento = getSpettacoloIntrattenimentoCode(ticketedEvent.taxType);
+  
+  // Incidenza intrattenimento (percentuale)
+  const incidenzaIntrattenimento = ticketedEvent.entertainmentIncidence || 100;
+  
+  // Codice locale (13 caratteri, padded con zeri)
+  const codiceLocale = (ticketedEvent.siaeLocationCode || '').padStart(13, '0').substring(0, 13);
   
   // Converti importo in centesimi (formato SIAE)
   const totalRevenueInCents = Math.round(totalRevenue * 100);
   const ivaAmount = Math.round(totalRevenueInCents * 0.10); // IVA 10% per spettacoli
+  const netAmount = totalRevenueInCents - ivaAmount;
   
-  // Data evento
-  const eventDate = eventRecord?.startDatetime 
-    ? new Date(eventRecord.startDatetime).toISOString().split('T')[0].replace(/-/g, '')
-    : reportDate.toISOString().split('T')[0].replace(/-/g, '');
-  const eventTime = eventRecord?.startDatetime
-    ? new Date(eventRecord.startDatetime).toTimeString().split(' ')[0].replace(/:/g, '').substring(0, 4)
-    : '2000';
+  // Calcola capienza totale dai settori
+  let capienzaTotale = 0;
+  if (sectors && sectors.length > 0) {
+    capienzaTotale = sectors.reduce((sum: number, s: any) => sum + (s.capacity || 0), 0);
+  } else {
+    capienzaTotale = 100; // Default
+  }
 
-  // Genera sezioni OrdineDiPosto per i settori
-  let ordiniDiPostoXml = '';
+  // Genera XML conforme a RiepilogoControlloAccessi DTD
+  let xml = `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE RiepilogoControlloAccessi SYSTEM "RiepilogoControlloAccessi_v0100_20080201.dtd">
+<RiepilogoControlloAccessi Sostituzione="N">
+  <Titolare>
+    <DenominazioneTitolareCA>${escapeXml(company?.name || 'N/A')}</DenominazioneTitolareCA>
+    <CFTitolareCA>${escapeXml(taxId)}</CFTitolareCA>
+    <CodiceSistemaCA>${escapeXml(systemCode)}</CodiceSistemaCA>
+    <DataRiepilogo>${dataRiepilogo}</DataRiepilogo>
+    <DataGenerazioneRiepilogo>${dataGenerazione}</DataGenerazioneRiepilogo>
+    <OraGenerazioneRiepilogo>${oraGenerazione}</OraGenerazioneRiepilogo>
+    <ProgressivoRiepilogo>${progressivo}</ProgressivoRiepilogo>
+  </Titolare>
+  <Evento>
+    <CFOrganizzatore>${escapeXml(taxId)}</CFOrganizzatore>
+    <DenominazioneOrganizzatore>${escapeXml(company?.name || 'N/A')}</DenominazioneOrganizzatore>
+    <TipologiaOrganizzatore>${ticketedEvent.organizerType || 'G'}</TipologiaOrganizzatore>
+    <SpettacoloIntrattenimento>${spettacoloIntrattenimento}</SpettacoloIntrattenimento>
+    <IncidenzaIntrattenimento>${incidenzaIntrattenimento}</IncidenzaIntrattenimento>
+    <DenominazioneLocale>${escapeXml(ticketedEvent.eventLocation || eventRecord?.locationId || 'Locale')}</DenominazioneLocale>
+    <CodiceLocale>${codiceLocale}</CodiceLocale>
+    <DataEvento>${dataEvento}</DataEvento>
+    <OraEvento>${oraEvento}</OraEvento>
+    <TipoGenere>${tipoGenere}</TipoGenere>
+    <TitoloEvento>${escapeXml(eventRecord?.name || ticketedEvent.eventTitle || 'Evento')}</TitoloEvento>
+    <Autore></Autore>
+    <Esecutore></Esecutore>
+    <NazionalitaFilm></NazionalitaFilm>
+    <NumOpereRappresentate>1</NumOpereRappresentate>
+    <SistemaEmissione CFTitolare="${escapeXml(taxId)}" CodiceSistema="${escapeXml(systemCode)}">`;
+
+  // Genera sezioni Titoli per ogni settore
   if (sectors && sectors.length > 0) {
     for (const sector of sectors) {
-      ordiniDiPostoXml += `
-            <OrdineDiPosto>
-                <CodiceOrdine>${sector.orderCode || 'A0'}</CodiceOrdine>
-                <Capienza>${sector.capacity || 0}</Capienza>
-                <IVAEccedenteOmaggi>0</IVAEccedenteOmaggi>
-            </OrdineDiPosto>`;
+      const sectorTickets = filteredTickets.filter((t: any) => t.sectorId === sector.id);
+      const sectorCancelled = reportData.cancelledTickets?.filter((t: any) => t.sectorId === sector.id)?.length || 0;
+      const sectorRevenue = sectorTickets.reduce((sum: number, t: any) => {
+        return sum + (Number(t.ticketPrice) || Number(t.grossAmount) || 0);
+      }, 0);
+      const sectorRevenueInCents = Math.round(sectorRevenue * 100);
+      
+      xml += `
+      <Titoli>
+        <CodiceOrdinePosto>${escapeXml(sector.orderCode || 'A0')}</CodiceOrdinePosto>
+        <Capienza>${sector.capacity || 0}</Capienza>
+        <TotaleTipoTitolo>
+          <TipoTitolo>IN</TipoTitolo>
+          <TotaleTitoliLTA>${sectorTickets.length}</TotaleTitoliLTA>
+          <TotaleTitoliNoAccessoTradiz>0</TotaleTitoliNoAccessoTradiz>
+          <TotaleTitoliNoAccessoDigitali>0</TotaleTitoliNoAccessoDigitali>
+          <TotaleTitoliLTAAccessoTradiz>${sectorTickets.length}</TotaleTitoliLTAAccessoTradiz>
+          <TotaleTitoliLTAAccessoDigitali>0</TotaleTitoliLTAAccessoDigitali>
+          <TotaleCorrispettiviLordi>${sectorRevenueInCents}</TotaleCorrispettiviLordi>
+          <TotaleDirittiPrevendita>0</TotaleDirittiPrevendita>
+          <TotaleIVACorrispettivi>${Math.round(sectorRevenueInCents * 0.10)}</TotaleIVACorrispettivi>
+          <TotaleIVADirittiPrevendita>0</TotaleIVADirittiPrevendita>
+        </TotaleTipoTitolo>
+        <TotaleTitoliAnnullati>
+          <TipoTitolo>IN</TipoTitolo>
+          <TotaleTitoliAnnull>${sectorCancelled}</TotaleTitoliAnnull>
+          <TotaleCorrispettiviLordiAnnull>0</TotaleCorrispettiviLordiAnnull>
+          <TotaleDirittiPrevenditaAnnull>0</TotaleDirittiPrevenditaAnnull>
+          <TotaleIVACorrispettiviAnnull>0</TotaleIVACorrispettiviAnnull>
+          <TotaleIVADirittiPrevenditaAnnull>0</TotaleIVADirittiPrevenditaAnnull>
+        </TotaleTitoliAnnullati>
+      </Titoli>`;
     }
   } else {
-    ordiniDiPostoXml = `
-            <OrdineDiPosto>
-                <CodiceOrdine>A0</CodiceOrdine>
-                <Capienza>100</Capienza>
-                <IVAEccedenteOmaggi>0</IVAEccedenteOmaggi>
-            </OrdineDiPosto>`;
+    // Settore default se non ci sono settori definiti
+    xml += `
+      <Titoli>
+        <CodiceOrdinePosto>A0</CodiceOrdinePosto>
+        <Capienza>${capienzaTotale}</Capienza>
+        <TotaleTipoTitolo>
+          <TipoTitolo>IN</TipoTitolo>
+          <TotaleTitoliLTA>${activeTicketsCount}</TotaleTitoliLTA>
+          <TotaleTitoliNoAccessoTradiz>0</TotaleTitoliNoAccessoTradiz>
+          <TotaleTitoliNoAccessoDigitali>0</TotaleTitoliNoAccessoDigitali>
+          <TotaleTitoliLTAAccessoTradiz>${activeTicketsCount}</TotaleTitoliLTAAccessoTradiz>
+          <TotaleTitoliLTAAccessoDigitali>0</TotaleTitoliLTAAccessoDigitali>
+          <TotaleCorrispettiviLordi>${totalRevenueInCents}</TotaleCorrispettiviLordi>
+          <TotaleDirittiPrevendita>0</TotaleDirittiPrevendita>
+          <TotaleIVACorrispettivi>${ivaAmount}</TotaleIVACorrispettivi>
+          <TotaleIVADirittiPrevendita>0</TotaleIVADirittiPrevendita>
+        </TotaleTipoTitolo>
+        <TotaleTitoliAnnullati>
+          <TipoTitolo>IN</TipoTitolo>
+          <TotaleTitoliAnnull>${cancelledTicketsCount}</TotaleTitoliAnnull>
+          <TotaleCorrispettiviLordiAnnull>0</TotaleCorrispettiviLordiAnnull>
+          <TotaleDirittiPrevenditaAnnull>0</TotaleDirittiPrevenditaAnnull>
+          <TotaleIVACorrispettiviAnnull>0</TotaleIVACorrispettiviAnnull>
+          <TotaleIVADirittiPrevenditaAnnull>0</TotaleIVADirittiPrevenditaAnnull>
+        </TotaleTitoliAnnullati>
+      </Titoli>`;
   }
 
   // Genera sezione Abbonamenti se presenti
-  let abbonamentiXml = '';
   const subscriptions = reportData.subscriptions || [];
   if (subscriptions.length > 0) {
     const totalSubRevenue = subscriptions.reduce((sum: number, s: any) => sum + (Number(s.price) || 0), 0);
     const totalSubRevenueInCents = Math.round(totalSubRevenue * 100);
     const subIvaAmount = Math.round(totalSubRevenueInCents * 0.10);
     
-    abbonamentiXml = `
-        <Abbonamenti>
-            <AbbonamentiEmessi>
-                <Quantita>${subscriptions.length}</Quantita>
-                <CorrispettivoLordo>${totalSubRevenueInCents}</CorrispettivoLordo>
-                <IVACorrispettivo>${subIvaAmount}</IVACorrispettivo>
-            </AbbonamentiEmessi>
-        </Abbonamenti>`;
+    xml += `
+      <Abbonamenti>
+        <TotaleAbbonamenti>${subscriptions.length}</TotaleAbbonamenti>
+        <TotaleCorrispettiviLordiAbb>${totalSubRevenueInCents}</TotaleCorrispettiviLordiAbb>
+        <TotaleIVAAbb>${subIvaAmount}</TotaleIVAAbb>
+      </Abbonamenti>`;
   }
 
-  const rootElement = isMonthly ? 'RiepilogoMensile' : 'RiepilogoGiornaliero';
-  const meseAttrName = isMonthly ? 'Mese' : 'Giorno';
-
-  let xml = `<?xml version="1.0" encoding="UTF-8"?>
-<${rootElement} ${meseAttrName}="${meseAttr}" DataGenerazione="${dataGen}" OraGenerazione="${oraGen}" ProgressivoGenerazione="${progressivo}" Sostituzione="N">
-    <Titolare>
-        <Denominazione>${company?.name || 'N/A'}</Denominazione>
-        <CodiceFiscale>${company?.taxId || 'XXXXXXXXXXXXXXXX'}</CodiceFiscale>
-        <SistemaEmissione>${ticketedEvent.systemCode || 'EVENT4U'}</SistemaEmissione>
-    </Titolare>
-    <Organizzatore>
-        <Denominazione>${company?.name || 'N/A'}</Denominazione>
-        <CodiceFiscale>${company?.taxId || 'XXXXXXXXXXXXXXXX'}</CodiceFiscale>
-        <TipoOrganizzatore valore="${ticketedEvent.organizerType || 'G'}"/>
-        <Evento>
-            <Intrattenimento>
-                <TipoTassazione valore="${ticketedEvent.taxType || 'I'}"/>
-                <Incidenza>${ticketedEvent.entertainmentIncidence || 100}</Incidenza>
-                <ImponibileIntrattenimenti>0</ImponibileIntrattenimenti>
-            </Intrattenimento>
-            <Locale>
-                <Denominazione>${ticketedEvent.eventLocation || eventRecord?.locationId || 'Locale'}</Denominazione>
-                <CodiceLocale>${ticketedEvent.siaeLocationCode || 'XXXXXX'}</CodiceLocale>
-            </Locale>
-            <DataEvento>${eventDate}</DataEvento>
-            <OraEvento>${eventTime}</OraEvento>
-            <MultiGenere>
-                <TipoGenere>${ticketedEvent.genreCode || '61'}</TipoGenere>
-                <IncidenzaGenere>0</IncidenzaGenere>
-                <TitoliOpere>
-                    <Titolo>${eventRecord?.name || ticketedEvent.eventTitle || 'Evento'}</Titolo>
-                </TitoliOpere>
-            </MultiGenere>${ordiniDiPostoXml}
-        </Evento>
-        <TitoliIngresso>
-            <TitoliEmessi>
-                <Quantita>${activeTicketsCount}</Quantita>
-                <CorrispettivoLordo>${totalRevenueInCents}</CorrispettivoLordo>
-                <Prevendita>0</Prevendita>
-                <IVACorrispettivo>${ivaAmount}</IVACorrispettivo>
-                <IVAPrevendita>0</IVAPrevendita>
-            </TitoliEmessi>
-            <TitoliAnnullati>
-                <Quantita>${cancelledTicketsCount}</Quantita>
-                <CorrispettivoLordo>0</CorrispettivoLordo>
-                <Prevendita>0</Prevendita>
-                <IVACorrispettivo>0</IVACorrispettivo>
-                <IVAPrevendita>0</IVAPrevendita>
-            </TitoliAnnullati>
-        </TitoliIngresso>${abbonamentiXml}
-    </Organizzatore>
-</${rootElement}>`;
+  xml += `
+    </SistemaEmissione>
+  </Evento>
+</RiepilogoControlloAccessi>`;
   
   return xml;
+}
+
+/**
+ * Escape caratteri speciali XML
+ */
+function escapeXml(str: string | null | undefined): string {
+  if (!str) return '';
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
 }
 
 async function checkExistingTransmission(ticketedEventId: string, transmissionType: string, periodDate: Date): Promise<boolean> {
@@ -244,7 +415,7 @@ async function checkExistingTransmission(ticketedEventId: string, transmissionTy
 }
 
 async function sendDailyReports() {
-  log('Avvio job invio report giornalieri C1...');
+  log('Avvio job invio report giornalieri RCA (RiepilogoControlloAccessi)...');
   
   try {
     const yesterday = new Date();
@@ -281,8 +452,9 @@ async function sendDailyReports() {
         const reportData = await generateC1ReportData(ticketedEvent, 'giornaliero', yesterday, progressivo);
         const xmlContent = generateXMLContent(reportData);
 
-        const dateStr = yesterday.toISOString().split('T')[0].replace(/-/g, '');
-        let fileName = `C1_DAILY_${ticketedEvent.siaeEventCode || ticketedEvent.id}_${dateStr}_P${progressivo}.xml`;
+        const systemCode = ticketedEvent.systemCode || SIAE_SYSTEM_CODE;
+        let fileName = generateSiaeFileName(yesterday, progressivo, false);
+        let isSigned = false;
 
         const transmission = await siaeStorage.createSiaeTransmission({
           companyId: ticketedEvent.companyId,
@@ -297,12 +469,11 @@ async function sendDailyReports() {
           totalAmount: reportData.totalRevenue.toFixed(2),
         });
 
-        log(`Evento ${ticketedEvent.id} (${event.name}) - Report giornaliero creato: ${fileName}`);
+        log(`Evento ${ticketedEvent.id} (${event.name}) - Report RCA creato: ${fileName}`);
 
         // Tenta firma digitale se il bridge è connesso
         let xmlToSend = xmlContent;
         let signatureInfo = '';
-        let isSigned = false;
         
         try {
           if (isBridgeConnected()) {
@@ -313,8 +484,8 @@ async function sendDailyReports() {
             isSigned = true;
             log(`XML firmato con successo alle ${signatureResult.signedAt}`);
             
-            // Aggiorna nome file con estensione .xml.p7m per file firmati
-            fileName = fileName.replace('.xml', '.xml.p7m');
+            // Aggiorna nome file con estensione .xsi.p7m per file firmati
+            fileName = generateSiaeFileName(yesterday, progressivo, true);
             
             // Aggiorna trasmissione con contenuto firmato e nuovo nome file
             await siaeStorage.updateSiaeTransmission(transmission.id, {
@@ -328,7 +499,7 @@ async function sendDailyReports() {
           log(`ATTENZIONE: Firma digitale fallita, invio non firmato: ${signError.message}`);
         }
 
-        // Invio automatico email a SIAE
+        // Invio automatico email a SIAE con nuovo formato subject
         try {
           await sendSiaeTransmissionEmail({
             to: SIAE_TEST_EMAIL,
@@ -339,6 +510,8 @@ async function sendDailyReports() {
             totalAmount: reportData.totalRevenue.toFixed(2),
             xmlContent: xmlToSend,
             transmissionId: transmission.id,
+            systemCode: systemCode,
+            sequenceNumber: progressivo,
           });
 
           // Aggiorna status a 'sent'
@@ -366,7 +539,7 @@ async function sendDailyReports() {
 }
 
 async function sendMonthlyReports() {
-  log('Avvio job invio report mensili C1...');
+  log('Avvio job invio report mensili RCA...');
   
   try {
     const now = new Date();
@@ -400,8 +573,9 @@ async function sendMonthlyReports() {
         const reportData = await generateC1ReportData(ticketedEvent, 'mensile', previousMonth, progressivo);
         const xmlContent = generateXMLContent(reportData);
 
-        const monthStr = `${previousMonth.getFullYear()}${String(previousMonth.getMonth() + 1).padStart(2, '0')}`;
-        let fileName = `C1_MONTHLY_${ticketedEvent.siaeEventCode || ticketedEvent.id}_${monthStr}_P${progressivo}.xml`;
+        const systemCode = ticketedEvent.systemCode || SIAE_SYSTEM_CODE;
+        let fileName = generateSiaeFileName(previousMonth, progressivo, false);
+        let isSigned = false;
 
         const transmission = await siaeStorage.createSiaeTransmission({
           companyId: ticketedEvent.companyId,
@@ -416,12 +590,11 @@ async function sendMonthlyReports() {
           totalAmount: reportData.totalRevenue.toFixed(2),
         });
 
-        log(`Evento ${ticketedEvent.id} - Report mensile creato: ${fileName}`);
+        log(`Evento ${ticketedEvent.id} - Report mensile RCA creato: ${fileName}`);
 
         // Tenta firma digitale se il bridge è connesso
         let xmlToSend = xmlContent;
         let signatureInfo = '';
-        let isSigned = false;
         
         try {
           if (isBridgeConnected()) {
@@ -432,8 +605,8 @@ async function sendMonthlyReports() {
             isSigned = true;
             log(`XML mensile firmato con successo alle ${signatureResult.signedAt}`);
             
-            // Aggiorna nome file con estensione .xml.p7m per file firmati
-            fileName = fileName.replace('.xml', '.xml.p7m');
+            // Aggiorna nome file con estensione .xsi.p7m per file firmati
+            fileName = generateSiaeFileName(previousMonth, progressivo, true);
             
             // Aggiorna trasmissione con contenuto firmato e nuovo nome file
             await siaeStorage.updateSiaeTransmission(transmission.id, {
@@ -447,7 +620,7 @@ async function sendMonthlyReports() {
           log(`ATTENZIONE: Firma digitale report mensile fallita, invio non firmato: ${signError.message}`);
         }
 
-        // Invio automatico email a SIAE
+        // Invio automatico email a SIAE con nuovo formato subject
         try {
           await sendSiaeTransmissionEmail({
             to: SIAE_TEST_EMAIL,
@@ -458,6 +631,8 @@ async function sendMonthlyReports() {
             totalAmount: reportData.totalRevenue.toFixed(2),
             xmlContent: xmlToSend,
             transmissionId: transmission.id,
+            systemCode: systemCode,
+            sequenceNumber: progressivo,
           });
 
           // Aggiorna status a 'sent'
@@ -509,7 +684,7 @@ function checkAndRunMonthlyJob() {
 }
 
 export function initSiaeScheduler() {
-  log('Inizializzazione scheduler SIAE...');
+  log('Inizializzazione scheduler SIAE (formato RiepilogoControlloAccessi)...');
 
   if (dailyIntervalId) clearInterval(dailyIntervalId);
   if (monthlyIntervalId) clearInterval(monthlyIntervalId);
@@ -520,6 +695,8 @@ export function initSiaeScheduler() {
   log('Scheduler SIAE inizializzato:');
   log('  - Job giornaliero: ogni notte alle 02:00');
   log('  - Job mensile: primo giorno del mese alle 03:00');
+  log(`  - System Code: ${SIAE_SYSTEM_CODE}`);
+  log(`  - Test Mode: ${SIAE_TEST_MODE}`);
 }
 
 export function stopSiaeScheduler() {

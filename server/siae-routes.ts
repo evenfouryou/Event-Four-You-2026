@@ -160,19 +160,65 @@ router.get("/api/siae/debug/test-smtp", async (req: Request, res: Response) => {
     let emailError: string | null = null;
     
     try {
+      const now = new Date();
+      const dataRiepilogo = now.getFullYear().toString() + String(now.getMonth() + 1).padStart(2, '0') + String(now.getDate()).padStart(2, '0');
+      const oraGenerazione = String(now.getHours()).padStart(2, '0') + String(now.getMinutes()).padStart(2, '0') + String(now.getSeconds()).padStart(2, '0');
       const testXml = `<?xml version="1.0" encoding="UTF-8"?>
-<ComunicazioneDatiTitoli xmlns="urn:siae:biglietteria:2025">
-  <Intestazione>
-    <CodiceFiscaleEmittente>DEBUG-TEST-CF</CodiceFiscaleEmittente>
-    <NumeroCarta>DEBUG-CARD</NumeroCarta>
-    <DataRiferimento>${new Date().toISOString().split('T')[0]}</DataRiferimento>
-    <TipoTrasmissione>DEBUG</TipoTrasmissione>
-  </Intestazione>
-  <Riepilogo>
-    <TotaleTitoli>0</TotaleTitoli>
-    <Nota>Questo è un test di debug dal sistema Event4U</Nota>
-  </Riepilogo>
-</ComunicazioneDatiTitoli>`;
+<!DOCTYPE RiepilogoControlloAccessi SYSTEM "RiepilogoControlloAccessi_v0100_20080201.dtd">
+<RiepilogoControlloAccessi Sostituzione="N">
+  <Titolare>
+    <DenominazioneTitolareCA>DEBUG TEST COMPANY</DenominazioneTitolareCA>
+    <CFTitolareCA>DEBUG-TEST-CF00</CFTitolareCA>
+    <CodiceSistemaCA>EVENT4U1</CodiceSistemaCA>
+    <DataRiepilogo>${dataRiepilogo}</DataRiepilogo>
+    <DataGenerazioneRiepilogo>${dataRiepilogo}</DataGenerazioneRiepilogo>
+    <OraGenerazioneRiepilogo>${oraGenerazione}</OraGenerazioneRiepilogo>
+    <ProgressivoRiepilogo>1</ProgressivoRiepilogo>
+  </Titolare>
+  <Evento>
+    <CFOrganizzatore>DEBUG-TEST-CF00</CFOrganizzatore>
+    <DenominazioneOrganizzatore>DEBUG TEST COMPANY</DenominazioneOrganizzatore>
+    <TipologiaOrganizzatore>G</TipologiaOrganizzatore>
+    <SpettacoloIntrattenimento>N</SpettacoloIntrattenimento>
+    <IncidenzaIntrattenimento>100</IncidenzaIntrattenimento>
+    <DenominazioneLocale>DEBUG Locale Test</DenominazioneLocale>
+    <CodiceLocale>0000000000000</CodiceLocale>
+    <DataEvento>${dataRiepilogo}</DataEvento>
+    <OraEvento>2000</OraEvento>
+    <TipoGenere>DI</TipoGenere>
+    <TitoloEvento>Debug Test Event</TitoloEvento>
+    <Autore></Autore>
+    <Esecutore></Esecutore>
+    <NazionalitaFilm></NazionalitaFilm>
+    <NumOpereRappresentate>1</NumOpereRappresentate>
+    <SistemaEmissione CFTitolare="DEBUG-TEST-CF00" CodiceSistema="EVENT4U1">
+      <Titoli>
+        <CodiceOrdinePosto>A0</CodiceOrdinePosto>
+        <Capienza>100</Capienza>
+        <TotaleTipoTitolo>
+          <TipoTitolo>IN</TipoTitolo>
+          <TotaleTitoliLTA>0</TotaleTitoliLTA>
+          <TotaleTitoliNoAccessoTradiz>0</TotaleTitoliNoAccessoTradiz>
+          <TotaleTitoliNoAccessoDigitali>0</TotaleTitoliNoAccessoDigitali>
+          <TotaleTitoliLTAAccessoTradiz>0</TotaleTitoliLTAAccessoTradiz>
+          <TotaleTitoliLTAAccessoDigitali>0</TotaleTitoliLTAAccessoDigitali>
+          <TotaleCorrispettiviLordi>0</TotaleCorrispettiviLordi>
+          <TotaleDirittiPrevendita>0</TotaleDirittiPrevendita>
+          <TotaleIVACorrispettivi>0</TotaleIVACorrispettivi>
+          <TotaleIVADirittiPrevendita>0</TotaleIVADirittiPrevendita>
+        </TotaleTipoTitolo>
+        <TotaleTitoliAnnullati>
+          <TipoTitolo>IN</TipoTitolo>
+          <TotaleTitoliAnnull>0</TotaleTitoliAnnull>
+          <TotaleCorrispettiviLordiAnnull>0</TotaleCorrispettiviLordiAnnull>
+          <TotaleDirittiPrevenditaAnnull>0</TotaleDirittiPrevenditaAnnull>
+          <TotaleIVACorrispettiviAnnull>0</TotaleIVACorrispettiviAnnull>
+          <TotaleIVADirittiPrevenditaAnnull>0</TotaleIVADirittiPrevenditaAnnull>
+        </TotaleTitoliAnnullati>
+      </Titoli>
+    </SistemaEmissione>
+  </Evento>
+</RiepilogoControlloAccessi>`;
 
       await sendSiaeTransmissionEmail({
         to: testDestination,
@@ -3010,7 +3056,7 @@ router.post("/api/siae/companies/:companyId/transmissions/send-c1", requireAuth,
       totalAmount: totalAmount.toString(),
     });
     
-    // Import and send the email
+    // Import and send the email with SIAE-compliant format (Allegato C)
     const { sendSiaeTransmissionEmail } = await import('./email-service');
     
     const destination = getSiaeDestinationEmail(toEmail);
@@ -3023,9 +3069,11 @@ router.post("/api/siae/companies/:companyId/transmissions/send-c1", requireAuth,
       totalAmount: totalAmount.toString(),
       xmlContent: xmlToSend,
       transmissionId: transmission.id,
+      systemCode: SIAE_SYSTEM_CODE_DEFAULT,
+      sequenceNumber: 1,
     });
     
-    console.log(`[SIAE-ROUTES] ${typeLabel.toUpperCase()} transmission sent to: ${destination}${signatureInfo} (Test mode: ${SIAE_TEST_MODE})`);
+    console.log(`[SIAE-ROUTES] ${typeLabel.toUpperCase()} RCA transmission sent to: ${destination}${signatureInfo} (Test mode: ${SIAE_TEST_MODE})`);
     
     // Update transmission status
     await siaeStorage.updateSiaeTransmission(transmission.id, {
@@ -3168,7 +3216,7 @@ router.post("/api/siae/companies/:companyId/transmissions/send-daily", requireAu
     // Use already loaded company for name
     const companyName = company?.name || 'N/A';
     
-    // Import and send the email
+    // Import and send the email with SIAE-compliant format (Allegato C)
     const { sendSiaeTransmissionEmail } = await import('./email-service');
     
     const dailyDestination = getSiaeDestinationEmail(toEmail);
@@ -3181,9 +3229,11 @@ router.post("/api/siae/companies/:companyId/transmissions/send-daily", requireAu
       totalAmount,
       xmlContent: xml,
       transmissionId: transmission.id,
+      systemCode: SIAE_SYSTEM_CODE_DEFAULT,
+      sequenceNumber: 1,
     });
     
-    console.log(`[SIAE-ROUTES] Daily transmission sent to: ${dailyDestination} (Test mode: ${SIAE_TEST_MODE})`);
+    console.log(`[SIAE-ROUTES] Daily RCA transmission sent to: ${dailyDestination} (Test mode: ${SIAE_TEST_MODE})`);
     
     // Update transmission status
     await siaeStorage.updateSiaeTransmission(transmission.id, {
@@ -3221,44 +3271,68 @@ router.post("/api/siae/transmissions/test-email", requireAuth, requireGestore, a
     const company = companyId ? await storage.getCompany(companyId) : null;
     const companyName = company?.name || 'Test Company';
     
-    // Create test XML
+    // Create test XML in RiepilogoControlloAccessi format (Allegato B - Provvedimento 04/03/2008)
+    const now = new Date();
+    const dataRiepilogo = formatSiaeDateCompact(now);
+    const oraGenerazione = formatSiaeTimeCompact(now);
+    const oraEvento = formatSiaeTimeHHMM(now);
+    
     const testXml = `<?xml version="1.0" encoding="UTF-8"?>
-<ComunicazioneDatiTitoli xmlns="urn:siae:biglietteria:2025">
-  <Intestazione>
-    <CodiceFiscaleEmittente>TEST00000000000</CodiceFiscaleEmittente>
-    <NumeroCarta>TEST-CARD-001</NumeroCarta>
-    <DataRiferimento>${formatSiaeDate(new Date())}</DataRiferimento>
-    <DataOraGenerazione>${formatSiaeDateTime(new Date())}</DataOraGenerazione>
-    <TipoTrasmissione>TEST</TipoTrasmissione>
-  </Intestazione>
-  <ElencoTitoli>
-    <Titolo>
-      <NumeroProgressivo>1</NumeroProgressivo>
-      <SigilloFiscale>TEST-SEAL-001</SigilloFiscale>
-      <TipologiaTitolo>01</TipologiaTitolo>
-      <DataOraEmissione>${formatSiaeDateTime(new Date())}</DataOraEmissione>
-      <CodiceCanale>WEB</CodiceCanale>
-      <ImportoLordo>10.00</ImportoLordo>
-      <ImportoNetto>8.20</ImportoNetto>
-      <Diritti>0.00</Diritti>
-      <IVA>1.80</IVA>
-      <CodiceGenere>01</CodiceGenere>
-      <CodicePrestazione>01</CodicePrestazione>
-      <DataEvento>${formatSiaeDate(new Date())}</DataEvento>
-      <NominativoAcquirente>
-        <Nome>Test</Nome>
-        <Cognome>Utente</Cognome>
-      </NominativoAcquirente>
-      <Stato>emesso</Stato>
-    </Titolo>
-  </ElencoTitoli>
-  <Riepilogo>
-    <TotaleTitoli>1</TotaleTitoli>
-    <TotaleImportoLordo>10.00</TotaleImportoLordo>
-    <TotaleDiritti>0.00</TotaleDiritti>
-    <TotaleIVA>1.80</TotaleIVA>
-  </Riepilogo>
-</ComunicazioneDatiTitoli>`;
+<!DOCTYPE RiepilogoControlloAccessi SYSTEM "RiepilogoControlloAccessi_v0100_20080201.dtd">
+<RiepilogoControlloAccessi Sostituzione="N">
+  <Titolare>
+    <DenominazioneTitolareCA>${escapeXml(companyName)}</DenominazioneTitolareCA>
+    <CFTitolareCA>TEST00000000000</CFTitolareCA>
+    <CodiceSistemaCA>${SIAE_SYSTEM_CODE_DEFAULT}</CodiceSistemaCA>
+    <DataRiepilogo>${dataRiepilogo}</DataRiepilogo>
+    <DataGenerazioneRiepilogo>${dataRiepilogo}</DataGenerazioneRiepilogo>
+    <OraGenerazioneRiepilogo>${oraGenerazione}</OraGenerazioneRiepilogo>
+    <ProgressivoRiepilogo>1</ProgressivoRiepilogo>
+  </Titolare>
+  <Evento>
+    <CFOrganizzatore>TEST00000000000</CFOrganizzatore>
+    <DenominazioneOrganizzatore>${escapeXml(companyName)}</DenominazioneOrganizzatore>
+    <TipologiaOrganizzatore>G</TipologiaOrganizzatore>
+    <SpettacoloIntrattenimento>N</SpettacoloIntrattenimento>
+    <IncidenzaIntrattenimento>100</IncidenzaIntrattenimento>
+    <DenominazioneLocale>Test Locale</DenominazioneLocale>
+    <CodiceLocale>0000000000000</CodiceLocale>
+    <DataEvento>${dataRiepilogo}</DataEvento>
+    <OraEvento>${oraEvento}</OraEvento>
+    <TipoGenere>DI</TipoGenere>
+    <TitoloEvento>Test Event</TitoloEvento>
+    <Autore></Autore>
+    <Esecutore></Esecutore>
+    <NazionalitaFilm></NazionalitaFilm>
+    <NumOpereRappresentate>1</NumOpereRappresentate>
+    <SistemaEmissione CFTitolare="TEST00000000000" CodiceSistema="${SIAE_SYSTEM_CODE_DEFAULT}">
+      <Titoli>
+        <CodiceOrdinePosto>A0</CodiceOrdinePosto>
+        <Capienza>100</Capienza>
+        <TotaleTipoTitolo>
+          <TipoTitolo>IN</TipoTitolo>
+          <TotaleTitoliLTA>1</TotaleTitoliLTA>
+          <TotaleTitoliNoAccessoTradiz>0</TotaleTitoliNoAccessoTradiz>
+          <TotaleTitoliNoAccessoDigitali>0</TotaleTitoliNoAccessoDigitali>
+          <TotaleTitoliLTAAccessoTradiz>1</TotaleTitoliLTAAccessoTradiz>
+          <TotaleTitoliLTAAccessoDigitali>0</TotaleTitoliLTAAccessoDigitali>
+          <TotaleCorrispettiviLordi>1000</TotaleCorrispettiviLordi>
+          <TotaleDirittiPrevendita>0</TotaleDirittiPrevendita>
+          <TotaleIVACorrispettivi>100</TotaleIVACorrispettivi>
+          <TotaleIVADirittiPrevendita>0</TotaleIVADirittiPrevendita>
+        </TotaleTipoTitolo>
+        <TotaleTitoliAnnullati>
+          <TipoTitolo>IN</TipoTitolo>
+          <TotaleTitoliAnnull>0</TotaleTitoliAnnull>
+          <TotaleCorrispettiviLordiAnnull>0</TotaleCorrispettiviLordiAnnull>
+          <TotaleDirittiPrevenditaAnnull>0</TotaleDirittiPrevenditaAnnull>
+          <TotaleIVACorrispettiviAnnull>0</TotaleIVACorrispettiviAnnull>
+          <TotaleIVADirittiPrevenditaAnnull>0</TotaleIVADirittiPrevenditaAnnull>
+        </TotaleTitoliAnnullati>
+      </Titoli>
+    </SistemaEmissione>
+  </Evento>
+</RiepilogoControlloAccessi>`;
     
     // Import and send the test email
     const { sendSiaeTransmissionEmail } = await import('./email-service');
@@ -3267,11 +3341,13 @@ router.post("/api/siae/transmissions/test-email", requireAuth, requireGestore, a
       to: toEmail,
       companyName,
       transmissionType: 'daily',
-      periodDate: new Date(),
+      periodDate: now,
       ticketsCount: 1,
       totalAmount: '10.00',
       xmlContent: testXml,
       transmissionId: 'TEST-' + Date.now(),
+      systemCode: SIAE_SYSTEM_CODE_DEFAULT,
+      sequenceNumber: 1,
     });
     
     res.json({
@@ -3741,6 +3817,10 @@ router.post("/api/siae/seed-public", async (req: Request, res: Response) => {
 });
 
 // ==================== XML Report Generation (SIAE Transmission) ====================
+// Conforme a Allegato B e C - Provvedimento Agenzia delle Entrate 04/03/2008
+
+// SIAE Configuration
+const SIAE_SYSTEM_CODE_DEFAULT = 'EVENT4U1'; // Max 8 caratteri
 
 // Helper to escape XML special characters
 function escapeXml(str: string | null | undefined): string {
@@ -3757,16 +3837,99 @@ function escapeXml(str: string | null | undefined): string {
   });
 }
 
-// Format date for SIAE XML (YYYY-MM-DD)
+// Format date for legacy SIAE XML (YYYY-MM-DD) - backward compatibility
 function formatSiaeDate(date: Date | null | undefined): string {
   if (!date) return '';
   return date.toISOString().split('T')[0];
 }
 
-// Format datetime for SIAE XML (YYYY-MM-DDTHH:MM:SS)
+// Format datetime for legacy SIAE XML (YYYY-MM-DDTHH:MM:SS) - backward compatibility
 function formatSiaeDateTime(date: Date | null | undefined): string {
   if (!date) return '';
   return date.toISOString().replace('.000Z', '');
+}
+
+/**
+ * Formatta data in formato SIAE compatto AAAAMMGG
+ * Conforme a Allegato B - Provvedimento 04/03/2008
+ * Es: 20241228 per 28 dicembre 2024
+ */
+function formatSiaeDateCompact(date: Date | string | null): string {
+  if (!date) return '00000000';
+  const d = typeof date === 'string' ? new Date(date) : date;
+  if (isNaN(d.getTime())) return '00000000';
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}${month}${day}`;
+}
+
+/**
+ * Formatta ora in formato SIAE compatto HHMMSS
+ * Conforme a Allegato B - OraGenerazioneRiepilogo
+ * Es: 143015 per 14:30:15
+ */
+function formatSiaeTimeCompact(date: Date | string | null): string {
+  if (!date) return '000000';
+  const d = typeof date === 'string' ? new Date(date) : date;
+  if (isNaN(d.getTime())) return '000000';
+  const hours = String(d.getHours()).padStart(2, '0');
+  const minutes = String(d.getMinutes()).padStart(2, '0');
+  const seconds = String(d.getSeconds()).padStart(2, '0');
+  return `${hours}${minutes}${seconds}`;
+}
+
+/**
+ * Formatta ora in formato SIAE HHMM (per OraEvento)
+ * Conforme a Allegato B - OraEvento
+ * Es: 1430 per 14:30
+ */
+function formatSiaeTimeHHMM(date: Date | string | null): string {
+  if (!date) return '0000';
+  const d = typeof date === 'string' ? new Date(date) : date;
+  if (isNaN(d.getTime())) return '0000';
+  const hours = String(d.getHours()).padStart(2, '0');
+  const minutes = String(d.getMinutes()).padStart(2, '0');
+  return `${hours}${minutes}`;
+}
+
+/**
+ * Mappa codice genere evento a codice SIAE (2 caratteri)
+ * Secondo Allegato B - TAB.1
+ */
+function mapGenreToSiaeCode(genreCode: string | null): string {
+  const genreMap: Record<string, string> = {
+    '60': 'DI', // Discoteca/Disco
+    '61': 'DI', // Disco/Club
+    '10': 'TE', // Teatro
+    '20': 'CI', // Cinema
+    '30': 'CO', // Concerto
+    '40': 'SP', // Sport
+    '50': 'AL', // Altro
+  };
+  return genreMap[genreCode || '60'] || 'DI';
+}
+
+/**
+ * Determina tipo SpettacoloIntrattenimento secondo specifiche SIAE
+ * S=spettacolo, I=intrattenimento, P=spettacolo digitale, N=intrattenimento digitale
+ */
+function getSpettacoloIntrattenimentoCode(taxType: string | null, isDigital: boolean = false): string {
+  if (taxType === 'S') return isDigital ? 'P' : 'S';
+  return isDigital ? 'N' : 'I';
+}
+
+/**
+ * Genera nome file conforme a Allegato C SIAE
+ * Formato: RCA_AAAA_MM_GG_###.xsi o RCA_AAAA_MM_GG_###.xsi.p7m
+ */
+function generateSiaeFileName(date: Date, sequenceNumber: number, isSigned: boolean): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const seq = String(sequenceNumber).padStart(3, '0');
+  const extension = isSigned ? '.xsi.p7m' : '.xsi';
+  return `RCA_${year}_${month}_${day}_${seq}${extension}`;
 }
 
 // Map internal ticket status to official SIAE status codes (Allegato A - Agenzia delle Entrate)
