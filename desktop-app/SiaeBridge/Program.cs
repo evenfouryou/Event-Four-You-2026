@@ -164,6 +164,7 @@ namespace SiaeBridge
                 if (cmd == "EXIT") { Environment.Exit(0); return OK("BYE"); }
                 if (cmd == "CHECK_READER") return CheckReader();
                 if (cmd == "READ_CARD") return ReadCard();
+                if (cmd == "GET_CERTIFICATE") return GetCertificate();
                 if (cmd == "GET_RETRIES") return GetRetries();
                 if (cmd.StartsWith("VERIFY_PIN:")) return VerifyPin(cmd.Substring(11));
                 if (cmd.StartsWith("CHANGE_PIN:")) return ChangePin(cmd.Substring(11));
@@ -385,6 +386,149 @@ namespace SiaeBridge
             catch (Exception ex)
             {
                 Log($"ReadCard error: {ex.Message}");
+                return ERR(ex.Message);
+            }
+            finally
+            {
+                if (tx)
+                {
+                    try
+                    {
+                        EndTransactionML(_slot);
+                        Log("  EndTransactionML done");
+                    }
+                    catch { }
+                }
+            }
+        }
+
+        // ============================================================
+        // GET CERTIFICATE - Legge certificato X.509 ed estrae email
+        // Per identificare l'indirizzo SIAE di risposta
+        // ============================================================
+        static string GetCertificate()
+        {
+            if (_slot < 0) return ERR("Nessuna carta rilevata - prima fai CHECK_READER");
+
+            bool tx = false;
+            try
+            {
+                Log($"GetCertificate: slot={_slot}");
+
+                int state = isCardIn(_slot);
+                Log($"  isCardIn({_slot}) = {state} ({DecodeCardState(state)})");
+                if (!IsCardPresent(state))
+                {
+                    _slot = -1;
+                    return ERR("Carta rimossa");
+                }
+
+                int init = Initialize(_slot);
+                Log($"  Initialize = {init}");
+
+                int txResult = BeginTransactionML(_slot);
+                Log($"  BeginTransactionML = {txResult}");
+                tx = (txResult == 0);
+
+                // Select DF PKI (0x1111) for certificate access
+                int sel0000 = LibSiae.SelectML(0x0000, _slot);
+                Log($"  SelectML(0x0000 root) = {sel0000} (0x{sel0000:X4})");
+                
+                int sel1111 = LibSiae.SelectML(0x1111, _slot);
+                Log($"  SelectML(0x1111 DF PKI) = {sel1111} (0x{sel1111:X4})");
+
+                // Get the certificate from the smart card
+                byte[] cert = new byte[2048];
+                int certLen = cert.Length;
+                int certResult = LibSiae.GetCertificateML(cert, ref certLen, _slot);
+                Log($"  GetCertificateML = {certResult}, certLen={certLen}");
+                
+                if (certResult != 0 || certLen == 0)
+                {
+                    return ERR($"Lettura certificato fallita: 0x{certResult:X4}");
+                }
+
+                byte[] actualCert = new byte[certLen];
+                Array.Copy(cert, actualCert, certLen);
+
+                // Parse X.509 certificate to extract email and other info
+                string email = "";
+                string commonName = "";
+                string serialNumber = "";
+                string issuer = "";
+                string expiryDate = "";
+                
+                try
+                {
+                    var x509 = new System.Security.Cryptography.X509Certificates.X509Certificate2(actualCert);
+                    commonName = x509.GetNameInfo(System.Security.Cryptography.X509Certificates.X509NameType.SimpleName, false) ?? "";
+                    serialNumber = x509.SerialNumber ?? "";
+                    issuer = x509.Issuer ?? "";
+                    expiryDate = x509.NotAfter.ToString("yyyy-MM-dd");
+                    
+                    // Try to get email from Subject Alternative Name (SAN) extension
+                    foreach (var ext in x509.Extensions)
+                    {
+                        if (ext.Oid?.Value == "2.5.29.17") // Subject Alternative Name OID
+                        {
+                            var sanString = ext.Format(false);
+                            Log($"  SAN extension: {sanString}");
+                            
+                            // Look for RFC822 Name (email) in SAN
+                            var match = System.Text.RegularExpressions.Regex.Match(sanString, @"RFC822[^=]*=([^\s,]+)");
+                            if (match.Success)
+                            {
+                                email = match.Groups[1].Value;
+                                Log($"  Found email in SAN: {email}");
+                                break;
+                            }
+                            // Also try email: prefix
+                            match = System.Text.RegularExpressions.Regex.Match(sanString, @"email:([^\s,]+)", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                            if (match.Success)
+                            {
+                                email = match.Groups[1].Value;
+                                Log($"  Found email in SAN (email:): {email}");
+                                break;
+                            }
+                        }
+                    }
+                    
+                    // Fallback: Try to get email from Subject (E= or EMAILADDRESS=)
+                    if (string.IsNullOrEmpty(email))
+                    {
+                        var subject = x509.Subject;
+                        Log($"  Subject: {subject}");
+                        
+                        var emailMatch = System.Text.RegularExpressions.Regex.Match(subject, @"(?:E=|EMAIL=|EMAILADDRESS=)([^,]+)", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                        if (emailMatch.Success)
+                        {
+                            email = emailMatch.Groups[1].Value.Trim();
+                            Log($"  Found email in Subject: {email}");
+                        }
+                    }
+                    
+                    Log($"  Certificate parsed: CN={commonName}, Email={email}, Expiry={expiryDate}");
+                }
+                catch (Exception certEx)
+                {
+                    Log($"  Certificate parsing error: {certEx.Message}");
+                    return ERR($"Errore parsing certificato: {certEx.Message}");
+                }
+
+                return JsonConvert.SerializeObject(new
+                {
+                    success = true,
+                    email = email,
+                    commonName = commonName,
+                    serialNumber = serialNumber,
+                    issuer = issuer,
+                    expiryDate = expiryDate,
+                    certificateBase64 = Convert.ToBase64String(actualCert)
+                });
+            }
+            catch (Exception ex)
+            {
+                Log($"GetCertificate error: {ex.Message}");
                 return ERR(ex.Message);
             }
             finally

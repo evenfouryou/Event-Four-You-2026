@@ -98,6 +98,9 @@ let currentStatus = {
   cardBalance: null,
   cardKeyId: null,
   cardAtr: null,
+  cardEmail: null,           // Email from X.509 certificate (SIAE response destination)
+  cardCertificateCN: null,   // Common Name from certificate
+  cardCertificateExpiry: null, // Certificate expiry date
   demoMode: false,
   canEmitTickets: false,
   relayConnected: false,
@@ -873,6 +876,10 @@ function startStatusPolling() {
           pinVerified = false;
           lastVerifiedPin = null;  // Clear stored PIN on card removal
           cardRemovalCounter = 0;
+          // Clear certificate data to force fresh read on reinsertion
+          currentStatus.cardEmail = null;
+          currentStatus.cardCertificateCN = null;
+          currentStatus.cardCertificateExpiry = null;
           // DON'T show PIN dialog here - the card is gone!
           // Dialog will be shown when card is reinserted (see below)
         }
@@ -923,6 +930,32 @@ function startStatusPolling() {
           } else {
             log.warn('READ_CARD returned success=false:', readResult.error);
           }
+          
+          // Also read certificate to get email (SIAE response destination)
+          // Only read if we don't already have it cached
+          if (!currentStatus.cardEmail) {
+            try {
+              log.info('Reading certificate for email...');
+              const certResult = await sendBridgeCommand('GET_CERTIFICATE');
+              log.info('GET_CERTIFICATE result:', JSON.stringify(certResult));
+              
+              if (certResult.success) {
+                cardData.cardEmail = certResult.email || null;
+                cardData.cardCertificateCN = certResult.commonName || null;
+                cardData.cardCertificateExpiry = certResult.expiryDate || null;
+                log.info(`Certificate email: ${certResult.email || '(not found)'}`);
+              } else {
+                log.warn('GET_CERTIFICATE failed:', certResult.error);
+              }
+            } catch (e) {
+              log.error('Certificate read failed:', e.message);
+            }
+          } else {
+            // Keep existing certificate data
+            cardData.cardEmail = currentStatus.cardEmail;
+            cardData.cardCertificateCN = currentStatus.cardCertificateCN;
+            cardData.cardCertificateExpiry = currentStatus.cardCertificateExpiry;
+          }
         } catch (e) {
           log.error('Card read failed:', e.message);
         }
@@ -940,6 +973,9 @@ function startStatusPolling() {
         cardBalance: cardData.cardBalance || null,
         cardKeyId: cardData.cardKeyId || null,  // Codice Sistema dalla carta
         cardAtr: result.cardAtr || null,
+        cardEmail: cardData.cardEmail || null,  // Email from certificate (SIAE response destination)
+        cardCertificateCN: cardData.cardCertificateCN || null,
+        cardCertificateExpiry: cardData.cardCertificateExpiry || null,
         pinLocked: pinLocked,
         pinRequired: pinLocked && !pinVerified
       };
