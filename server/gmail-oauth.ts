@@ -1,5 +1,6 @@
 // Custom Gmail OAuth for SIAE Response Reading
 // Uses googleapis with gmail.readonly scope
+// System-wide connection (not per-company)
 
 import { google } from 'googleapis';
 import { db } from './db';
@@ -7,6 +8,7 @@ import { gmailOAuthTokens } from '@shared/schema';
 import { eq } from 'drizzle-orm';
 
 const SCOPES = ['https://www.googleapis.com/auth/gmail.readonly'];
+const SYSTEM_TOKEN_KEY = 'SYSTEM';
 
 function getOAuth2Client() {
   const clientId = process.env.GMAIL_OAUTH_CLIENT_ID;
@@ -37,15 +39,14 @@ function getOAuth2Client() {
   return new google.auth.OAuth2(clientId, clientSecret, redirectUri);
 }
 
-// Generate OAuth authorization URL
-export function getAuthUrl(state: string): string {
+// Generate OAuth authorization URL (no state needed for system-wide)
+export function getAuthUrl(): string {
   const oauth2Client = getOAuth2Client();
   
   return oauth2Client.generateAuthUrl({
     access_type: 'offline',
     prompt: 'consent',
     scope: SCOPES,
-    state: state,
   });
 }
 
@@ -79,17 +80,17 @@ export async function exchangeCodeForTokens(code: string): Promise<{
   };
 }
 
-// Save tokens for a company
-export async function saveTokens(companyId: string, tokenData: {
+// Save system-wide tokens
+export async function saveSystemTokens(tokenData: {
   accessToken: string;
   refreshToken?: string;
   expiresAt?: Date;
   scope?: string;
   email?: string;
 }): Promise<void> {
-  // Check if tokens exist for this company
+  // Check if system tokens exist
   const existing = await db.select().from(gmailOAuthTokens)
-    .where(eq(gmailOAuthTokens.companyId, companyId))
+    .where(eq(gmailOAuthTokens.tokenKey, SYSTEM_TOKEN_KEY))
     .limit(1);
   
   if (existing.length > 0) {
@@ -103,11 +104,11 @@ export async function saveTokens(companyId: string, tokenData: {
         email: tokenData.email,
         updatedAt: new Date(),
       })
-      .where(eq(gmailOAuthTokens.companyId, companyId));
+      .where(eq(gmailOAuthTokens.tokenKey, SYSTEM_TOKEN_KEY));
   } else {
     // Insert new
     await db.insert(gmailOAuthTokens).values({
-      companyId,
+      tokenKey: SYSTEM_TOKEN_KEY,
       accessToken: tokenData.accessToken,
       refreshToken: tokenData.refreshToken,
       expiresAt: tokenData.expiresAt,
@@ -117,15 +118,15 @@ export async function saveTokens(companyId: string, tokenData: {
   }
 }
 
-// Get tokens for a company
-export async function getTokens(companyId: string): Promise<{
+// Get system-wide tokens
+export async function getSystemTokens(): Promise<{
   accessToken: string;
   refreshToken?: string;
   expiresAt?: Date;
   email?: string;
 } | null> {
   const tokens = await db.select().from(gmailOAuthTokens)
-    .where(eq(gmailOAuthTokens.companyId, companyId))
+    .where(eq(gmailOAuthTokens.tokenKey, SYSTEM_TOKEN_KEY))
     .limit(1);
   
   if (tokens.length === 0) {
@@ -142,8 +143,8 @@ export async function getTokens(companyId: string): Promise<{
 }
 
 // Refresh access token if expired
-export async function refreshAccessToken(companyId: string): Promise<string | null> {
-  const tokens = await getTokens(companyId);
+export async function refreshSystemAccessToken(): Promise<string | null> {
+  const tokens = await getSystemTokens();
   
   if (!tokens || !tokens.refreshToken) {
     return null;
@@ -167,7 +168,7 @@ export async function refreshAccessToken(companyId: string): Promise<string | nu
   }
   
   // Save new tokens
-  await saveTokens(companyId, {
+  await saveSystemTokens({
     accessToken: credentials.access_token,
     refreshToken: credentials.refresh_token || tokens.refreshToken,
     expiresAt: credentials.expiry_date ? new Date(credentials.expiry_date) : undefined,
@@ -177,15 +178,15 @@ export async function refreshAccessToken(companyId: string): Promise<string | nu
   return credentials.access_token;
 }
 
-// Get Gmail client with custom OAuth tokens
-export async function getCustomGmailClient(companyId: string) {
+// Get Gmail client with system-wide OAuth tokens
+export async function getSystemGmailClient() {
   // Try to get/refresh token
-  let accessToken = await refreshAccessToken(companyId);
+  let accessToken = await refreshSystemAccessToken();
   
   if (!accessToken) {
-    const tokens = await getTokens(companyId);
+    const tokens = await getSystemTokens();
     if (!tokens) {
-      throw new Error('GMAIL_NOT_AUTHORIZED: Gmail non autorizzato per questa azienda. Vai in Impostazioni SIAE → Autorizza Gmail.');
+      throw new Error('GMAIL_NOT_AUTHORIZED: Gmail non collegato. Vai in Impostazioni SIAE → Collega Gmail.');
     }
     accessToken = tokens.accessToken;
   }
@@ -196,27 +197,63 @@ export async function getCustomGmailClient(companyId: string) {
   return google.gmail({ version: 'v1', auth: oauth2Client });
 }
 
-// Check if Gmail is authorized for a company
-export async function isGmailAuthorized(companyId: string): Promise<{
-  authorized: boolean;
+// Check if Gmail is connected system-wide
+export async function isGmailConnected(): Promise<{
+  connected: boolean;
   email?: string;
   expiresAt?: Date;
 }> {
-  const tokens = await getTokens(companyId);
+  const tokens = await getSystemTokens();
   
   if (!tokens) {
-    return { authorized: false };
+    return { connected: false };
   }
   
   return {
-    authorized: true,
+    connected: true,
     email: tokens.email,
     expiresAt: tokens.expiresAt,
   };
 }
 
-// Delete Gmail authorization for a company
-export async function revokeGmailAuthorization(companyId: string): Promise<void> {
+// Disconnect Gmail system-wide
+export async function disconnectGmail(): Promise<void> {
   await db.delete(gmailOAuthTokens)
-    .where(eq(gmailOAuthTokens.companyId, companyId));
+    .where(eq(gmailOAuthTokens.tokenKey, SYSTEM_TOKEN_KEY));
+}
+
+// Legacy functions for backward compatibility (redirect to system functions)
+export async function saveTokens(_companyId: string, tokenData: {
+  accessToken: string;
+  refreshToken?: string;
+  expiresAt?: Date;
+  scope?: string;
+  email?: string;
+}): Promise<void> {
+  return saveSystemTokens(tokenData);
+}
+
+export async function getTokens(_companyId: string) {
+  return getSystemTokens();
+}
+
+export async function refreshAccessToken(_companyId: string) {
+  return refreshSystemAccessToken();
+}
+
+export async function getCustomGmailClient(_companyId: string) {
+  return getSystemGmailClient();
+}
+
+export async function isGmailAuthorized(_companyId: string) {
+  const status = await isGmailConnected();
+  return {
+    authorized: status.connected,
+    email: status.email,
+    expiresAt: status.expiresAt,
+  };
+}
+
+export async function revokeGmailAuthorization(_companyId: string) {
+  return disconnectGmail();
 }
