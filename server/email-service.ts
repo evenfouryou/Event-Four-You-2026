@@ -501,10 +501,12 @@ export async function sendSiaeTransmissionEmail(options: SiaeTransmissionEmailOp
         }
       }
       
-      // Costruisci il messaggio MIME da firmare
-      // Nota: Questo è un formato MIME semplificato. Il Desktop Bridge 
-      // gestirà la firma e restituirà il messaggio S/MIME completo.
+      // Costruisci il messaggio MIME da firmare usando base64 per HTML (supporta UTF-8 completo)
+      // Per Allegato C SIAE: CRLF folding e encoding canonico
       const boundary = `----=_Part_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const htmlBodyBase64 = Buffer.from(htmlBody, 'utf-8').toString('base64');
+      const xmlContentBase64 = Buffer.from(xmlContent, 'utf-8').toString('base64');
+      
       const mimeContent = [
         `From: ${fromAddress}`,
         `To: ${to}`,
@@ -517,22 +519,35 @@ export async function sendSiaeTransmissionEmail(options: SiaeTransmissionEmailOp
         ``,
         `--${boundary}`,
         `Content-Type: text/html; charset=utf-8`,
-        `Content-Transfer-Encoding: quoted-printable`,
+        `Content-Transfer-Encoding: base64`,
         ``,
-        htmlBody,
+        htmlBodyBase64,
         ``,
         `--${boundary}`,
         `Content-Type: application/xml; name="${fileName}"`,
         `Content-Disposition: attachment; filename="${fileName}"`,
         `Content-Transfer-Encoding: base64`,
         ``,
-        Buffer.from(xmlContent).toString('base64'),
+        xmlContentBase64,
         ``,
         `--${boundary}--`
       ].join('\r\n');
       
       // Richiedi firma S/MIME al Desktop Bridge
       const smimeData = await requestSmimeSignature(mimeContent, to);
+      
+      // Valida che il bridge abbia restituito un payload S/MIME valido
+      if (!smimeData.signedMime || smimeData.signedMime.length < 100) {
+        throw new Error('SMIME_INVALID_RESPONSE: Bridge ha restituito un payload S/MIME non valido');
+      }
+      
+      // Verifica struttura multipart/signed (controllo base)
+      const hasMultipartSigned = smimeData.signedMime.includes('multipart/signed') || 
+                                  smimeData.signedMime.includes('application/pkcs7-mime') ||
+                                  smimeData.signedMime.includes('application/x-pkcs7-mime');
+      if (!hasMultipartSigned) {
+        console.log(`[EMAIL-SERVICE] WARNING: S/MIME payload may not have standard multipart/signed structure`);
+      }
       
       smimeResult = {
         signed: true,
@@ -544,12 +559,26 @@ export async function sendSiaeTransmissionEmail(options: SiaeTransmissionEmailOp
       
       console.log(`[EMAIL-SERVICE] S/MIME signature obtained from ${smimeData.signerName} <${smimeData.signerEmail}>`);
       
-      // Invia il messaggio già firmato usando sendRaw se disponibile
-      // Per ora, nodemailer non supporta nativamente l'invio di messaggi S/MIME pre-firmati
-      // Il Desktop Bridge potrebbe dover gestire l'invio completo
-      // Come workaround, inviamo l'email normale e logghiamo che serve il bridge per l'invio
-      console.log(`[EMAIL-SERVICE] NOTE: S/MIME signed email requires Desktop Bridge to send. Falling back to unsigned send.`);
-      console.log(`[EMAIL-SERVICE] The Desktop Bridge should implement REQUEST_SEND_SMIME_EMAIL for full S/MIME compliance.`);
+      // Invia il messaggio S/MIME firmato esattamente come restituito dal bridge
+      // Per Allegato C SIAE, il messaggio firmato NON deve essere modificato
+      const rawMailOptions = {
+        envelope: {
+          from: smimeData.signerEmail || fromAddress.replace(/^.*<(.*)>.*$/, '$1'),
+          to: [to]
+        },
+        raw: smimeData.signedMime // Invia esattamente il payload firmato dal bridge
+      };
+      
+      await emailTransporter.sendMail(rawMailOptions);
+      console.log(`[EMAIL-SERVICE] S/MIME signed email sent successfully to ${to}`);
+      
+      return {
+        success: true,
+        smimeSigned: true,
+        signerEmail: smimeData.signerEmail,
+        signerName: smimeData.signerName,
+        signedAt: smimeData.signedAt
+      };
       
     } catch (smimeError: any) {
       console.log(`[EMAIL-SERVICE] S/MIME signature failed: ${smimeError.message}`);
@@ -561,7 +590,8 @@ export async function sendSiaeTransmissionEmail(options: SiaeTransmissionEmailOp
     smimeStatus = 'BRIDGE NON CONNESSO - NON FIRMATA';
   }
 
-  // Invia l'email (per ora non firmata S/MIME - richiede implementazione nel Desktop Bridge)
+  // Invia l'email non firmata (fallback quando S/MIME non disponibile o fallito)
+  // Nota: Senza firma S/MIME, SIAE potrebbe non inviare conferma di ricezione (Allegato C 1.6.2)
   const mailOptions = {
     from: fromAddress,
     to,
@@ -577,7 +607,8 @@ export async function sendSiaeTransmissionEmail(options: SiaeTransmissionEmailOp
 
   try {
     await emailTransporter.sendMail(mailOptions);
-    console.log(`[EMAIL-SERVICE] SIAE RCA email sent to ${to} | Subject: ${emailSubject} | File: ${fileName} | S/MIME: ${smimeResult.signed}`);
+    const smimeNote = smimeResult.signed ? '' : ' (NON firmata S/MIME - SIAE potrebbe non confermare)';
+    console.log(`[EMAIL-SERVICE] SIAE RCA email sent to ${to} | Subject: ${emailSubject} | File: ${fileName}${smimeNote}`);
     
     return {
       success: true,
