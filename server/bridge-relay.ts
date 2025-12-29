@@ -284,6 +284,19 @@ export function setupBridgeRelay(server: Server): void {
             if (message.toCompanyId) {
               forwardToClients(message.toCompanyId as string, message);
             }
+          } else if (message.type === 'SMIME_SIGNATURE_RESPONSE') {
+            // Handle S/MIME signature response from desktop app (for SIAE email signing)
+            console.log(`[Bridge] S/MIME Signature response received: requestId=${message.requestId}`);
+            handleSmimeSignatureResponse(
+              message.requestId || '',
+              message.payload?.success ?? false,
+              message.payload?.signatureData,
+              message.payload?.error
+            );
+            // Also forward to clients if there's a toCompanyId
+            if (message.toCompanyId) {
+              forwardToClients(message.toCompanyId as string, message);
+            }
           } else if (message.toCompanyId) {
             // Response to specific client request
             forwardToClients(message.toCompanyId as string, message);
@@ -989,4 +1002,154 @@ export function handleSignatureResponse(requestId: string, success: boolean, sig
 // Get pending signature requests count (for monitoring)
 export function getPendingSignatureRequestsCount(): number {
   return pendingSignatureRequests.size;
+}
+
+// ==================== S/MIME EMAIL SIGNATURE BROKER ====================
+// Per Allegato C SIAE - Provvedimento Agenzia Entrate 04/03/2008, sezione 1.6.2
+// L'email deve essere firmata S/MIME versione 2 con la carta di attivazione SIAE
+// Il mittente dell'email DEVE corrispondere all'email nel certificato della carta
+
+export interface SmimeSignatureData {
+  signedMime: string;           // Complete S/MIME signed message ready to send
+  signerEmail: string;          // Email address from the signing certificate
+  signerName: string;           // Common Name from the signing certificate  
+  certificateSerial: string;    // Serial number of the signing certificate
+  signedAt: string;             // ISO timestamp of when signature was created
+}
+
+interface PendingSmimeRequest {
+  resolve: (data: SmimeSignatureData) => void;
+  reject: (error: Error) => void;
+  timeout: NodeJS.Timeout;
+  createdAt: Date;
+}
+
+const pendingSmimeRequests = new Map<string, PendingSmimeRequest>();
+const SMIME_REQUEST_TIMEOUT = 60000; // 60 seconds for S/MIME signature (larger emails)
+
+function generateSmimeRequestId(): string {
+  return `smime_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+}
+
+/**
+ * Request S/MIME signature from the desktop bridge (SIAE smart card)
+ * The entire email MIME content is signed with the activation card's certificate.
+ * 
+ * @param mimeContent - Complete MIME message (headers + body) to be signed
+ * @param recipientEmail - Email address of the recipient (for logging/validation)
+ * @returns Promise resolving to signed MIME message and certificate info
+ * 
+ * Per SIAE Allegato C 1.6.1:
+ * - a.1. Il mittente deve essere titolare con carta di attivazione
+ * - a.2. L'email deve essere firmata mediante la carta di attivazione
+ * - a.3. L'indirizzo email del mittente deve corrispondere a quello nel certificato
+ */
+export async function requestSmimeSignature(
+  mimeContent: string, 
+  recipientEmail: string
+): Promise<SmimeSignatureData> {
+  console.log(`[Bridge] requestSmimeSignature called, MIME length=${mimeContent.length}, recipient=${recipientEmail}`);
+  
+  // Check if bridge is connected
+  if (!globalBridge || globalBridge.ws.readyState !== WebSocket.OPEN) {
+    console.log(`[Bridge] ERROR: Bridge not connected for S/MIME signature`);
+    throw new Error('SMIME_BRIDGE_OFFLINE: App desktop Event4U non connessa. Impossibile firmare email S/MIME.');
+  }
+  
+  // Check if card is ready
+  const cardReady = isCardReadyForSeals();
+  console.log(`[Bridge] Card ready check for S/MIME: ${JSON.stringify(cardReady)}`);
+  if (!cardReady.ready) {
+    throw new Error(`SMIME_CARD_NOT_READY: ${cardReady.error}`);
+  }
+  
+  const requestId = generateSmimeRequestId();
+  
+  console.log(`[Bridge] Requesting S/MIME signature: requestId=${requestId}`);
+  
+  return new Promise<SmimeSignatureData>((resolve, reject) => {
+    // Set timeout
+    const timeout = setTimeout(() => {
+      pendingSmimeRequests.delete(requestId);
+      console.log(`[Bridge] S/MIME signature request timeout: requestId=${requestId}`);
+      reject(new Error('SMIME_TIMEOUT: Timeout firma S/MIME email. Riprovare.'));
+    }, SMIME_REQUEST_TIMEOUT);
+    
+    // Store pending request
+    pendingSmimeRequests.set(requestId, {
+      resolve,
+      reject,
+      timeout,
+      createdAt: new Date()
+    });
+    
+    // Send request to bridge
+    try {
+      const smimeMessage = {
+        type: 'REQUEST_SMIME_SIGNATURE',
+        requestId,
+        payload: {
+          mimeContent,
+          recipientEmail,
+          timestamp: new Date().toISOString()
+        }
+      };
+      console.log(`[Bridge] Sending S/MIME signature request to bridge: requestId=${requestId}`);
+      globalBridge!.ws.send(JSON.stringify(smimeMessage));
+      console.log(`[Bridge] S/MIME signature request sent successfully, waiting for response...`);
+    } catch (sendError: any) {
+      console.log(`[Bridge] ERROR sending S/MIME signature request: ${sendError.message}`);
+      clearTimeout(timeout);
+      pendingSmimeRequests.delete(requestId);
+      reject(new Error('SMIME_SEND_ERROR: Errore invio richiesta firma S/MIME'));
+    }
+  });
+}
+
+// Handle S/MIME signature response from bridge
+export function handleSmimeSignatureResponse(
+  requestId: string, 
+  success: boolean, 
+  signatureData?: any, 
+  error?: string
+): void {
+  const pending = pendingSmimeRequests.get(requestId);
+  if (!pending) {
+    console.log(`[Bridge] No pending request for S/MIME signature response: requestId=${requestId}`);
+    return;
+  }
+  
+  clearTimeout(pending.timeout);
+  pendingSmimeRequests.delete(requestId);
+  
+  if (success && signatureData) {
+    console.log(`[Bridge] S/MIME signature request completed: requestId=${requestId}, signerEmail=${signatureData.signerEmail}`);
+    pending.resolve({
+      signedMime: signatureData.signedMime,
+      signerEmail: signatureData.signerEmail || '',
+      signerName: signatureData.signerName || '',
+      certificateSerial: signatureData.certificateSerial || '',
+      signedAt: signatureData.signedAt || new Date().toISOString()
+    });
+  } else {
+    console.log(`[Bridge] S/MIME signature request failed: requestId=${requestId}, error=${error}`);
+    pending.reject(new Error(`SMIME_ERROR: ${error || 'Errore firma S/MIME email'}`));
+  }
+}
+
+// Get pending S/MIME requests count (for monitoring)
+export function getPendingSmimeRequestsCount(): number {
+  return pendingSmimeRequests.size;
+}
+
+/**
+ * Get the signer email from the activation card certificate (cached from bridge status)
+ * Returns null if bridge is not connected or card not ready
+ */
+export function getCardSignerEmail(): string | null {
+  if (!cachedBridgeStatus?.payload) return null;
+  
+  const payload = cachedBridgeStatus.payload;
+  // The signer email should be exposed in the bridge status from certificate data
+  return payload.cardEmail || payload.certificateEmail || payload.signerEmail || null;
 }
