@@ -2880,7 +2880,7 @@ router.post("/api/siae/companies/:companyId/transmissions/send-c1", requireAuth,
       xml = `<?xml version="1.0" encoding="UTF-8"?>
 <ComunicazioneDatiTitoli xmlns="urn:siae:biglietteria:2025">
   <Intestazione>
-    <CodiceFiscaleEmittente>${escapeXml(systemConfig?.taxId || '')}</CodiceFiscaleEmittente>
+    <CodiceFiscaleEmittente>${escapeXml(systemConfig?.taxId || company?.taxId || activeCard?.cardCode || 'MANCANTE')}</CodiceFiscaleEmittente>
     <NumeroCarta>${escapeXml(activeCard.cardCode)}</NumeroCarta>
     <DataRiferimento>${formatSiaeDate(reportDate)}</DataRiferimento>
     <DataOraGenerazione>${formatSiaeDateTime(now)}</DataOraGenerazione>
@@ -2917,7 +2917,7 @@ router.post("/api/siae/companies/:companyId/transmissions/send-c1", requireAuth,
         <Nome>${escapeXml(ticket.participantFirstName || 'N/D')}</Nome>
         <Cognome>${escapeXml(ticket.participantLastName || 'N/D')}</Cognome>
       </NominativoAcquirente>
-      <Stato>${escapeXml(ticket.status)}</Stato>
+      <Stato>${mapToSiaeStatus(ticket.status)}</Stato>
     </Titolo>`;
       }
       
@@ -3050,6 +3050,7 @@ router.post("/api/siae/companies/:companyId/transmissions/send-daily", requireAu
     
     // Get system config for fiscal code
     const systemConfig = await siaeStorage.getSiaeSystemConfig(companyId);
+    const company = await storage.getCompany(companyId);
     
     // Get all tickets for the date range
     const startOfDay = new Date(reportDate);
@@ -3068,7 +3069,7 @@ router.post("/api/siae/companies/:companyId/transmissions/send-daily", requireAu
     let xml = `<?xml version="1.0" encoding="UTF-8"?>
 <ComunicazioneDatiTitoli xmlns="urn:siae:biglietteria:2025">
   <Intestazione>
-    <CodiceFiscaleEmittente>${escapeXml(systemConfig?.taxId || '')}</CodiceFiscaleEmittente>
+    <CodiceFiscaleEmittente>${escapeXml(systemConfig?.taxId || company?.taxId || activeCard?.cardCode || 'MANCANTE')}</CodiceFiscaleEmittente>
     <NumeroCarta>${escapeXml(activeCard.cardCode)}</NumeroCarta>
     <DataRiferimento>${formatSiaeDate(reportDate)}</DataRiferimento>
     <DataOraGenerazione>${formatSiaeDateTime(new Date())}</DataOraGenerazione>
@@ -3105,7 +3106,7 @@ router.post("/api/siae/companies/:companyId/transmissions/send-daily", requireAu
         <Nome>${escapeXml(ticket.participantFirstName || 'N/D')}</Nome>
         <Cognome>${escapeXml(ticket.participantLastName || 'N/D')}</Cognome>
       </NominativoAcquirente>
-      <Stato>${escapeXml(ticket.status)}</Stato>
+      <Stato>${mapToSiaeStatus(ticket.status)}</Stato>
     </Titolo>`;
     }
     
@@ -3132,8 +3133,7 @@ router.post("/api/siae/companies/:companyId/transmissions/send-daily", requireAu
       totalAmount,
     });
     
-    // Get company name
-    const company = await storage.getCompany(companyId);
+    // Use already loaded company for name
     const companyName = company?.name || 'N/A';
     
     // Import and send the email
@@ -3736,6 +3736,55 @@ function formatSiaeDateTime(date: Date | null | undefined): string {
   return date.toISOString().replace('.000Z', '');
 }
 
+// Map internal ticket status to official SIAE status codes (Allegato A - Agenzia delle Entrate)
+// VD = Valido digitale, ZD = Accesso automatizzato digitale, AD = Annullato digitale
+// MD = Accesso manuale digitale, DD = Daspato digitale
+function mapToSiaeStatus(internalStatus: string | null | undefined): string {
+  if (!internalStatus) return 'VD';
+  
+  const statusLower = internalStatus.toLowerCase();
+  switch (statusLower) {
+    // Valid/Active states -> VD (Valido digitale)
+    case 'active':
+    case 'emesso':
+    case 'emitted':
+    case 'valid':
+    case 'pending':
+      return 'VD';
+    
+    // Used/Accessed states -> ZD (Accesso automatizzato digitale)
+    case 'used':
+    case 'utilizzato':
+    case 'accessed':
+    case 'checked_in':
+    case 'scanned':
+      return 'ZD';
+    
+    // Cancelled states -> AD (Annullato digitale)
+    case 'cancelled':
+    case 'annullato':
+    case 'canceled':
+    case 'refunded':
+    case 'replaced':
+      return 'AD';
+    
+    // Manual access -> MD (Accesso manuale digitale)
+    case 'manual_access':
+    case 'manual':
+      return 'MD';
+    
+    // Expired/Blacklisted -> BD (Black list digitale)
+    case 'expired':
+    case 'blacklisted':
+    case 'blocked':
+      return 'BD';
+    
+    default:
+      // Default to valid for unknown statuses
+      return 'VD';
+  }
+}
+
 // Generate XML for daily ticket report (Provvedimento 356768/2025)
 router.get("/api/siae/companies/:companyId/reports/xml/daily", requireAuth, requireGestore, async (req: Request, res: Response) => {
   try {
@@ -3762,14 +3811,15 @@ router.get("/api/siae/companies/:companyId/reports/xml/daily", requireAuth, requ
     const endOfDay = new Date(reportDate);
     endOfDay.setHours(23, 59, 59, 999);
     
-    // Get system config for fiscal code
+    // Get system config and company for fiscal code
     const systemConfig = await siaeStorage.getSiaeSystemConfig(companyId);
+    const company = await storage.getCompany(companyId);
     
     // Build XML report
     let xml = `<?xml version="1.0" encoding="UTF-8"?>
 <ComunicazioneDatiTitoli xmlns="urn:siae:biglietteria:2025">
   <Intestazione>
-    <CodiceFiscaleEmittente>${escapeXml(systemConfig?.taxId || '')}</CodiceFiscaleEmittente>
+    <CodiceFiscaleEmittente>${escapeXml(systemConfig?.taxId || company?.taxId || activeCard?.cardCode || 'MANCANTE')}</CodiceFiscaleEmittente>
     <NumeroCarta>${escapeXml(activeCard.cardCode)}</NumeroCarta>
     <DataRiferimento>${formatSiaeDate(reportDate)}</DataRiferimento>
     <DataOraGenerazione>${formatSiaeDateTime(new Date())}</DataOraGenerazione>
@@ -3816,7 +3866,7 @@ router.get("/api/siae/companies/:companyId/reports/xml/daily", requireAuth, requ
         <Nome>${escapeXml(ticket.participantFirstName || 'N/D')}</Nome>
         <Cognome>${escapeXml(ticket.participantLastName || 'N/D')}</Cognome>
       </NominativoAcquirente>
-      <Stato>${escapeXml(ticket.status)}</Stato>
+      <Stato>${mapToSiaeStatus(ticket.status)}</Stato>
     </Titolo>`;
     }
     
@@ -3878,14 +3928,15 @@ router.get("/api/siae/ticketed-events/:eventId/reports/xml", requireAuth, requir
       allTickets.push(...sectorTickets);
     }
     
-    // Get system config for fiscal code
+    // Get system config and company for fiscal code
     const systemConfig = await siaeStorage.getSiaeSystemConfig(ticketedEvent.companyId);
+    const company = await storage.getCompany(ticketedEvent.companyId);
     
     // Build XML
     let xml = `<?xml version="1.0" encoding="UTF-8"?>
 <ReportEvento xmlns="urn:siae:biglietteria:2025">
   <Intestazione>
-    <CodiceFiscaleEmittente>${escapeXml(systemConfig?.taxId || '')}</CodiceFiscaleEmittente>
+    <CodiceFiscaleEmittente>${escapeXml(systemConfig?.taxId || company?.taxId || activeCard?.cardCode || 'MANCANTE')}</CodiceFiscaleEmittente>
     <NumeroCarta>${escapeXml(activeCard.cardCode)}</NumeroCarta>
     <DataOraGenerazione>${formatSiaeDateTime(new Date())}</DataOraGenerazione>
   </Intestazione>
@@ -3971,13 +4022,14 @@ router.get("/api/siae/companies/:companyId/reports/xml/cancellations", requireAu
     // Get cancellation reasons
     const reasons = await siaeStorage.getSiaeCancellationReasons();
     
-    // Get system config for fiscal code
+    // Get system config and company for fiscal code
     const systemConfig = await siaeStorage.getSiaeSystemConfig(companyId);
+    const company = await storage.getCompany(companyId);
     
     let xml = `<?xml version="1.0" encoding="UTF-8"?>
 <ReportAnnullamenti xmlns="urn:siae:biglietteria:2025">
   <Intestazione>
-    <CodiceFiscaleEmittente>${escapeXml(systemConfig?.taxId || '')}</CodiceFiscaleEmittente>
+    <CodiceFiscaleEmittente>${escapeXml(systemConfig?.taxId || company?.taxId || activeCard?.cardCode || 'MANCANTE')}</CodiceFiscaleEmittente>
     <NumeroCarta>${escapeXml(activeCard.cardCode)}</NumeroCarta>
     <PeriodoDa>${formatSiaeDate(startDate)}</PeriodoDa>
     <PeriodoA>${formatSiaeDate(endDate)}</PeriodoA>
