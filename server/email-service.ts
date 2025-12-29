@@ -324,9 +324,11 @@ interface SiaeTransmissionEmailOptions {
 export async function sendSiaeTransmissionEmail(options: SiaeTransmissionEmailOptions): Promise<void> {
   const { to, companyName, transmissionType, periodDate, ticketsCount, totalAmount, xmlContent, transmissionId } = options;
 
-  const isSigned = xmlContent.includes('Signature');
-  const fileExtension = isSigned ? 'xml.p7m' : 'xml';
-  const fileName = `C1_TRANS_${transmissionId}_${periodDate.toISOString().split('T')[0].replace(/-/g, '')}.${fileExtension}`;
+  // XML-DSig signatures are embedded in the XML itself, so extension should always be .xml
+  // .p7m extension is only for CMS/PKCS#7 wrapped files (external signature envelope)
+  // Since we use XML-DSig (enveloped signature), the file remains a valid XML
+  const isSigned = xmlContent.includes('<Signature') && xmlContent.includes('</Signature>');
+  const fileName = `C1_TRANS_${transmissionId}_${periodDate.toISOString().split('T')[0].replace(/-/g, '')}.xml`;
 
   const typeLabels: Record<string, string> = {
     'daily': 'Giornaliera',
@@ -378,7 +380,7 @@ export async function sendSiaeTransmissionEmail(options: SiaeTransmissionEmailOp
         </tr>
         <tr>
           <td style="padding: 12px 0; border-bottom: 1px solid #eee; color: #666;">Stato Firma</td>
-          <td style="padding: 12px 0; border-bottom: 1px solid #eee; font-weight: 500; text-align: right;">${isSigned ? 'FIRMATA (p7m)' : 'NON FIRMATA'}</td>
+          <td style="padding: 12px 0; border-bottom: 1px solid #eee; font-weight: 500; text-align: right;">${isSigned ? 'FIRMATA (XML-DSig)' : 'NON FIRMATA'}</td>
         </tr>
       </table>
       
