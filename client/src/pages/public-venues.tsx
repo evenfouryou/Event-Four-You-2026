@@ -151,7 +151,7 @@ export default function PublicVenues() {
                     </Avatar>
                   </Link>
                 ) : (
-                  <Link href="/accedi">
+                  <Link href="/login">
                     <Button variant="outline" data-testid="button-login">
                       <User className="w-4 h-4 mr-2" />
                       Accedi
@@ -423,7 +423,7 @@ export default function PublicVenues() {
                 </Avatar>
               </Link>
             ) : (
-              <Link href="/accedi">
+              <Link href="/login">
                 <Button 
                   variant="ghost" 
                   size="icon"

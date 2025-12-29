@@ -72,7 +72,6 @@ import SiaeApprovals from "@/pages/siae-approvals";
 // siae-card-reader merged into siae-activation-cards
 import PublicEvents from "@/pages/public-events";
 import PublicEventDetail from "@/pages/public-event-detail";
-import PublicLogin from "@/pages/public-login";
 import PublicForgotPassword from "@/pages/public-forgot-password";
 import PublicResetPassword from "@/pages/public-reset-password";
 import PublicCart from "@/pages/public-cart";
@@ -168,7 +167,9 @@ function Router() {
         <Route path="/acquista/:id" component={PublicEventDetail} />
         <Route path="/acquista" component={PublicEvents} />
         <Route path="/carrello" component={PublicCart} />
-        <Route path="/accedi" component={PublicLogin} />
+        <Route path="/accedi">
+          <Redirect to="/login" />
+        </Route>
         <Route path="/public/forgot-password" component={PublicForgotPassword} />
         <Route path="/public/reset-password" component={PublicResetPassword} />
         <Route path="/checkout/success" component={PublicCheckoutSuccess} />
@@ -189,10 +190,10 @@ function Router() {
           <Redirect to="/login" />
         </Route>
         <Route path="/account/:rest*">
-          <Redirect to="/accedi" />
+          <Redirect to="/login" />
         </Route>
         <Route path="/account">
-          <Redirect to="/accedi" />
+          <Redirect to="/login" />
         </Route>
         <Route component={NotFound} />
       </Switch>

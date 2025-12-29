@@ -336,7 +336,7 @@ export default function PublicEventsPage() {
                     </Avatar>
                   </Link>
                 ) : (
-                  <Link href="/accedi">
+                  <Link href="/login">
                     <Button className="h-10 px-5 rounded-xl font-semibold" data-testid="button-login-desktop">
                       Accedi
                     </Button>
@@ -485,7 +485,7 @@ export default function PublicEventsPage() {
                   </Avatar>
                 </Link>
               ) : (
-                <Link href="/accedi">
+                <Link href="/login">
                   <Button className="h-12 px-5 rounded-xl font-semibold" data-testid="button-login">
                     Accedi
                   </Button>

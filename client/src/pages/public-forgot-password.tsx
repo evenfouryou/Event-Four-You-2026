@@ -148,7 +148,7 @@ export default function PublicForgotPassword() {
                   <p className="text-muted-foreground text-sm">
                     Ricordi la password?{" "}
                     <Link 
-                      href="/accedi" 
+                      href="/login" 
                       className="text-primary font-medium hover:underline" 
                       data-testid="link-login"
                     >
@@ -190,7 +190,7 @@ export default function PublicForgotPassword() {
         className="h-11 w-11"
         hapticType="light"
       >
-        <Link href="/accedi">
+        <Link href="/login">
           <ArrowLeft className="h-5 w-5" />
         </Link>
       </HapticButton>

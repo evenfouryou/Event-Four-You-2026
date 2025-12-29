@@ -534,7 +534,7 @@ function CheckoutContent() {
         <p className="text-muted-foreground mb-8">
           Per completare l'acquisto devi accedere al tuo account o registrarti.
         </p>
-        <Link href="/accedi?redirect=/checkout">
+        <Link href="/login?redirect=/checkout">
           <HapticButton 
             className="h-14 px-8 text-base"
             hapticType="medium"
@@ -1156,7 +1156,7 @@ function DesktopCheckoutContent() {
             <p className="text-muted-foreground mb-6">
               Per completare l'acquisto devi accedere al tuo account o registrarti.
             </p>
-            <Link href="/accedi?redirect=/checkout">
+            <Link href="/login?redirect=/checkout">
               <Button data-testid="button-login-desktop">
                 Accedi o Registrati
               </Button>

@@ -83,7 +83,7 @@ export default function PublicResetPassword() {
       setSuccess(response.message || "Password reimpostata con successo!");
       
       setTimeout(() => {
-        navigate("/accedi");
+        navigate("/login");
       }, 2000);
     } catch (err: any) {
       setError(err.message || "Si è verificato un errore. Riprova più tardi.");
@@ -208,7 +208,7 @@ export default function PublicResetPassword() {
                     </Button>
 
                     <div className="text-center text-sm text-muted-foreground">
-                      <Link href="/accedi" className="text-primary hover:underline" data-testid="link-login">
+                      <Link href="/login" className="text-primary hover:underline" data-testid="link-login">
                         Torna al Login
                       </Link>
                     </div>
@@ -321,7 +321,7 @@ export default function PublicResetPassword() {
               </HapticButton>
 
               <div className="text-center text-sm text-muted-foreground pt-4">
-                <Link href="/accedi" className="text-primary hover:underline" data-testid="link-login-mobile">
+                <Link href="/login" className="text-primary hover:underline" data-testid="link-login-mobile">
                   Torna al Login
                 </Link>
               </div>
