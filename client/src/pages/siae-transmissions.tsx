@@ -67,6 +67,8 @@ import {
   TestTube,
   Plus,
   Building2,
+  ShieldCheck,
+  ShieldAlert,
 } from "lucide-react";
 
 const springTransition = {
@@ -544,7 +546,22 @@ export default function SiaeTransmissionsPage() {
                         <TableCell>{getTypeLabel(trans.transmissionType)}</TableCell>
                         <TableCell>{trans.ticketsCount}</TableCell>
                         <TableCell>€{Number(trans.totalAmount || 0).toFixed(2)}</TableCell>
-                        <TableCell>{statusConfig.badge}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            {statusConfig.badge}
+                            {trans.sentAt && (
+                              trans.smimeSigned ? (
+                                <span title={`Email firmata S/MIME da ${trans.smimeSignerEmail || 'N/A'}`}>
+                                  <ShieldCheck className="w-4 h-4 text-green-500" />
+                                </span>
+                              ) : (
+                                <span title="Email NON firmata S/MIME - SIAE potrebbe non rispondere">
+                                  <ShieldAlert className="w-4 h-4 text-amber-500" />
+                                </span>
+                              )
+                            )}
+                          </div>
+                        </TableCell>
                         <TableCell className="font-mono text-sm">
                           {trans.receiptProtocol || "-"}
                         </TableCell>
@@ -820,6 +837,22 @@ export default function SiaeTransmissionsPage() {
                     <div>
                       <Label className="text-muted-foreground">Data Invio</Label>
                       <p className="font-medium">{format(new Date(selectedTransmission.sentAt), "dd/MM/yyyy HH:mm", { locale: it })}</p>
+                    </div>
+                  )}
+                  {selectedTransmission.sentAt && (
+                    <div>
+                      <Label className="text-muted-foreground">Firma S/MIME</Label>
+                      {selectedTransmission.smimeSigned ? (
+                        <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
+                          <ShieldCheck className="w-4 h-4" />
+                          <span className="font-medium truncate">{selectedTransmission.smimeSignerEmail || 'Firmata'}</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400">
+                          <ShieldAlert className="w-4 h-4" />
+                          <span className="font-medium">Non firmata</span>
+                        </div>
+                      )}
                     </div>
                   )}
                   {selectedTransmission.receivedAt && (
@@ -1340,6 +1373,22 @@ export default function SiaeTransmissionsPage() {
                 <div className="flex justify-between py-3 border-b border-border/50">
                   <span className="text-muted-foreground text-sm">PEC Destinatario</span>
                   <span className="text-sm truncate max-w-[180px]">{selectedTransmission.sentToPec}</span>
+                </div>
+              )}
+              {selectedTransmission.sentAt && (
+                <div className="flex justify-between py-3 border-b border-border/50">
+                  <span className="text-muted-foreground text-sm">Firma S/MIME</span>
+                  {selectedTransmission.smimeSigned ? (
+                    <div className="flex items-center gap-2 text-sm text-green-400">
+                      <ShieldCheck className="w-4 h-4" />
+                      <span className="truncate max-w-[150px]">{selectedTransmission.smimeSignerEmail || 'Firmata'}</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 text-sm text-amber-400">
+                      <ShieldAlert className="w-4 h-4" />
+                      <span>Non firmata</span>
+                    </div>
+                  )}
                 </div>
               )}
               {selectedTransmission.receivedAt && (

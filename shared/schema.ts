@@ -1670,6 +1670,12 @@ export const siaeTransmissions = pgTable("siae_transmissions", {
   sentToPec: varchar("sent_to_pec", { length: 255 }),
   pecMessageId: varchar("pec_message_id", { length: 255 }),
   
+  // Firma S/MIME email (Allegato C - obbligatoria per conferma SIAE)
+  smimeSigned: boolean("smime_signed").notNull().default(false), // Email firmata S/MIME
+  smimeSignerEmail: varchar("smime_signer_email", { length: 255 }), // Email del firmatario dal certificato
+  smimeSignerName: varchar("smime_signer_name", { length: 255 }), // Nome del firmatario
+  smimeSignedAt: timestamp("smime_signed_at"), // Data/ora firma S/MIME
+  
   // Risposta AdE
   receivedAt: timestamp("received_at"),
   receiptContent: text("receipt_content"),

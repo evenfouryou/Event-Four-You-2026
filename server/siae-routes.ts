@@ -3060,7 +3060,7 @@ router.post("/api/siae/companies/:companyId/transmissions/send-c1", requireAuth,
     const { sendSiaeTransmissionEmail } = await import('./email-service');
     
     const destination = getSiaeDestinationEmail(toEmail);
-    await sendSiaeTransmissionEmail({
+    const emailResult = await sendSiaeTransmissionEmail({
       to: destination,
       companyName,
       transmissionType,
@@ -3073,18 +3073,25 @@ router.post("/api/siae/companies/:companyId/transmissions/send-c1", requireAuth,
       sequenceNumber: 1,
     });
     
-    console.log(`[SIAE-ROUTES] ${typeLabel.toUpperCase()} RCA transmission sent to: ${destination}${signatureInfo} (Test mode: ${SIAE_TEST_MODE})`);
+    const smimeInfo = emailResult.smimeSigned 
+      ? ` (S/MIME: ${emailResult.signerEmail})` 
+      : ' (NON firmata S/MIME)';
+    console.log(`[SIAE-ROUTES] ${typeLabel.toUpperCase()} RCA transmission sent to: ${destination}${signatureInfo}${smimeInfo} (Test mode: ${SIAE_TEST_MODE})`);
     
-    // Update transmission status
+    // Update transmission status with S/MIME info
     await siaeStorage.updateSiaeTransmission(transmission.id, {
       status: 'sent',
       sentAt: new Date(),
       sentToPec: destination,
+      smimeSigned: emailResult.smimeSigned || false,
+      smimeSignerEmail: emailResult.signerEmail || null,
+      smimeSignerName: emailResult.signerName || null,
+      smimeSignedAt: emailResult.signedAt ? new Date(emailResult.signedAt) : null,
     });
     
     res.json({
       success: true,
-      message: `Trasmissione ${typeLabel} generata e inviata con successo${signatureInfo}`,
+      message: `Trasmissione ${typeLabel} generata e inviata con successo${signatureInfo}${emailResult.smimeSigned ? ' (email firmata S/MIME)' : ''}`,
       transmission: {
         id: transmission.id,
         type: transmissionType,
@@ -3092,6 +3099,8 @@ router.post("/api/siae/companies/:companyId/transmissions/send-c1", requireAuth,
         totalAmount: totalAmount.toString(),
         sentTo: destination,
         signed: signatureData !== null,
+        smimeSigned: emailResult.smimeSigned,
+        smimeSignerEmail: emailResult.signerEmail,
       }
     });
   } catch (error: any) {
