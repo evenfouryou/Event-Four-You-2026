@@ -4004,7 +4004,8 @@ function formatSiaeDateTime(date: Date | null | undefined): string {
 
 // ==================== C1 Report XML Generation Helper ====================
 // Shared helper to generate RiepilogoMensile XML for both daily and monthly C1 reports
-// Avoids code duplication - both formats use identical structure with different date formats
+// Conforme al tracciato SIAE Allegato B - Provvedimento 04/03/2008
+// Importi in centesimi (interi), struttura con Abbonamenti
 
 interface C1ReportParams {
   companyId: string;
@@ -4017,26 +4018,35 @@ interface C1ReportParams {
   oraGen: string;
 }
 
+// Helper: converte euro in centesimi (intero)
+function toCentesimi(euroAmount: number | string): number {
+  const euro = typeof euroAmount === 'string' ? parseFloat(euroAmount) : euroAmount;
+  return Math.round((euro || 0) * 100);
+}
+
 async function generateC1ReportXml(params: C1ReportParams): Promise<string> {
   const { companyId, reportDate, isMonthly, filteredTickets, systemConfig, companyName, taxId, oraGen } = params;
   
-  // Calculate Data attribute: YYYYMM for monthly, YYYYMMDD for daily
-  let dataAttr: string;
-  let dataGenAttr: string;
+  const now = new Date();
+  const dataGenAttr = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
+  
+  // Formato attributo periodo: Mese="YYYYMM" per mensile, Data="YYYYMMDD" per giornaliero
+  let periodAttrName: string;
+  let periodAttrValue: string;
   
   if (isMonthly) {
-    dataAttr = `${reportDate.getFullYear()}${String(reportDate.getMonth() + 1).padStart(2, '0')}`;
-    dataGenAttr = dataAttr; // Monthly uses same format for DataGenerazione
+    periodAttrName = 'Mese';
+    periodAttrValue = `${reportDate.getFullYear()}${String(reportDate.getMonth() + 1).padStart(2, '0')}`;
   } else {
-    dataAttr = reportDate.getFullYear().toString() + 
+    periodAttrName = 'Data';
+    periodAttrValue = reportDate.getFullYear().toString() + 
                String(reportDate.getMonth() + 1).padStart(2, '0') + 
                String(reportDate.getDate()).padStart(2, '0');
-    dataGenAttr = new Date().toISOString().split('T')[0].replace(/-/g, '');
   }
   
   const systemEmissionCode = systemConfig?.systemCode || 'EVENT4U1';
   
-  // Get next progressive number (by month for monthly, by day for daily)
+  // Get progressive number and determine if this is a substitution
   const allTransmissions = await siaeStorage.getSiaeTransmissionsByCompany(companyId);
   const relevantTransmissions = allTransmissions.filter(t => {
     const tDate = new Date(t.periodDate);
@@ -4052,6 +4062,22 @@ async function generateC1ReportXml(params: C1ReportParams): Promise<string> {
     }
   });
   const progressiveGen = relevantTransmissions.length + 1;
+  // Sostituzione = "S" se esiste già una trasmissione precedente, altrimenti "N"
+  const sostituzione = relevantTransmissions.length > 0 ? 'S' : 'N';
+  
+  // ==================== Get Subscriptions for period ====================
+  const allSubscriptions = await siaeStorage.getSiaeSubscriptionsByCompany(companyId);
+  const filteredSubscriptions = allSubscriptions.filter(sub => {
+    const emDate = new Date(sub.emissionDate || sub.createdAt!);
+    if (isMonthly) {
+      return emDate.getFullYear() === reportDate.getFullYear() && 
+             emDate.getMonth() === reportDate.getMonth();
+    } else {
+      return emDate.getFullYear() === reportDate.getFullYear() && 
+             emDate.getMonth() === reportDate.getMonth() &&
+             emDate.getDate() === reportDate.getDate();
+    }
+  });
   
   // Group tickets by event
   const ticketsByEvent: Map<string, typeof filteredTickets> = new Map();
@@ -4063,11 +4089,17 @@ async function generateC1ReportXml(params: C1ReportParams): Promise<string> {
     ticketsByEvent.get(eventId)!.push(ticket);
   }
   
+  // Collect all unique events (from tickets + subscriptions)
+  const allEventIds = new Set<string>([...ticketsByEvent.keys()]);
+  for (const sub of filteredSubscriptions) {
+    if (sub.ticketedEventId) allEventIds.add(sub.ticketedEventId);
+  }
+  
   // Build events XML
   let eventsXml = '';
   const DEFAULT_SECTOR_KEY = '__DEFAULT__';
   
-  for (const [ticketedEventId, eventTickets] of ticketsByEvent) {
+  for (const ticketedEventId of allEventIds) {
     const ticketedEvent = await siaeStorage.getSiaeTicketedEvent(ticketedEventId);
     if (!ticketedEvent) continue;
     
@@ -4085,6 +4117,8 @@ async function generateC1ReportXml(params: C1ReportParams): Promise<string> {
     const eventTimeStr = String(eventDate.getHours()).padStart(2, '0') + 
                          String(eventDate.getMinutes()).padStart(2, '0');
     
+    const eventTickets = ticketsByEvent.get(ticketedEventId) || [];
+    
     // Group tickets by sector
     const ticketsBySector: Map<string, typeof eventTickets> = new Map();
     for (const ticket of eventTickets) {
@@ -4095,7 +4129,7 @@ async function generateC1ReportXml(params: C1ReportParams): Promise<string> {
       ticketsBySector.get(sectorKey)!.push(ticket);
     }
     
-    // Build OrdineDiPosto (sectors) XML
+    // Build OrdineDiPosto (sectors) XML with TitoliAccesso inside
     let sectorsXml = '';
     for (const [sectorKey, sectorTickets] of ticketsBySector) {
       let codiceOrdine = 'A0';
@@ -4133,11 +4167,10 @@ async function generateC1ReportXml(params: C1ReportParams): Promise<string> {
         if (validTickets.length === 0) continue;
         
         const quantita = validTickets.length;
-        const corrispettivoLordo = validTickets.reduce((sum: number, t: any) => sum + parseFloat(t.grossAmount || '0'), 0);
-        const prevendita = validTickets.reduce((sum: number, t: any) => sum + parseFloat(t.prevendita || '0'), 0);
-        const ivaCorrispettivo = validTickets.reduce((sum: number, t: any) => sum + parseFloat(t.vatAmount || '0'), 0);
-        const ivaPrevendita = validTickets.reduce((sum: number, t: any) => sum + parseFloat(t.prevenditaVat || '0'), 0);
-        const importoPrestazione = 0;
+        const corrispettivoLordo = toCentesimi(validTickets.reduce((sum: number, t: any) => sum + parseFloat(t.grossAmount || '0'), 0));
+        const prevendita = toCentesimi(validTickets.reduce((sum: number, t: any) => sum + parseFloat(t.prevendita || '0'), 0));
+        const ivaCorrispettivo = toCentesimi(validTickets.reduce((sum: number, t: any) => sum + parseFloat(t.vatAmount || '0'), 0));
+        const ivaPrevendita = toCentesimi(validTickets.reduce((sum: number, t: any) => sum + parseFloat(t.prevenditaVat || '0'), 0));
         
         if (tipoTitolo === 'O1') {
           totalOmaggiIva += ivaCorrispettivo;
@@ -4147,11 +4180,10 @@ async function generateC1ReportXml(params: C1ReportParams): Promise<string> {
                 <TitoliAccesso>
                     <TipoTitolo>${escapeXml(tipoTitolo)}</TipoTitolo>
                     <Quantita>${quantita}</Quantita>
-                    <CorrispettivoLordo>${corrispettivoLordo.toFixed(2)}</CorrispettivoLordo>
-                    <Prevendita>${prevendita.toFixed(2)}</Prevendita>
-                    <IVACorrispettivo>${ivaCorrispettivo.toFixed(2)}</IVACorrispettivo>
-                    <IVAPrevendita>${ivaPrevendita.toFixed(2)}</IVAPrevendita>
-                    <ImportoPrestazione>${importoPrestazione.toFixed(2)}</ImportoPrestazione>
+                    <CorrispettivoLordo>${corrispettivoLordo}</CorrispettivoLordo>
+                    <Prevendita>${prevendita}</Prevendita>
+                    <IVACorrispettivo>${ivaCorrispettivo}</IVACorrispettivo>
+                    <IVAPrevendita>${ivaPrevendita}</IVAPrevendita>
                 </TitoliAccesso>`;
       }
       
@@ -4159,18 +4191,33 @@ async function generateC1ReportXml(params: C1ReportParams): Promise<string> {
             <OrdineDiPosto>
                 <CodiceOrdine>${escapeXml(codiceOrdine)}</CodiceOrdine>
                 <Capienza>${capacity}</Capienza>${titoliAccessoXml}
-                <IVAEccedenteOmaggi>${totalOmaggiIva.toFixed(0)}</IVAEccedenteOmaggi>
+                <IVAEccedenteOmaggi>${totalOmaggiIva}</IVAEccedenteOmaggi>
+            </OrdineDiPosto>`;
+    }
+    
+    // If no sectors from tickets, add default sector for event
+    if (sectorsXml === '') {
+      sectorsXml = `
+            <OrdineDiPosto>
+                <CodiceOrdine>A0</CodiceOrdine>
+                <Capienza>${ticketedEvent.capacity || 100}</Capienza>
+                <IVAEccedenteOmaggi>0</IVAEccedenteOmaggi>
             </OrdineDiPosto>`;
     }
     
     const tipoTassazione = ticketedEvent.taxType || 'S';
-    const genreCode = ticketedEvent.genreCode || '05';
+    const incidenza = ticketedEvent.entertainmentIncidence ?? 100;
+    const imponibileIntrattenimenti = 0; // Calcolato automaticamente dal sistema SIAE
+    const genreCode = ticketedEvent.genreCode || '61';
+    const incidenzaGenere = ticketedEvent.genreIncidence ?? 0;
     const eventName = eventDetails.name || 'Evento';
     
     eventsXml += `
         <Evento>
             <Intrattenimento>
                 <TipoTassazione valore="${escapeXml(tipoTassazione)}"/>
+                <Incidenza>${incidenza}</Incidenza>
+                <ImponibileIntrattenimenti>${imponibileIntrattenimenti}</ImponibileIntrattenimenti>
             </Intrattenimento>
             <Locale>
                 <Denominazione>${escapeXml(venueName)}</Denominazione>
@@ -4180,7 +4227,7 @@ async function generateC1ReportXml(params: C1ReportParams): Promise<string> {
             <OraEvento>${eventTimeStr}</OraEvento>
             <MultiGenere>
                 <TipoGenere>${escapeXml(genreCode)}</TipoGenere>
-                <IncidenzaGenere>10</IncidenzaGenere>
+                <IncidenzaGenere>${incidenzaGenere}</IncidenzaGenere>
                 <TitoliOpere>
                     <Titolo>${escapeXml(eventName)}</Titolo>
                 </TitoliOpere>
@@ -4188,12 +4235,95 @@ async function generateC1ReportXml(params: C1ReportParams): Promise<string> {
         </Evento>`;
   }
   
+  // ==================== Build Abbonamenti XML ====================
+  let abbonamentiXml = '';
+  if (filteredSubscriptions.length > 0) {
+    // Group subscriptions by subscription code for aggregation
+    const subsByCode: Map<string, typeof filteredSubscriptions> = new Map();
+    for (const sub of filteredSubscriptions) {
+      const code = sub.subscriptionCode;
+      if (!subsByCode.has(code)) {
+        subsByCode.set(code, []);
+      }
+      subsByCode.get(code)!.push(sub);
+    }
+    
+    abbonamentiXml = `
+        <Abbonamenti>`;
+    
+    for (const [subCode, subs] of subsByCode) {
+      const firstSub = subs[0];
+      const validTo = new Date(firstSub.validTo);
+      const validitaStr = `${validTo.getFullYear()}${String(validTo.getMonth() + 1).padStart(2, '0')}${String(validTo.getDate()).padStart(2, '0')}`;
+      
+      // Get sector code
+      let codiceOrdine = 'A0';
+      if (firstSub.sectorId) {
+        const sector = await siaeStorage.getSiaeEventSector(firstSub.sectorId);
+        if (sector) codiceOrdine = sector.sectorCode || 'A0';
+      }
+      
+      // Determine subscription type code (max 2 chars)
+      const tipoTitolo = firstSub.subscriptionTypeId?.substring(0, 2).toUpperCase() || 'AB';
+      const tipoTassazione = 'S'; // Spettacolo (default for subscriptions)
+      const turno = firstSub.turnType || 'F';
+      
+      // Calculate totals for emitted subscriptions (active)
+      const emittedSubs = subs.filter(s => s.status === 'active');
+      const cancelledSubs = subs.filter(s => s.status === 'cancelled');
+      
+      const emessiQuantita = emittedSubs.length;
+      const emessiCorrispettivo = toCentesimi(emittedSubs.reduce((sum, s) => sum + parseFloat(s.totalAmount || '0'), 0));
+      const emessiIva = toCentesimi(emittedSubs.reduce((sum, s) => sum + parseFloat(s.rateoVat || '0'), 0));
+      
+      const annullatiQuantita = cancelledSubs.length;
+      const annullatiCorrispettivo = toCentesimi(cancelledSubs.reduce((sum, s) => sum + parseFloat(s.totalAmount || '0'), 0));
+      const annullatiIva = toCentesimi(cancelledSubs.reduce((sum, s) => sum + parseFloat(s.rateoVat || '0'), 0));
+      
+      abbonamentiXml += `
+            <CodiceAbbonamento>${escapeXml(subCode)}</CodiceAbbonamento>
+            <Validita>${validitaStr}</Validita>
+            <TipoTassazione valore="${tipoTassazione}"/>
+            <Turno valore="${turno}"/>
+            <CodiceOrdine>${codiceOrdine}</CodiceOrdine>
+            <TipoTitolo>${tipoTitolo}</TipoTitolo>
+            <QuantitaEventiAbilitati>${firstSub.eventsCount}</QuantitaEventiAbilitati>
+            <AbbonamentiEmessi>
+                <Quantita>${emessiQuantita}</Quantita>
+                <CorrispettivoLordo>${emessiCorrispettivo}</CorrispettivoLordo>
+                <Prevendita>0</Prevendita>
+                <IVACorrispettivo>${emessiIva}</IVACorrispettivo>
+                <IVAPrevendita>0</IVAPrevendita>
+            </AbbonamentiEmessi>
+            <AbbonamentiAnnullati>
+                <Quantita>${annullatiQuantita}</Quantita>
+                <CorrispettivoLordo>${annullatiCorrispettivo}</CorrispettivoLordo>
+                <Prevendita>0</Prevendita>
+                <IVACorrispettivo>${annullatiIva}</IVACorrispettivo>
+                <IVAPrevendita>0</IVAPrevendita>
+            </AbbonamentiAnnullati>
+            <AbbonamentiIVAPreassolta>
+                <Quantita>0</Quantita>
+                <ImportoFigurativo>0</ImportoFigurativo>
+                <IVAFigurativa>0</IVAFigurativa>
+            </AbbonamentiIVAPreassolta>
+            <AbbonamentiIVAPreassoltaAnnullati>
+                <Quantita>0</Quantita>
+                <ImportoFigurativo>0</ImportoFigurativo>
+                <IVAFigurativa>0</IVAFigurativa>
+            </AbbonamentiIVAPreassoltaAnnullati>`;
+    }
+    
+    abbonamentiXml += `
+        </Abbonamenti>`;
+  }
+  
   const organizerName = systemConfig?.businessName || companyName;
   const organizerTaxId = taxId;
   const organizerType = 'G';
   
   return `<?xml version="1.0" encoding="UTF-8"?>
-<RiepilogoMensile Data="${dataAttr}" DataGenerazione="${dataGenAttr}" OraGenerazione="${oraGen}" ProgressivoGenerazione="${progressiveGen}" Sostituzione="N">
+<RiepilogoMensile ${periodAttrName}="${periodAttrValue}" DataGenerazione="${dataGenAttr}" OraGenerazione="${oraGen}" ProgressivoGenerazione="${progressiveGen}" Sostituzione="${sostituzione}">
     <Titolare>
         <Denominazione>${escapeXml(companyName)}</Denominazione>
         <CodiceFiscale>${escapeXml(taxId)}</CodiceFiscale>
@@ -4202,7 +4332,7 @@ async function generateC1ReportXml(params: C1ReportParams): Promise<string> {
     <Organizzatore>
         <Denominazione>${escapeXml(organizerName)}</Denominazione>
         <CodiceFiscale>${escapeXml(organizerTaxId)}</CodiceFiscale>
-        <TipoOrganizzatore valore="${organizerType}"/>${eventsXml}
+        <TipoOrganizzatore valore="${organizerType}"/>${eventsXml}${abbonamentiXml}
     </Organizzatore>
 </RiepilogoMensile>`;
 }

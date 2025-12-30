@@ -1237,7 +1237,9 @@ export const siaeTicketedEvents = pgTable("siae_ticketed_events", {
   siaeLocationCode: varchar("siae_location_code", { length: 50 }), // Codice locale SIAE
   organizerType: varchar("organizer_type", { length: 10 }), // Tipo organizzatore SIAE
   genreCode: varchar("genre_code", { length: 2 }).notNull(), // TAB.1
+  genreIncidence: integer("genre_incidence").notNull().default(0), // IncidenzaGenere (0-100)
   taxType: varchar("tax_type", { length: 1 }).notNull().default('S'), // S=spettacolo, I=intrattenimento
+  entertainmentIncidence: integer("entertainment_incidence").notNull().default(100), // Incidenza intrattenimento (0-100)
   ivaPreassolta: varchar("iva_preassolta", { length: 1 }).notNull().default('N'), // N, B, F
   // Capienza e nominatività
   totalCapacity: integer("total_capacity").notNull(),
