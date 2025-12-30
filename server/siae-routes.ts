@@ -4108,7 +4108,9 @@ async function generateC1ReportXml(params: C1ReportParams): Promise<string> {
     
     const location = await storage.getLocation(eventDetails.locationId);
     const venueName = location?.name || 'N/D';
-    const venueCode = ticketedEvent.siaeLocationCode || location?.siaeLocationCode || 'VENUE01';
+    // CodiceLocale deve essere esattamente 13 cifre (Allegato B SIAE)
+    const rawVenueCode = ticketedEvent.siaeLocationCode || location?.siaeLocationCode || '0000000000001';
+    const venueCode = rawVenueCode.replace(/\D/g, '').padStart(13, '0').substring(0, 13);
     
     const eventDate = new Date(eventDetails.startDatetime);
     const eventDateStr = eventDate.getFullYear().toString() + 
@@ -4263,10 +4265,12 @@ async function generateC1ReportXml(params: C1ReportParams): Promise<string> {
         if (sector) codiceOrdine = sector.sectorCode || 'A0';
       }
       
-      // Determine subscription type code (max 2 chars)
-      const tipoTitolo = firstSub.subscriptionTypeId?.substring(0, 2).toUpperCase() || 'AB';
+      // TipoTitolo per abbonamenti deve essere 'ABB' (Allegato B SIAE)
+      const tipoTitolo = 'ABB';
       const tipoTassazione = 'S'; // Spettacolo (default for subscriptions)
-      const turno = firstSub.turnType || 'F';
+      // Turno: F=fisso, V=variabile (NON usare L, non è un valore SIAE valido)
+      const rawTurno = firstSub.turnType || 'F';
+      const turno = rawTurno === 'L' ? 'V' : rawTurno; // Converti L in V se necessario
       
       // Calculate totals for emitted subscriptions (active)
       const emittedSubs = subs.filter(s => s.status === 'active');
@@ -4280,38 +4284,41 @@ async function generateC1ReportXml(params: C1ReportParams): Promise<string> {
       const annullatiCorrispettivo = toCentesimi(cancelledSubs.reduce((sum, s) => sum + parseFloat(s.totalAmount || '0'), 0));
       const annullatiIva = toCentesimi(cancelledSubs.reduce((sum, s) => sum + parseFloat(s.rateoVat || '0'), 0));
       
+      // Ogni abbonamento deve essere wrappato in un elemento <Abbonamento> (Allegato B SIAE)
       abbonamentiXml += `
-            <CodiceAbbonamento>${escapeXml(subCode)}</CodiceAbbonamento>
-            <Validita>${validitaStr}</Validita>
-            <TipoTassazione valore="${tipoTassazione}"/>
-            <Turno valore="${turno}"/>
-            <CodiceOrdine>${codiceOrdine}</CodiceOrdine>
-            <TipoTitolo>${tipoTitolo}</TipoTitolo>
-            <QuantitaEventiAbilitati>${firstSub.eventsCount}</QuantitaEventiAbilitati>
-            <AbbonamentiEmessi>
-                <Quantita>${emessiQuantita}</Quantita>
-                <CorrispettivoLordo>${emessiCorrispettivo}</CorrispettivoLordo>
-                <Prevendita>0</Prevendita>
-                <IVACorrispettivo>${emessiIva}</IVACorrispettivo>
-                <IVAPrevendita>0</IVAPrevendita>
-            </AbbonamentiEmessi>
-            <AbbonamentiAnnullati>
-                <Quantita>${annullatiQuantita}</Quantita>
-                <CorrispettivoLordo>${annullatiCorrispettivo}</CorrispettivoLordo>
-                <Prevendita>0</Prevendita>
-                <IVACorrispettivo>${annullatiIva}</IVACorrispettivo>
-                <IVAPrevendita>0</IVAPrevendita>
-            </AbbonamentiAnnullati>
-            <AbbonamentiIVAPreassolta>
-                <Quantita>0</Quantita>
-                <ImportoFigurativo>0</ImportoFigurativo>
-                <IVAFigurativa>0</IVAFigurativa>
-            </AbbonamentiIVAPreassolta>
-            <AbbonamentiIVAPreassoltaAnnullati>
-                <Quantita>0</Quantita>
-                <ImportoFigurativo>0</ImportoFigurativo>
-                <IVAFigurativa>0</IVAFigurativa>
-            </AbbonamentiIVAPreassoltaAnnullati>`;
+            <Abbonamento>
+                <CodiceAbbonamento>${escapeXml(subCode)}</CodiceAbbonamento>
+                <Validita>${validitaStr}</Validita>
+                <TipoTassazione valore="${tipoTassazione}"/>
+                <Turno valore="${turno}"/>
+                <CodiceOrdine>${codiceOrdine}</CodiceOrdine>
+                <TipoTitolo>${tipoTitolo}</TipoTitolo>
+                <QuantitaEventiAbilitati>${firstSub.eventsCount}</QuantitaEventiAbilitati>
+                <AbbonamentiEmessi>
+                    <Quantita>${emessiQuantita}</Quantita>
+                    <CorrispettivoLordo>${emessiCorrispettivo}</CorrispettivoLordo>
+                    <Prevendita>0</Prevendita>
+                    <IVACorrispettivo>${emessiIva}</IVACorrispettivo>
+                    <IVAPrevendita>0</IVAPrevendita>
+                </AbbonamentiEmessi>
+                <AbbonamentiAnnullati>
+                    <Quantita>${annullatiQuantita}</Quantita>
+                    <CorrispettivoLordo>${annullatiCorrispettivo}</CorrispettivoLordo>
+                    <Prevendita>0</Prevendita>
+                    <IVACorrispettivo>${annullatiIva}</IVACorrispettivo>
+                    <IVAPrevendita>0</IVAPrevendita>
+                </AbbonamentiAnnullati>
+                <AbbonamentiIVAPreassolta>
+                    <Quantita>0</Quantita>
+                    <ImportoFigurativo>0</ImportoFigurativo>
+                    <IVAFigurativa>0</IVAFigurativa>
+                </AbbonamentiIVAPreassolta>
+                <AbbonamentiIVAPreassoltaAnnullati>
+                    <Quantita>0</Quantita>
+                    <ImportoFigurativo>0</ImportoFigurativo>
+                    <IVAFigurativa>0</IVAFigurativa>
+                </AbbonamentiIVAPreassoltaAnnullati>
+            </Abbonamento>`;
     }
     
     abbonamentiXml += `
