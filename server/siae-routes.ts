@@ -153,6 +153,145 @@ function normalizeSiaeCodiceOrdine(rawCode: string | null | undefined): string {
   return '99';
 }
 
+/**
+ * Valida e normalizza il Codice Fiscale italiano (16 caratteri)
+ * Implementa l'algoritmo di checksum ufficiale dell'Agenzia delle Entrate
+ * @returns { valid: boolean, normalized: string, error?: string }
+ */
+function validateCodiceFiscale(cf: string | null | undefined): { valid: boolean; normalized: string; error?: string } {
+  if (!cf || cf.trim() === '') {
+    return { valid: false, normalized: '', error: 'Codice Fiscale obbligatorio' };
+  }
+  
+  const normalized = cf.toUpperCase().replace(/\s/g, '');
+  
+  // Lunghezza: 16 caratteri per persone fisiche, 11 per persone giuridiche (P.IVA format)
+  if (normalized.length === 11 && /^\d{11}$/.test(normalized)) {
+    // È una Partita IVA, non un CF - valida come P.IVA
+    return validatePartitaIva(normalized);
+  }
+  
+  if (normalized.length !== 16) {
+    return { valid: false, normalized, error: 'Codice Fiscale deve essere di 16 caratteri' };
+  }
+  
+  // Pattern: 6 lettere + 2 numeri + 1 lettera + 2 numeri + 1 lettera + 3 alfanum + 1 lettera
+  const cfPattern = /^[A-Z]{6}\d{2}[A-Z]\d{2}[A-Z]\d{3}[A-Z]$/;
+  if (!cfPattern.test(normalized)) {
+    return { valid: false, normalized, error: 'Formato Codice Fiscale non valido' };
+  }
+  
+  // Tabelle per il calcolo del carattere di controllo
+  const oddMap: Record<string, number> = {
+    '0': 1, '1': 0, '2': 5, '3': 7, '4': 9, '5': 13, '6': 15, '7': 17, '8': 19, '9': 21,
+    'A': 1, 'B': 0, 'C': 5, 'D': 7, 'E': 9, 'F': 13, 'G': 15, 'H': 17, 'I': 19, 'J': 21,
+    'K': 2, 'L': 4, 'M': 18, 'N': 20, 'O': 11, 'P': 3, 'Q': 6, 'R': 8, 'S': 12, 'T': 14,
+    'U': 16, 'V': 10, 'W': 22, 'X': 25, 'Y': 24, 'Z': 23
+  };
+  
+  const evenMap: Record<string, number> = {
+    '0': 0, '1': 1, '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9,
+    'A': 0, 'B': 1, 'C': 2, 'D': 3, 'E': 4, 'F': 5, 'G': 6, 'H': 7, 'I': 8, 'J': 9,
+    'K': 10, 'L': 11, 'M': 12, 'N': 13, 'O': 14, 'P': 15, 'Q': 16, 'R': 17, 'S': 18, 'T': 19,
+    'U': 20, 'V': 21, 'W': 22, 'X': 23, 'Y': 24, 'Z': 25
+  };
+  
+  const controlChars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  
+  // Calcola checksum
+  let sum = 0;
+  for (let i = 0; i < 15; i++) {
+    const char = normalized[i];
+    if (i % 2 === 0) {
+      // Posizione dispari (1-based), usa oddMap
+      sum += oddMap[char] ?? 0;
+    } else {
+      // Posizione pari (1-based), usa evenMap
+      sum += evenMap[char] ?? 0;
+    }
+  }
+  
+  const expectedControl = controlChars[sum % 26];
+  const actualControl = normalized[15];
+  
+  if (expectedControl !== actualControl) {
+    return { valid: false, normalized, error: 'Carattere di controllo Codice Fiscale non valido' };
+  }
+  
+  return { valid: true, normalized };
+}
+
+/**
+ * Valida e normalizza la Partita IVA italiana (11 cifre)
+ * Implementa l'algoritmo di checksum Luhn modificato
+ * @returns { valid: boolean, normalized: string, error?: string }
+ */
+function validatePartitaIva(piva: string | null | undefined): { valid: boolean; normalized: string; error?: string } {
+  if (!piva || piva.trim() === '') {
+    return { valid: false, normalized: '', error: 'Partita IVA obbligatoria' };
+  }
+  
+  const normalized = piva.replace(/\s/g, '').replace(/[^0-9]/g, '');
+  
+  if (normalized.length !== 11) {
+    return { valid: false, normalized, error: 'Partita IVA deve essere di 11 cifre' };
+  }
+  
+  // Tutte le cifre devono essere numeri
+  if (!/^\d{11}$/.test(normalized)) {
+    return { valid: false, normalized, error: 'Partita IVA deve contenere solo cifre' };
+  }
+  
+  // Algoritmo di controllo Partita IVA italiana
+  const digits = normalized.split('').map(d => parseInt(d, 10));
+  
+  let sumOdd = 0;
+  let sumEven = 0;
+  
+  for (let i = 0; i < 10; i++) {
+    if (i % 2 === 0) {
+      // Posizione dispari (1-based)
+      sumOdd += digits[i];
+    } else {
+      // Posizione pari (1-based) - raddoppia e sottrai 9 se > 9
+      const doubled = digits[i] * 2;
+      sumEven += doubled > 9 ? doubled - 9 : doubled;
+    }
+  }
+  
+  const total = sumOdd + sumEven;
+  const expectedControl = (10 - (total % 10)) % 10;
+  const actualControl = digits[10];
+  
+  if (expectedControl !== actualControl) {
+    return { valid: false, normalized, error: 'Cifra di controllo Partita IVA non valida' };
+  }
+  
+  return { valid: true, normalized };
+}
+
+/**
+ * Valida Codice Fiscale o Partita IVA (accetta entrambi i formati)
+ * Utile per campi che possono contenere l'uno o l'altro
+ */
+function validateFiscalId(id: string | null | undefined): { valid: boolean; normalized: string; type: 'cf' | 'piva' | null; error?: string } {
+  if (!id || id.trim() === '') {
+    return { valid: false, normalized: '', type: null, error: 'Codice Fiscale o Partita IVA obbligatorio' };
+  }
+  
+  const cleaned = id.toUpperCase().replace(/\s/g, '');
+  
+  // Prova prima come Partita IVA (11 cifre)
+  if (/^\d{11}$/.test(cleaned)) {
+    const pivaResult = validatePartitaIva(cleaned);
+    return { ...pivaResult, type: pivaResult.valid ? 'piva' : null };
+  }
+  
+  // Altrimenti prova come Codice Fiscale (16 caratteri)
+  const cfResult = validateCodiceFiscale(cleaned);
+  return { ...cfResult, type: cfResult.valid ? 'cf' : null };
+}
+
 // Middleware to check if user is authenticated
 function requireAuth(req: Request, res: Response, next: NextFunction) {
   if (!req.isAuthenticated || !req.isAuthenticated()) {
@@ -326,6 +465,88 @@ router.get("/api/siae/debug/test-smtp", async (req: Request, res: Response) => {
       error: error.message,
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined 
     });
+  }
+});
+
+// ==================== DEBUG ENDPOINT - Validate Fiscal Code / P.IVA ====================
+router.get("/api/siae/debug/validate-fiscal", async (req: Request, res: Response) => {
+  try {
+    const { cf, piva, id } = req.query;
+    const results: any = { timestamp: new Date().toISOString() };
+    
+    if (cf) {
+      results.codiceFiscale = {
+        input: cf,
+        ...validateCodiceFiscale(cf as string)
+      };
+    }
+    
+    if (piva) {
+      results.partitaIva = {
+        input: piva,
+        ...validatePartitaIva(piva as string)
+      };
+    }
+    
+    if (id) {
+      results.fiscalId = {
+        input: id,
+        ...validateFiscalId(id as string)
+      };
+    }
+    
+    if (!cf && !piva && !id) {
+      // Test con valori di esempio (codici fiscali reali per test)
+      results.examples = {
+        codiceFiscaleValido: {
+          input: 'RSSMRA80A01H501U',
+          ...validateCodiceFiscale('RSSMRA80A01H501U')
+        },
+        codiceFiscaleNonValido: {
+          input: 'RSSMRA80A01H501X',
+          ...validateCodiceFiscale('RSSMRA80A01H501X')
+        },
+        partitaIvaValida: {
+          input: '12345678903',
+          ...validatePartitaIva('12345678903')
+        },
+        partitaIvaNonValida: {
+          input: '12345678901',
+          ...validatePartitaIva('12345678901')
+        }
+      };
+      results.usage = {
+        message: "Usa i parametri query per testare i tuoi codici",
+        examples: [
+          "/api/siae/debug/validate-fiscal?cf=RSSMRA85M01H501U",
+          "/api/siae/debug/validate-fiscal?piva=12345678903",
+          "/api/siae/debug/validate-fiscal?id=RSSMRA85M01H501U"
+        ]
+      };
+    }
+    
+    res.json(results);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ==================== DEBUG ENDPOINT - Signature Audit Log ====================
+router.get("/api/siae/debug/signature-audit", async (req: Request, res: Response) => {
+  try {
+    const { getSignatureAuditLog, SignatureErrorCode } = await import('./bridge-relay');
+    
+    const auditLog = getSignatureAuditLog();
+    
+    res.json({
+      timestamp: new Date().toISOString(),
+      totalEntries: auditLog.length,
+      entries: auditLog,
+      errorCodes: Object.values(SignatureErrorCode),
+      description: "Log delle ultime 100 operazioni di firma digitale (XML e S/MIME)"
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
   }
 });
 

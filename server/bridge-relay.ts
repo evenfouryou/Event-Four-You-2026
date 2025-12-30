@@ -891,12 +891,133 @@ export function getPendingSealRequestsCount(): number {
 }
 
 // ==================== XML SIGNATURE BROKER ====================
+// Error codes for smart card / digital signature operations
+// These are used for structured error handling and user-friendly messages
+export enum SignatureErrorCode {
+  // Bridge connection errors
+  BRIDGE_OFFLINE = 'SIGNATURE_BRIDGE_OFFLINE',
+  BRIDGE_SEND_ERROR = 'SIGNATURE_SEND_ERROR',
+  BRIDGE_TIMEOUT = 'SIGNATURE_TIMEOUT',
+  
+  // Smart card errors
+  CARD_NOT_READY = 'SIGNATURE_CARD_NOT_READY',
+  CARD_NOT_FOUND = 'SIGNATURE_CARD_NOT_FOUND',
+  CARD_DISCONNECTED = 'SIGNATURE_CARD_DISCONNECTED',
+  CARD_READER_ERROR = 'SIGNATURE_CARD_READER_ERROR',
+  
+  // PIN errors
+  PIN_REQUIRED = 'SIGNATURE_PIN_REQUIRED',
+  PIN_INCORRECT = 'SIGNATURE_PIN_INCORRECT',
+  PIN_LOCKED = 'SIGNATURE_PIN_LOCKED',
+  PIN_CANCELLED = 'SIGNATURE_PIN_CANCELLED',
+  
+  // Certificate errors
+  CERT_EXPIRED = 'SIGNATURE_CERT_EXPIRED',
+  CERT_NOT_FOUND = 'SIGNATURE_CERT_NOT_FOUND',
+  CERT_INVALID = 'SIGNATURE_CERT_INVALID',
+  CERT_REVOKED = 'SIGNATURE_CERT_REVOKED',
+  
+  // Signature errors
+  SIGNATURE_FAILED = 'SIGNATURE_FAILED',
+  SIGNATURE_CANCELLED = 'SIGNATURE_CANCELLED',
+  
+  // Generic error
+  UNKNOWN_ERROR = 'SIGNATURE_UNKNOWN_ERROR'
+}
+
+// Map bridge error messages to structured error codes
+export function parseSignatureError(errorMessage: string): { code: SignatureErrorCode; message: string } {
+  const errorLower = errorMessage.toLowerCase();
+  
+  // PIN errors
+  if (errorLower.includes('pin') && (errorLower.includes('wrong') || errorLower.includes('incorrect') || errorLower.includes('errato'))) {
+    return { code: SignatureErrorCode.PIN_INCORRECT, message: 'PIN errato. Verificare il PIN e riprovare.' };
+  }
+  if (errorLower.includes('pin') && (errorLower.includes('locked') || errorLower.includes('bloccato'))) {
+    return { code: SignatureErrorCode.PIN_LOCKED, message: 'PIN bloccato. Contattare SIAE per sbloccare la carta.' };
+  }
+  if (errorLower.includes('pin') && (errorLower.includes('cancel') || errorLower.includes('annull'))) {
+    return { code: SignatureErrorCode.PIN_CANCELLED, message: 'Inserimento PIN annullato dall\'utente.' };
+  }
+  if (errorLower.includes('pin') && errorLower.includes('requir')) {
+    return { code: SignatureErrorCode.PIN_REQUIRED, message: 'Inserimento PIN richiesto per la firma.' };
+  }
+  
+  // Card errors
+  if (errorLower.includes('card') && (errorLower.includes('not found') || errorLower.includes('non trovata'))) {
+    return { code: SignatureErrorCode.CARD_NOT_FOUND, message: 'Carta SIAE non trovata. Inserire la carta nel lettore.' };
+  }
+  if (errorLower.includes('card') && (errorLower.includes('disconnect') || errorLower.includes('removed') || errorLower.includes('rimossa'))) {
+    return { code: SignatureErrorCode.CARD_DISCONNECTED, message: 'Carta SIAE scollegata durante l\'operazione. Reinserire la carta.' };
+  }
+  if (errorLower.includes('reader') || errorLower.includes('lettore')) {
+    return { code: SignatureErrorCode.CARD_READER_ERROR, message: 'Errore lettore smart card. Verificare la connessione.' };
+  }
+  
+  // Certificate errors
+  if (errorLower.includes('certificate') && (errorLower.includes('expired') || errorLower.includes('scadut'))) {
+    return { code: SignatureErrorCode.CERT_EXPIRED, message: 'Certificato SIAE scaduto. Richiedere nuova carta di attivazione.' };
+  }
+  if (errorLower.includes('certificate') && (errorLower.includes('not found') || errorLower.includes('non trovato'))) {
+    return { code: SignatureErrorCode.CERT_NOT_FOUND, message: 'Certificato non trovato sulla carta SIAE.' };
+  }
+  if (errorLower.includes('certificate') && (errorLower.includes('invalid') || errorLower.includes('non valido'))) {
+    return { code: SignatureErrorCode.CERT_INVALID, message: 'Certificato SIAE non valido.' };
+  }
+  if (errorLower.includes('certificate') && (errorLower.includes('revoked') || errorLower.includes('revocato'))) {
+    return { code: SignatureErrorCode.CERT_REVOKED, message: 'Certificato SIAE revocato. Contattare SIAE.' };
+  }
+  
+  // Signature specific
+  if (errorLower.includes('cancel') || errorLower.includes('annull')) {
+    return { code: SignatureErrorCode.SIGNATURE_CANCELLED, message: 'Operazione di firma annullata.' };
+  }
+  if (errorLower.includes('fail') || errorLower.includes('error') || errorLower.includes('errore')) {
+    return { code: SignatureErrorCode.SIGNATURE_FAILED, message: 'Firma digitale fallita. Riprovare.' };
+  }
+  
+  // Default
+  return { code: SignatureErrorCode.UNKNOWN_ERROR, message: errorMessage || 'Errore sconosciuto durante la firma.' };
+}
+
+// Signature audit log entry type
+export interface SignatureAuditEntry {
+  requestId: string;
+  operation: 'xml_signature' | 'smime_signature';
+  status: 'requested' | 'completed' | 'failed' | 'timeout';
+  errorCode?: SignatureErrorCode;
+  errorMessage?: string;
+  xmlLength?: number;
+  certificateSerial?: string;
+  signerEmail?: string;
+  requestedAt: Date;
+  completedAt?: Date;
+  durationMs?: number;
+}
+
+// In-memory audit log (last 100 entries) - for debugging and monitoring
+const signatureAuditLog: SignatureAuditEntry[] = [];
+const MAX_AUDIT_LOG_ENTRIES = 100;
+
+function addSignatureAuditEntry(entry: SignatureAuditEntry): void {
+  signatureAuditLog.unshift(entry);
+  if (signatureAuditLog.length > MAX_AUDIT_LOG_ENTRIES) {
+    signatureAuditLog.pop();
+  }
+  console.log(`[Bridge-Audit] ${entry.operation}: ${entry.status} - requestId=${entry.requestId}${entry.errorCode ? ` error=${entry.errorCode}` : ''}`);
+}
+
+export function getSignatureAuditLog(): SignatureAuditEntry[] {
+  return [...signatureAuditLog];
+}
+
 // Pending XML signature requests waiting for response from desktop bridge
 interface PendingSignatureRequest {
   resolve: (signedXml: XmlSignatureData) => void;
   reject: (error: Error) => void;
   timeout: NodeJS.Timeout;
   createdAt: Date;
+  auditEntry: SignatureAuditEntry;
 }
 
 export interface XmlSignatureData {
@@ -919,37 +1040,70 @@ function generateSignatureRequestId(): string {
 export async function requestXmlSignature(xmlContent: string): Promise<XmlSignatureData> {
   console.log(`[Bridge] requestXmlSignature called, XML length=${xmlContent.length}`);
   
+  const requestId = generateSignatureRequestId();
+  const requestedAt = new Date();
+  
+  // Create audit entry
+  const auditEntry: SignatureAuditEntry = {
+    requestId,
+    operation: 'xml_signature',
+    status: 'requested',
+    xmlLength: xmlContent.length,
+    requestedAt
+  };
+  
   // Check if bridge is connected
   if (!globalBridge || globalBridge.ws.readyState !== WebSocket.OPEN) {
     console.log(`[Bridge] ERROR: Bridge not connected for XML signature`);
-    throw new Error('SIGNATURE_BRIDGE_OFFLINE: App desktop Event4U non connessa. Impossibile firmare XML.');
+    auditEntry.status = 'failed';
+    auditEntry.errorCode = SignatureErrorCode.BRIDGE_OFFLINE;
+    auditEntry.errorMessage = 'App desktop Event4U non connessa';
+    auditEntry.completedAt = new Date();
+    auditEntry.durationMs = auditEntry.completedAt.getTime() - requestedAt.getTime();
+    addSignatureAuditEntry(auditEntry);
+    throw new Error(`${SignatureErrorCode.BRIDGE_OFFLINE}: App desktop Event4U non connessa. Impossibile firmare XML.`);
   }
   
   // Check if card is ready
   const cardReady = isCardReadyForSeals();
   console.log(`[Bridge] Card ready check for signature: ${JSON.stringify(cardReady)}`);
   if (!cardReady.ready) {
-    throw new Error(`SIGNATURE_CARD_NOT_READY: ${cardReady.error}`);
+    auditEntry.status = 'failed';
+    auditEntry.errorCode = SignatureErrorCode.CARD_NOT_READY;
+    auditEntry.errorMessage = cardReady.error;
+    auditEntry.completedAt = new Date();
+    auditEntry.durationMs = auditEntry.completedAt.getTime() - requestedAt.getTime();
+    addSignatureAuditEntry(auditEntry);
+    throw new Error(`${SignatureErrorCode.CARD_NOT_READY}: ${cardReady.error}`);
   }
   
-  const requestId = generateSignatureRequestId();
-  
   console.log(`[Bridge] Requesting XML signature: requestId=${requestId}`);
+  addSignatureAuditEntry(auditEntry);
   
   return new Promise<XmlSignatureData>((resolve, reject) => {
     // Set timeout
     const timeout = setTimeout(() => {
+      const pending = pendingSignatureRequests.get(requestId);
+      if (pending) {
+        pending.auditEntry.status = 'timeout';
+        pending.auditEntry.errorCode = SignatureErrorCode.BRIDGE_TIMEOUT;
+        pending.auditEntry.errorMessage = 'Timeout firma digitale XML';
+        pending.auditEntry.completedAt = new Date();
+        pending.auditEntry.durationMs = pending.auditEntry.completedAt.getTime() - pending.auditEntry.requestedAt.getTime();
+        addSignatureAuditEntry(pending.auditEntry);
+      }
       pendingSignatureRequests.delete(requestId);
       console.log(`[Bridge] XML signature request timeout: requestId=${requestId}`);
-      reject(new Error('SIGNATURE_TIMEOUT: Timeout firma digitale XML. Riprovare.'));
+      reject(new Error(`${SignatureErrorCode.BRIDGE_TIMEOUT}: Timeout firma digitale XML. Riprovare.`));
     }, SIGNATURE_REQUEST_TIMEOUT);
     
-    // Store pending request
+    // Store pending request with audit entry
     pendingSignatureRequests.set(requestId, {
       resolve,
       reject,
       timeout,
-      createdAt: new Date()
+      createdAt: requestedAt,
+      auditEntry: { ...auditEntry }
     });
     
     // Send request to bridge
@@ -967,9 +1121,18 @@ export async function requestXmlSignature(xmlContent: string): Promise<XmlSignat
       console.log(`[Bridge] XML signature request sent successfully, waiting for response...`);
     } catch (sendError: any) {
       console.log(`[Bridge] ERROR sending XML signature request: ${sendError.message}`);
+      const pending = pendingSignatureRequests.get(requestId);
+      if (pending) {
+        pending.auditEntry.status = 'failed';
+        pending.auditEntry.errorCode = SignatureErrorCode.BRIDGE_SEND_ERROR;
+        pending.auditEntry.errorMessage = sendError.message;
+        pending.auditEntry.completedAt = new Date();
+        pending.auditEntry.durationMs = pending.auditEntry.completedAt.getTime() - pending.auditEntry.requestedAt.getTime();
+        addSignatureAuditEntry(pending.auditEntry);
+      }
       clearTimeout(timeout);
       pendingSignatureRequests.delete(requestId);
-      reject(new Error('SIGNATURE_SEND_ERROR: Errore invio richiesta firma'));
+      reject(new Error(`${SignatureErrorCode.BRIDGE_SEND_ERROR}: Errore invio richiesta firma`));
     }
   });
 }
@@ -985,8 +1148,19 @@ export function handleSignatureResponse(requestId: string, success: boolean, sig
   clearTimeout(pending.timeout);
   pendingSignatureRequests.delete(requestId);
   
+  const completedAt = new Date();
+  const durationMs = completedAt.getTime() - pending.createdAt.getTime();
+  
   if (success && signatureData) {
-    console.log(`[Bridge] XML signature request completed: requestId=${requestId}`);
+    console.log(`[Bridge] XML signature request completed: requestId=${requestId}, duration=${durationMs}ms`);
+    
+    // Update audit entry for success
+    pending.auditEntry.status = 'completed';
+    pending.auditEntry.completedAt = completedAt;
+    pending.auditEntry.durationMs = durationMs;
+    pending.auditEntry.certificateSerial = signatureData.certificateSerial;
+    addSignatureAuditEntry(pending.auditEntry);
+    
     pending.resolve({
       signedXml: signatureData.signedXml,
       signatureValue: signatureData.signatureValue || '',
@@ -994,8 +1168,19 @@ export function handleSignatureResponse(requestId: string, success: boolean, sig
       signedAt: signatureData.signedAt || new Date().toISOString()
     });
   } else {
-    console.log(`[Bridge] XML signature request failed: requestId=${requestId}, error=${error}`);
-    pending.reject(new Error(`SIGNATURE_ERROR: ${error || 'Errore firma digitale XML'}`));
+    // Parse the error for structured handling
+    const parsedError = parseSignatureError(error || 'Errore firma digitale XML');
+    console.log(`[Bridge] XML signature request failed: requestId=${requestId}, code=${parsedError.code}, error=${parsedError.message}`);
+    
+    // Update audit entry for failure
+    pending.auditEntry.status = 'failed';
+    pending.auditEntry.errorCode = parsedError.code;
+    pending.auditEntry.errorMessage = parsedError.message;
+    pending.auditEntry.completedAt = completedAt;
+    pending.auditEntry.durationMs = durationMs;
+    addSignatureAuditEntry(pending.auditEntry);
+    
+    pending.reject(new Error(`${parsedError.code}: ${parsedError.message}`));
   }
 }
 
@@ -1022,6 +1207,7 @@ interface PendingSmimeRequest {
   reject: (error: Error) => void;
   timeout: NodeJS.Timeout;
   createdAt: Date;
+  auditEntry: SignatureAuditEntry;
 }
 
 const pendingSmimeRequests = new Map<string, PendingSmimeRequest>();
@@ -1050,37 +1236,70 @@ export async function requestSmimeSignature(
 ): Promise<SmimeSignatureData> {
   console.log(`[Bridge] requestSmimeSignature called, MIME length=${mimeContent.length}, recipient=${recipientEmail}`);
   
+  const requestId = generateSmimeRequestId();
+  const requestedAt = new Date();
+  
+  // Create audit entry for S/MIME signature
+  const auditEntry: SignatureAuditEntry = {
+    requestId,
+    operation: 'smime_signature',
+    status: 'requested',
+    xmlLength: mimeContent.length,
+    requestedAt
+  };
+  
   // Check if bridge is connected
   if (!globalBridge || globalBridge.ws.readyState !== WebSocket.OPEN) {
     console.log(`[Bridge] ERROR: Bridge not connected for S/MIME signature`);
-    throw new Error('SMIME_BRIDGE_OFFLINE: App desktop Event4U non connessa. Impossibile firmare email S/MIME.');
+    auditEntry.status = 'failed';
+    auditEntry.errorCode = SignatureErrorCode.BRIDGE_OFFLINE;
+    auditEntry.errorMessage = 'App desktop Event4U non connessa';
+    auditEntry.completedAt = new Date();
+    auditEntry.durationMs = auditEntry.completedAt.getTime() - requestedAt.getTime();
+    addSignatureAuditEntry(auditEntry);
+    throw new Error(`${SignatureErrorCode.BRIDGE_OFFLINE}: App desktop Event4U non connessa. Impossibile firmare email S/MIME.`);
   }
   
   // Check if card is ready
   const cardReady = isCardReadyForSeals();
   console.log(`[Bridge] Card ready check for S/MIME: ${JSON.stringify(cardReady)}`);
   if (!cardReady.ready) {
-    throw new Error(`SMIME_CARD_NOT_READY: ${cardReady.error}`);
+    auditEntry.status = 'failed';
+    auditEntry.errorCode = SignatureErrorCode.CARD_NOT_READY;
+    auditEntry.errorMessage = cardReady.error;
+    auditEntry.completedAt = new Date();
+    auditEntry.durationMs = auditEntry.completedAt.getTime() - requestedAt.getTime();
+    addSignatureAuditEntry(auditEntry);
+    throw new Error(`${SignatureErrorCode.CARD_NOT_READY}: ${cardReady.error}`);
   }
   
-  const requestId = generateSmimeRequestId();
-  
   console.log(`[Bridge] Requesting S/MIME signature: requestId=${requestId}`);
+  addSignatureAuditEntry(auditEntry);
   
   return new Promise<SmimeSignatureData>((resolve, reject) => {
     // Set timeout
     const timeout = setTimeout(() => {
+      const pending = pendingSmimeRequests.get(requestId);
+      if (pending) {
+        pending.auditEntry.status = 'timeout';
+        pending.auditEntry.errorCode = SignatureErrorCode.BRIDGE_TIMEOUT;
+        pending.auditEntry.errorMessage = 'Timeout firma S/MIME email';
+        pending.auditEntry.completedAt = new Date();
+        pending.auditEntry.durationMs = pending.auditEntry.completedAt.getTime() - pending.auditEntry.requestedAt.getTime();
+        addSignatureAuditEntry(pending.auditEntry);
+      }
       pendingSmimeRequests.delete(requestId);
       console.log(`[Bridge] S/MIME signature request timeout: requestId=${requestId}`);
-      reject(new Error('SMIME_TIMEOUT: Timeout firma S/MIME email. Riprovare.'));
+      reject(new Error(`${SignatureErrorCode.BRIDGE_TIMEOUT}: Timeout firma S/MIME email. Riprovare.`));
     }, SMIME_REQUEST_TIMEOUT);
     
-    // Store pending request
+    // Store pending request with audit entry
     pendingSmimeRequests.set(requestId, {
       resolve,
       reject,
       timeout,
-      createdAt: new Date()
+      createdAt: requestedAt,
+      auditEntry: { ...auditEntry }
     });
     
     // Send request to bridge
@@ -1099,9 +1318,18 @@ export async function requestSmimeSignature(
       console.log(`[Bridge] S/MIME signature request sent successfully, waiting for response...`);
     } catch (sendError: any) {
       console.log(`[Bridge] ERROR sending S/MIME signature request: ${sendError.message}`);
+      const pending = pendingSmimeRequests.get(requestId);
+      if (pending) {
+        pending.auditEntry.status = 'failed';
+        pending.auditEntry.errorCode = SignatureErrorCode.BRIDGE_SEND_ERROR;
+        pending.auditEntry.errorMessage = sendError.message;
+        pending.auditEntry.completedAt = new Date();
+        pending.auditEntry.durationMs = pending.auditEntry.completedAt.getTime() - pending.auditEntry.requestedAt.getTime();
+        addSignatureAuditEntry(pending.auditEntry);
+      }
       clearTimeout(timeout);
       pendingSmimeRequests.delete(requestId);
-      reject(new Error('SMIME_SEND_ERROR: Errore invio richiesta firma S/MIME'));
+      reject(new Error(`${SignatureErrorCode.BRIDGE_SEND_ERROR}: Errore invio richiesta firma S/MIME`));
     }
   });
 }
@@ -1122,8 +1350,20 @@ export function handleSmimeSignatureResponse(
   clearTimeout(pending.timeout);
   pendingSmimeRequests.delete(requestId);
   
+  const completedAt = new Date();
+  const durationMs = completedAt.getTime() - pending.createdAt.getTime();
+  
   if (success && signatureData) {
-    console.log(`[Bridge] S/MIME signature request completed: requestId=${requestId}, signerEmail=${signatureData.signerEmail}`);
+    console.log(`[Bridge] S/MIME signature request completed: requestId=${requestId}, signerEmail=${signatureData.signerEmail}, duration=${durationMs}ms`);
+    
+    // Update audit entry for success
+    pending.auditEntry.status = 'completed';
+    pending.auditEntry.completedAt = completedAt;
+    pending.auditEntry.durationMs = durationMs;
+    pending.auditEntry.signerEmail = signatureData.signerEmail;
+    pending.auditEntry.certificateSerial = signatureData.certificateSerial;
+    addSignatureAuditEntry(pending.auditEntry);
+    
     pending.resolve({
       signedMime: signatureData.signedMime,
       signerEmail: signatureData.signerEmail || '',
@@ -1132,8 +1372,19 @@ export function handleSmimeSignatureResponse(
       signedAt: signatureData.signedAt || new Date().toISOString()
     });
   } else {
-    console.log(`[Bridge] S/MIME signature request failed: requestId=${requestId}, error=${error}`);
-    pending.reject(new Error(`SMIME_ERROR: ${error || 'Errore firma S/MIME email'}`));
+    // Parse the error for structured handling
+    const parsedError = parseSignatureError(error || 'Errore firma S/MIME email');
+    console.log(`[Bridge] S/MIME signature request failed: requestId=${requestId}, code=${parsedError.code}, error=${parsedError.message}`);
+    
+    // Update audit entry for failure
+    pending.auditEntry.status = 'failed';
+    pending.auditEntry.errorCode = parsedError.code;
+    pending.auditEntry.errorMessage = parsedError.message;
+    pending.auditEntry.completedAt = completedAt;
+    pending.auditEntry.durationMs = durationMs;
+    addSignatureAuditEntry(pending.auditEntry);
+    
+    pending.reject(new Error(`${parsedError.code}: ${parsedError.message}`));
   }
 }
 
