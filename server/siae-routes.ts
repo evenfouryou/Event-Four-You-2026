@@ -3077,170 +3077,186 @@ router.post("/api/siae/transmissions/:id/send-email", requireAuth, requireGestor
   }
 });
 
-// Generate and send C1 transmission (daily or monthly)
-// type: 'daily' for giornaliero (default), 'monthly' for mensile
-router.post("/api/siae/companies/:companyId/transmissions/send-c1", requireAuth, requireGestore, async (req: Request, res: Response) => {
-  try {
-    const { companyId } = req.params;
-    const { date, toEmail, type = 'daily', signWithSmartCard = true } = req.body;
-    const isMonthly = type === 'monthly';
+// ==================== C1 Transmission Handler (Shared Logic) ====================
+// Shared handler for generating and sending C1 transmissions (daily or monthly)
+// Used by both /send-c1 and legacy /send-daily endpoints
+interface SendC1Params {
+  companyId: string;
+  date?: string;
+  toEmail?: string;
+  type?: 'daily' | 'monthly';
+  signWithSmartCard?: boolean;
+}
+
+async function handleSendC1Transmission(params: SendC1Params): Promise<{
+  success: boolean;
+  statusCode: number;
+  data?: any;
+  error?: string;
+}> {
+  const { companyId, date, toEmail, type = 'daily', signWithSmartCard = true } = params;
+  const isMonthly = type === 'monthly';
+  
+  const reportDate = date ? new Date(date) : new Date();
+  reportDate.setHours(0, 0, 0, 0);
+  
+  // Get activation card for company
+  const activationCards = await siaeStorage.getSiaeActivationCardsByCompany(companyId);
+  const activeCard = activationCards.find(c => c.status === 'active');
+  
+  if (!activeCard) {
+    return { success: false, statusCode: 400, error: "Nessuna carta di attivazione attiva trovata" };
+  }
+  
+  // Get system config for fiscal code
+  const systemConfig = await siaeStorage.getSiaeSystemConfig(companyId);
+  const company = await storage.getCompany(companyId);
+  const companyName = company?.name || 'N/A';
+  
+  // CONTROLLO OBBLIGATORIO: Codice Fiscale Emittente
+  const taxId = systemConfig?.taxId || company?.taxId;
+  if (!taxId) {
+    return { 
+      success: false, 
+      statusCode: 400, 
+      error: "Codice Fiscale Emittente non configurato. Vai su Impostazioni SIAE > Dati Aziendali per configurarlo prima di generare report.",
+      data: { code: "TAX_ID_REQUIRED" }
+    };
+  }
+  
+  // Calculate date range based on report type
+  let startDate: Date, endDate: Date;
+  if (isMonthly) {
+    // For monthly: entire month
+    startDate = new Date(reportDate.getFullYear(), reportDate.getMonth(), 1);
+    endDate = new Date(reportDate.getFullYear(), reportDate.getMonth() + 1, 0, 23, 59, 59, 999);
+  } else {
+    // For daily: single day
+    startDate = new Date(reportDate);
+    startDate.setHours(0, 0, 0, 0);
+    endDate = new Date(reportDate);
+    endDate.setHours(23, 59, 59, 999);
+  }
+  
+  // Get tickets for the date range
+  const allTickets = await siaeStorage.getSiaeTicketsByCompany(companyId);
+  const filteredTickets = allTickets.filter(t => {
+    const ticketDate = new Date(t.emissionDate);
+    return ticketDate >= startDate && ticketDate <= endDate;
+  });
+  
+  const now = new Date();
+  const oraGen = now.toTimeString().split(' ')[0].replace(/:/g, '');
+  
+  // Calculate totals
+  const totalAmount = filteredTickets.reduce((sum, t) => sum + parseFloat(t.grossAmount || '0'), 0);
+  
+  // Generate C1 XML using shared helper (eliminates duplication between daily/monthly)
+  const xml = await generateC1ReportXml({
+    companyId,
+    reportDate,
+    isMonthly,
+    filteredTickets,
+    systemConfig,
+    companyName,
+    taxId,
+    oraGen,
+  });
+  
+  const transmissionType = isMonthly ? 'monthly' : 'daily';
+  const typeLabel = isMonthly ? 'mensile' : 'giornaliera';
+  
+  // Try to sign the XML with smart card if requested (with retry for unstable connections)
+  let xmlToSend = xml;
+  let signatureInfo = '';
+  let signatureData = null;
+  
+  if (signWithSmartCard) {
+    const MAX_SIGNATURE_RETRIES = 3;
+    const RETRY_DELAY_MS = 2000;
     
-    const reportDate = date ? new Date(date) : new Date();
-    reportDate.setHours(0, 0, 0, 0);
-    
-    // Get activation card for company
-    const activationCards = await siaeStorage.getSiaeActivationCardsByCompany(companyId);
-    const activeCard = activationCards.find(c => c.status === 'active');
-    
-    if (!activeCard) {
-      return res.status(400).json({ message: "Nessuna carta di attivazione attiva trovata" });
-    }
-    
-    // Get system config for fiscal code
-    const systemConfig = await siaeStorage.getSiaeSystemConfig(companyId);
-    const company = await storage.getCompany(companyId);
-    const companyName = company?.name || 'N/A';
-    
-    // CONTROLLO OBBLIGATORIO: Codice Fiscale Emittente
-    const taxId = systemConfig?.taxId || company?.taxId;
-    if (!taxId) {
-      return res.status(400).json({ 
-        message: "Codice Fiscale Emittente non configurato. Vai su Impostazioni SIAE > Dati Aziendali per configurarlo prima di generare report.",
-        code: "TAX_ID_REQUIRED"
-      });
-    }
-    
-    // Calculate date range based on report type
-    let startDate: Date, endDate: Date;
-    if (isMonthly) {
-      // For monthly: entire month
-      startDate = new Date(reportDate.getFullYear(), reportDate.getMonth(), 1);
-      endDate = new Date(reportDate.getFullYear(), reportDate.getMonth() + 1, 0, 23, 59, 59, 999);
-    } else {
-      // For daily: single day
-      startDate = new Date(reportDate);
-      startDate.setHours(0, 0, 0, 0);
-      endDate = new Date(reportDate);
-      endDate.setHours(23, 59, 59, 999);
-    }
-    
-    // Get tickets for the date range
-    const allTickets = await siaeStorage.getSiaeTicketsByCompany(companyId);
-    const filteredTickets = allTickets.filter(t => {
-      const ticketDate = new Date(t.emissionDate);
-      return ticketDate >= startDate && ticketDate <= endDate;
-    });
-    
-    const now = new Date();
-    const oraGen = now.toTimeString().split(' ')[0].replace(/:/g, '');
-    
-    // Calculate totals
-    const totalAmount = filteredTickets.reduce((sum, t) => sum + parseFloat(t.grossAmount || '0'), 0);
-    
-    // Generate C1 XML using shared helper (eliminates duplication between daily/monthly)
-    const xml = await generateC1ReportXml({
-      companyId,
-      reportDate,
-      isMonthly,
-      filteredTickets,
-      systemConfig,
-      companyName,
-      taxId,
-      oraGen,
-    });
-    
-    const transmissionType = isMonthly ? 'monthly' : 'daily';
-    const typeLabel = isMonthly ? 'mensile' : 'giornaliera';
-    
-    // Try to sign the XML with smart card if requested (with retry for unstable connections)
-    let xmlToSend = xml;
-    let signatureInfo = '';
-    let signatureData = null;
-    
-    if (signWithSmartCard) {
-      const MAX_SIGNATURE_RETRIES = 3;
-      const RETRY_DELAY_MS = 2000;
-      
-      for (let attempt = 1; attempt <= MAX_SIGNATURE_RETRIES; attempt++) {
-        try {
-          const bridgeConnected = isBridgeConnected();
-          console.log(`[SIAE-ROUTES] Signature attempt ${attempt}/${MAX_SIGNATURE_RETRIES}: bridgeConnected=${bridgeConnected}`);
-          
-          if (bridgeConnected) {
-            console.log(`[SIAE-ROUTES] Attempting XML signature for C1 ${typeLabel} report...`);
-            signatureData = await requestXmlSignature(xml);
-            xmlToSend = signatureData.signedXml;
-            signatureInfo = ' (firmato digitalmente)';
-            console.log(`[SIAE-ROUTES] XML signed successfully for C1 ${typeLabel}`);
-            break; // Success, exit retry loop
-          } else {
-            console.log(`[SIAE-ROUTES] Bridge not connected on attempt ${attempt}, waiting ${RETRY_DELAY_MS}ms...`);
-            if (attempt < MAX_SIGNATURE_RETRIES) {
-              await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS));
-            } else {
-              console.log(`[SIAE-ROUTES] Bridge not connected after ${MAX_SIGNATURE_RETRIES} attempts, sending unsigned XML for C1 ${typeLabel}`);
-              signatureInfo = ' (non firmato - bridge non connesso)';
-            }
-          }
-        } catch (signError: any) {
-          console.error(`[SIAE-ROUTES] XML signature failed on attempt ${attempt}:`, signError.message);
+    for (let attempt = 1; attempt <= MAX_SIGNATURE_RETRIES; attempt++) {
+      try {
+        const bridgeConnected = isBridgeConnected();
+        console.log(`[SIAE-ROUTES] Signature attempt ${attempt}/${MAX_SIGNATURE_RETRIES}: bridgeConnected=${bridgeConnected}`);
+        
+        if (bridgeConnected) {
+          console.log(`[SIAE-ROUTES] Attempting XML signature for C1 ${typeLabel} report...`);
+          signatureData = await requestXmlSignature(xml);
+          xmlToSend = signatureData.signedXml;
+          signatureInfo = ' (firmato digitalmente)';
+          console.log(`[SIAE-ROUTES] XML signed successfully for C1 ${typeLabel}`);
+          break; // Success, exit retry loop
+        } else {
+          console.log(`[SIAE-ROUTES] Bridge not connected on attempt ${attempt}, waiting ${RETRY_DELAY_MS}ms...`);
           if (attempt < MAX_SIGNATURE_RETRIES) {
-            console.log(`[SIAE-ROUTES] Retrying in ${RETRY_DELAY_MS}ms...`);
             await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS));
           } else {
-            signatureInfo = ` (non firmato - ${signError.message})`;
+            console.log(`[SIAE-ROUTES] Bridge not connected after ${MAX_SIGNATURE_RETRIES} attempts, sending unsigned XML for C1 ${typeLabel}`);
+            signatureInfo = ' (non firmato - bridge non connesso)';
           }
+        }
+      } catch (signError: any) {
+        console.error(`[SIAE-ROUTES] XML signature failed on attempt ${attempt}:`, signError.message);
+        if (attempt < MAX_SIGNATURE_RETRIES) {
+          console.log(`[SIAE-ROUTES] Retrying in ${RETRY_DELAY_MS}ms...`);
+          await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS));
+        } else {
+          signatureInfo = ` (non firmato - ${signError.message})`;
         }
       }
     }
-    
-    // Create transmission record
-    const transmission = await siaeStorage.createSiaeTransmission({
-      companyId,
-      transmissionType,
-      periodDate: reportDate,
-      fileContent: xmlToSend,
-      status: 'pending',
-      ticketsCount: filteredTickets.length,
-      totalAmount: totalAmount.toString(),
-    });
-    
-    // Import and send the email with SIAE-compliant format (Allegato C)
-    const { sendSiaeTransmissionEmail } = await import('./email-service');
-    
-    const destination = getSiaeDestinationEmail(toEmail);
-    const emailResult = await sendSiaeTransmissionEmail({
-      to: destination,
-      companyName,
-      transmissionType,
-      periodDate: reportDate,
-      ticketsCount: filteredTickets.length,
-      totalAmount: totalAmount.toString(),
-      xmlContent: xmlToSend,
-      transmissionId: transmission.id,
-      systemCode: SIAE_SYSTEM_CODE_DEFAULT,
-      sequenceNumber: 1,
-      signWithSmime: true, // Per Allegato C SIAE 1.6.2 - firma S/MIME obbligatoria
-    });
-    
-    const smimeInfo = emailResult.smimeSigned 
-      ? ` (S/MIME: ${emailResult.signerEmail})` 
-      : ' (NON firmata S/MIME)';
-    console.log(`[SIAE-ROUTES] ${typeLabel.toUpperCase()} RCA transmission sent to: ${destination}${signatureInfo}${smimeInfo} (Test mode: ${SIAE_TEST_MODE})`);
-    
-    // Update transmission status with S/MIME info
-    await siaeStorage.updateSiaeTransmission(transmission.id, {
-      status: 'sent',
-      sentAt: new Date(),
-      sentToPec: destination,
-      smimeSigned: emailResult.smimeSigned || false,
-      smimeSignerEmail: emailResult.signerEmail || null,
-      smimeSignerName: emailResult.signerName || null,
-      smimeSignedAt: emailResult.signedAt ? new Date(emailResult.signedAt) : null,
-    });
-    
-    res.json({
-      success: true,
+  }
+  
+  // Create transmission record
+  const transmission = await siaeStorage.createSiaeTransmission({
+    companyId,
+    transmissionType,
+    periodDate: reportDate,
+    fileContent: xmlToSend,
+    status: 'pending',
+    ticketsCount: filteredTickets.length,
+    totalAmount: totalAmount.toString(),
+  });
+  
+  // Import and send the email with SIAE-compliant format (Allegato C)
+  const { sendSiaeTransmissionEmail } = await import('./email-service');
+  
+  const destination = getSiaeDestinationEmail(toEmail);
+  const emailResult = await sendSiaeTransmissionEmail({
+    to: destination,
+    companyName,
+    transmissionType,
+    periodDate: reportDate,
+    ticketsCount: filteredTickets.length,
+    totalAmount: totalAmount.toString(),
+    xmlContent: xmlToSend,
+    transmissionId: transmission.id,
+    systemCode: SIAE_SYSTEM_CODE_DEFAULT,
+    sequenceNumber: 1,
+    signWithSmime: true, // Per Allegato C SIAE 1.6.2 - firma S/MIME obbligatoria
+  });
+  
+  const smimeInfo = emailResult.smimeSigned 
+    ? ` (S/MIME: ${emailResult.signerEmail})` 
+    : ' (NON firmata S/MIME)';
+  console.log(`[SIAE-ROUTES] ${typeLabel.toUpperCase()} C1 transmission sent to: ${destination}${signatureInfo}${smimeInfo} (Test mode: ${SIAE_TEST_MODE})`);
+  
+  // Update transmission status with S/MIME info
+  await siaeStorage.updateSiaeTransmission(transmission.id, {
+    status: 'sent',
+    sentAt: new Date(),
+    sentToPec: destination,
+    smimeSigned: emailResult.smimeSigned || false,
+    smimeSignerEmail: emailResult.signerEmail || null,
+    smimeSignerName: emailResult.signerName || null,
+    smimeSignedAt: emailResult.signedAt ? new Date(emailResult.signedAt) : null,
+  });
+  
+  return {
+    success: true,
+    statusCode: 200,
+    data: {
       message: `Trasmissione ${typeLabel} generata e inviata con successo${signatureInfo}${emailResult.smimeSigned ? ' (email firmata S/MIME)' : ''}`,
       transmission: {
         id: transmission.id,
@@ -3252,177 +3268,59 @@ router.post("/api/siae/companies/:companyId/transmissions/send-c1", requireAuth,
         smimeSigned: emailResult.smimeSigned,
         smimeSignerEmail: emailResult.signerEmail,
       }
+    }
+  };
+}
+
+// Generate and send C1 transmission (daily or monthly)
+// type: 'daily' for giornaliero (default), 'monthly' for mensile
+router.post("/api/siae/companies/:companyId/transmissions/send-c1", requireAuth, requireGestore, async (req: Request, res: Response) => {
+  try {
+    const { companyId } = req.params;
+    const { date, toEmail, type = 'daily', signWithSmartCard = true } = req.body;
+    
+    const result = await handleSendC1Transmission({
+      companyId,
+      date,
+      toEmail,
+      type,
+      signWithSmartCard,
     });
+    
+    if (result.success) {
+      res.json({ success: true, ...result.data });
+    } else {
+      res.status(result.statusCode).json({ message: result.error, ...result.data });
+    }
   } catch (error: any) {
     console.error('[SIAE-ROUTES] Failed to send C1 transmission:', error);
     res.status(500).json({ message: error.message });
   }
 });
 
-// Legacy endpoint - redirect to new send-c1 with type=daily
+// Legacy endpoint - uses shared C1 handler with type=daily
+// DEPRECATED: Use /api/siae/companies/:companyId/transmissions/send-c1 with type='daily' instead
 router.post("/api/siae/companies/:companyId/transmissions/send-daily", requireAuth, requireGestore, async (req: Request, res: Response) => {
-  req.body.type = 'daily';
-  
+  console.log('[SIAE-ROUTES] Legacy send-daily endpoint called - using shared C1 handler with type=daily');
   try {
     const { companyId } = req.params;
-    const { date, toEmail } = req.body;
+    const { date, toEmail, signWithSmartCard = true } = req.body;
     
-    const reportDate = date ? new Date(date) : new Date();
-    reportDate.setHours(0, 0, 0, 0);
-    
-    // Get activation card for company
-    const activationCards = await siaeStorage.getSiaeActivationCardsByCompany(companyId);
-    const activeCard = activationCards.find(c => c.status === 'active');
-    
-    if (!activeCard) {
-      return res.status(400).json({ message: "Nessuna carta di attivazione attiva trovata" });
-    }
-    
-    // Get system config for fiscal code
-    const systemConfig = await siaeStorage.getSiaeSystemConfig(companyId);
-    const company = await storage.getCompany(companyId);
-    
-    // CONTROLLO OBBLIGATORIO: Codice Fiscale Emittente
-    const taxId = systemConfig?.taxId || company?.taxId;
-    if (!taxId) {
-      return res.status(400).json({ 
-        message: "Codice Fiscale Emittente non configurato. Vai su Impostazioni SIAE > Dati Aziendali per configurarlo prima di generare report.",
-        code: "TAX_ID_REQUIRED"
-      });
-    }
-    
-    // Get all tickets for the date range
-    const startOfDay = new Date(reportDate);
-    startOfDay.setHours(0, 0, 0, 0);
-    const endOfDay = new Date(reportDate);
-    endOfDay.setHours(23, 59, 59, 999);
-    
-    // Get tickets issued on this date
-    const allTickets = await siaeStorage.getSiaeTicketsByCompany(companyId);
-    const dayTickets = allTickets.filter(t => {
-      const ticketDate = new Date(t.emissionDate);
-      return ticketDate >= startOfDay && ticketDate <= endOfDay;
-    });
-    
-    // Build XML report
-    let xml = `<?xml version="1.0" encoding="UTF-8"?>
-<ComunicazioneDatiTitoli xmlns="urn:siae:biglietteria:2025">
-  <Intestazione>
-    <CodiceFiscaleEmittente>${escapeXml(taxId)}</CodiceFiscaleEmittente>
-    <NumeroCarta>${escapeXml(activeCard.cardCode)}</NumeroCarta>
-    <DataRiferimento>${formatSiaeDate(reportDate)}</DataRiferimento>
-    <DataOraGenerazione>${formatSiaeDateTime(new Date())}</DataOraGenerazione>
-    <TipoTrasmissione>ORDINARIA</TipoTrasmissione>
-  </Intestazione>
-  <ElencoTitoli>`;
-    
-    for (const ticket of dayTickets) {
-      let ticketedEvent = null;
-      if (ticket.sectorId) {
-        const sector = await siaeStorage.getSiaeEventSector(ticket.sectorId);
-        if (sector?.ticketedEventId) {
-          ticketedEvent = await siaeStorage.getSiaeTicketedEvent(sector.ticketedEventId);
-        }
-      } else if (ticket.ticketedEventId) {
-        ticketedEvent = await siaeStorage.getSiaeTicketedEvent(ticket.ticketedEventId);
-      }
-      
-      xml += `
-    <Titolo>
-      <NumeroProgressivo>${ticket.progressiveNumber || 0}</NumeroProgressivo>
-      <SigilloFiscale>${escapeXml(ticket.fiscalSealCode)}</SigilloFiscale>
-      <TipologiaTitolo>${escapeXml(ticket.ticketTypeCode)}</TipologiaTitolo>
-      <DataOraEmissione>${formatSiaeDateTime(ticket.emissionDate)}</DataOraEmissione>
-      <CodiceCanale>${escapeXml(ticket.emissionChannelCode || 'WEB')}</CodiceCanale>
-      <ImportoLordo>${parseFloat(ticket.grossAmount || '0').toFixed(2)}</ImportoLordo>
-      <ImportoNetto>${parseFloat(ticket.netAmount || '0').toFixed(2)}</ImportoNetto>
-      <Diritti>0.00</Diritti>
-      <IVA>${parseFloat(ticket.vatAmount || '0').toFixed(2)}</IVA>
-      <CodiceGenere>${escapeXml(ticketedEvent?.genreCode || '60')}</CodiceGenere>
-      <CodicePrestazione>${escapeXml(ticket.ticketTypeCode || 'INT')}</CodicePrestazione>
-      <DataEvento>${formatSiaeDate(ticketedEvent?.eventDate || ticketedEvent?.saleStartDate || null)}</DataEvento>
-      <NominativoAcquirente>
-        <Nome>${escapeXml(ticket.participantFirstName || 'N/D')}</Nome>
-        <Cognome>${escapeXml(ticket.participantLastName || 'N/D')}</Cognome>
-      </NominativoAcquirente>
-      <Stato>${mapToSiaeStatus(ticket.status)}</Stato>
-    </Titolo>`;
-    }
-    
-    xml += `
-  </ElencoTitoli>
-  <Riepilogo>
-    <TotaleTitoli>${dayTickets.length}</TotaleTitoli>
-    <TotaleImportoLordo>${dayTickets.reduce((sum, t) => sum + parseFloat(t.grossAmount || '0'), 0).toFixed(2)}</TotaleImportoLordo>
-    <TotaleDiritti>0.00</TotaleDiritti>
-    <TotaleIVA>${dayTickets.reduce((sum, t) => sum + parseFloat(t.vatAmount || '0'), 0).toFixed(2)}</TotaleIVA>
-  </Riepilogo>
-</ComunicazioneDatiTitoli>`;
-    
-    const totalAmount = dayTickets.reduce((sum, t) => sum + parseFloat(t.grossAmount || '0'), 0).toString();
-    
-    // Create transmission record
-    const transmission = await siaeStorage.createSiaeTransmission({
+    const result = await handleSendC1Transmission({
       companyId,
-      transmissionType: 'daily',
-      periodDate: reportDate,
-      fileContent: xml,
-      status: 'pending',
-      ticketsCount: dayTickets.length,
-      totalAmount,
+      date,
+      toEmail,
+      type: 'daily',
+      signWithSmartCard,
     });
     
-    // Use already loaded company for name
-    const companyName = company?.name || 'N/A';
-    
-    // Import and send the email with SIAE-compliant format (Allegato C)
-    const { sendSiaeTransmissionEmail } = await import('./email-service');
-    
-    const dailyDestination = getSiaeDestinationEmail(toEmail);
-    const emailResult = await sendSiaeTransmissionEmail({
-      to: dailyDestination,
-      companyName,
-      transmissionType: 'daily',
-      periodDate: reportDate,
-      ticketsCount: dayTickets.length,
-      totalAmount,
-      xmlContent: xml,
-      transmissionId: transmission.id,
-      systemCode: SIAE_SYSTEM_CODE_DEFAULT,
-      sequenceNumber: 1,
-      signWithSmime: true, // Per Allegato C SIAE 1.6.2 - firma S/MIME obbligatoria
-    });
-    
-    const smimeInfo = emailResult.smimeSigned 
-      ? ` (S/MIME: ${emailResult.signerEmail})` 
-      : ' (NON firmata S/MIME)';
-    console.log(`[SIAE-ROUTES] Daily RCA transmission sent to: ${dailyDestination}${smimeInfo} (Test mode: ${SIAE_TEST_MODE})`);
-    
-    // Update transmission status with S/MIME info
-    await siaeStorage.updateSiaeTransmission(transmission.id, {
-      status: 'sent',
-      sentAt: new Date(),
-      sentToPec: dailyDestination,
-      smimeSigned: emailResult.smimeSigned || false,
-      smimeSignerEmail: emailResult.signerEmail || null,
-      smimeSignerName: emailResult.signerName || null,
-      smimeSignedAt: emailResult.signedAt ? new Date(emailResult.signedAt) : null,
-    });
-    
-    res.json({
-      success: true,
-      message: `Trasmissione giornaliera generata e inviata con successo${emailResult.smimeSigned ? ' (email firmata S/MIME)' : ''}`,
-      transmission: {
-        id: transmission.id,
-        ticketsCount: dayTickets.length,
-        totalAmount,
-        sentTo: dailyDestination,
-        smimeSigned: emailResult.smimeSigned,
-        smimeSignerEmail: emailResult.signerEmail,
-      }
-    });
+    if (result.success) {
+      res.json({ success: true, ...result.data });
+    } else {
+      res.status(result.statusCode).json({ message: result.error, ...result.data });
+    }
   } catch (error: any) {
-    console.error('[SIAE-ROUTES] Failed to send daily transmission:', error);
+    console.error('[SIAE-ROUTES] Failed to send daily transmission (legacy):', error);
     res.status(500).json({ message: error.message });
   }
 });
@@ -4522,6 +4420,9 @@ router.get("/api/siae/companies/:companyId/reports/xml/daily", requireAuth, requ
 });
 
 // Generate XML for event report (all tickets for a specific event)
+// NOTE: This is an INTERNAL UTILITY endpoint for viewing/downloading event data.
+// Uses custom internal format - NOT for official SIAE transmission.
+// For official C1 transmissions, use /api/siae/companies/:companyId/transmissions/send-c1
 router.get("/api/siae/ticketed-events/:eventId/reports/xml", requireAuth, requireOrganizer, async (req: Request, res: Response) => {
   try {
     const { eventId } = req.params;
@@ -4621,6 +4522,9 @@ router.get("/api/siae/ticketed-events/:eventId/reports/xml", requireAuth, requir
 });
 
 // Generate XML for cancellations report
+// NOTE: This is an INTERNAL UTILITY endpoint for viewing/downloading cancellation data.
+// Uses custom internal format - NOT for official SIAE transmission.
+// For official C1 transmissions, use /api/siae/companies/:companyId/transmissions/send-c1
 router.get("/api/siae/companies/:companyId/reports/xml/cancellations", requireAuth, requireGestore, async (req: Request, res: Response) => {
   try {
     const { companyId } = req.params;
