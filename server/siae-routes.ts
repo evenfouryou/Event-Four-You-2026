@@ -4134,28 +4134,38 @@ async function generateC1ReportXml(params: C1ReportParams): Promise<string> {
     // Build OrdineDiPosto (sectors) XML with TitoliAccesso inside
     let sectorsXml = '';
     for (const [sectorKey, sectorTickets] of ticketsBySector) {
-      let codiceOrdine = 'A0';
+      // CodiceOrdine: codice settore 2 caratteri (Allegato B TAB.2). Default: 99=Altro settore
+      let codiceOrdine = '99';
       let capacity = ticketedEvent.capacity || 100;
       
       if (sectorKey !== DEFAULT_SECTOR_KEY) {
         const sector = await siaeStorage.getSiaeEventSector(sectorKey);
         if (sector) {
-          codiceOrdine = sector.sectorCode || 'A0';
+          codiceOrdine = sector.sectorCode || '99';
           capacity = sector.capacity || capacity;
         }
       }
       
       // Group by ticket type for TitoliAccesso
+      // Mappa TipoTitolo: I=intero, R1-R6=ridotto, O1-O6=omaggio (Allegato B TAB.3)
       const ticketsByType: Map<string, typeof sectorTickets> = new Map();
       for (const ticket of sectorTickets) {
-        let tipoTitolo = 'R1';
-        if (ticket.ticketTypeCode === 'R2' || ticket.ticketTypeCode === 'RID') {
-          tipoTitolo = 'R2';
-        } else if (ticket.ticketTypeCode === 'O1' || ticket.ticketTypeCode === 'OMA' || ticket.isComplimentary) {
+        let tipoTitolo = 'I'; // Default: Intero
+        const code = ticket.ticketTypeCode?.toUpperCase() || '';
+        
+        // Mappa codici interni a codici SIAE ufficiali
+        if (code === 'INT' || code === 'I' || code === 'INTERO') {
+          tipoTitolo = 'I';
+        } else if (code === 'R1' || code === 'R2' || code === 'R3' || code === 'R4' || code === 'R5' || code === 'R6' || code === 'RX') {
+          tipoTitolo = code; // Già codice SIAE valido
+        } else if (code === 'RID' || code === 'RIDOTTO') {
+          tipoTitolo = 'R1';
+        } else if (code === 'O1' || code === 'O2' || code === 'O3' || code === 'O4' || code === 'O5' || code === 'O6' || code === 'OX') {
+          tipoTitolo = code; // Già codice SIAE valido
+        } else if (code === 'OMA' || code === 'OMG' || code === 'OMAGGIO' || ticket.isComplimentary) {
           tipoTitolo = 'O1';
-        } else if (ticket.ticketTypeCode) {
-          tipoTitolo = ticket.ticketTypeCode;
         }
+        
         if (!ticketsByType.has(tipoTitolo)) {
           ticketsByType.set(tipoTitolo, []);
         }
@@ -4197,11 +4207,11 @@ async function generateC1ReportXml(params: C1ReportParams): Promise<string> {
             </OrdineDiPosto>`;
     }
     
-    // If no sectors from tickets, add default sector for event
+    // If no sectors from tickets, add default sector for event (99=Altro settore)
     if (sectorsXml === '') {
       sectorsXml = `
             <OrdineDiPosto>
-                <CodiceOrdine>A0</CodiceOrdine>
+                <CodiceOrdine>99</CodiceOrdine>
                 <Capienza>${ticketedEvent.capacity || 100}</Capienza>
                 <IVAEccedenteOmaggi>0</IVAEccedenteOmaggi>
             </OrdineDiPosto>`;
@@ -4258,11 +4268,11 @@ async function generateC1ReportXml(params: C1ReportParams): Promise<string> {
       const validTo = new Date(firstSub.validTo);
       const validitaStr = `${validTo.getFullYear()}${String(validTo.getMonth() + 1).padStart(2, '0')}${String(validTo.getDate()).padStart(2, '0')}`;
       
-      // Get sector code
-      let codiceOrdine = 'A0';
+      // Get sector code (99=Altro settore come default valido per SIAE)
+      let codiceOrdine = '99';
       if (firstSub.sectorId) {
         const sector = await siaeStorage.getSiaeEventSector(firstSub.sectorId);
-        if (sector) codiceOrdine = sector.sectorCode || 'A0';
+        if (sector) codiceOrdine = sector.sectorCode || '99';
       }
       
       // TipoTitolo per abbonamenti deve essere 'ABB' (Allegato B SIAE)
@@ -5697,8 +5707,8 @@ router.post('/api/siae/ticketed-events/:id/reports/c1/send', requireAuth, requir
     // Process all tickets to build proper groupings
     const soldTickets = allTickets.filter(t => t.status === 'emitted' || t.status === 'used');
     for (const ticket of soldTickets) {
-      const sectorCode = ticket.sectorCode || 'A0';
-      const ticketTypeCode = ticket.ticketTypeCode || 'FD'; // SIAE ticket type code
+      const sectorCode = ticket.sectorCode || '99'; // 99=Altro settore (valido SIAE)
+      const ticketTypeCode = ticket.ticketTypeCode || 'I'; // I=Intero (codice SIAE valido)
       
       if (!ticketsBySector.has(sectorCode)) {
         const sector = sectors.find(s => s.sectorCode === sectorCode);
@@ -5750,7 +5760,7 @@ router.post('/api/siae/ticketed-events/:id/reports/c1/send', requireAuth, requir
     
     // Also add sectors with no tickets (capacity only)
     for (const sector of sectors) {
-      const sectorCode = sector.sectorCode || 'A0';
+      const sectorCode = sector.sectorCode || '99'; // 99=Altro settore (valido SIAE)
       if (!ticketsBySector.has(sectorCode)) {
         ticketsBySector.set(sectorCode, {
           sectorCode,
