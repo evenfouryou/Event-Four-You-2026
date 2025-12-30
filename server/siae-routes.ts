@@ -2038,6 +2038,139 @@ router.patch("/api/siae/transactions/:id", requireAuth, async (req: Request, res
   }
 });
 
+// ==================== Admin Name Changes (Super Admin) ====================
+
+router.get("/api/siae/admin/name-changes", requireAuth, requireSuperAdmin, async (req: Request, res: Response) => {
+  try {
+    const { companyId, eventId, status, page = '1', limit = '50' } = req.query;
+    
+    // Build query with filters
+    let query = db
+      .select({
+        nameChange: siaeNameChanges,
+        ticket: {
+          id: siaeTickets.id,
+          ticketCode: siaeTickets.ticketCode,
+          participantFirstName: siaeTickets.participantFirstName,
+          participantLastName: siaeTickets.participantLastName,
+          ticketedEventId: siaeTickets.ticketedEventId,
+        },
+        ticketedEvent: {
+          id: siaeTicketedEvents.id,
+          eventId: siaeTicketedEvents.eventId,
+          companyId: siaeTicketedEvents.companyId,
+          nameChangeFee: siaeTicketedEvents.nameChangeFee,
+        },
+        event: {
+          id: events.id,
+          name: events.name,
+          date: events.date,
+        },
+        company: {
+          id: companies.id,
+          name: companies.name,
+        },
+      })
+      .from(siaeNameChanges)
+      .innerJoin(siaeTickets, eq(siaeNameChanges.originalTicketId, siaeTickets.id))
+      .innerJoin(siaeTicketedEvents, eq(siaeTickets.ticketedEventId, siaeTicketedEvents.id))
+      .innerJoin(events, eq(siaeTicketedEvents.eventId, events.id))
+      .innerJoin(companies, eq(siaeTicketedEvents.companyId, companies.id));
+    
+    // Apply filters
+    const conditions: any[] = [];
+    if (companyId && typeof companyId === 'string') {
+      conditions.push(eq(siaeTicketedEvents.companyId, companyId));
+    }
+    if (eventId && typeof eventId === 'string') {
+      conditions.push(eq(siaeTicketedEvents.eventId, eventId));
+    }
+    if (status && typeof status === 'string') {
+      conditions.push(eq(siaeNameChanges.status, status));
+    }
+    
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions)) as any;
+    }
+    
+    // Add ordering and pagination
+    const pageNum = parseInt(page as string) || 1;
+    const limitNum = Math.min(parseInt(limit as string) || 50, 100);
+    const offset = (pageNum - 1) * limitNum;
+    
+    const results = await query
+      .orderBy(desc(siaeNameChanges.createdAt))
+      .limit(limitNum)
+      .offset(offset);
+    
+    // Get total count for pagination
+    const countResult = await db
+      .select({ count: count() })
+      .from(siaeNameChanges)
+      .innerJoin(siaeTickets, eq(siaeNameChanges.originalTicketId, siaeTickets.id))
+      .innerJoin(siaeTicketedEvents, eq(siaeTickets.ticketedEventId, siaeTicketedEvents.id));
+    
+    const total = countResult[0]?.count || 0;
+    
+    res.json({
+      nameChanges: results.map(r => ({
+        ...r.nameChange,
+        ticket: r.ticket,
+        ticketedEvent: r.ticketedEvent,
+        event: r.event,
+        company: r.company,
+      })),
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total,
+        totalPages: Math.ceil(total / limitNum),
+      },
+    });
+  } catch (error: any) {
+    console.error('[ADMIN NAME-CHANGES] Error:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Get companies and events for filters
+router.get("/api/siae/admin/name-changes/filters", requireAuth, requireSuperAdmin, async (req: Request, res: Response) => {
+  try {
+    // Get all companies with name changes
+    const companiesWithChanges = await db
+      .selectDistinct({
+        id: companies.id,
+        name: companies.name,
+      })
+      .from(siaeNameChanges)
+      .innerJoin(siaeTickets, eq(siaeNameChanges.originalTicketId, siaeTickets.id))
+      .innerJoin(siaeTicketedEvents, eq(siaeTickets.ticketedEventId, siaeTicketedEvents.id))
+      .innerJoin(companies, eq(siaeTicketedEvents.companyId, companies.id))
+      .orderBy(companies.name);
+    
+    // Get all events with name changes
+    const eventsWithChanges = await db
+      .selectDistinct({
+        id: events.id,
+        name: events.name,
+        companyId: siaeTicketedEvents.companyId,
+      })
+      .from(siaeNameChanges)
+      .innerJoin(siaeTickets, eq(siaeNameChanges.originalTicketId, siaeTickets.id))
+      .innerJoin(siaeTicketedEvents, eq(siaeTickets.ticketedEventId, siaeTicketedEvents.id))
+      .innerJoin(events, eq(siaeTicketedEvents.eventId, events.id))
+      .orderBy(events.name);
+    
+    res.json({
+      companies: companiesWithChanges,
+      events: eventsWithChanges,
+      statuses: ['pending', 'completed', 'rejected'],
+    });
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
 // ==================== Name Changes (Customer / Organizer) ====================
 
 router.get("/api/siae/companies/:companyId/name-changes", requireAuth, requireGestore, async (req: Request, res: Response) => {
