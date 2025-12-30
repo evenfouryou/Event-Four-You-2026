@@ -1515,6 +1515,8 @@ export const siaeNameChanges = pgTable("siae_name_changes", {
   paymentStatus: varchar("payment_status", { length: 20 }).notNull().default('not_required'), // not_required, pending, paid, refunded
   paymentIntentId: varchar("payment_intent_id", { length: 100 }), // Stripe payment intent ID
   paidAt: timestamp("paid_at"),
+  refundId: varchar("refund_id", { length: 100 }), // Stripe refund ID when refunded
+  refundedAt: timestamp("refunded_at"),
   // Stato
   status: varchar("status", { length: 20 }).notNull().default('pending'), // pending, completed, rejected
   processedAt: timestamp("processed_at"),

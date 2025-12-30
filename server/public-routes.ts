@@ -3688,6 +3688,27 @@ router.post("/api/public/account/name-change/:id/pay", async (req, res) => {
     const amountInCents = Math.round(feeAmount * 100);
 
     const stripe = await getUncachableStripeClient();
+    
+    // Check if we already have a payment intent for this request
+    if (nameChange.paymentIntentId) {
+      try {
+        const existingIntent = await stripe.paymentIntents.retrieve(nameChange.paymentIntentId);
+        if (existingIntent.status === 'requires_payment_method' || existingIntent.status === 'requires_confirmation') {
+          // Return existing intent
+          return res.json({
+            clientSecret: existingIntent.client_secret,
+            paymentIntentId: existingIntent.id,
+            amount: feeAmount,
+          });
+        }
+      } catch (e) {
+        // Intent not found or invalid, create new one
+      }
+    }
+    
+    // Use idempotency key to prevent duplicate intents
+    const idempotencyKey = `name_change_fee_${id}_${feeAmount}`;
+    
     const paymentIntent = await stripe.paymentIntents.create({
       amount: amountInCents,
       currency: "eur",
@@ -3697,6 +3718,8 @@ router.post("/api/public/account/name-change/:id/pay", async (req, res) => {
         customerId: customer.id,
         amount: feeAmount.toString(),
       },
+    }, {
+      idempotencyKey,
     });
 
     // Save payment intent ID

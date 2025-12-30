@@ -2205,8 +2205,14 @@ router.post("/api/siae/name-changes", requireAuth, async (req: Request, res: Res
       const [ticketedEvent] = await db.select().from(siaeTicketedEvents).where(eq(siaeTicketedEvents.id, originalTicket.ticketedEventId));
       
       if (ticketedEvent?.autoApproveNameChanges) {
-        // Auto-process the name change
-        console.log(`[NAME-CHANGE] Auto-approving name change ${change.id} for event ${ticketedEvent.id}`);
+        // Check if payment is required but not yet paid - skip auto-approval
+        const feeAmount = parseFloat(ticketedEvent.nameChangeFee || '0');
+        if (feeAmount > 0 && change.paymentStatus !== 'paid') {
+          console.log(`[NAME-CHANGE] Auto-approval skipped: payment required (€${feeAmount}) but not yet paid for ${change.id}`);
+          // Fall through to return pending status with payment info
+        } else {
+          // Auto-process the name change
+          console.log(`[NAME-CHANGE] Auto-approving name change ${change.id} for event ${ticketedEvent.id}`);
         
         // Check bridge availability
         const bridgeStatus = getCachedBridgeStatus();
@@ -2372,6 +2378,7 @@ router.post("/api/siae/name-changes", requireAuth, async (req: Request, res: Res
         } else {
           console.log('[NAME-CHANGE] Auto-approval skipped: bridge not ready');
         }
+        } // End of else block for payment check
       }
     }
     
@@ -2416,14 +2423,60 @@ router.post("/api/siae/name-changes/:id/process", requireAuth, requireOrganizer,
     
     // Handle rejection - no payment check needed
     if (action === 'reject') {
-      // If fee was paid and rejecting, consider refund
+      // If fee was paid and rejecting, process refund first
       const shouldRefund = nameChangeRequest.paymentStatus === 'paid' && parseFloat(nameChangeRequest.fee || '0') > 0;
-      const updatedPaymentStatus = shouldRefund ? 'refunded' : nameChangeRequest.paymentStatus;
+      
+      let refundId: string | null = null;
+      let refundSuccess = false;
+      let refundError: string | null = null;
+      
+      // Check for missing paymentIntentId when refund is needed
+      if (shouldRefund && !nameChangeRequest.paymentIntentId) {
+        console.error(`[NAME-CHANGE] Cannot refund - missing paymentIntentId for request ${req.params.id}`);
+        return res.status(400).json({
+          message: "Impossibile rifiutare: pagamento presente ma ID pagamento mancante. Contatta il supporto per elaborazione manuale.",
+          code: "MISSING_PAYMENT_INTENT",
+          requiresManualIntervention: true,
+        });
+      }
+      
+      // Attempt Stripe refund BEFORE updating DB status
+      if (shouldRefund && nameChangeRequest.paymentIntentId) {
+        try {
+          console.log(`[NAME-CHANGE] Processing refund for payment ${nameChangeRequest.paymentIntentId}`);
+          const stripe = await getUncachableStripeClient();
+          const refund = await stripe.refunds.create({
+            payment_intent: nameChangeRequest.paymentIntentId,
+            reason: 'requested_by_customer',
+            metadata: {
+              type: 'name_change_fee_refund',
+              nameChangeId: req.params.id,
+              rejectionReason: rejectionReason || 'Rejected by operator',
+            },
+          });
+          refundId = refund.id;
+          refundSuccess = true;
+          console.log(`[NAME-CHANGE] Refund processed successfully: ${refundId}`);
+        } catch (err: any) {
+          console.error(`[NAME-CHANGE] Refund failed for ${nameChangeRequest.paymentIntentId}:`, err);
+          refundError = err.message;
+          // Continue with rejection but note the failure
+        }
+      }
+      
+      // Only set 'refunded' if refund actually succeeded, otherwise keep 'paid'
+      const finalPaymentStatus = refundSuccess ? 'refunded' : nameChangeRequest.paymentStatus;
+      const notes = refundError 
+        ? `${rejectionReason || 'Rifiutata'}. ATTENZIONE: Rimborso fallito - elaborazione manuale necessaria. Errore: ${refundError}`
+        : (rejectionReason || 'Rifiutata dall\'operatore');
+      
       const [updated] = await db.update(siaeNameChanges)
         .set({
           status: 'rejected',
-          paymentStatus: updatedPaymentStatus,
-          notes: rejectionReason || 'Rifiutata dall\'operatore',
+          paymentStatus: finalPaymentStatus,
+          refundId: refundId,
+          refundedAt: refundSuccess ? new Date() : null,
+          notes,
           processedAt: new Date(),
           processedByUserId: userId,
           updatedAt: new Date()
@@ -2431,17 +2484,27 @@ router.post("/api/siae/name-changes/:id/process", requireAuth, requireOrganizer,
         .where(eq(siaeNameChanges.id, req.params.id))
         .returning();
       
-      // TODO: Process refund via Stripe if shouldRefund is true
-      if (shouldRefund && nameChangeRequest.paymentIntentId) {
-        console.log(`[NAME-CHANGE] Should refund payment ${nameChangeRequest.paymentIntentId} for rejected request ${req.params.id}`);
-        // Refund logic would go here
+      if (refundError) {
+        // Return partial success - rejection worked but refund failed
+        return res.status(207).json({ 
+          success: false,
+          partialSuccess: true,
+          rejectionCompleted: true,
+          refundCompleted: false,
+          nameChange: updated, 
+          message: "Richiesta rifiutata. ATTENZIONE: Rimborso non riuscito - elaborazione manuale necessaria.",
+          refundInitiated: false,
+          refundError,
+          requiresManualRefund: true,
+        });
       }
       
       return res.json({ 
         success: true, 
         nameChange: updated, 
-        message: shouldRefund ? "Richiesta rifiutata. Il rimborso verrà elaborato." : "Richiesta rifiutata",
-        refundInitiated: shouldRefund,
+        message: refundSuccess ? "Richiesta rifiutata e rimborso elaborato." : "Richiesta rifiutata",
+        refundInitiated: refundSuccess,
+        refundId,
       });
     }
     
