@@ -1668,6 +1668,18 @@ export class SiaeStorage implements ISiaeStorage {
       lastEmission: Date | null;
     }[];
   }> {
+    // First get the card to find its cardCode (serial)
+    const [card] = await db
+      .select()
+      .from(siaeActivationCards)
+      .where(eq(siaeActivationCards.id, cardId));
+    
+    if (!card) {
+      return { totalSeals: 0, totalTickets: 0, organizers: [] };
+    }
+    
+    const cardCode = card.cardCode;
+    
     // Get total seals for this card
     const sealsResult = await db
       .select({ count: count() })
@@ -1676,7 +1688,8 @@ export class SiaeStorage implements ISiaeStorage {
     
     const totalSeals = sealsResult[0]?.count || 0;
 
-    // Get tickets with organizer info grouped by user
+    // Get tickets by cardCode directly (tickets store cardCode, not cardId)
+    // Use LEFT JOIN to handle cases where issuedByUserId might be null
     const ticketsWithOrganizers = await db
       .select({
         userId: siaeTickets.issuedByUserId,
@@ -1686,30 +1699,30 @@ export class SiaeStorage implements ISiaeStorage {
         lastEmission: sql<Date>`MAX(${siaeTickets.emissionDate})`,
       })
       .from(siaeTickets)
-      .innerJoin(siaeFiscalSeals, eq(siaeTickets.fiscalSealId, siaeFiscalSeals.id))
-      .innerJoin(users, eq(siaeTickets.issuedByUserId, users.id))
-      .where(eq(siaeFiscalSeals.cardId, cardId))
+      .leftJoin(users, eq(siaeTickets.issuedByUserId, users.id))
+      .where(eq(siaeTickets.cardCode, cardCode))
       .groupBy(siaeTickets.issuedByUserId, users.username, users.fullName);
 
-    // Get total tickets
+    // Get total tickets by cardCode
     const totalTicketsResult = await db
       .select({ count: count() })
       .from(siaeTickets)
-      .innerJoin(siaeFiscalSeals, eq(siaeTickets.fiscalSealId, siaeFiscalSeals.id))
-      .where(eq(siaeFiscalSeals.cardId, cardId));
+      .where(eq(siaeTickets.cardCode, cardCode));
 
     const totalTickets = totalTicketsResult[0]?.count || 0;
 
     return {
       totalSeals,
       totalTickets,
-      organizers: ticketsWithOrganizers.map(row => ({
-        userId: row.userId || '',
-        username: row.username || '',
-        fullName: row.fullName || '',
-        ticketCount: Number(row.ticketCount),
-        lastEmission: row.lastEmission,
-      })),
+      organizers: ticketsWithOrganizers
+        .filter(row => row.userId) // Filter out null users
+        .map(row => ({
+          userId: row.userId || '',
+          username: row.username || '',
+          fullName: row.fullName || '',
+          ticketCount: Number(row.ticketCount),
+          lastEmission: row.lastEmission,
+        })),
     };
   }
 
