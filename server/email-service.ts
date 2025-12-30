@@ -1,6 +1,7 @@
 import nodemailer from 'nodemailer';
 import { isBridgeConnected, requestSmimeSignature, getCardSignerEmail } from './bridge-relay';
 
+// Transporter principale per email generiche (info@eventfouryou.com)
 export const emailTransporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST || 'smtp.gmail.com',
   port: parseInt(process.env.SMTP_PORT || '587'),
@@ -18,6 +19,32 @@ emailTransporter.verify((error, success) => {
     console.log('[EMAIL-SERVICE] SMTP server connected successfully');
   }
 });
+
+// Transporter separato per email SIAE (tickefouryou@gmail.com - corrisponde al certificato smart card)
+// Usato solo per trasmissioni SIAE che richiedono firma S/MIME
+const siaeSmtpUser = process.env.SIAE_SMTP_USER || process.env.SMTP_USER;
+const siaeSmtpPass = process.env.SIAE_SMTP_PASS || process.env.SMTP_PASS;
+
+export const siaeEmailTransporter = nodemailer.createTransport({
+  host: process.env.SMTP_HOST || 'smtp.gmail.com',
+  port: parseInt(process.env.SMTP_PORT || '587'),
+  secure: false,
+  auth: {
+    user: siaeSmtpUser,
+    pass: siaeSmtpPass,
+  },
+});
+
+// Verifica connessione SIAE SMTP solo se configurato diversamente
+if (process.env.SIAE_SMTP_USER && process.env.SIAE_SMTP_USER !== process.env.SMTP_USER) {
+  siaeEmailTransporter.verify((error, success) => {
+    if (error) {
+      console.error('[EMAIL-SERVICE] SIAE SMTP connection failed:', error.message);
+    } else {
+      console.log(`[EMAIL-SERVICE] SIAE SMTP connected (${process.env.SIAE_SMTP_USER})`);
+    }
+  });
+}
 
 interface TicketEmailOptions {
   to: string;
@@ -482,8 +509,9 @@ export async function sendSiaeTransmissionEmail(options: SiaeTransmissionEmailOp
 </html>
   `;
 
-  // Prepara opzioni email base
-  const fromAddress = process.env.SMTP_FROM || `"Event4U" <${process.env.SMTP_USER || 'noreply@event4u.it'}>`;
+  // Prepara opzioni email base - usa SIAE SMTP per le trasmissioni (corrisponde al certificato smart card)
+  const siaeSmtpUser = process.env.SIAE_SMTP_USER || process.env.SMTP_USER;
+  const fromAddress = process.env.SIAE_SMTP_FROM || `"Event4U SIAE" <${siaeSmtpUser || 'noreply@event4u.it'}>`;
   
   // Se richiesta firma S/MIME e bridge connesso, tenta di firmare l'email
   if (signWithSmime && isBridgeConnected()) {
@@ -569,8 +597,8 @@ export async function sendSiaeTransmissionEmail(options: SiaeTransmissionEmailOp
         raw: smimeData.signedMime // Invia esattamente il payload firmato dal bridge
       };
       
-      await emailTransporter.sendMail(rawMailOptions);
-      console.log(`[EMAIL-SERVICE] S/MIME signed email sent successfully to ${to}`);
+      await siaeEmailTransporter.sendMail(rawMailOptions);
+      console.log(`[EMAIL-SERVICE] S/MIME signed email sent successfully to ${to} via SIAE SMTP`);
       
       return {
         success: true,
@@ -606,9 +634,9 @@ export async function sendSiaeTransmissionEmail(options: SiaeTransmissionEmailOp
   };
 
   try {
-    await emailTransporter.sendMail(mailOptions);
+    await siaeEmailTransporter.sendMail(mailOptions);
     const smimeNote = smimeResult.signed ? '' : ' (NON firmata S/MIME - SIAE potrebbe non confermare)';
-    console.log(`[EMAIL-SERVICE] SIAE RCA email sent to ${to} | Subject: ${emailSubject} | File: ${fileName}${smimeNote}`);
+    console.log(`[EMAIL-SERVICE] SIAE RCA email sent to ${to} via SIAE SMTP | Subject: ${emailSubject} | File: ${fileName}${smimeNote}`);
     
     return {
       success: true,
