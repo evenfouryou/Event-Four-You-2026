@@ -82,6 +82,7 @@ import PublicVenueDetail from "@/pages/public-venue-detail";
 import AccountPage from "@/pages/account";
 import AccountTicketDetail from "@/pages/account-ticket-detail";
 import AccountNameChange from "@/pages/account-name-change";
+import AccountTicketResale from "@/pages/account-ticket-resale";
 import { AccountLayout } from "@/components/account-layout";
 import PrGuestLists from "@/pages/pr-guest-lists";
 import PrTables from "@/pages/pr-tables";
@@ -230,10 +231,14 @@ function Router() {
     const AccountNameChangeWithLayout = () => (
       <AccountLayout><AccountNameChange /></AccountLayout>
     );
+    const AccountTicketResaleWithLayout = () => (
+      <AccountLayout><AccountTicketResale /></AccountLayout>
+    );
     
     return (
       <Switch>
         <Route path="/account/tickets/:id/name-change" component={AccountNameChangeWithLayout} />
+        <Route path="/account/tickets/:id/resale" component={AccountTicketResaleWithLayout} />
         <Route path="/account/tickets/:id" component={AccountTicketDetailWithLayout} />
         <Route path="/account/:rest*" component={AccountPage} />
         <Route path="/account" component={AccountPage} />

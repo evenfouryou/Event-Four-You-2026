@@ -3120,6 +3120,8 @@ router.get("/api/public/account/tickets/:id", async (req, res) => {
         locationAddress: locations.address,
         allowsChangeName: siaeTicketedEvents.allowsChangeName,
         allowsResale: siaeTicketedEvents.allowsResale,
+        nameChangeFee: siaeTicketedEvents.nameChangeFee,
+        resaleMaxMarkupPercent: siaeTicketedEvents.resaleMaxMarkupPercent,
         organizerCompany: companies.name,
         companyId: companies.id,
         ticketingManager: siaeSystemConfig.businessName,
@@ -3178,6 +3180,8 @@ router.get("/api/public/account/tickets/:id", async (req, res) => {
       // Map DB field names to frontend expected names
       allowNameChange: ticket.allowsChangeName,
       allowResale: ticket.allowsResale,
+      nameChangeFee: ticket.nameChangeFee || '0',
+      resaleMaxMarkupPercent: ticket.resaleMaxMarkupPercent || 0,
       nameChangeDeadlineHours: 24,
       resaleDeadlineHours: 48,
       canNameChange,

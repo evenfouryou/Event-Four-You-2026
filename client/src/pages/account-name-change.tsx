@@ -1,5 +1,8 @@
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, Link, useLocation } from "wouter";
+import { loadStripe, StripeElementsOptions } from "@stripe/stripe-js";
+import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-stripe-js";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -49,6 +52,8 @@ import {
   CheckCircle,
   AlertCircle,
   ArrowLeft,
+  Euro,
+  CreditCard,
 } from "lucide-react";
 
 const nameChangeSchema = z.object({
@@ -81,6 +86,144 @@ interface TicketDetail {
   sectorName: string;
   canNameChange: boolean;
   hoursToEvent: number;
+  nameChangeFee: string;
+}
+
+interface NameChangeResponse {
+  message: string;
+  nameChangeId: string;
+  fee: string;
+  paymentStatus: string;
+  requiresPayment: boolean;
+}
+
+interface PaymentIntentResponse {
+  clientSecret: string;
+  amount: number;
+}
+
+let stripePromise: Promise<any> | null = null;
+
+async function getStripe() {
+  if (!stripePromise) {
+    const response = await fetch("/api/public/stripe-key");
+    const { publishableKey } = await response.json();
+    stripePromise = loadStripe(publishableKey);
+  }
+  return stripePromise;
+}
+
+function NameChangePaymentForm({
+  nameChangeId,
+  fee,
+  onSuccess,
+  onCancel,
+}: {
+  nameChangeId: string;
+  fee: string;
+  onSuccess: () => void;
+  onCancel: () => void;
+}) {
+  const stripe = useStripe();
+  const elements = useElements();
+  const { toast } = useToast();
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [isReady, setIsReady] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSubmit = async () => {
+    if (!stripe || !elements || !isReady) return;
+
+    setIsProcessing(true);
+    setError(null);
+
+    try {
+      const { error: paymentError, paymentIntent } = await stripe.confirmPayment({
+        elements,
+        confirmParams: {
+          return_url: `${window.location.origin}/account/tickets`,
+        },
+        redirect: "if_required",
+      });
+
+      if (paymentError) {
+        setError(paymentError.message || "Pagamento fallito. Riprova.");
+        setIsProcessing(false);
+        return;
+      }
+
+      if (paymentIntent && paymentIntent.status === "succeeded") {
+        await apiRequest("POST", `/api/public/account/name-change/${nameChangeId}/pay/confirm`, {
+          paymentIntentId: paymentIntent.id,
+        });
+
+        toast({
+          title: "Pagamento completato",
+          description: "Il cambio nominativo sarà processato a breve.",
+        });
+        onSuccess();
+      }
+    } catch (err: any) {
+      setError(err.message || "Errore durante il pagamento.");
+      setIsProcessing(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-muted/50 rounded-lg p-4 border border-border">
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-sm text-muted-foreground">Commissione cambio nominativo</span>
+          <span className="font-semibold text-foreground">€{parseFloat(fee).toFixed(2)}</span>
+        </div>
+      </div>
+
+      <div className="p-4 bg-muted/30 rounded-lg border border-border">
+        <PaymentElement
+          options={{ layout: "tabs" }}
+          onReady={() => setIsReady(true)}
+        />
+      </div>
+
+      {error && (
+        <div className="p-3 bg-destructive/10 rounded-lg border border-destructive/20">
+          <p className="text-sm text-destructive">{error}</p>
+        </div>
+      )}
+
+      <div className="flex gap-3">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={onCancel}
+          disabled={isProcessing}
+          className="flex-1"
+          data-testid="button-cancel-payment"
+        >
+          Annulla
+        </Button>
+        <Button
+          type="button"
+          onClick={handleSubmit}
+          disabled={!isReady || isProcessing}
+          className="flex-1"
+          data-testid="button-confirm-payment"
+        >
+          {isProcessing ? (
+            <>
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              Elaborazione...
+            </>
+          ) : (
+            <>
+              <CreditCard className="w-4 h-4 mr-2" />
+              Paga €{parseFloat(fee).toFixed(2)}
+            </>
+          )}
+        </Button>
+      </div>
+    </div>
+  );
 }
 
 export default function AccountNameChange() {
@@ -88,6 +231,9 @@ export default function AccountNameChange() {
   const { toast } = useToast();
   const [, navigate] = useLocation();
   const isMobile = useIsMobile();
+  const [showPaymentDialog, setShowPaymentDialog] = useState(false);
+  const [pendingNameChangeId, setPendingNameChangeId] = useState<string | null>(null);
+  const [pendingFee, setPendingFee] = useState<string>("0");
 
   const { data: ticket, isLoading, isError } = useQuery<TicketDetail>({
     queryKey: [`/api/public/account/tickets/${id}`],
@@ -107,9 +253,12 @@ export default function AccountNameChange() {
     },
   });
 
+  const fee = parseFloat(ticket?.nameChangeFee || '0');
+  const hasFee = fee > 0;
+
   const nameChangeMutation = useMutation({
     mutationFn: async (data: NameChangeFormData) => {
-      return await apiRequest("POST", "/api/public/account/name-change", {
+      const response = await apiRequest("POST", "/api/public/account/name-change", {
         ticketId: id,
         newFirstName: data.newFirstName,
         newLastName: data.newLastName,
@@ -119,15 +268,27 @@ export default function AccountNameChange() {
         newDocumentNumber: data.newDocumentNumber,
         newDateOfBirth: data.newDateOfBirth,
       });
+      return response as NameChangeResponse;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: [`/api/public/account/tickets/${id}`] });
       queryClient.invalidateQueries({ queryKey: ["/api/public/account/tickets"] });
-      toast({
-        title: "Richiesta inviata",
-        description: "La tua richiesta di cambio nominativo è stata inviata con successo.",
-      });
-      navigate(`/account/tickets/${id}`);
+      
+      if (data.requiresPayment) {
+        setPendingNameChangeId(data.nameChangeId);
+        setPendingFee(data.fee);
+        setShowPaymentDialog(true);
+        toast({
+          title: "Richiesta creata",
+          description: "Per completare il cambio nominativo è richiesto il pagamento della commissione.",
+        });
+      } else {
+        toast({
+          title: "Richiesta inviata",
+          description: "La tua richiesta di cambio nominativo è stata inviata con successo.",
+        });
+        navigate(`/account/tickets/${id}`);
+      }
     },
     onError: (error: Error) => {
       toast({
@@ -140,6 +301,48 @@ export default function AccountNameChange() {
 
   const onSubmit = (data: NameChangeFormData) => {
     nameChangeMutation.mutate(data);
+  };
+
+  const [stripeInstance, setStripeInstance] = useState<Promise<any> | null>(null);
+  const [clientSecret, setClientSecret] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (showPaymentDialog && pendingNameChangeId) {
+      getStripe().then(setStripeInstance);
+      
+      apiRequest("POST", `/api/public/account/name-change/${pendingNameChangeId}/pay`)
+        .then((response) => {
+          const data = response as PaymentIntentResponse;
+          setClientSecret(data.clientSecret);
+        })
+        .catch((error) => {
+          toast({
+            title: "Errore",
+            description: error.message || "Impossibile inizializzare il pagamento.",
+            variant: "destructive",
+          });
+          setShowPaymentDialog(false);
+        });
+    }
+  }, [showPaymentDialog, pendingNameChangeId]);
+
+  const handlePaymentSuccess = () => {
+    setShowPaymentDialog(false);
+    setClientSecret(null);
+    setPendingNameChangeId(null);
+    queryClient.invalidateQueries({ queryKey: [`/api/public/account/tickets/${id}`] });
+    queryClient.invalidateQueries({ queryKey: ["/api/public/account/tickets"] });
+    navigate(`/account/tickets/${id}`);
+  };
+
+  const handlePaymentCancel = () => {
+    setShowPaymentDialog(false);
+    setClientSecret(null);
+    toast({
+      title: "Pagamento annullato",
+      description: "Puoi completare il pagamento in seguito dalla pagina del biglietto.",
+    });
+    navigate(`/account/tickets/${id}`);
   };
 
   const eventDate = ticket ? new Date(ticket.eventStart) : new Date();
@@ -247,17 +450,33 @@ export default function AccountNameChange() {
               </div>
             </div>
 
-            <div className="bg-primary/5 rounded-lg p-4 border border-primary/20">
-              <div className="flex items-start gap-3">
-                <CheckCircle className="w-5 h-5 text-primary mt-0.5" />
-                <div>
-                  <p className="text-sm font-medium text-foreground">Cambio gratuito</p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Nessun costo aggiuntivo per il cambio nominativo di questo biglietto.
-                  </p>
+            {hasFee ? (
+              <div className="bg-amber-50 dark:bg-amber-950/30 rounded-lg p-4 border border-amber-200 dark:border-amber-800">
+                <div className="flex items-start gap-3">
+                  <Euro className="w-5 h-5 text-amber-600 dark:text-amber-400 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-medium text-foreground">
+                      Commissione: €{fee.toFixed(2)}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Il pagamento sarà richiesto dopo l'invio della richiesta.
+                    </p>
+                  </div>
                 </div>
               </div>
-            </div>
+            ) : (
+              <div className="bg-primary/5 rounded-lg p-4 border border-primary/20">
+                <div className="flex items-start gap-3">
+                  <CheckCircle className="w-5 h-5 text-primary mt-0.5" />
+                  <div>
+                    <p className="text-sm font-medium text-foreground">Cambio gratuito</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Nessun costo aggiuntivo per il cambio nominativo di questo biglietto.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
 
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -435,6 +654,42 @@ export default function AccountNameChange() {
             </p>
           </CardContent>
         </Card>
+
+        <Dialog open={showPaymentDialog} onOpenChange={setShowPaymentDialog}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <CreditCard className="w-5 h-5" />
+                Pagamento Commissione
+              </DialogTitle>
+            </DialogHeader>
+            {stripeInstance && clientSecret ? (
+              <Elements
+                stripe={stripeInstance}
+                options={{
+                  clientSecret,
+                  appearance: {
+                    theme: "stripe",
+                    variables: {
+                      colorPrimary: "#7c3aed",
+                    },
+                  },
+                }}
+              >
+                <NameChangePaymentForm
+                  nameChangeId={pendingNameChangeId!}
+                  fee={pendingFee}
+                  onSuccess={handlePaymentSuccess}
+                  onCancel={handlePaymentCancel}
+                />
+              </Elements>
+            ) : (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="w-8 h-8 animate-spin text-primary" />
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
       </div>
     );
   }
@@ -522,17 +777,33 @@ export default function AccountNameChange() {
           </div>
         </div>
 
-        <div className="bg-primary/5 rounded-lg p-4 border border-primary/20">
-          <div className="flex items-start gap-3">
-            <CheckCircle className="w-5 h-5 text-primary mt-0.5" />
-            <div>
-              <p className="text-sm font-medium text-foreground">Cambio gratuito</p>
-              <p className="text-xs text-muted-foreground mt-1">
-                Nessun costo aggiuntivo per il cambio nominativo di questo biglietto.
-              </p>
+        {hasFee ? (
+          <div className="bg-amber-50 dark:bg-amber-950/30 rounded-lg p-4 border border-amber-200 dark:border-amber-800">
+            <div className="flex items-start gap-3">
+              <Euro className="w-5 h-5 text-amber-600 dark:text-amber-400 mt-0.5" />
+              <div>
+                <p className="text-sm font-medium text-foreground">
+                  Commissione: €{fee.toFixed(2)}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Il pagamento sarà richiesto dopo l'invio della richiesta.
+                </p>
+              </div>
             </div>
           </div>
-        </div>
+        ) : (
+          <div className="bg-primary/5 rounded-lg p-4 border border-primary/20">
+            <div className="flex items-start gap-3">
+              <CheckCircle className="w-5 h-5 text-primary mt-0.5" />
+              <div>
+                <p className="text-sm font-medium text-foreground">Cambio gratuito</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Nessun costo aggiuntivo per il cambio nominativo di questo biglietto.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -705,6 +976,42 @@ export default function AccountNameChange() {
           La richiesta sarà processata entro 24 ore. Riceverai una conferma via email.
         </p>
       </div>
+
+      <Dialog open={showPaymentDialog} onOpenChange={setShowPaymentDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CreditCard className="w-5 h-5" />
+              Pagamento Commissione
+            </DialogTitle>
+          </DialogHeader>
+          {stripeInstance && clientSecret ? (
+            <Elements
+              stripe={stripeInstance}
+              options={{
+                clientSecret,
+                appearance: {
+                  theme: "stripe",
+                  variables: {
+                    colorPrimary: "#7c3aed",
+                  },
+                },
+              }}
+            >
+              <NameChangePaymentForm
+                nameChangeId={pendingNameChangeId!}
+                fee={pendingFee}
+                onSuccess={handlePaymentSuccess}
+                onCancel={handlePaymentCancel}
+              />
+            </Elements>
+          ) : (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </MobileAppLayout>
   );
 }
