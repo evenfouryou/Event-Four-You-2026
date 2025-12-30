@@ -1245,6 +1245,7 @@ export const siaeTicketedEvents = pgTable("siae_ticketed_events", {
   allowsChangeName: boolean("allows_change_name").notNull().default(false), // Solo se >5000
   allowsResale: boolean("allows_resale").notNull().default(false), // Solo se >5000
   autoApproveNameChanges: boolean("auto_approve_name_changes").notNull().default(false), // Approva automaticamente le richieste
+  nameChangeFee: decimal("name_change_fee", { precision: 10, scale: 2 }).default('0'), // Commissione cambio nominativo
   // Date vendita
   saleStartDate: timestamp("sale_start_date"),
   saleEndDate: timestamp("sale_end_date"),
@@ -1511,6 +1512,9 @@ export const siaeNameChanges = pgTable("siae_name_changes", {
   newDateOfBirth: date("new_date_of_birth"), // Data di nascita
   // Costi
   fee: decimal("fee", { precision: 10, scale: 2 }).default('0'),
+  paymentStatus: varchar("payment_status", { length: 20 }).notNull().default('not_required'), // not_required, pending, paid, refunded
+  paymentIntentId: varchar("payment_intent_id", { length: 100 }), // Stripe payment intent ID
+  paidAt: timestamp("paid_at"),
   // Stato
   status: varchar("status", { length: 20 }).notNull().default('pending'), // pending, completed, rejected
   processedAt: timestamp("processed_at"),
