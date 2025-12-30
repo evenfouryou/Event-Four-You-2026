@@ -23,6 +23,7 @@ import {
   siaeBoxOfficeSessions,
   siaeSubscriptions,
   siaeAuditLogs,
+  siaeEmailAudit,
   siaeNumberedSeats,
   siaeSmartCardSessions,
   siaeSmartCardSealLogs,
@@ -74,6 +75,8 @@ import {
   type InsertSiaeSubscription,
   type SiaeAuditLog,
   type InsertSiaeAuditLog,
+  type SiaeEmailAudit,
+  type InsertSiaeEmailAudit,
   type SiaeNumberedSeat,
   type InsertSiaeNumberedSeat,
   type SiaeSmartCardSession,
@@ -281,6 +284,14 @@ export interface ISiaeStorage {
   getSiaeAuditLogsByCompany(companyId: string): Promise<SiaeAuditLog[]>;
   getSiaeAuditLogsByEntity(entityType: string, entityId: string): Promise<SiaeAuditLog[]>;
   createSiaeAuditLog(log: InsertSiaeAuditLog): Promise<SiaeAuditLog>;
+  
+  // ==================== Email Audit Trail ====================
+  
+  getSiaeEmailAuditByCompany(companyId: string, limit?: number): Promise<SiaeEmailAudit[]>;
+  getSiaeEmailAuditByTransmission(transmissionId: string): Promise<SiaeEmailAudit[]>;
+  getSiaeEmailAudit(id: string): Promise<SiaeEmailAudit | undefined>;
+  createSiaeEmailAudit(audit: InsertSiaeEmailAudit): Promise<SiaeEmailAudit>;
+  updateSiaeEmailAudit(id: string, audit: Partial<SiaeEmailAudit>): Promise<SiaeEmailAudit | undefined>;
   
   // ==================== Numbered Seats ====================
   
@@ -1362,6 +1373,39 @@ export class SiaeStorage implements ISiaeStorage {
   async createSiaeAuditLog(log: InsertSiaeAuditLog): Promise<SiaeAuditLog> {
     const [created] = await db.insert(siaeAuditLogs).values(log).returning();
     return created;
+  }
+  
+  // ==================== Email Audit Trail ====================
+  
+  async getSiaeEmailAuditByCompany(companyId: string, limit: number = 100): Promise<SiaeEmailAudit[]> {
+    return await db.select().from(siaeEmailAudit)
+      .where(eq(siaeEmailAudit.companyId, companyId))
+      .orderBy(desc(siaeEmailAudit.createdAt))
+      .limit(limit);
+  }
+  
+  async getSiaeEmailAuditByTransmission(transmissionId: string): Promise<SiaeEmailAudit[]> {
+    return await db.select().from(siaeEmailAudit)
+      .where(eq(siaeEmailAudit.transmissionId, transmissionId))
+      .orderBy(desc(siaeEmailAudit.createdAt));
+  }
+  
+  async getSiaeEmailAudit(id: string): Promise<SiaeEmailAudit | undefined> {
+    const [audit] = await db.select().from(siaeEmailAudit).where(eq(siaeEmailAudit.id, id));
+    return audit;
+  }
+  
+  async createSiaeEmailAudit(audit: InsertSiaeEmailAudit): Promise<SiaeEmailAudit> {
+    const [created] = await db.insert(siaeEmailAudit).values(audit).returning();
+    return created;
+  }
+  
+  async updateSiaeEmailAudit(id: string, audit: Partial<SiaeEmailAudit>): Promise<SiaeEmailAudit | undefined> {
+    const [updated] = await db.update(siaeEmailAudit)
+      .set(audit)
+      .where(eq(siaeEmailAudit.id, id))
+      .returning();
+    return updated;
   }
   
   // ==================== Numbered Seats ====================

@@ -531,6 +531,29 @@ router.get("/api/siae/debug/validate-fiscal", async (req: Request, res: Response
   }
 });
 
+// ==================== Email Audit Trail Endpoints ====================
+
+router.get("/api/siae/companies/:companyId/email-audit", requireAuth, requireGestore, async (req: Request, res: Response) => {
+  try {
+    const limit = parseInt(req.query.limit as string) || 100;
+    const audits = await siaeStorage.getSiaeEmailAuditByCompany(req.params.companyId, limit);
+    res.json(audits);
+  } catch (error: any) {
+    console.error('[SIAE-ROUTES] Failed to get email audit:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+router.get("/api/siae/transmissions/:transmissionId/email-audit", requireAuth, requireGestore, async (req: Request, res: Response) => {
+  try {
+    const audits = await siaeStorage.getSiaeEmailAuditByTransmission(req.params.transmissionId);
+    res.json(audits);
+  } catch (error: any) {
+    console.error('[SIAE-ROUTES] Failed to get email audit for transmission:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
 // ==================== DEBUG ENDPOINT - Signature Audit Log ====================
 router.get("/api/siae/debug/signature-audit", async (req: Request, res: Response) => {
   try {
@@ -2478,15 +2501,92 @@ router.post("/api/siae/name-changes", requireAuth, async (req: Request, res: Res
     const userId = (req as any).user?.id;
     const data = insertSiaeNameChangeSchema.parse(req.body);
     
+    // Validate ticket exists and get event info
+    const [originalTicket] = await db.select().from(siaeTickets).where(eq(siaeTickets.id, data.originalTicketId));
+    if (!originalTicket) {
+      return res.status(404).json({ message: "Biglietto non trovato" });
+    }
+    
+    const [ticketedEvent] = await db.select().from(siaeTicketedEvents).where(eq(siaeTicketedEvents.id, originalTicket.ticketedEventId));
+    if (!ticketedEvent) {
+      return res.status(404).json({ message: "Evento non trovato" });
+    }
+    
+    // Check if name changes are allowed for this event
+    if (!ticketedEvent.allowsChangeName) {
+      return res.status(400).json({ 
+        message: "Il cambio nominativo non è abilitato per questo evento",
+        code: "NAME_CHANGE_NOT_ALLOWED"
+      });
+    }
+    
+    // Get event details for datetime
+    const [eventDetails] = await db.select().from(events).where(eq(events.id, ticketedEvent.eventId));
+    if (!eventDetails) {
+      return res.status(404).json({ message: "Dettagli evento non trovati" });
+    }
+    
+    // Check temporal limit - deadline hours before event
+    // Fallback: use event.date if startDatetime is null (legacy events or all-day events)
+    const eventDateSource = eventDetails.startDatetime || eventDetails.date;
+    const deadlineHours = ticketedEvent.nameChangeDeadlineHours || 48;
+    
+    if (eventDateSource) {
+      const eventStartTime = new Date(eventDateSource);
+      const deadlineTime = new Date(eventStartTime.getTime() - (deadlineHours * 60 * 60 * 1000));
+      const now = new Date();
+      
+      if (now > deadlineTime) {
+        const hoursRemaining = Math.max(0, Math.floor((eventStartTime.getTime() - now.getTime()) / (1000 * 60 * 60)));
+        return res.status(400).json({ 
+          message: `Cambio nominativo non più disponibile. Il termine era ${deadlineHours} ore prima dell'evento (${hoursRemaining} ore rimaste).`,
+          code: "NAME_CHANGE_DEADLINE_PASSED",
+          deadlineHours,
+          hoursRemaining
+        });
+      }
+    } else {
+      // No event date available - log warning and allow name change (legacy compatibility)
+      console.warn(`[NAME-CHANGE] Event ${ticketedEvent.id} has no startDatetime or date - skipping deadline check`);
+    }
+    
+    // Check max name changes per ticket limit
+    const maxChanges = ticketedEvent.maxNameChangesPerTicket || 1;
+    const existingChanges = await siaeStorage.getSiaeNameChanges(data.originalTicketId);
+    const completedChanges = existingChanges.filter(c => c.status === 'completed').length;
+    
+    if (completedChanges >= maxChanges) {
+      return res.status(400).json({ 
+        message: `Limite massimo di cambi nominativo raggiunto (${maxChanges}). Non è possibile richiedere ulteriori modifiche.`,
+        code: "MAX_NAME_CHANGES_EXCEEDED",
+        maxChanges,
+        currentChanges: completedChanges
+      });
+    }
+    
+    // Check if ticket status allows name change
+    if (originalTicket.status !== 'active') {
+      return res.status(400).json({ 
+        message: `Il biglietto non è in stato valido per il cambio nominativo (stato: ${originalTicket.status})`,
+        code: "INVALID_TICKET_STATUS"
+      });
+    }
+    
+    // Check if there's already a pending name change request
+    const pendingChanges = existingChanges.filter(c => c.status === 'pending');
+    if (pendingChanges.length > 0) {
+      return res.status(400).json({ 
+        message: "Esiste già una richiesta di cambio nominativo in attesa per questo biglietto",
+        code: "PENDING_REQUEST_EXISTS",
+        pendingRequestId: pendingChanges[0].id
+      });
+    }
+    
     // Create the name change request
     const change = await siaeStorage.createSiaeNameChange(data);
     
     // Check if auto-approval is enabled for this event
-    const [originalTicket] = await db.select().from(siaeTickets).where(eq(siaeTickets.id, data.originalTicketId));
-    if (originalTicket) {
-      const [ticketedEvent] = await db.select().from(siaeTicketedEvents).where(eq(siaeTicketedEvents.id, originalTicket.ticketedEventId));
-      
-      if (ticketedEvent?.autoApproveNameChanges) {
+    if (ticketedEvent.autoApproveNameChanges) {
         // Check if payment is required but not yet paid - skip auto-approval
         const feeAmount = parseFloat(ticketedEvent.nameChangeFee || '0');
         if (feeAmount > 0 && change.paymentStatus !== 'paid') {
@@ -2660,7 +2760,6 @@ router.post("/api/siae/name-changes", requireAuth, async (req: Request, res: Res
         } else {
           console.log('[NAME-CHANGE] Auto-approval skipped: bridge not ready');
         }
-        } // End of else block for payment check
       }
     }
     
@@ -3523,6 +3622,28 @@ async function handleSendC1Transmission(params: SendC1Params): Promise<{
     ? ` (S/MIME: ${emailResult.signerEmail})` 
     : ' (NON firmata S/MIME)';
   console.log(`[SIAE-ROUTES] ${typeLabel.toUpperCase()} C1 transmission sent to: ${destination}${signatureInfo}${smimeInfo} (Test mode: ${SIAE_TEST_MODE})`);
+  
+  // Create email audit trail for traceability
+  const crypto = await import('crypto');
+  const attachmentHash = crypto.createHash('sha256').update(xmlToSend).digest('hex');
+  await siaeStorage.createSiaeEmailAudit({
+    companyId,
+    transmissionId: transmission.id,
+    emailType: transmissionType === 'daily' ? 'c1_daily' : 'c1_monthly',
+    recipientEmail: destination,
+    senderEmail: emailResult.signerEmail || process.env.SIAE_SMTP_USER || undefined,
+    subject: `Trasmissione SIAE ${typeLabel.toUpperCase()} - ${companyName}`,
+    bodyPreview: `Trasmissione ${typeLabel} per ${companyName} - ${filteredTickets.length} biglietti - ${totalAmount.toString()} EUR`,
+    attachmentName: `siae_${transmissionType}_${reportDate.toISOString().split('T')[0]}.xml`,
+    attachmentHash,
+    smimeSigned: emailResult.smimeSigned || false,
+    smimeSignerEmail: emailResult.signerEmail || undefined,
+    smimeCertSerial: emailResult.certificateSerial || undefined,
+    smimeSignedAt: emailResult.signedAt ? new Date(emailResult.signedAt) : undefined,
+    status: 'sent',
+    smtpMessageId: emailResult.messageId || undefined,
+    sentAt: new Date(),
+  });
   
   // Update transmission status with S/MIME info
   await siaeStorage.updateSiaeTransmission(transmission.id, {

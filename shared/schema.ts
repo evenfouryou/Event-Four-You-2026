@@ -1248,6 +1248,9 @@ export const siaeTicketedEvents = pgTable("siae_ticketed_events", {
   allowsResale: boolean("allows_resale").notNull().default(false), // Solo se >5000
   autoApproveNameChanges: boolean("auto_approve_name_changes").notNull().default(false), // Approva automaticamente le richieste
   nameChangeFee: decimal("name_change_fee", { precision: 10, scale: 2 }).default('0'), // Commissione cambio nominativo
+  // Limiti temporali cambio nominativo (Allegato B SIAE)
+  nameChangeDeadlineHours: integer("name_change_deadline_hours").notNull().default(48), // Ore prima dell'evento per richiedere cambio (min 24h per legge)
+  maxNameChangesPerTicket: integer("max_name_changes_per_ticket").notNull().default(1), // Massimo numero di cambi nominativo per biglietto
   // Date vendita
   saleStartDate: timestamp("sale_start_date"),
   saleEndDate: timestamp("sale_end_date"),
@@ -1740,6 +1743,59 @@ export const siaeTransmissionsRelations = relations(siaeTransmissions, ({ one, m
     references: [siaeTicketedEvents.id],
   }),
   logs: many(siaeLogs),
+  emailAudits: many(siaeEmailAudit),
+}));
+
+// Email Audit Trail per trasmissioni SIAE - Tracciabilità completa
+export const siaeEmailAudit = pgTable("siae_email_audit", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").notNull().references(() => companies.id),
+  transmissionId: varchar("transmission_id").references(() => siaeTransmissions.id),
+  
+  // Tipo operazione email
+  emailType: varchar("email_type", { length: 30 }).notNull(), // c1_daily, c1_monthly, rca_daily, rca_monthly, receipt_confirm
+  
+  // Destinatari
+  recipientEmail: varchar("recipient_email", { length: 255 }).notNull(), // Email destinatario SIAE
+  senderEmail: varchar("sender_email", { length: 255 }), // Email mittente
+  
+  // Contenuto
+  subject: varchar("subject", { length: 500 }).notNull(),
+  bodyPreview: text("body_preview"), // Primi 500 char del body per debug
+  attachmentName: varchar("attachment_name", { length: 255 }), // Nome file XML allegato
+  attachmentHash: varchar("attachment_hash", { length: 64 }), // SHA-256 hash dell'allegato per integrità
+  
+  // Firma S/MIME
+  smimeSigned: boolean("smime_signed").notNull().default(false),
+  smimeSignerEmail: varchar("smime_signer_email", { length: 255 }),
+  smimeCertSerial: varchar("smime_cert_serial", { length: 100 }),
+  smimeSignedAt: timestamp("smime_signed_at"),
+  
+  // Stato invio
+  status: varchar("status", { length: 20 }).notNull().default('pending'), // pending, sent, delivered, bounced, error
+  smtpMessageId: varchar("smtp_message_id", { length: 255 }), // Message-ID header
+  smtpResponse: varchar("smtp_response", { length: 500 }), // Risposta server SMTP
+  
+  // Errori
+  errorCode: varchar("error_code", { length: 50 }),
+  errorMessage: text("error_message"),
+  retryCount: integer("retry_count").notNull().default(0),
+  lastRetryAt: timestamp("last_retry_at"),
+  
+  // Timestamps
+  createdAt: timestamp("created_at").defaultNow(),
+  sentAt: timestamp("sent_at"),
+});
+
+export const siaeEmailAuditRelations = relations(siaeEmailAudit, ({ one }) => ({
+  company: one(companies, {
+    fields: [siaeEmailAudit.companyId],
+    references: [companies.id],
+  }),
+  transmission: one(siaeTransmissions, {
+    fields: [siaeEmailAudit.transmissionId],
+    references: [siaeTransmissions.id],
+  }),
 }));
 
 // Box Office Sessions (Sessioni Cassa) - Per operatori PV
@@ -2817,6 +2873,12 @@ export const insertSiaeTransmissionSchema = createInsertSchema(siaeTransmissions
 });
 export const updateSiaeTransmissionSchema = insertSiaeTransmissionSchema.partial().omit({ companyId: true });
 
+// Email Audit
+export const insertSiaeEmailAuditSchema = createInsertSchema(siaeEmailAudit).omit({
+  id: true,
+  createdAt: true,
+});
+
 // Box Office Sessions
 export const insertSiaeBoxOfficeSessionSchema = createInsertSchema(siaeBoxOfficeSessions).omit({
   id: true,
@@ -2990,6 +3052,10 @@ export type InsertSiaeLog = z.infer<typeof insertSiaeLogSchema>;
 export type SiaeTransmission = typeof siaeTransmissions.$inferSelect;
 export type InsertSiaeTransmission = z.infer<typeof insertSiaeTransmissionSchema>;
 export type UpdateSiaeTransmission = z.infer<typeof updateSiaeTransmissionSchema>;
+
+// Email Audit
+export type SiaeEmailAudit = typeof siaeEmailAudit.$inferSelect;
+export type InsertSiaeEmailAudit = z.infer<typeof insertSiaeEmailAuditSchema>;
 
 // Box Office
 export type SiaeBoxOfficeSession = typeof siaeBoxOfficeSessions.$inferSelect;
