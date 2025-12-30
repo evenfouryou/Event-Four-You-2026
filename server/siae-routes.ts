@@ -92,6 +92,67 @@ function getSiaeDestinationEmail(overrideEmail?: string): string {
 console.log('[SIAE Routes] Router initialized, registering routes...');
 console.log(`[SIAE Routes] Test mode: ${SIAE_TEST_MODE}, Test email: ${SIAE_TEST_EMAIL}`);
 
+/**
+ * Normalizza TipoTitolo a codici SIAE validi secondo Allegato B TAB.3
+ * I=Intero, R1-R6=Ridotto, O1-O6=Omaggio, RX/OX=Altri, ABB=Abbonamento
+ * Qualsiasi codice non riconosciuto viene mappato a 'I' (Intero)
+ */
+function normalizeSiaeTipoTitolo(rawCode: string | null | undefined, isComplimentary?: boolean): string {
+  const code = (rawCode || 'I').toUpperCase().trim();
+  
+  // Codici SIAE già validi (pass-through)
+  const validCodes = ['I', 'R1', 'R2', 'R3', 'R4', 'R5', 'R6', 'RX', 'O1', 'O2', 'O3', 'O4', 'O5', 'O6', 'OX', 'ABB'];
+  if (validCodes.includes(code)) {
+    return code;
+  }
+  
+  // Mappatura codici interni legacy
+  if (code === 'INT' || code === 'INTERO' || code === 'FD') {
+    return 'I';
+  }
+  if (code === 'RID' || code === 'RIDOTTO') {
+    return 'R1';
+  }
+  if (code === 'OMA' || code === 'OMG' || code === 'OMAGGIO') {
+    return 'O1';
+  }
+  if (code === 'ABBONAMENTO') {
+    return 'ABB';
+  }
+  
+  // Fallback per ticket omaggio se flag isComplimentary
+  if (isComplimentary) {
+    return 'O1';
+  }
+  
+  // Default: Intero
+  return 'I';
+}
+
+/**
+ * Normalizza CodiceOrdine (settore) a codici SIAE validi secondo Allegato B TAB.2
+ * Codici validi: 01-14, 99 (Altro settore)
+ * Qualsiasi codice non riconosciuto viene mappato a '99'
+ */
+function normalizeSiaeCodiceOrdine(rawCode: string | null | undefined): string {
+  const code = (rawCode || '99').trim();
+  
+  // Validate known sector codes (01-14 and 99)
+  const validCodes = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12', '13', '14', '99'];
+  if (validCodes.includes(code)) {
+    return code;
+  }
+  
+  // Try to parse numeric and zero-pad if valid
+  const numValue = parseInt(code, 10);
+  if (!isNaN(numValue) && numValue >= 1 && numValue <= 14) {
+    return String(numValue).padStart(2, '0');
+  }
+  
+  // Invalid code: use default 99 (Altro settore)
+  return '99';
+}
+
 // Middleware to check if user is authenticated
 function requireAuth(req: Request, res: Response, next: NextFunction) {
   if (!req.isAuthenticated || !req.isAuthenticated()) {
@@ -4134,36 +4195,28 @@ async function generateC1ReportXml(params: C1ReportParams): Promise<string> {
     // Build OrdineDiPosto (sectors) XML with TitoliAccesso inside
     let sectorsXml = '';
     for (const [sectorKey, sectorTickets] of ticketsBySector) {
-      // CodiceOrdine: codice settore 2 caratteri (Allegato B TAB.2). Default: 99=Altro settore
-      let codiceOrdine = '99';
+      // CodiceOrdine: usa helper per normalizzazione Allegato B TAB.2
+      let codiceOrdine = normalizeSiaeCodiceOrdine(null);
       let capacity = ticketedEvent.capacity || 100;
       
       if (sectorKey !== DEFAULT_SECTOR_KEY) {
         const sector = await siaeStorage.getSiaeEventSector(sectorKey);
         if (sector) {
-          codiceOrdine = sector.sectorCode || '99';
+          codiceOrdine = normalizeSiaeCodiceOrdine(sector.sectorCode);
           capacity = sector.capacity || capacity;
         }
       }
       
-      // Group by ticket type for TitoliAccesso
-      // Mappa TipoTitolo: I=intero, R1-R6=ridotto, O1-O6=omaggio (Allegato B TAB.3)
+      // Group by ticket type for TitoliAccesso using helper for normalization
+      // ABB tickets are excluded - they go in the separate <Abbonamenti> section per Allegato B
       const ticketsByType: Map<string, typeof sectorTickets> = new Map();
       for (const ticket of sectorTickets) {
-        let tipoTitolo = 'I'; // Default: Intero
-        const code = ticket.ticketTypeCode?.toUpperCase() || '';
+        // Usa helper centralizzato per normalizzazione TipoTitolo (Allegato B TAB.3)
+        const tipoTitolo = normalizeSiaeTipoTitolo(ticket.ticketTypeCode, ticket.isComplimentary);
         
-        // Mappa codici interni a codici SIAE ufficiali
-        if (code === 'INT' || code === 'I' || code === 'INTERO') {
-          tipoTitolo = 'I';
-        } else if (code === 'R1' || code === 'R2' || code === 'R3' || code === 'R4' || code === 'R5' || code === 'R6' || code === 'RX') {
-          tipoTitolo = code; // Già codice SIAE valido
-        } else if (code === 'RID' || code === 'RIDOTTO') {
-          tipoTitolo = 'R1';
-        } else if (code === 'O1' || code === 'O2' || code === 'O3' || code === 'O4' || code === 'O5' || code === 'O6' || code === 'OX') {
-          tipoTitolo = code; // Già codice SIAE valido
-        } else if (code === 'OMA' || code === 'OMG' || code === 'OMAGGIO' || ticket.isComplimentary) {
-          tipoTitolo = 'O1';
+        // Skip ABB tickets - questi vanno nella sezione <Abbonamenti>, non <TitoliAccesso>
+        if (tipoTitolo === 'ABB') {
+          continue;
         }
         
         if (!ticketsByType.has(tipoTitolo)) {
@@ -4207,11 +4260,11 @@ async function generateC1ReportXml(params: C1ReportParams): Promise<string> {
             </OrdineDiPosto>`;
     }
     
-    // If no sectors from tickets, add default sector for event (99=Altro settore)
+    // If no sectors from tickets, add default sector for event using helper
     if (sectorsXml === '') {
       sectorsXml = `
             <OrdineDiPosto>
-                <CodiceOrdine>99</CodiceOrdine>
+                <CodiceOrdine>${normalizeSiaeCodiceOrdine(null)}</CodiceOrdine>
                 <Capienza>${ticketedEvent.capacity || 100}</Capienza>
                 <IVAEccedenteOmaggi>0</IVAEccedenteOmaggi>
             </OrdineDiPosto>`;
@@ -4268,11 +4321,11 @@ async function generateC1ReportXml(params: C1ReportParams): Promise<string> {
       const validTo = new Date(firstSub.validTo);
       const validitaStr = `${validTo.getFullYear()}${String(validTo.getMonth() + 1).padStart(2, '0')}${String(validTo.getDate()).padStart(2, '0')}`;
       
-      // Get sector code (99=Altro settore come default valido per SIAE)
-      let codiceOrdine = '99';
+      // Get sector code using helper for normalization
+      let codiceOrdine = normalizeSiaeCodiceOrdine(null);
       if (firstSub.sectorId) {
         const sector = await siaeStorage.getSiaeEventSector(firstSub.sectorId);
-        if (sector) codiceOrdine = sector.sectorCode || '99';
+        if (sector) codiceOrdine = normalizeSiaeCodiceOrdine(sector.sectorCode);
       }
       
       // TipoTitolo per abbonamenti deve essere 'ABB' (Allegato B SIAE)
@@ -5707,8 +5760,14 @@ router.post('/api/siae/ticketed-events/:id/reports/c1/send', requireAuth, requir
     // Process all tickets to build proper groupings
     const soldTickets = allTickets.filter(t => t.status === 'emitted' || t.status === 'used');
     for (const ticket of soldTickets) {
-      const sectorCode = ticket.sectorCode || '99'; // 99=Altro settore (valido SIAE)
-      const ticketTypeCode = ticket.ticketTypeCode || 'I'; // I=Intero (codice SIAE valido)
+      // Usa helper centralizzati per normalizzazione codici SIAE
+      const sectorCode = normalizeSiaeCodiceOrdine(ticket.sectorCode);
+      const ticketTypeCode = normalizeSiaeTipoTitolo(ticket.ticketTypeCode, (ticket as any).isComplimentary);
+      
+      // Skip ABB tickets - questi vanno nella sezione <Abbonamenti>, non <TitoliAccesso>
+      if (ticketTypeCode === 'ABB') {
+        continue;
+      }
       
       if (!ticketsBySector.has(sectorCode)) {
         const sector = sectors.find(s => s.sectorCode === sectorCode);
@@ -5760,7 +5819,7 @@ router.post('/api/siae/ticketed-events/:id/reports/c1/send', requireAuth, requir
     
     // Also add sectors with no tickets (capacity only)
     for (const sector of sectors) {
-      const sectorCode = sector.sectorCode || '99'; // 99=Altro settore (valido SIAE)
+      const sectorCode = normalizeSiaeCodiceOrdine(sector.sectorCode);
       if (!ticketsBySector.has(sectorCode)) {
         ticketsBySector.set(sectorCode, {
           sectorCode,
