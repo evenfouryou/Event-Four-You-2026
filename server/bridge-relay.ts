@@ -54,8 +54,8 @@ interface BridgeMessage {
 // Keep track of clients by company for routing responses
 const activeClients = new Map<string, ClientConnection[]>();
 
-const HEARTBEAT_INTERVAL = 30000;
-const CONNECTION_TIMEOUT = 35000;
+const HEARTBEAT_INTERVAL = 15000;  // 15 seconds (aligned with desktop app)
+const CONNECTION_TIMEOUT = 20000;  // 20 seconds (15s + 5s grace period)
 
 export function setupBridgeRelay(server: Server): void {
   const wss = new WebSocketServer({ noServer: true });
