@@ -5,6 +5,7 @@ import { siaeStorage } from "./siae-storage";
 import { storage } from "./storage";
 import { sendSiaeTransmissionEmail } from "./email-service";
 import { isBridgeConnected, requestXmlSignature } from "./bridge-relay";
+import { escapeXml, formatSiaeDateCompact, formatSiaeTimeCompact, formatSiaeTimeHHMM } from './siae-utils';
 
 // Configurazione SIAE secondo Allegato B e C - Provvedimento Agenzia delle Entrate 04/03/2008
 const SIAE_TEST_MODE = process.env.SIAE_TEST_MODE === 'true';
@@ -20,50 +21,6 @@ function log(message: string) {
     hour12: false,
   });
   console.log(`${formattedTime} [SIAE-Scheduler] ${message}`);
-}
-
-// ==================== SIAE Date/Time Format Helpers ====================
-// Formato SIAE conforme a Allegato B - Provvedimento 04/03/2008
-
-/**
- * Formatta data in formato SIAE compatto AAAAMMGG
- * Es: 20241228 per 28 dicembre 2024
- */
-export function formatSiaeDateCompact(date: Date | string | null): string {
-  if (!date) return '00000000';
-  const d = typeof date === 'string' ? new Date(date) : date;
-  if (isNaN(d.getTime())) return '00000000';
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${year}${month}${day}`;
-}
-
-/**
- * Formatta ora in formato SIAE compatto HHMMSS
- * Es: 143015 per 14:30:15
- */
-export function formatSiaeTimeCompact(date: Date | string | null): string {
-  if (!date) return '000000';
-  const d = typeof date === 'string' ? new Date(date) : date;
-  if (isNaN(d.getTime())) return '000000';
-  const hours = String(d.getHours()).padStart(2, '0');
-  const minutes = String(d.getMinutes()).padStart(2, '0');
-  const seconds = String(d.getSeconds()).padStart(2, '0');
-  return `${hours}${minutes}${seconds}`;
-}
-
-/**
- * Formatta ora in formato SIAE HHMM (per OraEvento)
- * Es: 1430 per 14:30
- */
-export function formatSiaeTimeHHMM(date: Date | string | null): string {
-  if (!date) return '0000';
-  const d = typeof date === 'string' ? new Date(date) : date;
-  if (isNaN(d.getTime())) return '0000';
-  const hours = String(d.getHours()).padStart(2, '0');
-  const minutes = String(d.getMinutes()).padStart(2, '0');
-  return `${hours}${minutes}`;
 }
 
 /**
@@ -383,18 +340,6 @@ function generateXMLContent(reportData: any): string {
   return xml;
 }
 
-/**
- * Escape caratteri speciali XML
- */
-function escapeXml(str: string | null | undefined): string {
-  if (!str) return '';
-  return str
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&apos;');
-}
 
 async function checkExistingTransmission(ticketedEventId: string, transmissionType: string, periodDate: Date): Promise<boolean> {
   const dateStr = periodDate.toISOString().split('T')[0];

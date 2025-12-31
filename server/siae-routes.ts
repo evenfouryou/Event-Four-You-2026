@@ -1,5 +1,6 @@
 // SIAE Module API Routes
 import { Router, Request, Response, NextFunction } from "express";
+import { escapeXml, formatSiaeDateCompact, formatSiaeTimeCompact, formatSiaeTimeHHMM, formatSiaeDate, formatSiaeDateTime, toCentesimi, normalizeSiaeTipoTitolo, normalizeSiaeCodiceOrdine, generateSiaeFileName, SIAE_SYSTEM_CODE_DEFAULT } from './siae-utils';
 import { siaeStorage } from "./siae-storage";
 import { storage } from "./storage";
 import { db } from "./db";
@@ -91,67 +92,6 @@ function getSiaeDestinationEmail(overrideEmail?: string): string {
 
 console.log('[SIAE Routes] Router initialized, registering routes...');
 console.log(`[SIAE Routes] Test mode: ${SIAE_TEST_MODE}, Test email: ${SIAE_TEST_EMAIL}`);
-
-/**
- * Normalizza TipoTitolo a codici SIAE validi secondo Allegato B TAB.3
- * I=Intero, R1-R6=Ridotto, O1-O6=Omaggio, RX/OX=Altri, ABB=Abbonamento
- * Qualsiasi codice non riconosciuto viene mappato a 'I' (Intero)
- */
-function normalizeSiaeTipoTitolo(rawCode: string | null | undefined, isComplimentary?: boolean): string {
-  const code = (rawCode || 'I').toUpperCase().trim();
-  
-  // Codici SIAE già validi (pass-through)
-  const validCodes = ['I', 'R1', 'R2', 'R3', 'R4', 'R5', 'R6', 'RX', 'O1', 'O2', 'O3', 'O4', 'O5', 'O6', 'OX', 'ABB'];
-  if (validCodes.includes(code)) {
-    return code;
-  }
-  
-  // Mappatura codici interni legacy
-  if (code === 'INT' || code === 'INTERO' || code === 'FD') {
-    return 'I';
-  }
-  if (code === 'RID' || code === 'RIDOTTO') {
-    return 'R1';
-  }
-  if (code === 'OMA' || code === 'OMG' || code === 'OMAGGIO') {
-    return 'O1';
-  }
-  if (code === 'ABBONAMENTO') {
-    return 'ABB';
-  }
-  
-  // Fallback per ticket omaggio se flag isComplimentary
-  if (isComplimentary) {
-    return 'O1';
-  }
-  
-  // Default: Intero
-  return 'I';
-}
-
-/**
- * Normalizza CodiceOrdine (settore) a codici SIAE validi secondo Allegato B TAB.2
- * Codici validi: 01-14, 99 (Altro settore)
- * Qualsiasi codice non riconosciuto viene mappato a '99'
- */
-function normalizeSiaeCodiceOrdine(rawCode: string | null | undefined): string {
-  const code = (rawCode || '99').trim();
-  
-  // Validate known sector codes (01-14 and 99)
-  const validCodes = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12', '13', '14', '99'];
-  if (validCodes.includes(code)) {
-    return code;
-  }
-  
-  // Try to parse numeric and zero-pad if valid
-  const numValue = parseInt(code, 10);
-  if (!isNaN(numValue) && numValue >= 1 && numValue <= 14) {
-    return String(numValue).padStart(2, '0');
-  }
-  
-  // Invalid code: use default 99 (Altro settore)
-  return '99';
-}
 
 /**
  * Valida e normalizza il Codice Fiscale italiano (16 caratteri)
@@ -4375,36 +4315,6 @@ router.post("/api/siae/seed-public", async (req: Request, res: Response) => {
 // ==================== XML Report Generation (SIAE Transmission) ====================
 // Conforme a Allegato B e C - Provvedimento Agenzia delle Entrate 04/03/2008
 
-// SIAE Configuration
-const SIAE_SYSTEM_CODE_DEFAULT = 'EVENT4U1'; // Max 8 caratteri
-
-// Helper to escape XML special characters
-function escapeXml(str: string | null | undefined): string {
-  if (!str) return '';
-  return str.replace(/[<>&'"]/g, (c) => {
-    switch (c) {
-      case '<': return '&lt;';
-      case '>': return '&gt;';
-      case '&': return '&amp;';
-      case "'": return '&apos;';
-      case '"': return '&quot;';
-      default: return c;
-    }
-  });
-}
-
-// Format date for legacy SIAE XML (YYYY-MM-DD) - backward compatibility
-function formatSiaeDate(date: Date | null | undefined): string {
-  if (!date) return '';
-  return date.toISOString().split('T')[0];
-}
-
-// Format datetime for legacy SIAE XML (YYYY-MM-DDTHH:MM:SS) - backward compatibility
-function formatSiaeDateTime(date: Date | null | undefined): string {
-  if (!date) return '';
-  return date.toISOString().replace('.000Z', '');
-}
-
 // ==================== C1 Report XML Generation Helper ====================
 // Shared helper to generate RiepilogoMensile XML for both daily and monthly C1 reports
 // Conforme al tracciato SIAE Allegato B - Provvedimento 04/03/2008
@@ -4419,12 +4329,6 @@ interface C1ReportParams {
   companyName: string;
   taxId: string;
   oraGen: string;
-}
-
-// Helper: converte euro in centesimi (intero)
-function toCentesimi(euroAmount: number | string): number {
-  const euro = typeof euroAmount === 'string' ? parseFloat(euroAmount) : euroAmount;
-  return Math.round((euro || 0) * 100);
 }
 
 async function generateC1ReportXml(params: C1ReportParams): Promise<string> {
@@ -4734,8 +4638,13 @@ async function generateC1ReportXml(params: C1ReportParams): Promise<string> {
   const organizerTaxId = taxId;
   const organizerType = 'G';
   
+  // SIAE richiede elementi radice distinti:
+  // - RiepilogoGiornaliero con attributo Data="YYYYMMDD" per report giornalieri
+  // - RiepilogoMensile con attributo Mese="YYYYMM" per report mensili
+  const rootElement = isMonthly ? 'RiepilogoMensile' : 'RiepilogoGiornaliero';
+  
   return `<?xml version="1.0" encoding="UTF-8"?>
-<RiepilogoMensile ${periodAttrName}="${periodAttrValue}" DataGenerazione="${dataGenAttr}" OraGenerazione="${oraGen}" ProgressivoGenerazione="${progressiveGen}" Sostituzione="${sostituzione}">
+<${rootElement} ${periodAttrName}="${periodAttrValue}" DataGenerazione="${dataGenAttr}" OraGenerazione="${oraGen}" ProgressivoGenerazione="${progressiveGen}" Sostituzione="${sostituzione}">
     <Titolare>
         <Denominazione>${escapeXml(companyName)}</Denominazione>
         <CodiceFiscale>${escapeXml(taxId)}</CodiceFiscale>
@@ -4746,7 +4655,7 @@ async function generateC1ReportXml(params: C1ReportParams): Promise<string> {
         <CodiceFiscale>${escapeXml(organizerTaxId)}</CodiceFiscale>
         <TipoOrganizzatore valore="${organizerType}"/>${eventsXml}${abbonamentiXml}
     </Organizzatore>
-</RiepilogoMensile>`;
+</${rootElement}>`;
 }
 
 /**
@@ -6084,14 +5993,17 @@ router.post('/api/siae/ticketed-events/:id/reports/c1/send', requireAuth, requir
     const transmissionCount = await siaeStorage.getSiaeTransmissionCount(event.companyId);
     const progressivoGenerazione = transmissionCount + 1;
     
-    // Nome file conforme Allegato C SIAE: RMG_AAAA_MM_GG_###.xsi (RiepilogoGiornaliero)
-    // RMG = Riepilogo Mensile/Giornaliero (C1 report)
+    // Nome file conforme Allegato C SIAE:
+    // - RMG_AAAA_MM_GG_###.xsi per RiepilogoGiornaliero (giornaliero)
+    // - RPM_AAAA_MM_###.xsi per RiepilogoMensile (mensile)
     // Estensione .p7m aggiunta se firmato digitalmente
     const year = eventDate.getFullYear();
     const month = String(eventDate.getMonth() + 1).padStart(2, '0');
     const day = String(eventDate.getDate()).padStart(2, '0');
     const progressivo = String(progressivoGenerazione).padStart(3, '0');
-    const baseFileName = `RMG_${year}_${month}_${day}_${progressivo}`;
+    const baseFileName = isMonthly 
+      ? `RPM_${year}_${month}_${progressivo}` // Riepilogo Periodico Mensile
+      : `RMG_${year}_${month}_${day}_${progressivo}`; // Riepilogo Giornaliero
     // fileName will be updated to .xsi.p7m if signed, otherwise .xsi
     let fileName = `${baseFileName}.xsi`;
     
@@ -6228,9 +6140,21 @@ ${titoliAccessoXml}
     // Get Locale data
     const localeDenominazione = location?.name || event.venueName || '';
     const codiceLocale = location?.siaeLocationCode || event.siaeLocationCode || '';
+    
+    // SIAE richiede elementi radice distinti:
+    // - RiepilogoGiornaliero con attributo Data="YYYYMMDD" per report giornalieri
+    // - RiepilogoMensile con attributo Mese="YYYYMM" per report mensili
+    const rootElement = isMonthly ? 'RiepilogoMensile' : 'RiepilogoGiornaliero';
+    const periodAttrName = isMonthly ? 'Mese' : 'Data';
+    const periodAttrValue = isMonthly 
+      ? `${year}${month}` // YYYYMM per mensile
+      : dataEvento; // YYYYMMDD per giornaliero
+    
+    // Incidenza intrattenimento (percentuale) - 0 se solo spettacolo
+    const incidenzaIntrattenimento = isIntrattenimento ? 100 : 0;
 
     const xmlContent = `<?xml version="1.0" encoding="UTF-8"?>
-<RiepilogoGiornaliero Data="${dataEvento}" DataGenerazione="${dataGenerazione}" OraGenerazione="${oraGenerazione}" ProgressivoGenerazione="${progressivoGenerazione}" Sostituzione="N">
+<${rootElement} ${periodAttrName}="${periodAttrValue}" DataGenerazione="${dataGenerazione}" OraGenerazione="${oraGenerazione}" ProgressivoGenerazione="${progressivoGenerazione}" Sostituzione="N">
     <Titolare>
         <Denominazione>${escapeXml(titolareDenominazione)}</Denominazione>
         <CodiceFiscale>${titolareCodiceFiscale}</CodiceFiscale>
@@ -6243,7 +6167,8 @@ ${titoliAccessoXml}
         <Evento>
             <Intrattenimento>
                 <TipoTassazione valore="${tipoTassazione}"/>
-                <Incidenza>0</Incidenza>
+                <Incidenza>${incidenzaIntrattenimento}</Incidenza>
+                <ImponibileIntrattenimenti>0</ImponibileIntrattenimenti>
             </Intrattenimento>
             <Locale>
                 <Denominazione>${escapeXml(localeDenominazione)}</Denominazione>
@@ -6261,7 +6186,7 @@ ${titoliAccessoXml}
 ${ordiniDiPostoXml}
         </Evento>
     </Organizzatore>
-</RiepilogoGiornaliero>`;
+</${rootElement}>`;
 
     // Check if digital signature is requested via smart card
     const { signWithSmartCard } = req.body;
