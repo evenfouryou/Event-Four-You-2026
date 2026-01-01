@@ -1,0 +1,133 @@
+Perfetto.
+Ti preparo **una spiegazione tecnica chiara, neutra e strutturata**, pensata **per essere data in pasto a un’altra AI o a uno sviluppatore**, così capisce **esattamente il problema e cosa correggere**.
+
+---
+
+# 📌 SPIEGAZIONE TECNICA PER AI / SVILUPPATORE
+
+## Problema: mancata ricezione dei report SIAE
+
+### Contesto
+
+Il sistema invia flussi verso SIAE (SIETA) per la gestione di report/eventi.
+L’invio avviene correttamente, ma **non viene mai ricevuta alcuna risposta di esito** (né positiva né negativa).
+
+---
+
+## 🔍 Analisi tecnica effettuata
+
+### 1️⃣ Il file inviato NON è un vero `.p7m`
+
+Il file analizzato (`RPM_2025_12_001.xsi.p7m`) **non è un CAdES (.p7m)**, ma:
+
+* un **file XML firmato internamente (XMLDSig – enveloped)**
+* contiene il tag `<Signature xmlns="http://www.w3.org/2000/09/xmldsig#">`
+
+➡️ Questo **non corrisponde** al formato richiesto dai flussi SIAE, che si aspettano:
+
+> **CAdES-BES (CMS SignedData)**
+> ovvero un vero file `.p7m`
+
+---
+
+### 2️⃣ Algoritmo di firma obsoleto (SHA1)
+
+Nel file è presente:
+
+* `SignatureMethod: rsa-sha1`
+* `DigestMethod: sha1`
+
+SHA1 oggi è **considerato non sicuro** ed è **rifiutato da molti sistemi istituzionali**, inclusi i sistemi SIAE più recenti.
+
+➡️ Anche se il certificato è valido, la firma viene scartata.
+
+---
+
+### 3️⃣ Certificato valido, ma usato nel modo sbagliato
+
+Il certificato presente risulta:
+
+* emesso da **InfoCert CA 4**
+* intestato correttamente (uso SIAE)
+* periodo di validità OK
+
+❗ Tuttavia:
+
+* viene usato per **XMLDSig**
+* non per **CAdES-BES**
+
+👉 SIAE accetta solo **CAdES-BES (.p7m)** con **SHA-256**
+
+---
+
+### 4️⃣ Effetto finale lato SIAE
+
+Quando arriva un file con:
+
+* firma XML invece di P7M
+* SHA1 invece di SHA256
+
+👉 il sistema SIAE **non genera risposta**, non invia errore, e il file viene ignorato.
+
+Questo spiega perfettamente il comportamento osservato.
+
+---
+
+## ✅ SOLUZIONE CORRETTA (da implementare)
+
+### ✅ Formato richiesto
+
+* **CAdES-BES**
+* Estensione: `.p7m`
+* Tipo: CMS SignedData
+
+### ✅ Algoritmi
+
+* Firma: `RSA-SHA256`
+* Digest: `SHA256`
+
+### ✅ Certificato
+
+* Certificato di firma valido (InfoCert / Aruba / Namirial / Actalis)
+* Catena completa (root + intermedi)
+
+---
+
+## 🔧 Flusso corretto
+
+1. Generare il file XML (non firmato)
+2. Firmarlo come **CAdES-BES (.p7m)**
+3. Inviare il `.p7m` al canale SIAE previsto (PEC / WS / FTP)
+4. Attendere:
+
+   * esito tecnico
+   * esito applicativo
+
+---
+
+## ❌ Cosa NON fare
+
+* Non usare XMLDSig
+* Non usare SHA1
+* Non usare CSP legacy (Bit4ID vecchi)
+* Non inviare file “travestiti” da `.p7m`
+
+---
+
+## ✅ Conclusione
+
+Il problema **non è nel tracciato SIAE**,
+**non è nei dati**,
+**non è nel certificato in sé**,
+
+👉 ma **nel formato di firma e negli algoritmi usati**.
+
+---
+
+Se vuoi, posso anche fornire:
+
+* un esempio di comando OpenSSL corretto
+* una configurazione Java / C# / JavaScript
+* o uno schema di validazione automatico pre-invio
+
+Dimmi solo cosa deve usare l’altra AI.
