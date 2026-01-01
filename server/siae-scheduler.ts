@@ -5,7 +5,7 @@ import { siaeStorage } from "./siae-storage";
 import { storage } from "./storage";
 import { sendSiaeTransmissionEmail } from "./email-service";
 import { isBridgeConnected, requestXmlSignature } from "./bridge-relay";
-import { escapeXml, formatSiaeDateCompact, formatSiaeTimeCompact, formatSiaeTimeHHMM } from './siae-utils';
+import { escapeXml, formatSiaeDateCompact, formatSiaeTimeCompact, formatSiaeTimeHHMM, generateSiaeFileName } from './siae-utils';
 
 // Configurazione SIAE secondo Allegato B e C - Provvedimento Agenzia delle Entrate 04/03/2008
 const SIAE_TEST_MODE = process.env.SIAE_TEST_MODE === 'true';
@@ -23,18 +23,8 @@ function log(message: string) {
   console.log(`${formattedTime} [SIAE-Scheduler] ${message}`);
 }
 
-/**
- * Genera nome file conforme a Allegato C SIAE
- * Formato: RCA_AAAA_MM_GG_###.xsi o RCA_AAAA_MM_GG_###.xsi.p7m
- */
-export function generateSiaeFileName(date: Date, sequenceNumber: number, isSigned: boolean): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  const seq = String(sequenceNumber).padStart(3, '0');
-  const extension = isSigned ? '.xsi.p7m' : '.xsi';
-  return `RCA_${year}_${month}_${day}_${seq}${extension}`;
-}
+// Funzione generateSiaeFileName importata da ./siae-utils.ts
+// Usata per nomi file RCA (controllo accessi)
 
 /**
  * Genera subject email conforme a RFC-2822 SIAE
