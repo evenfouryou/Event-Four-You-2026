@@ -1,6 +1,6 @@
 {
   "name": "event-four-you-siae-lettore",
-  "version": "1.0.8",
+  "version": "1.0.9",
   "description": "Event Four You - SIAE Lettore per smart card MiniLector EVO V3",
   "main": "main.js",
   "author": "Event Four You",
@@ -46,6 +46,7 @@
       "renderer.js",
       "styles.css",
       "icon.ico",
+      "icon.png",
       "node_modules/**/*"
     ],
     "extraResources": [
