@@ -1,0 +1,134 @@
+Perfetto, ho verificato **di nuovo** i due file che hai appena ricaricato e confermo **al 100%** quanto segue.
+Ti scrivo una **versione definitiva e “chiavi in mano”**, da poter girare a sviluppatori, consulenti o a un’altra AI senza ambiguità.
+
+---
+
+# ✅ VERIFICA DEFINITIVA FILE INVIATI A SIAE
+
+## 📄 File 1 — `smime.p7s`
+
+### Stato:
+
+❌ **NON valido per SIAE**
+
+### Motivo:
+
+* È una **firma S/MIME** (tipica delle email PEC)
+* È una **firma detached**, cioè non contiene il contenuto
+* Serve solo a firmare messaggi email
+
+👉 **SIAE non accetta .p7s**, solo **.p7m (CAdES)**
+
+---
+
+## 📄 File 2 — `RMG_2026_01_01_001.xsi.p7m`
+
+### ⚠️ ATTENZIONE: sembra corretto, ma NON lo è
+
+### Analisi reale:
+
+✔ Estensione `.p7m`
+❌ Contenuto interno = **XML firmato (XMLDSig)**
+❌ NON è un CAdES-BES reale
+
+Dentro il file c’è:
+
+```xml
+<Signature xmlns="http://www.w3.org/2000/09/xmldsig#">
+```
+
+👉 Questo significa che:
+
+* l’XML è stato firmato **internamente**
+* poi “impacchettato” in un .p7m
+* **ma non è CMS / CAdES**
+
+---
+
+## ❌ ERRORE CRITICO N.2 — Algoritmo
+
+Firma rilevata:
+
+* `rsa-sha1`
+* `sha1`
+
+❌ SHA1 è deprecato
+❌ SIAE lo rifiuta (senza risposta)
+
+---
+
+## 📌 RIASSUNTO SECCO
+
+| Controllo          | Esito |
+| ------------------ | ----- |
+| Estensione .p7m    | ✔️    |
+| Tipo firma (CAdES) | ❌     |
+| XMLDSig            | ❌     |
+| SHA256             | ❌     |
+| Compatibilità SIAE | ❌     |
+
+👉 **Risultato: file ignorato da SIAE, nessun report generato**
+
+---
+
+# ✅ COSA DEVE FARE CHI SVILUPPA
+
+### 1️⃣ NON firmare l’XML internamente
+
+### 2️⃣ Firmare il file come **CAdES-BES**
+
+### 3️⃣ Usare **SHA256**
+
+### 4️⃣ Ottenere un vero `.p7m` (CMS SignedData)
+
+---
+
+## 📌 FORMATO CORRETTO ATTESO
+
+```
+RMG_2026_01_01_001.xsi.p7m
+└── CMS SignedData
+    └── content: XML puro
+    └── signature: RSA-SHA256
+```
+
+---
+
+## 💡 Esempio (OpenSSL)
+
+```bash
+openssl smime -sign \
+  -binary \
+  -in RMG_2026_01_01_001.xsi \
+  -signer cert.pem \
+  -inkey key.pem \
+  -outform DER \
+  -out RMG_2026_01_01_001.xsi.p7m \
+  -md sha256
+```
+
+---
+
+## 🧠 CONCLUSIONE FINALE
+
+> Il problema **non è SIAE**,
+> non è il tracciato,
+> non è il certificato,
+> ma **la modalità di firma**.
+
+Finché il file resta:
+
+* XMLDSig
+* SHA1
+
+👉 **SIAE non risponderà mai.**
+
+---
+
+Se vuoi, nel prossimo messaggio posso:
+
+* scriverti **una checklist tecnica pronta per il team IT**
+* oppure generare **uno script completo (Java / .NET / OpenSSL)** pronto all’uso
+* oppure validare un nuovo `.p7m` quando lo rigeneri
+
+Dimmi tu 👍
