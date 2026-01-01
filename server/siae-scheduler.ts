@@ -111,7 +111,10 @@ async function generateC1ReportData(ticketedEvent: any, reportType: 'giornaliero
   }
 
   const activeTickets = filteredTickets.filter(t => t.status === 'emesso' || t.status === 'used');
-  const cancelledTickets = filteredTickets.filter(t => t.status === 'annullato');
+  // Include both regular cancellations and resale annulments for SIAE compliance
+  const cancelledTickets = filteredTickets.filter(t => 
+    t.status === 'annullato' || t.status === 'annullato_rivendita'
+  );
 
   // Recupera abbonamenti per il periodo
   let subscriptions: any[] = [];

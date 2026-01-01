@@ -4652,7 +4652,12 @@ async function generateC1ReportXml(params: C1ReportParams): Promise<string> {
       let titoliAccessoXml = '';
       let totalOmaggiIva = 0;
       for (const [tipoTitolo, typeTickets] of ticketsByType) {
-        const validTickets = typeTickets.filter((t: any) => t.status !== 'annullato' && t.status !== 'cancelled');
+        // Exclude all cancelled/annulled tickets including resale annulments
+        const validTickets = typeTickets.filter((t: any) => 
+          t.status !== 'annullato' && 
+          t.status !== 'cancelled' && 
+          t.status !== 'annullato_rivendita'
+        );
         if (validTickets.length === 0) continue;
         
         const quantita = validTickets.length;
