@@ -20,11 +20,19 @@
 
   <!-- Native DLLs for SIAE Smart Card -->
   <ItemGroup>
-    <None Update="libSIAE.dll">
+    <!-- libSIAE.dll is in prebuilt folder -->
+    <None Include="prebuilt\libSIAE.dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Link>libSIAE.dll</Link>
+    </None>
+    <!-- libSIAEp7.dll is in project root -->
+    <None Include="libSIAEp7.dll">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Update="libSIAEp7.dll">
+    <!-- Newtonsoft.Json from prebuilt as fallback -->
+    <None Include="prebuilt\Newtonsoft.Json.dll">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Link>Newtonsoft.Json.dll</Link>
     </None>
   </ItemGroup>
 
