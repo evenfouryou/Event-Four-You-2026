@@ -163,7 +163,7 @@ async function main() {
     
     // Create commit
     console.log('📝 Creating commit...');
-    const commitMessage = 'v3.7: Integrate libSIAEp7.dll for direct PKCS7 P7M signing\n\n- Replace Windows CSP-based signing with PKCS7SignML from libSIAEp7.dll\n- Direct smart card access bypasses certificate store issues\n- File-based workflow: XML temp file -> PKCS7SignML -> P7M output\n- Smart card error code handling (PIN blocked/wrong/attempts remaining)\n- Temp file cleanup in finally block';
+    const commitMessage = 'v3.10: Fix DLL paths in SiaeBridge.csproj\n\n- Fixed libSIAE.dll path from root to prebuilt/ folder\n- Added <Link> directives for correct output file names\n- Included Newtonsoft.Json.dll from prebuilt as fallback\n- Version bump to 1.0.7 for Electron app\n- All native DLLs now copy correctly to output directory';
     
     const { data: commit } = await octokit.git.createCommit({
       owner,

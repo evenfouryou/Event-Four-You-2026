@@ -104,7 +104,7 @@ namespace SiaeBridge
             try { _log = new StreamWriter(logPath, true) { AutoFlush = true }; } catch { }
 
             Log("═══════════════════════════════════════════════════════");
-            Log("SiaeBridge v3.7 - PKCS7SignML direct smart card signing (libSIAEp7.dll)");
+            Log("SiaeBridge v3.10 - PKCS7SignML direct smart card signing with fixed DLL paths");
             Log($"Time: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
             Log($"Dir: {AppDomain.CurrentDomain.BaseDirectory}");
             Log($"32-bit Process: {!Environment.Is64BitProcess}");

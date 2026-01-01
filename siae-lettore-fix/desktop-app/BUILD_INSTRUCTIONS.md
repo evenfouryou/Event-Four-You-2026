@@ -1,5 +1,37 @@
 # 🔧 ISTRUZIONI DI BUILD - Event Four You SIAE Lettore
 
+## ✅ BUG FIX v3.10 (Gennaio 2025)
+
+**Problema:** Le DLL native (libSIAE.dll, libSIAEp7.dll) non venivano copiate correttamente nella cartella di output
+
+### Correzioni applicate v3.10:
+
+1. **SiaeBridge.csproj aggiornato:**
+   - Corretto percorso `libSIAE.dll` da root a `prebuilt/libSIAE.dll`
+   - Aggiunto `<Link>` per copiare i file con il nome corretto nella cartella output
+   - Incluso anche `Newtonsoft.Json.dll` da prebuilt come fallback
+
+2. **Struttura file:**
+   ```
+   SiaeBridge/
+   ├── Program.cs
+   ├── SiaeBridge.csproj
+   ├── libSIAEp7.dll          (per firme P7M)
+   └── prebuilt/
+       ├── libSIAE.dll        (per lettura smart card)
+       └── Newtonsoft.Json.dll
+   ```
+
+### Per aggiornare:
+```powershell
+git pull origin main
+dotnet build SiaeBridge\SiaeBridge.csproj -c Release
+# Verifica che le DLL siano nella cartella output
+dir SiaeBridge\bin\Release\net8.0-windows\win-x86\*.dll
+```
+
+---
+
 ## ✅ NUOVA FUNZIONALITÀ v1.0.6 (Dicembre 2024)
 
 **Funzionalità:** Auto-riconnessione e Cambio PIN
