@@ -44,6 +44,15 @@ Server-side validation for Italian fiscal identifiers including Codice Fiscale (
 ### Name Change Management (Cambio Nominativo)
 SIAE-compliant ticket holder name change workflow with configurable temporal limits, maximum changes per ticket, optional auto-approval, and payment integration for fees.
 
+### SIAE-Compliant Resale Marketplace (Secondary Ticketing)
+A marketplace for ticket resale complying with Italian Allegato B regulations. Key features:
+- **Seller listing**: Ticket holders can list tickets for resale with price ≤ original face value
+- **Buyer purchase flow**: Atomic reservation with 10-minute Stripe checkout window
+- **Fiscal compliance**: Original ticket annulled with `annullato_rivendita` status, new ticket emitted with fresh fiscal seal (`sigilloFiscaleRivendita`)
+- **Seller payout**: Automatic wallet credit minus 5% platform fee via `siaeWalletTransactions`
+- **C1 report integration**: Resale annulments included in cancelled tickets count for SIAE reporting
+- **UI components**: `ResaleMarketplace` on public event pages with SIAE verification badges, success page at `/account/resale-success`
+
 ### Scanner Management Module
 Manages event scanner operators for `gestore`/`super_admin` users, supporting scanner account creation, mobile-optimized UI, and granular event assignment with permissions for list, table, and ticket scanning (including specific sectors/types).
 

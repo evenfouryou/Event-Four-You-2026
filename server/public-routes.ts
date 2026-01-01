@@ -4276,8 +4276,15 @@ router.post("/api/public/resales/:id/confirm", async (req, res) => {
       })
       .where(eq(siaeResales.id, id));
     
-    // 7. Credit seller wallet
-    const sellerPayout = parseFloat(resale.sellerPayout || '0');
+    // 7. Credit seller wallet (use stored payout, or recompute if missing)
+    let sellerPayout = parseFloat(resale.sellerPayout || '0');
+    if (sellerPayout <= 0) {
+      // Fallback: recompute from resale price with 5% platform fee
+      const resalePrice = parseFloat(resale.resalePrice);
+      const platformFee = Math.round(resalePrice * 5) / 100;
+      sellerPayout = resalePrice - platformFee;
+      console.log(`[RESALE] Recomputed payout: €${sellerPayout} (stored was null/zero)`);
+    }
     if (sellerPayout > 0) {
       const [walletTx] = await db
         .insert(siaeWalletTransactions)
