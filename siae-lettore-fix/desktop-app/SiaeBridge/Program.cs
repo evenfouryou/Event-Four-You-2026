@@ -7,6 +7,16 @@ using System.Security.Cryptography;
 using System.Security.Cryptography.Pkcs;
 using System.Security.Cryptography.X509Certificates;
 using Newtonsoft.Json;
+using Org.BouncyCastle.Asn1;
+using Org.BouncyCastle.Asn1.Cms;
+using Org.BouncyCastle.Asn1.X509;
+using Org.BouncyCastle.Asn1.Pkcs;
+using Org.BouncyCastle.Cms;
+using Org.BouncyCastle.Crypto;
+using Org.BouncyCastle.Crypto.Digests;
+using Org.BouncyCastle.Security;
+using Org.BouncyCastle.X509;
+using BCX509 = Org.BouncyCastle.X509;
 
 namespace SiaeBridge
 {
@@ -104,7 +114,7 @@ namespace SiaeBridge
             try { _log = new StreamWriter(logPath, true) { AutoFlush = true }; } catch { }
 
             Log("═══════════════════════════════════════════════════════");
-            Log("SiaeBridge v3.12 - PKCS7SignML with bInitialize=1 for separate session");
+            Log("SiaeBridge v3.14 - CAdES-BES SHA-256 with SigningCertificateV2 (ETSI EN 319 122-1 compliant)");
             Log($"Time: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
             Log($"Dir: {AppDomain.CurrentDomain.BaseDirectory}");
             Log($"32-bit Process: {!Environment.Is64BitProcess}");
@@ -1426,13 +1436,25 @@ namespace SiaeBridge
                 Log($"  XML bytes: {xmlBytes.Length}");
 
                 // ============================================================
-                // NUOVO: Usa CAdES-BES con SHA-256 invece di XMLDSig con SHA-1
+                // CAdES-BES con SHA-256 usando BouncyCastle
+                // Prima prova con BouncyCastle, poi fallback a libSIAEp7.dll legacy
                 // ============================================================
-                var (success, p7mBase64, error, signedAt) = CreateCAdESSignature(xmlBytes, pin);
+                Log($"  Attempting CAdES-BES signature with BouncyCastle (SHA-256)...");
+                var (success, p7mBase64, error, signedAt) = CreateCAdESSignatureBC(xmlBytes, pin);
 
                 if (!success)
                 {
-                    return ERR(error ?? "Errore sconosciuto nella firma CAdES");
+                    Log($"  BouncyCastle signature failed: {error}");
+                    Log($"  Falling back to legacy libSIAEp7.dll method (SHA-1)...");
+                    
+                    // Fallback to legacy method using libSIAEp7.dll
+                    (success, p7mBase64, error, signedAt) = CreateCAdESSignatureLegacy(xmlBytes, pin);
+                    
+                    if (!success)
+                    {
+                        return ERR(error ?? "Errore sconosciuto nella firma CAdES");
+                    }
+                    Log($"  ✓ Legacy CAdES signature successful (SHA-1)");
                 }
 
                 Log($"  ✓ CAdES-BES signature created successfully");
@@ -1524,16 +1546,329 @@ namespace SiaeBridge
         }
 
         // ============================================================
-        // CAdES-BES SIGNATURE - Firma PKCS#7/P7M usando libSIAEp7.dll
+        // CAdES-BES SIGNATURE con BouncyCastle - SHA-256
+        // Nuova implementazione che usa BouncyCastle per costruire la struttura CMS
+        // con firma RSA dalla smart card SIAE
+        // ============================================================
+
+        /// <summary>
+        /// Crea firma CAdES-BES usando BouncyCastle con SHA-256
+        /// La firma RSA viene eseguita dalla smart card tramite LibSiae.SignML
+        /// Ritorna il file P7M firmato in Base64
+        /// </summary>
+        static (bool success, string p7mBase64, string error, string signedAt) CreateCAdESSignatureBC(byte[] xmlBytes, string pin)
+        {
+            try
+            {
+                Log($"CreateCAdESSignatureBC: xmlBytes.Length={xmlBytes.Length}, slot={_slot}");
+                string signedAt = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ");
+
+                // ============================================================
+                // STEP 1: Leggi il certificato dalla smart card
+                // ============================================================
+                Log($"  Step 1: Reading certificate from smart card...");
+                byte[] certBuffer = new byte[2048];
+                int certLen = certBuffer.Length;
+                int certResult = LibSiae.GetCertificateML(certBuffer, ref certLen, _slot);
+                Log($"  GetCertificateML = {certResult} (0x{certResult:X4}), certLen={certLen}");
+
+                if (certResult != 0 || certLen == 0)
+                {
+                    return (false, null, $"Lettura certificato fallita: 0x{certResult:X4}", null);
+                }
+
+                byte[] certBytes = new byte[certLen];
+                Array.Copy(certBuffer, certBytes, certLen);
+
+                // Parse certificate with BouncyCastle
+                BCX509.X509Certificate bcCert;
+                try
+                {
+                    X509CertificateParser certParser = new X509CertificateParser();
+                    bcCert = certParser.ReadCertificate(certBytes);
+                    Log($"  ✓ Certificate parsed: Subject={bcCert.SubjectDN}");
+                }
+                catch (Exception certEx)
+                {
+                    Log($"  Certificate parsing error: {certEx.Message}");
+                    return (false, null, $"Errore parsing certificato: {certEx.Message}", null);
+                }
+
+                // ============================================================
+                // STEP 2: Get KeyID from smart card
+                // ============================================================
+                Log($"  Step 2: Getting KeyID from smart card...");
+                byte keyId = LibSiae.GetKeyIDML(_slot);
+                Log($"  GetKeyIDML = {keyId} (0x{keyId:X2})");
+
+                if (keyId == 0)
+                {
+                    return (false, null, "GetKeyID ha restituito 0 - nessuna chiave di firma disponibile", null);
+                }
+
+                // ============================================================
+                // STEP 3: Calculate SHA-256 hash of the content (for messageDigest)
+                // ============================================================
+                Log($"  Step 3: Calculating SHA-256 hash of content...");
+                Sha256Digest contentDigest = new Sha256Digest();
+                contentDigest.BlockUpdate(xmlBytes, 0, xmlBytes.Length);
+                byte[] contentHash = new byte[contentDigest.GetDigestSize()];
+                contentDigest.DoFinal(contentHash, 0);
+                Log($"  Content SHA-256: {BitConverter.ToString(contentHash).Replace("-", "").Substring(0, 32)}...");
+
+                // ============================================================
+                // STEP 4: Build signedAttributes (CAdES-BES requires specific attributes)
+                // ============================================================
+                Log($"  Step 4: Building signedAttributes...");
+                
+                // ContentType attribute (id-data = 1.2.840.113549.1.7.1)
+                Asn1EncodableVector contentTypeAttr = new Asn1EncodableVector();
+                contentTypeAttr.Add(CmsAttributes.ContentType);
+                contentTypeAttr.Add(new DerSet(CmsObjectIdentifiers.Data));
+                
+                // Signing time attribute
+                Asn1EncodableVector signingTimeAttr = new Asn1EncodableVector();
+                signingTimeAttr.Add(CmsAttributes.SigningTime);
+                signingTimeAttr.Add(new DerSet(new Org.BouncyCastle.Asn1.Cms.Time(DateTime.UtcNow)));
+                
+                // Message digest attribute (hash of content)
+                Asn1EncodableVector messageDigestAttr = new Asn1EncodableVector();
+                messageDigestAttr.Add(CmsAttributes.MessageDigest);
+                messageDigestAttr.Add(new DerSet(new DerOctetString(contentHash)));
+
+                // ============================================================
+                // SigningCertificateV2 attribute - MANDATORY for CAdES-BES
+                // Per ETSI EN 319 122-1 §6.2.1
+                // OID: 1.2.840.113549.1.9.16.2.47
+                // ============================================================
+                Log($"  Building SigningCertificateV2 attribute...");
+                
+                // Calculate SHA-256 hash of the certificate
+                Sha256Digest certDigest = new Sha256Digest();
+                certDigest.BlockUpdate(certBytes, 0, certBytes.Length);
+                byte[] certHash = new byte[certDigest.GetDigestSize()];
+                certDigest.DoFinal(certHash, 0);
+                Log($"  Certificate SHA-256: {BitConverter.ToString(certHash).Replace("-", "").Substring(0, 32)}...");
+
+                // Build ESSCertIDv2 structure:
+                // ESSCertIDv2 ::= SEQUENCE {
+                //   hashAlgorithm AlgorithmIdentifier DEFAULT sha256,
+                //   certHash      OCTET STRING,
+                //   issuerSerial  IssuerSerial OPTIONAL
+                // }
+                // When hashAlgorithm is SHA-256 (default), it can be omitted
+                
+                // Build IssuerSerial (optional but recommended)
+                // IssuerSerial ::= SEQUENCE { issuer GeneralNames, serialNumber CertificateSerialNumber }
+                Asn1EncodableVector generalNamesVector = new Asn1EncodableVector();
+                generalNamesVector.Add(new Org.BouncyCastle.Asn1.X509.GeneralName(
+                    Org.BouncyCastle.Asn1.X509.GeneralName.DirectoryName, 
+                    bcCert.IssuerDN
+                ));
+                Org.BouncyCastle.Asn1.X509.GeneralNames issuerGeneralNames = 
+                    new Org.BouncyCastle.Asn1.X509.GeneralNames(
+                        new Org.BouncyCastle.Asn1.X509.GeneralName(
+                            Org.BouncyCastle.Asn1.X509.GeneralName.DirectoryName, 
+                            bcCert.IssuerDN
+                        )
+                    );
+                
+                // IssuerSerial sequence
+                Asn1EncodableVector issuerSerialVector = new Asn1EncodableVector();
+                issuerSerialVector.Add(issuerGeneralNames);
+                issuerSerialVector.Add(new DerInteger(bcCert.SerialNumber));
+                DerSequence issuerSerial = new DerSequence(issuerSerialVector);
+                
+                // ESSCertIDv2 - SHA-256 is default so we can omit hashAlgorithm
+                // Structure: SEQUENCE { certHash OCTET STRING, issuerSerial IssuerSerial OPTIONAL }
+                Asn1EncodableVector essCertIdV2Vector = new Asn1EncodableVector();
+                essCertIdV2Vector.Add(new DerOctetString(certHash));
+                essCertIdV2Vector.Add(issuerSerial);
+                DerSequence essCertIdV2 = new DerSequence(essCertIdV2Vector);
+                
+                // SigningCertificateV2 ::= SEQUENCE { certs SEQUENCE OF ESSCertIDv2 }
+                Asn1EncodableVector certsSequence = new Asn1EncodableVector();
+                certsSequence.Add(essCertIdV2);
+                DerSequence signingCertV2 = new DerSequence(new DerSequence(certsSequence));
+                
+                // SigningCertificateV2 attribute
+                DerObjectIdentifier signingCertV2Oid = new DerObjectIdentifier("1.2.840.113549.1.9.16.2.47");
+                Asn1EncodableVector signingCertV2Attr = new Asn1EncodableVector();
+                signingCertV2Attr.Add(signingCertV2Oid);
+                signingCertV2Attr.Add(new DerSet(signingCertV2));
+                Log($"  ✓ SigningCertificateV2 attribute built");
+
+                // Combine all signed attributes
+                Asn1EncodableVector signedAttrsVector = new Asn1EncodableVector();
+                signedAttrsVector.Add(new DerSequence(contentTypeAttr));
+                signedAttrsVector.Add(new DerSequence(signingTimeAttr));
+                signedAttrsVector.Add(new DerSequence(messageDigestAttr));
+                signedAttrsVector.Add(new DerSequence(signingCertV2Attr)); // CAdES-BES mandatory
+                
+                DerSet signedAttrs = new DerSet(signedAttrsVector);
+                byte[] signedAttrsEncoded = signedAttrs.GetDerEncoded();
+                Log($"  SignedAttributes encoded: {signedAttrsEncoded.Length} bytes");
+
+                // ============================================================
+                // STEP 5: Calculate SHA-256 hash of signedAttributes (for signature)
+                // ============================================================
+                Log($"  Step 5: Calculating SHA-256 hash of signedAttributes...");
+                Sha256Digest attrsDigest = new Sha256Digest();
+                attrsDigest.BlockUpdate(signedAttrsEncoded, 0, signedAttrsEncoded.Length);
+                byte[] attrsHash = new byte[attrsDigest.GetDigestSize()];
+                attrsDigest.DoFinal(attrsHash, 0);
+                Log($"  SignedAttrs SHA-256: {BitConverter.ToString(attrsHash).Replace("-", "").Substring(0, 32)}...");
+
+                // ============================================================
+                // STEP 6: Apply PKCS#1 v1.5 padding with SHA-256 DigestInfo
+                // DigestInfo ::= SEQUENCE { AlgorithmIdentifier, OCTET STRING digest }
+                // SHA-256 OID: 2.16.840.1.101.3.4.2.1
+                // ============================================================
+                Log($"  Step 6: Building DigestInfo and applying PKCS#1 padding...");
+                
+                // Build DigestInfo for SHA-256
+                AlgorithmIdentifier sha256AlgId = new AlgorithmIdentifier(
+                    new DerObjectIdentifier("2.16.840.1.101.3.4.2.1"), // SHA-256 OID
+                    DerNull.Instance
+                );
+                DigestInfo digestInfo = new DigestInfo(sha256AlgId, attrsHash);
+                byte[] digestInfoEncoded = digestInfo.GetDerEncoded();
+                Log($"  DigestInfo encoded: {digestInfoEncoded.Length} bytes");
+
+                // PKCS#1 v1.5 padding: 0x00 0x01 [0xFF...] 0x00 [DigestInfo]
+                // For RSA 1024-bit: block size = 128 bytes
+                int keySize = 128; // RSA 1024-bit = 128 bytes
+                byte[] paddedDigest = new byte[keySize];
+                
+                // Build padding: 0x00 0x01 FF...FF 0x00 DigestInfo
+                paddedDigest[0] = 0x00;
+                paddedDigest[1] = 0x01;
+                int ffLength = keySize - 3 - digestInfoEncoded.Length;
+                for (int i = 0; i < ffLength; i++)
+                {
+                    paddedDigest[2 + i] = 0xFF;
+                }
+                paddedDigest[2 + ffLength] = 0x00;
+                Array.Copy(digestInfoEncoded, 0, paddedDigest, 3 + ffLength, digestInfoEncoded.Length);
+                
+                Log($"  PKCS#1 padded digest: {paddedDigest.Length} bytes, first bytes: {BitConverter.ToString(paddedDigest, 0, 4)}");
+
+                // ============================================================
+                // STEP 7: Sign with smart card using LibSiae.SignML
+                // ============================================================
+                Log($"  Step 7: Signing with smart card (keyId={keyId})...");
+                byte[] signature = new byte[128]; // RSA 1024-bit signature
+                int signResult = LibSiae.SignML(keyId, paddedDigest, signature, _slot);
+                Log($"  SignML = {signResult} (0x{signResult:X4})");
+
+                if (signResult != 0)
+                {
+                    string signError = signResult switch
+                    {
+                        0x6983 => "PIN bloccato - troppi tentativi errati",
+                        0x6982 => "Non autorizzato - verificare PIN prima della firma",
+                        _ when signResult >= 0x63C0 && signResult <= 0x63CF => $"PIN errato - tentativi rimasti: {signResult & 0x0F}",
+                        _ => $"Firma fallita: 0x{signResult:X4}"
+                    };
+                    return (false, null, signError, null);
+                }
+                Log($"  ✓ Smart card signature: {signature.Length} bytes");
+
+                // ============================================================
+                // STEP 8: Build CMS SignedData structure using BouncyCastle
+                // ============================================================
+                Log($"  Step 8: Building CMS SignedData structure...");
+                
+                // SignerIdentifier (IssuerAndSerialNumber)
+                IssuerAndSerialNumber issuerAndSerial = new IssuerAndSerialNumber(
+                    bcCert.IssuerDN,
+                    bcCert.SerialNumber
+                );
+                SignerIdentifier signerIdentifier = new SignerIdentifier(issuerAndSerial);
+
+                // DigestAlgorithm (SHA-256)
+                AlgorithmIdentifier digestAlgorithm = new AlgorithmIdentifier(
+                    new DerObjectIdentifier("2.16.840.1.101.3.4.2.1"), // SHA-256
+                    DerNull.Instance
+                );
+
+                // SignatureAlgorithm (RSA with SHA-256)
+                AlgorithmIdentifier signatureAlgorithm = new AlgorithmIdentifier(
+                    new DerObjectIdentifier("1.2.840.113549.1.1.11"), // sha256WithRSAEncryption
+                    DerNull.Instance
+                );
+
+                // Build SignerInfo
+                SignerInfo signerInfo = new SignerInfo(
+                    signerIdentifier,
+                    digestAlgorithm,
+                    signedAttrs,           // signedAttrs (authenticated attributes)
+                    signatureAlgorithm,
+                    new DerOctetString(signature),
+                    null                   // unsignedAttrs (none for CAdES-BES)
+                );
+
+                // Build ContentInfo (encapsulated content)
+                ContentInfo encapContentInfo = new ContentInfo(
+                    CmsObjectIdentifiers.Data,
+                    new DerOctetString(xmlBytes)
+                );
+
+                // Build SignedData
+                Asn1EncodableVector digestAlgorithms = new Asn1EncodableVector();
+                digestAlgorithms.Add(digestAlgorithm);
+
+                Asn1EncodableVector certificates = new Asn1EncodableVector();
+                certificates.Add(bcCert.CertificateStructure);
+
+                Asn1EncodableVector signerInfos = new Asn1EncodableVector();
+                signerInfos.Add(signerInfo);
+
+                SignedData signedData = new SignedData(
+                    new DerSet(digestAlgorithms),
+                    encapContentInfo,
+                    new BerSet(certificates),
+                    null, // CRLs
+                    new DerSet(signerInfos)
+                );
+
+                // Wrap in ContentInfo (PKCS#7 container)
+                ContentInfo pkcs7ContentInfo = new ContentInfo(
+                    CmsObjectIdentifiers.SignedData,
+                    signedData
+                );
+
+                // Encode to DER
+                byte[] p7mBytes = pkcs7ContentInfo.GetDerEncoded();
+                string p7mBase64 = Convert.ToBase64String(p7mBytes);
+
+                Log($"  ✓ CAdES-BES P7M created: {p7mBytes.Length} bytes");
+                Log($"  ContentType: signedData (1.2.840.113549.1.7.2)");
+                Log($"  DigestAlgorithm: SHA-256 (2.16.840.1.101.3.4.2.1)");
+                Log($"  SignatureAlgorithm: sha256WithRSAEncryption (1.2.840.113549.1.1.11)");
+
+                return (true, p7mBase64, null, signedAt);
+            }
+            catch (Exception ex)
+            {
+                Log($"CreateCAdESSignatureBC error: {ex.GetType().Name}: {ex.Message}");
+                Log($"  Stack trace: {ex.StackTrace}");
+                return (false, null, $"Errore BouncyCastle: {ex.Message}", null);
+            }
+        }
+
+        // ============================================================
+        // CAdES-BES SIGNATURE LEGACY - Firma PKCS#7/P7M usando libSIAEp7.dll
         // Usa direttamente la smart card SIAE senza passare per Windows CSP
-        // Richiesto per report C1 inviati a SIAE
+        // ATTENZIONE: Questa versione usa SHA-1 (deprecato)
         // ============================================================
 
         /// <summary>
         /// Crea firma PKCS#7/P7M usando libSIAEp7.dll direttamente dalla smart card SIAE
+        /// LEGACY: Usa SHA-1 - preferire CreateCAdESSignatureBC per nuove implementazioni
         /// Ritorna il file P7M firmato in Base64
         /// </summary>
-        static (bool success, string p7mBase64, string error, string signedAt) CreateCAdESSignature(byte[] xmlBytes, string pin)
+        static (bool success, string p7mBase64, string error, string signedAt) CreateCAdESSignatureLegacy(byte[] xmlBytes, string pin)
         {
             string inputFile = null;
             string outputFile = null;
