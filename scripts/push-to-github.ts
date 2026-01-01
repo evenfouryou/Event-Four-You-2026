@@ -57,9 +57,11 @@ async function main() {
     console.log(`✅ Connesso come: ${user.login}`);
     
     // Files da pushare - SIAE Lettore (file aggiornati)
+    // La struttura del repo è: root/SiaeBridge, root/main.js, etc.
     const files = [
-      { path: 'SiaeBridge/Program.cs', localPath: 'siae-lettore-fix/SiaeBridge/Program.cs' },
-      { path: 'SiaeBridge/SiaeBridge.csproj', localPath: 'siae-lettore-fix/SiaeBridge/SiaeBridge.csproj' }
+      { path: 'SiaeBridge/Program.cs', localPath: 'siae-lettore-fix/desktop-app/SiaeBridge/Program.cs' },
+      { path: 'SiaeBridge/SiaeBridge.csproj', localPath: 'siae-lettore-fix/desktop-app/SiaeBridge/SiaeBridge.csproj' },
+      { path: 'main.js', localPath: 'siae-lettore-fix/desktop-app/main.js' }
     ];
     
     // Binary files (DLLs)
