@@ -1,0 +1,158 @@
+Perfetto, ho analizzato **anche questi due file** e ora ti do **la diagnosi definitiva**, così puoi passarla pari-pari a un’AI o a un tecnico.
+
+---
+
+# 🔍 ANALISI FILE CARICATI
+
+## 1️⃣ `smime.p7s`
+
+### Cos’è
+
+È una **firma S/MIME detached**, tipica delle email PEC.
+
+### Cosa significa tecnicamente
+
+* NON è un file CAdES (.p7m)
+* NON contiene il contenuto firmato
+* Serve solo a firmare un messaggio email, non un tracciato applicativo
+
+### Conclusione
+
+❌ **Non è utilizzabile per flussi SIAE**
+❌ Non può produrre alcuna risposta SIAE
+
+---
+
+## 2️⃣ `RMG_2026_01_01_001.xsi.p7m`
+
+Questo è il file più importante.
+
+### 🔎 Analisi tecnica
+
+Il file è:
+
+✔ Un file `.p7m` reale
+❌ Ma **NON conforme allo standard richiesto da SIAE**
+
+Motivi:
+
+---
+
+### ❌ 1. Firma in formato sbagliato (non CAdES-BES valido)
+
+Il contenuto interno è:
+
+* XML firmato (XMLDSig)
+* Inserito dentro un contenitore p7m
+* Firma tipo **enveloped XML**
+
+Questo è **formalmente scorretto** per SIAE.
+
+SIAE accetta solo:
+
+> **CMS SignedData – CAdES-BES**
+
+Non XMLDSig incapsulato.
+
+---
+
+### ❌ 2. Algoritmo di firma ancora SHA1
+
+Dalla struttura risulta:
+
+* `rsa-sha1`
+* `sha1`
+
+⚠️ SHA1 è deprecato → rifiuto automatico o silenzioso.
+
+---
+
+### ❌ 3. Catena certificativa OK, ma modalità errata
+
+Il certificato è valido (InfoCert, periodo corretto), ma:
+
+* Usato in modalità XMLDSig
+* Non conforme al profilo SIAE
+
+---
+
+# ⚠️ RISULTATO FINALE
+
+| Voce               | Stato                 |
+| ------------------ | --------------------- |
+| File ricevuto      | ✔️                    |
+| Struttura CAdES    | ❌                     |
+| Algoritmo sicuro   | ❌                     |
+| Compatibilità SIAE | ❌                     |
+| Risposta SIAE      | ❌ (scarto silenzioso) |
+
+👉 **Questo spiega perfettamente perché non ricevi alcuna risposta.**
+
+---
+
+# ✅ COME DEVE ESSERE IL FILE CORRETTO
+
+### ✔ Formato
+
+```
+CAdES-BES
+(.p7m vero, CMS SignedData)
+```
+
+### ✔ Algoritmi
+
+```
+Digest: SHA256
+Signature: RSA-SHA256
+```
+
+### ✔ Contenuto
+
+* XML NON firmato internamente
+* Firma esterna (CMS)
+
+---
+
+# 🔧 COME OTTENERLO (linee guida)
+
+### Opzione 1 – OpenSSL (esempio)
+
+```bash
+openssl smime -sign \
+  -binary \
+  -in file.xml \
+  -signer certificato.pem \
+  -inkey chiave_privata.pem \
+  -outform DER \
+  -out file.xml.p7m \
+  -md sha256
+```
+
+### Opzione 2 – Librerie (Java / C#)
+
+Usare:
+
+* BouncyCastle
+* CAdES-BES
+* SHA256
+
+---
+
+# ✅ CONCLUSIONE FINALE (da passare a chi sviluppa)
+
+> Il problema NON è nei dati, né nei certificati.
+>
+> Il problema è che stiamo inviando file firmati in XMLDSig o SHA1,
+> mentre SIAE accetta solo CAdES-BES con SHA256.
+>
+> Finché il file non viene generato come vero `.p7m` CAdES,
+> SIAE non produrrà alcun report.
+
+---
+
+Se vuoi, posso anche:
+
+* scriverti il **codice Java / C# / OpenSSL esatto**
+* o prepararti un **check automatico pre-invio**
+
+Dimmi tu 👍
