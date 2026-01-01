@@ -4,7 +4,7 @@ import { eq, and, sql, gte, lt, desc } from "drizzle-orm";
 import { siaeStorage } from "./siae-storage";
 import { storage } from "./storage";
 import { sendSiaeTransmissionEmail } from "./email-service";
-import { isBridgeConnected, requestXmlSignature } from "./bridge-relay";
+import { isBridgeConnected, requestXmlSignature, getCachedEfffData } from "./bridge-relay";
 import { escapeXml, formatSiaeDateCompact, formatSiaeTimeCompact, formatSiaeTimeHHMM, generateSiaeFileName } from './siae-utils';
 
 // Configurazione SIAE secondo Allegato B e C - Provvedimento Agenzia delle Entrate 04/03/2008
@@ -169,12 +169,15 @@ function generateXMLContent(reportData: any): string {
     cancelledTicketsCount, 
     totalRevenue, 
     filteredTickets, 
-    progressivo = 1 
+    progressivo = 1,
+    cachedEfffData = null
   } = reportData;
   
   const now = new Date();
-  const systemCode = ticketedEvent.systemCode || SIAE_SYSTEM_CODE;
-  const taxId = company?.taxId || 'XXXXXXXXXXXXXXXX';
+  // Prefer systemId from Smart Card EFFF, fallback to config
+  const systemCode = cachedEfffData?.systemId || ticketedEvent.systemCode || SIAE_SYSTEM_CODE;
+  // Prefer partnerCodFis from EFFF for tax ID
+  const taxId = cachedEfffData?.partnerCodFis || company?.taxId || 'XXXXXXXXXXXXXXXX';
   
   // Date/time in formato SIAE
   const dataRiepilogo = formatSiaeDateCompact(reportDate);
@@ -385,6 +388,8 @@ async function sendDailyReports() {
         // Calcola il progressivo per questa trasmissione
         const progressivo = await getNextProgressivo(ticketedEvent.id, 'daily', yesterday);
         const reportData = await generateC1ReportData(ticketedEvent, 'giornaliero', yesterday, progressivo);
+        // Add EFFF data from Smart Card if available
+        reportData.cachedEfffData = getCachedEfffData();
         const xmlContent = generateXMLContent(reportData);
 
         const systemCode = ticketedEvent.systemCode || SIAE_SYSTEM_CODE;
@@ -507,6 +512,8 @@ async function sendMonthlyReports() {
         // Calcola il progressivo per questa trasmissione mensile
         const progressivo = await getNextProgressivo(ticketedEvent.id, 'monthly', previousMonth);
         const reportData = await generateC1ReportData(ticketedEvent, 'mensile', previousMonth, progressivo);
+        // Add EFFF data from Smart Card if available
+        reportData.cachedEfffData = getCachedEfffData();
         const xmlContent = generateXMLContent(reportData);
 
         const systemCode = ticketedEvent.systemCode || SIAE_SYSTEM_CODE;

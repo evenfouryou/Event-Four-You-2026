@@ -4473,6 +4473,10 @@ interface C1ReportParams {
 async function generateC1ReportXml(params: C1ReportParams): Promise<string> {
   const { companyId, reportDate, isMonthly, filteredTickets, systemConfig, companyName, taxId, oraGen } = params;
   
+  // Try to get EFFF data from Smart Card for SIAE compliance
+  const { getCachedEfffData } = await import('./bridge-relay');
+  const cachedEfff = getCachedEfffData();
+  
   const now = new Date();
   const dataGenAttr = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
   
@@ -4490,7 +4494,8 @@ async function generateC1ReportXml(params: C1ReportParams): Promise<string> {
                String(reportDate.getDate()).padStart(2, '0');
   }
   
-  const systemEmissionCode = systemConfig?.systemCode || 'EVENT4U1';
+  // Prefer systemId from Smart Card EFFF, fallback to config
+  const systemEmissionCode = cachedEfff?.systemId || systemConfig?.systemCode || 'EVENT4U1';
   
   // Get progressive number and determine if this is a substitution
   const allTransmissions = await siaeStorage.getSiaeTransmissionsByCompany(companyId);
