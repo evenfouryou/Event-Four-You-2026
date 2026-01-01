@@ -4054,11 +4054,6 @@ router.post("/api/public/resales/:id/reserve", async (req, res) => {
       return res.status(404).json({ message: "Rivendita non trovata" });
     }
     
-    // Check if still available
-    if (resale.resale.status !== 'listed') {
-      return res.status(400).json({ message: "Questo biglietto non è più disponibile" });
-    }
-    
     // Check buyer is not the seller
     if (resale.resale.sellerId === customer.id) {
       return res.status(400).json({ message: "Non puoi acquistare il tuo stesso biglietto" });
@@ -4067,8 +4062,9 @@ router.post("/api/public/resales/:id/reserve", async (req, res) => {
     // Reserve for 10 minutes
     const reservedUntil = new Date(Date.now() + 10 * 60 * 1000);
     
-    // Update resale to reserved status
-    await db
+    // ATOMIC: Update resale to reserved status ONLY if still listed
+    // Uses returning() to verify exactly one row was updated
+    const [updatedResale] = await db
       .update(siaeResales)
       .set({
         status: 'reserved',
@@ -4082,7 +4078,13 @@ router.post("/api/public/resales/:id/reserve", async (req, res) => {
       .where(and(
         eq(siaeResales.id, id),
         eq(siaeResales.status, 'listed')
-      ));
+      ))
+      .returning();
+    
+    // If no rows updated, another buyer grabbed it first
+    if (!updatedResale) {
+      return res.status(409).json({ message: "Questo biglietto è stato appena acquistato da un altro utente" });
+    }
     
     // Create Stripe checkout session
     const stripe = (await import('stripe')).default;

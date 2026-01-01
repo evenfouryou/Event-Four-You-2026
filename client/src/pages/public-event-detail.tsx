@@ -33,6 +33,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useCustomerAuth } from "@/hooks/useCustomerAuth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { triggerHaptic } from "@/components/mobile-primitives";
 import {
@@ -75,6 +76,7 @@ import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { PublicReservationSection } from "@/components/public-reservation-section";
 import { useSeatHolds, type SeatStatusUpdate } from "@/hooks/use-ticketing-websocket";
 import { HoldCountdownTimer } from "@/components/hold-countdown-timer";
+import { ResaleMarketplace } from "@/components/resale-marketplace";
 
 interface Seat {
   id: string;
@@ -1823,6 +1825,7 @@ export default function PublicEventDetailPage() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const isMobile = useIsMobile();
+  const { isAuthenticated: isCustomerAuthenticated } = useCustomerAuth();
   const [isAdding, setIsAdding] = useState(false);
   const [isPurchaseDialogOpen, setIsPurchaseDialogOpen] = useState(false);
   const [cartCount, setCartCount] = useState(0);
@@ -2567,6 +2570,11 @@ export default function PublicEventDetailPage() {
                     )}
                   </CardContent>
                 </Card>
+
+                {/* Resale Marketplace - Secondary ticketing */}
+                {event && (
+                  <ResaleMarketplace eventId={event.id} isAuthenticated={isCustomerAuthenticated} />
+                )}
 
                 {/* Subscriptions section - Desktop */}
                 {subscriptionTypes && subscriptionTypes.length > 0 && (
