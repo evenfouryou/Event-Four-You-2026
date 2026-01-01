@@ -53,6 +53,13 @@ body {
   gap: 12px;
 }
 
+.logo-image {
+  width: 42px;
+  height: 42px;
+  border-radius: 8px;
+  object-fit: contain;
+}
+
 .logo-icon {
   font-size: 32px;
 }
