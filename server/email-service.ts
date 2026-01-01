@@ -339,35 +339,52 @@ export async function sendPasswordResetEmail(options: PasswordResetEmailOptions)
 
 // ==================== SIAE XML Transmission Email ====================
 // Conforme a Allegato C - Provvedimento Agenzia delle Entrate 04/03/2008
-// Formato subject RFC-2822: RCA_<AAAA>_<MM>_<GG>_<SSSSSSSS>_<###>_<TTT>_V.<XX>.<YY>
+// Usa funzioni condivise da siae-utils.ts per nomi file corretti
+
+import { generateSiaeFileName, SIAE_SYSTEM_CODE_DEFAULT } from './siae-utils';
 
 const SIAE_VERSION = 'V.01.00';
-const DEFAULT_SYSTEM_CODE = 'EVENT4U1';
+const DEFAULT_SYSTEM_CODE = SIAE_SYSTEM_CODE_DEFAULT;
 
-/**
- * Genera nome file conforme a Allegato C SIAE
- * Formato: RCA_AAAA_MM_GG_###.xsi o RCA_AAAA_MM_GG_###.xsi.p7m
- */
-function generateSiaeFileName(date: Date, sequenceNumber: number, isSigned: boolean): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  const seq = String(sequenceNumber).padStart(3, '0');
-  const extension = isSigned ? '.xsi.p7m' : '.xsi';
-  return `RCA_${year}_${month}_${day}_${seq}${extension}`;
-}
+// generateSiaeFileName importata da siae-utils.ts
+// Supporta: 'giornaliero' -> RMG_, 'mensile' -> RPM_, 'rca' -> RCA_
 
 /**
  * Genera subject email conforme a RFC-2822 SIAE
- * Formato: RCA_<AAAA>_<MM>_<GG>_<SSSSSSSS>_<###>_<TTT>_V.<XX>.<YY>
+ * Formato dipende dal tipo di report:
+ * - C1 giornaliero: RMG_<AAAA>_<MM>_<GG>_<SSSSSSSS>_<###>_<TTT>_V.<XX>.<YY>
+ * - C1 mensile: RPM_<AAAA>_<MM>_<SSSSSSSS>_<###>_<TTT>_V.<XX>.<YY>
+ * - RCA: RCA_<AAAA>_<MM>_<GG>_<SSSSSSSS>_<###>_<TTT>_V.<XX>.<YY>
  */
-function generateSiaeEmailSubject(date: Date, systemCode: string, sequenceNumber: number): string {
+function generateSiaeEmailSubject(
+  transmissionType: 'daily' | 'monthly' | 'corrective' | 'rca',
+  date: Date, 
+  systemCode: string, 
+  sequenceNumber: number
+): string {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
   const code = systemCode.padEnd(8, '0').substring(0, 8);
   const seq = String(sequenceNumber).padStart(3, '0');
-  return `RCA_${year}_${month}_${day}_${code}_${seq}_XSI_${SIAE_VERSION}`;
+  
+  // Determina il prefisso corretto in base al tipo
+  let prefix: string;
+  let datePart: string;
+  
+  if (transmissionType === 'monthly') {
+    prefix = 'RPM';
+    datePart = `${year}_${month}`; // Solo anno e mese per mensile
+  } else if (transmissionType === 'rca') {
+    prefix = 'RCA';
+    datePart = `${year}_${month}_${day}`;
+  } else {
+    // daily o corrective -> RMG (giornaliero)
+    prefix = 'RMG';
+    datePart = `${year}_${month}_${day}`;
+  }
+  
+  return `${prefix}_${datePart}_${code}_${seq}_XSI_${SIAE_VERSION}`;
 }
 
 interface SiaeTransmissionEmailOptions {
@@ -419,17 +436,33 @@ export async function sendSiaeTransmissionEmail(options: SiaeTransmissionEmailOp
   // Determina se il file è firmato (CMS/PKCS#7 o XML-DSig)
   const isSigned = xmlContent.includes('<Signature') && xmlContent.includes('</Signature>');
   
-  // Nome file conforme a Allegato C SIAE
-  const fileName = generateSiaeFileName(periodDate, sequenceNumber, isSigned);
+  // Mappa transmissionType al formato richiesto da generateSiaeFileName
+  const reportTypeMap: Record<string, 'giornaliero' | 'mensile' | 'rca'> = {
+    'daily': 'giornaliero',
+    'monthly': 'mensile',
+    'corrective': 'giornaliero', // Correttivo usa stesso formato di giornaliero
+  };
+  const reportType = reportTypeMap[transmissionType] || 'giornaliero';
   
-  // Subject conforme a RFC-2822 SIAE
-  const emailSubject = generateSiaeEmailSubject(periodDate, systemCode, sequenceNumber);
+  // Nome file conforme a Allegato C SIAE (RMG_ per giornaliero, RPM_ per mensile)
+  const fileName = generateSiaeFileName(reportType, periodDate, sequenceNumber, isSigned);
+  
+  // Subject conforme a RFC-2822 SIAE con prefisso corretto
+  const emailSubject = generateSiaeEmailSubject(transmissionType, periodDate, systemCode, sequenceNumber);
 
   const typeLabels: Record<string, string> = {
-    'daily': 'Giornaliera',
-    'monthly': 'Mensile',
-    'corrective': 'Correttiva'
+    'daily': 'Giornaliera (C1)',
+    'monthly': 'Mensile (C1)',
+    'corrective': 'Correttiva (C1)'
   };
+  
+  // Nome report per header email
+  const reportNames: Record<string, string> = {
+    'daily': 'RiepilogoGiornaliero',
+    'monthly': 'RiepilogoMensile',
+    'corrective': 'RiepilogoGiornaliero'
+  };
+  const reportName = reportNames[transmissionType] || 'RiepilogoGiornaliero';
 
   const formatDate = (date: Date) => {
     return date.toLocaleDateString('it-IT', { day: '2-digit', month: 'long', year: 'numeric' });
@@ -449,8 +482,8 @@ export async function sendSiaeTransmissionEmail(options: SiaeTransmissionEmailOp
 <body style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f5f5f5; color: #333333; margin: 0; padding: 0;">
   <div style="max-width: 600px; margin: 0 auto; padding: 40px 20px;">
     <div style="text-align: center; margin-bottom: 40px;">
-      <div style="font-size: 28px; font-weight: bold; color: #1a237e; margin-bottom: 10px;">Event4U - RiepilogoControlloAccessi</div>
-      <div style="font-size: 18px; color: #666;">Trasmissione SIAE - Allegato B/C</div>
+      <div style="font-size: 28px; font-weight: bold; color: #1a237e; margin-bottom: 10px;">Event4U - ${reportName}</div>
+      <div style="font-size: 18px; color: #666;">Trasmissione SIAE C1 - Allegato B</div>
     </div>
 
     <div style="background-color: #ffffff; border-radius: 8px; padding: 30px; margin-bottom: 30px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
@@ -493,10 +526,10 @@ export async function sendSiaeTransmissionEmail(options: SiaeTransmissionEmailOp
       
       <div style="margin-top: 25px; padding: 15px; background-color: #e8eaf6; border-radius: 4px;">
         <p style="margin: 0; font-size: 14px; color: #1a237e;">
-          <strong>Nota:</strong> Il file RiepilogoControlloAccessi è allegato con nome <code>${fileName}</code>.
+          <strong>Nota:</strong> Il file ${reportName} è allegato con nome <code>${fileName}</code>.
         </p>
         <p style="margin: 10px 0 0 0; font-size: 12px; color: #666;">
-          Formato conforme a Provvedimento Agenzia delle Entrate 04/03/2008 (Allegato B e C)
+          Formato conforme a Provvedimento Agenzia delle Entrate 04/03/2008 (Allegato B)
         </p>
       </div>
     </div>
