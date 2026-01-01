@@ -389,114 +389,149 @@ export function validateC1Report(xml: string): C1ValidationResult {
     errors.push('Dichiarazione XML mancante');
   }
   
-  // 2. Verifica DOCTYPE
-  if (!xml.includes('<!DOCTYPE RiepilogoControlloAccessi')) {
-    errors.push('DOCTYPE RiepilogoControlloAccessi mancante');
+  // Detect report format: RiepilogoControlloAccessi vs RiepilogoGiornaliero/RiepilogoMensile
+  const isRCA = xml.includes('<RiepilogoControlloAccessi');
+  const isRG = xml.includes('<RiepilogoGiornaliero');
+  const isRM = xml.includes('<RiepilogoMensile');
+  
+  if (!isRCA && !isRG && !isRM) {
+    errors.push('Elemento radice mancante (atteso RiepilogoControlloAccessi, RiepilogoGiornaliero o RiepilogoMensile)');
   }
   
-  // 3. Verifica elemento radice
-  if (!xml.includes('<RiepilogoControlloAccessi')) {
-    errors.push('Elemento radice RiepilogoControlloAccessi mancante');
-  }
-  
-  // 4. Verifica sezione Titolare
-  if (xml.includes('<Titolare>')) {
-    summary.hasTitolare = true;
+  // Validate based on format
+  if (isRCA) {
+    // ============ RiepilogoControlloAccessi format ============
+    if (!xml.includes('<!DOCTYPE RiepilogoControlloAccessi')) {
+      warnings.push('DOCTYPE RiepilogoControlloAccessi mancante');
+    }
     
-    // Estrai CFTitolareCA
-    const cfMatch = xml.match(/<CFTitolareCA>([^<]+)<\/CFTitolareCA>/);
-    if (cfMatch) {
-      summary.taxId = cfMatch[1];
-      if (cfMatch[1].length !== 16 && cfMatch[1].length !== 11) {
-        errors.push(`Codice Fiscale non valido (${cfMatch[1].length} caratteri, attesi 16 o 11)`);
+    // Verifica sezione Titolare (formato RCA)
+    if (xml.includes('<Titolare>')) {
+      summary.hasTitolare = true;
+      
+      const cfMatch = xml.match(/<CFTitolareCA>([^<]+)<\/CFTitolareCA>/);
+      if (cfMatch) {
+        summary.taxId = cfMatch[1];
+        if (cfMatch[1].length !== 16 && cfMatch[1].length !== 11) {
+          errors.push(`Codice Fiscale non valido (${cfMatch[1].length} caratteri, attesi 16 o 11)`);
+        }
+      } else {
+        errors.push('CFTitolareCA mancante - Codice Fiscale obbligatorio');
+      }
+      
+      const codeMatch = xml.match(/<CodiceSistemaCA>([^<]+)<\/CodiceSistemaCA>/);
+      if (codeMatch) {
+        summary.systemCode = codeMatch[1];
+      } else {
+        errors.push('CodiceSistemaCA mancante - Codice Sistema obbligatorio');
+      }
+      
+      if (!xml.includes('<DenominazioneTitolareCA>')) {
+        errors.push('DenominazioneTitolareCA mancante');
+      }
+      if (!xml.includes('<DataRiepilogo>')) {
+        errors.push('DataRiepilogo mancante');
+      }
+      if (!xml.includes('<ProgressivoRiepilogo>')) {
+        errors.push('ProgressivoRiepilogo mancante');
       }
     } else {
-      errors.push('CFTitolareCA mancante - Codice Fiscale obbligatorio');
+      errors.push('Sezione Titolare mancante - obbligatoria');
     }
     
-    // Estrai CodiceSistemaCA
-    const codeMatch = xml.match(/<CodiceSistemaCA>([^<]+)<\/CodiceSistemaCA>/);
-    if (codeMatch) {
-      summary.systemCode = codeMatch[1];
-      if (codeMatch[1].length < 5) {
-        warnings.push('CodiceSistemaCA potrebbe essere troppo corto');
+    // Verifica evento (formato RCA)
+    if (xml.includes('<Evento>')) {
+      summary.hasEvents = true;
+      const rcaEventRequired = ['CFOrganizzatore', 'DenominazioneOrganizzatore', 'TipologiaOrganizzatore', 
+                                'DenominazioneLocale', 'CodiceLocale', 'DataEvento', 'OraEvento', 'TipoGenere'];
+      for (const field of rcaEventRequired) {
+        if (!xml.includes(`<${field}>`)) {
+          errors.push(`Campo evento obbligatorio mancante: ${field}`);
+        }
       }
     } else {
-      errors.push('CodiceSistemaCA mancante - Codice Sistema obbligatorio');
+      warnings.push('Nessun evento trovato nel report');
     }
     
-    // Verifica DenominazioneTitolareCA
-    if (!xml.includes('<DenominazioneTitolareCA>')) {
-      errors.push('DenominazioneTitolareCA mancante');
+    if (!xml.includes('</RiepilogoControlloAccessi>')) {
+      errors.push('Chiusura elemento RiepilogoControlloAccessi mancante');
     }
     
-    // Verifica DataRiepilogo
-    if (!xml.includes('<DataRiepilogo>')) {
-      errors.push('DataRiepilogo mancante');
+  } else if (isRG || isRM) {
+    // ============ RiepilogoGiornaliero / RiepilogoMensile format ============
+    const rootTag = isRG ? 'RiepilogoGiornaliero' : 'RiepilogoMensile';
+    
+    // Verifica sezione Titolare (formato RG/RM)
+    if (xml.includes('<Titolare>')) {
+      summary.hasTitolare = true;
+      
+      // In RG/RM format uses <CodiceFiscale> and <SistemaEmissione>
+      const cfMatch = xml.match(/<Titolare>[^]*?<CodiceFiscale>([^<]+)<\/CodiceFiscale>/);
+      if (cfMatch) {
+        summary.taxId = cfMatch[1];
+        if (cfMatch[1].length !== 16 && cfMatch[1].length !== 11) {
+          errors.push(`Codice Fiscale non valido (${cfMatch[1].length} caratteri, attesi 16 o 11)`);
+        }
+      } else {
+        errors.push('CodiceFiscale in Titolare mancante');
+      }
+      
+      const codeMatch = xml.match(/<Titolare>[^]*?<SistemaEmissione>([^<]+)<\/SistemaEmissione>/);
+      if (codeMatch) {
+        summary.systemCode = codeMatch[1];
+      } else {
+        errors.push('SistemaEmissione in Titolare mancante');
+      }
+      
+      if (!/<Titolare>[^]*?<Denominazione>/.test(xml)) {
+        errors.push('Denominazione in Titolare mancante');
+      }
+    } else {
+      errors.push('Sezione Titolare mancante - obbligatoria');
     }
     
-    // Verifica ProgressivoRiepilogo
-    if (!xml.includes('<ProgressivoRiepilogo>')) {
-      errors.push('ProgressivoRiepilogo mancante');
-    }
-  } else {
-    errors.push('Sezione Titolare mancante - obbligatoria');
-  }
-  
-  // 5. Verifica sezione Evento
-  if (xml.includes('<Evento>')) {
-    summary.hasEvents = true;
-    
-    // Verifica campi evento obbligatori
-    const eventRequired = [
-      'CFOrganizzatore',
-      'DenominazioneOrganizzatore', 
-      'TipologiaOrganizzatore',
-      'DenominazioneLocale',
-      'CodiceLocale',
-      'DataEvento',
-      'OraEvento',
-      'TipoGenere'
-    ];
-    
-    for (const field of eventRequired) {
-      if (!xml.includes(`<${field}>`)) {
-        errors.push(`Campo evento obbligatorio mancante: ${field}`);
+    // Verifica Organizzatore
+    if (xml.includes('<Organizzatore>')) {
+      const orgRequired = ['Denominazione', 'CodiceFiscale', 'TipoOrganizzatore'];
+      for (const field of orgRequired) {
+        const regex = new RegExp(`<Organizzatore>[^]*?<${field}>`);
+        if (!regex.test(xml)) {
+          warnings.push(`Campo Organizzatore mancante: ${field}`);
+        }
       }
     }
     
-    // Verifica CodiceLocale formato (13 caratteri)
-    const codLocaleMatch = xml.match(/<CodiceLocale>([^<]+)<\/CodiceLocale>/);
-    if (codLocaleMatch && codLocaleMatch[1].length !== 13) {
-      warnings.push(`CodiceLocale dovrebbe essere 13 caratteri (trovati ${codLocaleMatch[1].length})`);
+    // Verifica evento (formato RG/RM)
+    if (xml.includes('<Evento>')) {
+      summary.hasEvents = true;
+      const rgEventRequired = ['Denominazione', 'CodiceLocale', 'DataEvento', 'OraEvento'];
+      for (const field of rgEventRequired) {
+        if (!xml.includes(`<${field}>`)) {
+          warnings.push(`Campo evento mancante: ${field}`);
+        }
+      }
+      
+      // Conta biglietti da Quantita in TitoliEmessi
+      const quantitaMatches = xml.matchAll(/<TitoliEmessi>[^]*?<Quantita>(\d+)<\/Quantita>/g);
+      for (const match of quantitaMatches) {
+        summary.ticketsCount += parseInt(match[1], 10);
+      }
+      
+      // Somma importi da CorrispettivoLordo
+      const corrMatches = xml.matchAll(/<CorrispettivoLordo>(\d+)<\/CorrispettivoLordo>/g);
+      for (const match of corrMatches) {
+        summary.totalAmount += parseInt(match[1], 10);
+      }
+    } else {
+      warnings.push('Nessun evento trovato nel report');
     }
     
-    // Conta biglietti da TotaleTitoliLTA
-    const titoliMatches = xml.matchAll(/<TotaleTitoliLTA>(\d+)<\/TotaleTitoliLTA>/g);
-    for (const match of titoliMatches) {
-      summary.ticketsCount += parseInt(match[1], 10);
+    if (!xml.includes(`</${rootTag}>`)) {
+      errors.push(`Chiusura elemento ${rootTag} mancante`);
     }
-    
-    // Somma importi da TotaleCorrispettiviLordi (in centesimi)
-    const importoMatches = xml.matchAll(/<TotaleCorrispettiviLordi>(\d+)<\/TotaleCorrispettiviLordi>/g);
-    for (const match of importoMatches) {
-      summary.totalAmount += parseInt(match[1], 10);
-    }
-    
-    // Verifica SistemaEmissione
-    if (!xml.includes('<SistemaEmissione')) {
-      errors.push('SistemaEmissione mancante');
-    }
-  } else {
-    warnings.push('Nessun evento trovato nel report');
   }
   
-  // 6. Verifica chiusura elemento radice
-  if (!xml.includes('</RiepilogoControlloAccessi>')) {
-    errors.push('Chiusura elemento RiepilogoControlloAccessi mancante');
-  }
-  
-  // 7. Verifica caratteri XML validi
+  // Verifica caratteri XML validi (comune)
   const invalidChars = xml.match(/[^\x09\x0A\x0D\x20-\uD7FF\uE000-\uFFFD]/g);
   if (invalidChars && invalidChars.length > 0) {
     errors.push(`Caratteri XML non validi trovati: ${invalidChars.slice(0, 5).join(', ')}`);
