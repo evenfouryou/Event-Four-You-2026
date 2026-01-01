@@ -56,17 +56,31 @@ async function main() {
     const { data: user } = await octokit.users.getAuthenticated();
     console.log(`✅ Connesso come: ${user.login}`);
     
-    // Files da pushare - SIAE Lettore (file aggiornati)
+    // Files da pushare - SIAE Lettore COMPLETO
     // La struttura del repo è: root/SiaeBridge, root/main.js, etc.
     const files = [
+      // SiaeBridge (.NET)
       { path: 'SiaeBridge/Program.cs', localPath: 'siae-lettore-fix/desktop-app/SiaeBridge/Program.cs' },
       { path: 'SiaeBridge/SiaeBridge.csproj', localPath: 'siae-lettore-fix/desktop-app/SiaeBridge/SiaeBridge.csproj' },
-      { path: 'main.js', localPath: 'siae-lettore-fix/desktop-app/main.js' }
+      { path: 'SiaeBridge/LibSiae.cs', localPath: 'siae-lettore-fix/desktop-app/SiaeBridge/LibSiae.cs' },
+      { path: 'SiaeBridge/SIAEReader.cs', localPath: 'siae-lettore-fix/desktop-app/SiaeBridge/SIAEReader.cs' },
+      // Electron app
+      { path: 'main.js', localPath: 'siae-lettore-fix/desktop-app/main.js' },
+      { path: 'preload.js', localPath: 'siae-lettore-fix/desktop-app/preload.js' },
+      { path: 'renderer.js', localPath: 'siae-lettore-fix/desktop-app/renderer.js' },
+      { path: 'index.html', localPath: 'siae-lettore-fix/desktop-app/index.html' },
+      { path: 'styles.css', localPath: 'siae-lettore-fix/desktop-app/styles.css' },
+      { path: 'package.json', localPath: 'siae-lettore-fix/desktop-app/package.json' },
+      // Build instructions
+      { path: 'BUILD_INSTRUCTIONS.md', localPath: 'siae-lettore-fix/desktop-app/BUILD_INSTRUCTIONS.md' },
+      { path: 'build-local.ps1', localPath: 'siae-lettore-fix/desktop-app/build-local.ps1' }
     ];
     
     // Binary files (DLLs)
     const binaryFiles = [
-      { path: 'SiaeBridge/libSIAEp7.dll', localPath: 'siae-lettore-fix/SiaeBridge/libSIAEp7.dll' }
+      { path: 'SiaeBridge/libSIAEp7.dll', localPath: 'siae-lettore-fix/desktop-app/SiaeBridge/libSIAEp7.dll' },
+      { path: 'SiaeBridge/prebuilt/libSIAE.dll', localPath: 'siae-lettore-fix/desktop-app/SiaeBridge/prebuilt/libSIAE.dll' },
+      { path: 'SiaeBridge/prebuilt/Newtonsoft.Json.dll', localPath: 'siae-lettore-fix/desktop-app/SiaeBridge/prebuilt/Newtonsoft.Json.dll' }
     ];
     
     console.log(`📂 Target: https://github.com/${owner}/${repo}`);
