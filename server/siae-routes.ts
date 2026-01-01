@@ -4487,6 +4487,10 @@ async function generateC1ReportXml(params: C1ReportParams): Promise<string> {
           totalOmaggiIva += ivaCorrispettivo;
         }
         
+        // ImportoPrestazione: importo quota prestazione (Allegato B DTD)
+        // Normalmente 0 per biglietti standard; rappresenta la quota servizio
+        const importoPrestazione = toCentesimi(validTickets.reduce((sum: number, t: any) => sum + parseFloat(t.serviceAmount || '0'), 0));
+        
         titoliAccessoXml += `
                 <TitoliAccesso>
                     <TipoTitolo>${escapeXml(tipoTitolo)}</TipoTitolo>
@@ -4495,6 +4499,7 @@ async function generateC1ReportXml(params: C1ReportParams): Promise<string> {
                     <Prevendita>${prevendita}</Prevendita>
                     <IVACorrispettivo>${ivaCorrispettivo}</IVACorrispettivo>
                     <IVAPrevendita>${ivaPrevendita}</IVAPrevendita>
+                    <ImportoPrestazione>${importoPrestazione}</ImportoPrestazione>
                 </TitoliAccesso>`;
       }
       
@@ -4552,6 +4557,10 @@ async function generateC1ReportXml(params: C1ReportParams): Promise<string> {
   }
   
   // ==================== Build Abbonamenti XML ====================
+  // CONFORME DTD RiepilogoMensile_v0039_20040209.dtd:
+  // <!ELEMENT Organizzatore (Denominazione, CodiceFiscale, TipoOrganizzatore, Evento*, Abbonamenti*, ...)>
+  // <!ELEMENT Abbonamenti (CodiceAbbonamento, Validita, TipoTassazione, Turno, CodiceOrdine, TipoTitolo, ...)>
+  // NOTA: Ogni <Abbonamenti> rappresenta UN abbonamento - NON esiste wrapper <Abbonamento>
   let abbonamentiXml = '';
   if (filteredSubscriptions.length > 0) {
     // Group subscriptions by subscription code for aggregation
@@ -4563,9 +4572,6 @@ async function generateC1ReportXml(params: C1ReportParams): Promise<string> {
       }
       subsByCode.get(code)!.push(sub);
     }
-    
-    abbonamentiXml = `
-        <Abbonamenti>`;
     
     for (const [subCode, subs] of subsByCode) {
       const firstSub = subs[0];
@@ -4579,12 +4585,11 @@ async function generateC1ReportXml(params: C1ReportParams): Promise<string> {
         if (sector) codiceOrdine = normalizeSiaeCodiceOrdine(sector.sectorCode);
       }
       
-      // TipoTitolo per abbonamenti deve essere 'ABB' (Allegato B SIAE)
-      const tipoTitolo = 'ABB';
-      const tipoTassazione = 'S'; // Spettacolo (default for subscriptions)
-      // Turno: F=fisso, V=variabile (NON usare L, non è un valore SIAE valido)
-      const rawTurno = firstSub.turnType || 'F';
-      const turno = rawTurno === 'L' ? 'V' : rawTurno; // Converti L in V se necessario
+      // TipoTitolo per abbonamenti: I1=intero, R1=ridotto, O1=omaggio (conforme Allegato B TAB.3)
+      const tipoTitolo = normalizeSiaeTipoTitolo(firstSub.ticketTypeCode, firstSub.isComplimentary);
+      const tipoTassazione = firstSub.taxType || 'S'; // S=Spettacolo, I=Intrattenimento
+      // Turno: F=fisso, L=libero (Allegato B - L è valido, non V!)
+      const turno = firstSub.turnType || 'F';
       
       // Calculate totals for emitted subscriptions (active)
       const emittedSubs = subs.filter(s => s.status === 'active');
@@ -4598,45 +4603,32 @@ async function generateC1ReportXml(params: C1ReportParams): Promise<string> {
       const annullatiCorrispettivo = toCentesimi(cancelledSubs.reduce((sum, s) => sum + parseFloat(s.totalAmount || '0'), 0));
       const annullatiIva = toCentesimi(cancelledSubs.reduce((sum, s) => sum + parseFloat(s.rateoVat || '0'), 0));
       
-      // Ogni abbonamento deve essere wrappato in un elemento <Abbonamento> (Allegato B SIAE)
+      // Struttura conforme DTD: <Abbonamenti> contiene direttamente i campi, SENZA wrapper <Abbonamento>
       abbonamentiXml += `
-            <Abbonamento>
-                <CodiceAbbonamento>${escapeXml(subCode)}</CodiceAbbonamento>
-                <Validita>${validitaStr}</Validita>
-                <TipoTassazione valore="${tipoTassazione}"/>
-                <Turno valore="${turno}"/>
-                <CodiceOrdine>${codiceOrdine}</CodiceOrdine>
-                <TipoTitolo>${tipoTitolo}</TipoTitolo>
-                <QuantitaEventiAbilitati>${firstSub.eventsCount}</QuantitaEventiAbilitati>
-                <AbbonamentiEmessi>
-                    <Quantita>${emessiQuantita}</Quantita>
-                    <CorrispettivoLordo>${emessiCorrispettivo}</CorrispettivoLordo>
-                    <Prevendita>0</Prevendita>
-                    <IVACorrispettivo>${emessiIva}</IVACorrispettivo>
-                    <IVAPrevendita>0</IVAPrevendita>
-                </AbbonamentiEmessi>
-                <AbbonamentiAnnullati>
-                    <Quantita>${annullatiQuantita}</Quantita>
-                    <CorrispettivoLordo>${annullatiCorrispettivo}</CorrispettivoLordo>
-                    <Prevendita>0</Prevendita>
-                    <IVACorrispettivo>${annullatiIva}</IVACorrispettivo>
-                    <IVAPrevendita>0</IVAPrevendita>
-                </AbbonamentiAnnullati>
-                <AbbonamentiIVAPreassolta>
-                    <Quantita>0</Quantita>
-                    <ImportoFigurativo>0</ImportoFigurativo>
-                    <IVAFigurativa>0</IVAFigurativa>
-                </AbbonamentiIVAPreassolta>
-                <AbbonamentiIVAPreassoltaAnnullati>
-                    <Quantita>0</Quantita>
-                    <ImportoFigurativo>0</ImportoFigurativo>
-                    <IVAFigurativa>0</IVAFigurativa>
-                </AbbonamentiIVAPreassoltaAnnullati>
-            </Abbonamento>`;
-    }
-    
-    abbonamentiXml += `
+        <Abbonamenti>
+            <CodiceAbbonamento>${escapeXml(subCode)}</CodiceAbbonamento>
+            <Validita>${validitaStr}</Validita>
+            <TipoTassazione valore="${tipoTassazione}"/>
+            <Turno valore="${turno}"/>
+            <CodiceOrdine>${codiceOrdine}</CodiceOrdine>
+            <TipoTitolo>${tipoTitolo}</TipoTitolo>
+            <QuantitaEventiAbilitati>${firstSub.eventsCount || 1}</QuantitaEventiAbilitati>
+            <AbbonamentiEmessi>
+                <Quantita>${emessiQuantita}</Quantita>
+                <CorrispettivoLordo>${emessiCorrispettivo}</CorrispettivoLordo>
+                <Prevendita>0</Prevendita>
+                <IVACorrispettivo>${emessiIva}</IVACorrispettivo>
+                <IVAPrevendita>0</IVAPrevendita>
+            </AbbonamentiEmessi>
+            <AbbonamentiAnnullati>
+                <Quantita>${annullatiQuantita}</Quantita>
+                <CorrispettivoLordo>${annullatiCorrispettivo}</CorrispettivoLordo>
+                <Prevendita>0</Prevendita>
+                <IVACorrispettivo>${annullatiIva}</IVACorrispettivo>
+                <IVAPrevendita>0</IVAPrevendita>
+            </AbbonamentiAnnullati>
         </Abbonamenti>`;
+    }
   }
   
   const organizerName = systemConfig?.businessName || companyName;
