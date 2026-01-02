@@ -1727,7 +1727,7 @@ namespace SiaeBridge
                 Log($"  Step 6: Building DigestInfo and applying PKCS#1 padding...");
                 
                 // Build DigestInfo for SHA-256
-                AlgorithmIdentifier sha256AlgId = new AlgorithmIdentifier(
+                Org.BouncyCastle.Asn1.X509.AlgorithmIdentifier sha256AlgId = new Org.BouncyCastle.Asn1.X509.AlgorithmIdentifier(
                     new DerObjectIdentifier("2.16.840.1.101.3.4.2.1"), // SHA-256 OID
                     DerNull.Instance
                 );
@@ -1780,26 +1780,26 @@ namespace SiaeBridge
                 Log($"  Step 8: Building CMS SignedData structure...");
                 
                 // SignerIdentifier (IssuerAndSerialNumber)
-                IssuerAndSerialNumber issuerAndSerial = new IssuerAndSerialNumber(
+                Org.BouncyCastle.Asn1.Cms.IssuerAndSerialNumber issuerAndSerial = new Org.BouncyCastle.Asn1.Cms.IssuerAndSerialNumber(
                     bcCert.IssuerDN,
                     bcCert.SerialNumber
                 );
                 SignerIdentifier signerIdentifier = new SignerIdentifier(issuerAndSerial);
 
                 // DigestAlgorithm (SHA-256)
-                AlgorithmIdentifier digestAlgorithm = new AlgorithmIdentifier(
+                Org.BouncyCastle.Asn1.X509.AlgorithmIdentifier digestAlgorithm = new Org.BouncyCastle.Asn1.X509.AlgorithmIdentifier(
                     new DerObjectIdentifier("2.16.840.1.101.3.4.2.1"), // SHA-256
                     DerNull.Instance
                 );
 
                 // SignatureAlgorithm (RSA with SHA-256)
-                AlgorithmIdentifier signatureAlgorithm = new AlgorithmIdentifier(
+                Org.BouncyCastle.Asn1.X509.AlgorithmIdentifier signatureAlgorithm = new Org.BouncyCastle.Asn1.X509.AlgorithmIdentifier(
                     new DerObjectIdentifier("1.2.840.113549.1.1.11"), // sha256WithRSAEncryption
                     DerNull.Instance
                 );
 
                 // Build SignerInfo
-                SignerInfo signerInfo = new SignerInfo(
+                Org.BouncyCastle.Asn1.Cms.SignerInfo signerInfo = new Org.BouncyCastle.Asn1.Cms.SignerInfo(
                     signerIdentifier,
                     digestAlgorithm,
                     signedAttrs,           // signedAttrs (authenticated attributes)
@@ -1809,7 +1809,7 @@ namespace SiaeBridge
                 );
 
                 // Build ContentInfo (encapsulated content)
-                ContentInfo encapContentInfo = new ContentInfo(
+                Org.BouncyCastle.Asn1.Cms.ContentInfo encapContentInfo = new Org.BouncyCastle.Asn1.Cms.ContentInfo(
                     CmsObjectIdentifiers.Data,
                     new DerOctetString(xmlBytes)
                 );
@@ -1824,7 +1824,7 @@ namespace SiaeBridge
                 Asn1EncodableVector signerInfos = new Asn1EncodableVector();
                 signerInfos.Add(signerInfo);
 
-                SignedData signedData = new SignedData(
+                Org.BouncyCastle.Asn1.Cms.SignedData signedData = new Org.BouncyCastle.Asn1.Cms.SignedData(
                     new DerSet(digestAlgorithms),
                     encapContentInfo,
                     new BerSet(certificates),
@@ -1833,7 +1833,7 @@ namespace SiaeBridge
                 );
 
                 // Wrap in ContentInfo (PKCS#7 container)
-                ContentInfo pkcs7ContentInfo = new ContentInfo(
+                Org.BouncyCastle.Asn1.Cms.ContentInfo pkcs7ContentInfo = new Org.BouncyCastle.Asn1.Cms.ContentInfo(
                     CmsObjectIdentifiers.SignedData,
                     signedData
                 );
