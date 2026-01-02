@@ -170,18 +170,30 @@ export function normalizeSiaeCodiceOrdine(rawCode: string | null | undefined): s
  * - RMG_AAAA_MM_GG_###.xsi per RiepilogoGiornaliero
  * - RPM_AAAA_MM_###.xsi per RiepilogoMensile
  * - RCA_AAAA_MM_GG_###.xsi per RiepilogoControlloAccessi
+ * 
+ * Per file firmati CAdES-BES: estensione .xsi.p7m
+ * Per file non firmati o XMLDSig legacy: estensione .xsi
+ * 
+ * NOTA: XMLDSig è deprecato e NON accettato da SIAE dal 2025
+ * Solo CAdES-BES con SHA-256 produce file P7M validi
  */
 export function generateSiaeFileName(
   reportType: 'giornaliero' | 'mensile' | 'rca',
   date: Date,
   progressivo: number,
-  isSigned: boolean = false
+  signatureFormat?: 'cades' | 'xmldsig' | null
 ): string {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
   const prog = String(progressivo).padStart(3, '0');
-  const extension = isSigned ? '.xsi.p7m' : '.xsi';
+  
+  // Solo CAdES-BES produce veri file P7M, XMLDSig rimane .xsi
+  const extension = signatureFormat === 'cades' ? '.xsi.p7m' : '.xsi';
+  
+  if (signatureFormat === 'xmldsig') {
+    console.warn('[SIAE-UTILS] ATTENZIONE: XMLDSig e DEPRECATO e rifiutato da SIAE. Aggiornare il bridge desktop a v3.14+ per CAdES-BES con SHA-256.');
+  }
   
   switch (reportType) {
     case 'mensile':

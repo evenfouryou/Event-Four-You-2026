@@ -452,7 +452,9 @@ export async function sendSiaeTransmissionEmail(options: SiaeTransmissionEmailOp
   const reportType = reportTypeMap[transmissionType] || 'giornaliero';
   
   // Nome file conforme a Allegato C SIAE (RMG_ per giornaliero, RPM_ per mensile)
-  const fileName = generateSiaeFileName(reportType, periodDate, sequenceNumber, isSigned);
+  // .xsi.p7m solo per CAdES-BES, .xsi per XMLDSig legacy o non firmato
+  const effectiveSignatureFormat = isCAdES ? 'cades' : (isXmlDsig ? 'xmldsig' : null);
+  const fileName = generateSiaeFileName(reportType, periodDate, sequenceNumber, effectiveSignatureFormat);
   
   // Subject conforme a RFC-2822 SIAE con prefisso corretto
   const emailSubject = generateSiaeEmailSubject(transmissionType, periodDate, systemCode, sequenceNumber);

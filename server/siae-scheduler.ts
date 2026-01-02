@@ -399,8 +399,8 @@ async function sendDailyReports() {
         // Prefer systemId from Smart Card EFFF for email subject consistency with XML
         const systemCode = cachedEfff?.systemId || ticketedEvent.systemCode || SIAE_SYSTEM_CODE;
         // RCA reports: usa 'rca' come tipo report per nome file RCA_YYYY_MM_DD_###.xsi
-        let fileName = generateSiaeFileName('rca', yesterday, progressivo, false);
-        let isSigned = false;
+        let fileName = generateSiaeFileName('rca', yesterday, progressivo, null);
+        let signatureFormat: 'cades' | 'xmldsig' | null = null;
 
         const transmission = await siaeStorage.createSiaeTransmission({
           companyId: ticketedEvent.companyId,
@@ -431,26 +431,26 @@ async function sendDailyReports() {
             if (signatureResult.p7mBase64) {
               // CAdES-BES: mantieni il P7M Base64 separato
               p7mBase64 = signatureResult.p7mBase64;
+              signatureFormat = 'cades';
               signatureInfo = ` (firmato CAdES-BES ${signatureResult.algorithm || 'SHA-256'})`;
-              isSigned = true;
               log(`Firma CAdES-BES creata alle ${signatureResult.signedAt}`);
             } else if (signatureResult.signedXml) {
-              // Legacy XMLDSig (deprecato)
+              // Legacy XMLDSig (deprecato) - SIAE NON ACCETTA questo formato!
               signedXmlContent = signatureResult.signedXml;
-              signatureInfo = ' (firmato XMLDSig - DEPRECATO)';
-              isSigned = true;
-              log(`Firma XMLDSig creata alle ${signatureResult.signedAt}`);
+              signatureFormat = 'xmldsig';
+              signatureInfo = ' (firmato XMLDSig - DEPRECATO E RIFIUTATO DA SIAE!)';
+              log(`ATTENZIONE: Firma XMLDSig creata alle ${signatureResult.signedAt} - QUESTO FORMATO NON E ACCETTATO DA SIAE! Aggiornare il bridge a v3.14+`);
             }
             
-            // Aggiorna nome file con estensione .xsi.p7m per file firmati
-            fileName = generateSiaeFileName('rca', yesterday, progressivo, true);
+            // Aggiorna nome file: .xsi.p7m solo per CAdES-BES, altrimenti .xsi
+            fileName = generateSiaeFileName('rca', yesterday, progressivo, signatureFormat);
             
             // Aggiorna trasmissione con firma e contenuto appropriato
             await siaeStorage.updateSiaeTransmission(transmission.id, {
               fileContent: signedXmlContent || xmlContent, // XML originale o XMLDSig firmato
               fileName: fileName,
               p7mContent: p7mBase64 || null, // Salva P7M Base64 per resend offline
-              signatureFormat: p7mBase64 ? 'cades' : (signedXmlContent ? 'xmldsig' : null),
+              signatureFormat: signatureFormat,
               signedAt: new Date(),
             });
           } else {
@@ -474,7 +474,7 @@ async function sendDailyReports() {
             systemCode: systemCode,
             sequenceNumber: progressivo,
             p7mBase64: p7mBase64, // CAdES-BES P7M per allegato email
-            signatureFormat: p7mBase64 ? 'cades' : (signedXmlContent ? 'xmldsig' : undefined),
+            signatureFormat: signatureFormat || undefined,
           });
 
           // Aggiorna status a 'sent'
@@ -542,8 +542,8 @@ async function sendMonthlyReports() {
         // Prefer systemId from Smart Card EFFF for email subject consistency with XML
         const systemCode = cachedEfff?.systemId || ticketedEvent.systemCode || SIAE_SYSTEM_CODE;
         // RCA reports mensili: usa 'rca' come tipo report per nome file RCA_YYYY_MM_DD_###.xsi
-        let fileName = generateSiaeFileName('rca', previousMonth, progressivo, false);
-        let isSigned = false;
+        let fileName = generateSiaeFileName('rca', previousMonth, progressivo, null);
+        let signatureFormat: 'cades' | 'xmldsig' | null = null;
 
         const transmission = await siaeStorage.createSiaeTransmission({
           companyId: ticketedEvent.companyId,
@@ -574,26 +574,26 @@ async function sendMonthlyReports() {
             if (signatureResult.p7mBase64) {
               // CAdES-BES: mantieni il P7M Base64 separato
               p7mBase64 = signatureResult.p7mBase64;
+              signatureFormat = 'cades';
               signatureInfo = ` (firmato CAdES-BES ${signatureResult.algorithm || 'SHA-256'})`;
-              isSigned = true;
               log(`Firma mensile CAdES-BES creata alle ${signatureResult.signedAt}`);
             } else if (signatureResult.signedXml) {
-              // Legacy XMLDSig (deprecato)
+              // Legacy XMLDSig (deprecato) - SIAE NON ACCETTA questo formato!
               signedXmlContent = signatureResult.signedXml;
-              signatureInfo = ' (firmato XMLDSig - DEPRECATO)';
-              isSigned = true;
-              log(`Firma mensile XMLDSig creata alle ${signatureResult.signedAt}`);
+              signatureFormat = 'xmldsig';
+              signatureInfo = ' (firmato XMLDSig - DEPRECATO E RIFIUTATO DA SIAE!)';
+              log(`ATTENZIONE: Firma mensile XMLDSig creata alle ${signatureResult.signedAt} - QUESTO FORMATO NON E ACCETTATO DA SIAE! Aggiornare il bridge a v3.14+`);
             }
             
-            // Aggiorna nome file con estensione .xsi.p7m per file firmati
-            fileName = generateSiaeFileName('rca', previousMonth, progressivo, true);
+            // Aggiorna nome file: .xsi.p7m solo per CAdES-BES, altrimenti .xsi
+            fileName = generateSiaeFileName('rca', previousMonth, progressivo, signatureFormat);
             
             // Aggiorna trasmissione con firma e contenuto appropriato
             await siaeStorage.updateSiaeTransmission(transmission.id, {
               fileContent: signedXmlContent || xmlContent, // XML originale o XMLDSig firmato
               fileName: fileName,
               p7mContent: p7mBase64 || null, // Salva P7M Base64 per resend offline
-              signatureFormat: p7mBase64 ? 'cades' : (signedXmlContent ? 'xmldsig' : null),
+              signatureFormat: signatureFormat,
               signedAt: new Date(),
             });
           } else {
@@ -617,7 +617,7 @@ async function sendMonthlyReports() {
             systemCode: systemCode,
             sequenceNumber: progressivo,
             p7mBase64: p7mBase64, // CAdES-BES P7M per allegato email
-            signatureFormat: p7mBase64 ? 'cades' : (signedXmlContent ? 'xmldsig' : undefined),
+            signatureFormat: signatureFormat || undefined,
           });
 
           // Aggiorna status a 'sent'
