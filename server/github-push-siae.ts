@@ -54,6 +54,7 @@ interface FileUpdate {
 }
 
 const filesToUpdate: FileUpdate[] = [
+  // SiaeBridge .NET project files
   {
     localPath: 'siae-lettore-fix/desktop-app/SiaeBridge/Program.cs',
     repoPath: 'desktop-app/SiaeBridge/Program.cs'
@@ -73,6 +74,91 @@ const filesToUpdate: FileUpdate[] = [
   {
     localPath: 'siae-lettore-fix/desktop-app/SiaeBridge/libSIAEp7.dll',
     repoPath: 'desktop-app/SiaeBridge/libSIAEp7.dll',
+    binary: true
+  },
+  {
+    localPath: 'siae-lettore-fix/desktop-app/SiaeBridge/prebuilt/libSIAE.dll',
+    repoPath: 'desktop-app/SiaeBridge/prebuilt/libSIAE.dll',
+    binary: true
+  },
+  {
+    localPath: 'siae-lettore-fix/desktop-app/SiaeBridge/prebuilt/Newtonsoft.Json.dll',
+    repoPath: 'desktop-app/SiaeBridge/prebuilt/Newtonsoft.Json.dll',
+    binary: true
+  },
+  // Electron app files
+  {
+    localPath: 'siae-lettore-fix/desktop-app/main.js',
+    repoPath: 'desktop-app/main.js'
+  },
+  {
+    localPath: 'siae-lettore-fix/desktop-app/preload.js',
+    repoPath: 'desktop-app/preload.js'
+  },
+  {
+    localPath: 'siae-lettore-fix/desktop-app/renderer.js',
+    repoPath: 'desktop-app/renderer.js'
+  },
+  {
+    localPath: 'siae-lettore-fix/desktop-app/index.html',
+    repoPath: 'desktop-app/index.html'
+  },
+  {
+    localPath: 'siae-lettore-fix/desktop-app/styles.css',
+    repoPath: 'desktop-app/styles.css'
+  },
+  {
+    localPath: 'siae-lettore-fix/desktop-app/package.json',
+    repoPath: 'desktop-app/package.json'
+  },
+  {
+    localPath: 'siae-lettore-fix/desktop-app/build-local.ps1',
+    repoPath: 'desktop-app/build-local.ps1'
+  },
+  {
+    localPath: 'siae-lettore-fix/desktop-app/BUILD_INSTRUCTIONS.md',
+    repoPath: 'desktop-app/BUILD_INSTRUCTIONS.md'
+  },
+  // Root files
+  {
+    localPath: 'siae-lettore-fix/README.md',
+    repoPath: 'README.md'
+  },
+  {
+    localPath: 'siae-lettore-fix/package.json',
+    repoPath: 'package.json'
+  },
+  {
+    localPath: 'siae-lettore-fix/main.js',
+    repoPath: 'main.js'
+  },
+  {
+    localPath: 'siae-lettore-fix/preload.js',
+    repoPath: 'preload.js'
+  },
+  {
+    localPath: 'siae-lettore-fix/renderer.js',
+    repoPath: 'renderer.js'
+  },
+  {
+    localPath: 'siae-lettore-fix/index.html',
+    repoPath: 'index.html'
+  },
+  {
+    localPath: 'siae-lettore-fix/styles.css',
+    repoPath: 'styles.css'
+  },
+  {
+    localPath: 'siae-lettore-fix/build-local.ps1',
+    repoPath: 'build-local.ps1'
+  },
+  {
+    localPath: 'siae-lettore-fix/BUILD_INSTRUCTIONS.md',
+    repoPath: 'BUILD_INSTRUCTIONS.md'
+  },
+  {
+    localPath: 'siae-lettore-fix/icon.png',
+    repoPath: 'icon.png',
     binary: true
   }
 ];
