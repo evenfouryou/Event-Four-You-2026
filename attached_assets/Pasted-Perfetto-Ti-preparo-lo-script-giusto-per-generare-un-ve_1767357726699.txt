@@ -1,0 +1,113 @@
+Perfetto 👍 Ti preparo lo **script “giusto”** per generare un **vero CAdES-BES (.p7m) con SHA-256**, partendo dal tuo file `.xsi` (XML) **NON firmato internamente**.
+
+Di seguito trovi 2 varianti:
+
+* **A) OpenSSL** (la più immediata, va bene per test e produzione se gestisci bene i certificati)
+* **B) Java (BouncyCastle)** (se devi integrarlo in un’app)
+
+---
+
+## A) Script OpenSSL (CAdES-BES / CMS SignedData / SHA256)
+
+### 0) Prerequisiti
+
+* OpenSSL installato
+* Il tuo certificato di firma in **.p12/.pfx** (con chiave privata)
+  (oppure già in PEM)
+
+---
+
+### 1) Estrai certificato e chiave dal P12 (una volta sola)
+
+> **ATTENZIONE:** la chiave privata va protetta (permessi file, accesso limitato).
+
+```bash
+# Estrai certificato (pubblico)
+openssl pkcs12 -in firma.p12 -clcerts -nokeys -out cert.pem
+
+# Estrai chiave privata
+openssl pkcs12 -in firma.p12 -nocerts -nodes -out key.pem
+
+# (Consigliato) Metti la chiave in formato PKCS8
+openssl pkcs8 -topk8 -inform PEM -outform PEM -in key.pem -out key_pkcs8.pem -nocrypt
+```
+
+---
+
+### 2) Firma il file XML/XSI in CAdES-BES (genera .p7m reale)
+
+> Input: `RMG_2026_01_02_001.xsi` (NON deve contenere `<Signature ...xmldsig...>`)
+
+```bash
+openssl smime -sign \
+  -binary \
+  -in RMG_2026_01_02_001.xsi \
+  -signer cert.pem \
+  -inkey key_pkcs8.pem \
+  -outform DER \
+  -out RMG_2026_01_02_001.xsi.p7m \
+  -md sha256 \
+  -nodetach
+```
+
+**Cosa ottieni:** un vero `CMS SignedData` in DER = **CAdES**.
+
+---
+
+### 3) Verifica che il .p7m sia corretto (diagnostica)
+
+#### 3.1 Controlla che sia un CMS SignedData
+
+```bash
+openssl asn1parse -inform DER -in RMG_2026_01_02_001.xsi.p7m | head
+```
+
+#### 3.2 Estrai e controlla algoritmi (deve essere SHA256, non SHA1)
+
+```bash
+openssl cms -inform DER -in RMG_2026_01_02_001.xsi.p7m -cmsout -print | grep -i -E "sha1|sha256|digest|signature"
+```
+
+#### 3.3 Verifica firma e “sbusta” il contenuto
+
+(questa verifica la firma **ma** richiede una CA store per validare la catena; per test base va bene anche senza)
+
+```bash
+openssl smime -verify \
+  -inform DER \
+  -in RMG_2026_01_02_001.xsi.p7m \
+  -noverify \
+  -out estratto_RMG_2026_01_02_001.xsi
+```
+
+Se tutto è OK, `estratto_...xsi` deve essere identico all’originale.
+
+---
+
+## B) Variante Java (BouncyCastle) – se vuoi integrarlo in applicazione
+
+Se mi dici **Java 8/11/17** e se hai il certificato in **PKCS#12**, ti preparo un file `.java` completo (carica p12, firma CAdES, SHA256, output .p7m DER).
+
+---
+
+## IMPORTANTISSIMO (causa principale dei tuoi problemi)
+
+Prima di firmare:
+
+* il file `.xsi` deve essere **XML “puro”**
+* **NON deve contenere**:
+
+```xml
+<Signature xmlns="http://www.w3.org/2000/09/xmldsig#">
+```
+
+Se c’è, vuol dire che stai facendo XMLDSig e SIAE tende a scartarlo.
+
+---
+
+### Dimmi solo questo e ti preparo anche la versione “pronta produzione”
+
+1. Il certificato lo hai in **.p12/.pfx**?
+2. Su che OS giri (Windows / Linux)?
+
+Intanto, con lo script OpenSSL sopra puoi già rigenerare un `.p7m` corretto e (quando lo invii) dovresti finalmente ricevere i report.
