@@ -45,7 +45,7 @@ async function getGitHubClient() {
 
 const OWNER = 'evenfouryou';
 const REPO = 'event-four-you-siae-lettore';
-const COMMIT_MESSAGE = 'v3.14: CAdES-BES SHA-256 con SigningCertificateV2 (ETSI EN 319 122-1)';
+const COMMIT_MESSAGE = 'v3.16.0: Rimuove fallback XMLDSig da main.js - SOLO CAdES-BES SHA-256';
 
 interface FileUpdate {
   localPath: string;
