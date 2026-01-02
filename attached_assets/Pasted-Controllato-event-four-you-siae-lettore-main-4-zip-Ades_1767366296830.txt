@@ -1,0 +1,101 @@
+Controllato ✅ (event-four-you-siae-lettore-main 4.zip). Adesso il bridge C# è impostato correttamente per fare CAdES-BES con libSIAEp7.dll e restituire p7mBase64.
+
+Quello che va sistemato per evitare ancora “.p7m” sbagliati è nel layer Electron/relay (e lato Replit).
+
+1) Bridge C# (SiaeBridge/Program.cs) — OK
+
+La funzione SignXml():
+	•	prende xmlContent
+	•	chiama CreateCAdESSignature(...) (PKCS#7/P7M via libSIAEp7.dll)
+	•	ritorna JSON con:
+	•	signature.p7mBase64
+	•	format: CAdES-BES
+	•	algorithm: SHA-256
+
+✅ Qui sei a posto.
+
+⸻
+
+2) Desktop app Electron (desktop-app/main.js) — DA CORREGGERE (importante)
+
+In desktop-app/main.js c’è ancora questa logica:
+
+const signatureData = result.signature.p7mBase64 ? { ... } : { ... fallback XMLDSig ... };
+
+👉 Questo è pericoloso perché se per qualunque motivo p7mBase64 manca, inviate XMLDSig (che poi qualcuno salva come .p7m → file leggibile → SIAE ignora).
+
+✅ Fix richiesto
+
+Rimuovere il fallback e bloccare la firma se manca p7mBase64.
+
+Sostituisci quel blocco con:
+
+if (!result.signature?.p7mBase64) {
+  relayWs.send(JSON.stringify({
+    type: 'SIGNATURE_RESPONSE',
+    requestId: signRequestId,
+    payload: { success: false, error: 'Firma CAdES-BES fallita: p7mBase64 mancante' }
+  }));
+  return;
+}
+
+const signatureData = {
+  p7mBase64: result.signature.p7mBase64,
+  format: result.signature.format || 'CAdES-BES',
+  algorithm: result.signature.algorithm || 'SHA-256',
+  signedAt: result.signature.signedAt
+};
+
+✅ Così invii solo P7M vero, oppure fallisci chiaramente.
+
+⸻
+
+3) Root Electron (main.js) — quasi OK, ma togli xmlContent
+
+Nel main.js root hai già disabilitato il fallback (bene), però mandi ancora:
+
+xmlContent: result.signature.xmlContent
+
+Nel bridge non esiste più xmlContent dentro signature, quindi è undefined, ma può confondere chi riceve.
+
+✅ Fix richiesto
+
+Rimuovi xmlContent dalla payload inviata al relay:
+
+const signatureData = {
+  p7mBase64: result.signature.p7mBase64,
+  format: result.signature.format || 'CAdES-BES',
+  algorithm: result.signature.algorithm || 'SHA-256',
+  signedAt: result.signature.signedAt
+};
+
+
+⸻
+
+4) Lato Replit (fondamentale) — come salvare il file
+
+Replit deve decodificare base64 → bytes e scrivere in binario.
+
+Node (Replit)
+
+fs.writeFileSync(outPath, Buffer.from(p7mBase64, 'base64'));
+
+❌ NON fare writeFileSync(outPath, p7mBase64, 'utf8') (crea file testo).
+
+⸻
+
+Check rapido (senza OpenSSL)
+
+Dopo aver salvato il .p7m:
+	•	Aprilo con Blocco Note
+	•	✅ Deve essere illeggibile (caratteri strani)
+	•	❌ Se vedi XML o base64, state salvando male
+
+⸻
+
+In 1 riga: cosa deve sistemare per la firma
+	1.	Eliminare il fallback XMLDSig in desktop-app/main.js
+	2.	Inviare solo p7mBase64 (senza xmlContent)
+	3.	Su Replit salvare il P7M decodificando base64 in bytes
+
+Se vuoi, incollami qui il pezzo di codice Replit dove riceve SIGNATURE_RESPONSE e salva il file: ti dico esattamente la riga da cambiare.

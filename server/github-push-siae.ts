@@ -45,7 +45,7 @@ async function getGitHubClient() {
 
 const OWNER = 'evenfouryou';
 const REPO = 'event-four-you-siae-lettore';
-const COMMIT_MESSAGE = 'v3.16.1: Rimuove xmlContent dalla risposta C# per evitare confusione';
+const COMMIT_MESSAGE = 'v3.16.2: Rimuove fallback XMLDSig da desktop-app/main.js e xmlContent da risposta';
 
 interface FileUpdate {
   localPath: string;

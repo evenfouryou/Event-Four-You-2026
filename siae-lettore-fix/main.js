@@ -1516,10 +1516,10 @@ async function handleRelayCommand(msg) {
             
             const signatureData = {
               // Formato CAdES-BES (P7M) - UNICO FORMATO ACCETTATO DA SIAE 2025
+              // NOTA: NON includere xmlContent - solo p7mBase64 è necessario
               p7mBase64: result.signature.p7mBase64,
               format: result.signature.format || 'CAdES-BES',
               algorithm: result.signature.algorithm || 'SHA-256',
-              xmlContent: result.signature.xmlContent,
               signedAt: result.signature.signedAt
             };
             
